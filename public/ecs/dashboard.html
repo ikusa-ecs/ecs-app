@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS ダッシュボード</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="data/cases.js"></script>
+  <style>
+    /* 月次の件数集計テーブル */
+    .cnt-sub { font-size: 13.5px; font-weight: 700; margin: 0 0 8px; color: var(--ink); }
+    .cnt-table td { padding: 6px 12px; }
+    .cnt-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+    .cnt-table tr.total td { font-weight: 700; background: var(--brand-soft); color: var(--brand-dark); }
+    .cnt-table tr.grp td { font-weight: 700; background: #f1ece3; }
+    .cnt-table tr.ind td { color: var(--muted); }
+
+    /* 危険日カレンダー */
+    .cal-head { display:flex; align-items:center; gap:12px; }
+    .cal-head .mlabel { font-size:15px; font-weight:700; min-width:120px; text-align:center; }
+    .cal-nav { border:1px solid var(--line); background:#fff; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:16px; line-height:1; }
+    .cal-nav:hover { background:var(--brand-soft); }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:14px; }
+    .cal-dow { text-align:center; font-size:12px; font-weight:700; color:var(--muted); padding:4px 0; }
+    .cal-dow.sat { color:#3b6db5; }
+    .cal-dow.sun { color:var(--danger); }
+    .cal-cell { min-height:78px; border:1px solid var(--line); border-radius:8px; padding:5px 6px; background:#fff; position:relative; }
+    .cal-cell.empty { background:transparent; border:none; }
+    .cal-cell .dnum { font-size:12.5px; font-weight:700; color:var(--ink); }
+    .cal-cell.sat .dnum { color:#3b6db5; }
+    .cal-cell.sun .dnum { color:var(--danger); }
+    .cal-cell.today { outline:2px solid var(--brand); outline-offset:-2px; }
+    .cal-cell.has { background:#f3f7ff; }
+    .cal-cell.danger { background:var(--danger-soft); border-color:var(--danger); cursor:help; }
+    .cal-cell .cnum { display:inline-block; margin-top:4px; font-size:11px; font-weight:700; color:#3b6db5; }
+    .cal-cell.danger .cnum { color:var(--danger); }
+    .cal-cell .big-mark { display:inline-block; margin-top:3px; font-size:10px; font-weight:700; background:#fde68a; color:#7a5200; border:1px solid #e0b84a; border-radius:5px; padding:0 4px; }
+    .cal-cell .warn-ico { position:absolute; top:4px; right:5px; font-size:13px; }
+    .cal-legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; font-size:12px; color:var(--muted); }
+    .cal-legend .lg { display:inline-flex; align-items:center; gap:6px; }
+    .cal-legend .sw { width:14px; height:14px; border-radius:4px; border:1px solid var(--line); display:inline-block; }
+    .cal-legend .sw.has { background:#f3f7ff; }
+    .cal-legend .sw.danger { background:var(--danger-soft); border-color:var(--danger); }
+    .cal-legend .sw.big { background:#fde68a; border-color:#e0b84a; }
+    /* 危険日リスト */
+    .dgr-list { margin-top:16px; }
+    .dgr-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px solid var(--line); }
+    .dgr-item .ddate { min-width:64px; font-weight:700; color:var(--danger); font-size:13px; }
+    .dgr-item .drsn { font-size:12.5px; color:var(--ink); }
+    .dgr-item .drsn .nm { color:var(--muted); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== サイドバー（全画面共通） ===== -->
+  <aside class="sidebar">
+    <div class="logo">ECS<small>スタッフアサイン管理</small></div>
+    <nav>
+      <a class="active" href="dashboard.html"><span class="nav-icon">▣</span> ダッシュボード</a>
+      <div class="group-label">案件</div>
+      <a href="projects.html"><span class="nav-icon">▤</span> 案件一覧</a>
+      <a href="project_form.html"><span class="nav-icon">＋</span> 案件登録</a>
+      <a href="#" onclick="window.open('projects_agg.html','ecs_agg','width=820,height=640'); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
+      <div class="group-label">アサイン</div>
+      <a href="assign.html"><span class="nav-icon">▦</span> 日別ボード</a>
+      <a href="assign_director.html"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
+      <a href="employee_availability.html"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
+      <a href="assign_detail.html"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
+      <a href="assign_publish.html"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+      <a href="entries.html"><span class="nav-icon">🙋</span> エントリー一覧</a>
+      <a href="pickup.html"><span class="nav-icon">📌</span> ピックアップ</a>
+      <a href="#" onclick="window.open('assign_wishlist.html','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">👥</span> スタッフ一覧</a>
+      <div class="group-label">スタッフ</div>
+      <a href="staff.html"><span class="nav-icon">☷</span> スタッフ管理</a>
+      <a href="employees.html"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+      <a href="staff_status.html"><span class="nav-icon">📊</span> 稼働状況</a>
+      <div class="group-label">その他</div>
+      <a href="mypage.html"><span class="nav-icon">🙍</span> マイページ</a>
+      <a href="mypage_finance.html"><span class="nav-icon">💰</span> 収支入力</a>
+      <a href="settings.html"><span class="nav-icon">⚙️</span> 共通設定</a>
+    </nav>
+    <div class="userbox">
+      <strong>baba さん</strong>
+      社員
+      <div style="margin-top:8px;"><a href="login.html" style="color:#a08a73;">ログアウト</a></div>
+    </div>
+  </aside>
+
+  <!-- ===== 本文 ===== -->
+  <div class="main">
+    <div class="topbar">
+      <h1>ダッシュボード</h1>
+      <div class="spacer"></div>
+      <span class="role-pill">社員</span>
+    </div>
+
+    <div class="content">
+      <div class="mock-note">これは見た目確認用のモックです。数値・データはすべて仮の見本です。</div>
+
+      <!-- 数値サマリ（全社員向け・案件データから自動計算） -->
+      <div class="grid cols-4">
+        <div class="stat">
+          <div class="label">今月の案件数</div>
+          <div class="value" id="kpiThisMonth">–</div>
+          <div class="sub" id="kpiThisMonthSub">全社・本番/設営など合計</div>
+        </div>
+        <div class="stat">
+          <div class="label">今週の現場</div>
+          <div class="value ok" id="kpiThisWeek">–</div>
+          <div class="sub" id="kpiThisWeekSub">今週（月〜日）に開催</div>
+        </div>
+        <div class="stat">
+          <div class="label">今月の大型案件</div>
+          <div class="value warn" id="kpiBig">–</div>
+          <div class="sub">規模「大型」の案件</div>
+        </div>
+        <div class="stat">
+          <div class="label">来月の案件数</div>
+          <div class="value" id="kpiNextMonth">–</div>
+          <div class="sub" id="kpiNextMonthSub">先の予定の見込み</div>
+        </div>
+      </div>
+
+      <!-- 危険日カレンダー -->
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head">
+          <h2>危険日カレンダー</h2>
+          <div class="spacer"></div>
+          <div class="cal-head">
+            <button class="cal-nav" id="calPrev" title="前の月">‹</button>
+            <span class="mlabel" id="calLabel">—</span>
+            <button class="cal-nav" id="calNext" title="次の月">›</button>
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px; margin:0 0 4px;">
+          同じ日に案件が集中して、人手が足りなくなりそうな日（危険日）を赤く表示します。判定は「大型2件以上／リアル系5件以上／必要スタッフ合計が稼働40名の7割（28名）以上」のいずれか。数値はすべて仮の見本です。
+        </p>
+        <div class="cal-grid" id="calDow"></div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-legend">
+          <span class="lg"><span class="sw danger"></span>危険日（要注意）</span>
+          <span class="lg"><span class="sw has"></span>案件あり</span>
+          <span class="lg"><span class="sw big"></span>大型案件あり</span>
+          <span class="lg">数字＝その日の件数</span>
+        </div>
+        <div class="dgr-list" id="dgrList"></div>
+      </div>
+
+      <!-- 今月の件数集計 -->
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head">
+          <h2>今月の件数集計（7月）</h2>
+          <div class="spacer"></div>
+          <span class="muted" style="font-size:12px;">数値はすべて仮の見本です</span>
+        </div>
+        <div class="grid cols-2">
+
+          <!-- 拠点別サマリ -->
+          <div>
+            <div class="cnt-sub">拠点別</div>
+            <table class="tbl cnt-table">
+              <tbody>
+                <tr><td>イベント東</td><td class="num">18</td></tr>
+                <tr><td>イベント東北</td><td class="num">5</td></tr>
+                <tr><td>東 → 他拠点</td><td class="num">2</td></tr>
+                <tr><td>他拠点 → 東</td><td class="num">1</td></tr>
+                <tr><td>他拠点ヘルプのみ</td><td class="num">3</td></tr>
+                <tr class="total"><td>イベント合計</td><td class="num">29</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 種別内訳 -->
+          <div>
+            <div class="cnt-sub">種別内訳</div>
+            <table class="tbl cnt-table">
+              <tbody>
+                <tr class="grp"><td>イベント東</td><td class="num">18</td></tr>
+                <tr><td>　オンライン</td><td class="num">4</td></tr>
+                <tr><td>　リアル</td><td class="num">12</td></tr>
+                <tr class="ind"><td>　　└ リアル通常</td><td class="num">9</td></tr>
+                <tr class="ind"><td>　　└ リアルロング</td><td class="num">3</td></tr>
+                <tr><td>　ARENA場所貸し</td><td class="num">2</td></tr>
+                <tr><td>　仮案件</td><td class="num">3</td></tr>
+                <tr><td>　追加案件</td><td class="num">2</td></tr>
+                <tr class="grp"><td>イベント東北</td><td class="num">5</td></tr>
+                <tr><td>　オンライン</td><td class="num">1</td></tr>
+                <tr><td>　リアル</td><td class="num">4</td></tr>
+                <tr class="ind"><td>　　└ リアル通常</td><td class="num">3</td></tr>
+                <tr class="ind"><td>　　└ リアルロング</td><td class="num">1</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+        <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
+          ※「リアル」の内訳が「リアル通常＋リアルロング」です。拠点ごとの合計（イベント東18／東北5）は オンライン＋リアル＋ARENA の数です。<br>
+          ※「仮案件」＝確度（ヨミ）がまだ確定していない見込み案件、「追加案件」＝アサインMTG後に入った案件。これらは実施形態とは別の見方なので、上の合計には含めず参考として併記しています。月の切替は今後つけます。
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var today = new Date(); today.setHours(0,0,0,0);
+  var y = today.getFullYear(), m = today.getMonth();
+
+  // 今週（月曜〜日曜）の範囲
+  var weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // 月曜
+  var weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6); // 日曜
+
+  // 集計対象＝過去・下書きを除いた案件
+  var cases = (window.ECS_CASES || []).filter(function(c){ return !c.archived && !c.draft; });
+
+  var cntThisMonth = 0, cntNextMonth = 0, cntThisWeek = 0, cntBig = 0;
+  var nextY = (m === 11) ? y + 1 : y, nextM = (m === 11) ? 0 : m + 1;
+
+  cases.forEach(function(c){
+    var d = window.ECS_caseDate(c.off);
+    if (d.getFullYear() === y && d.getMonth() === m){
+      cntThisMonth++;
+      if (c.scale === '大型') cntBig++;
+    }
+    if (d.getFullYear() === nextY && d.getMonth() === nextM) cntNextMonth++;
+    if (d >= weekStart && d <= weekEnd) cntThisWeek++;
+  });
+
+  function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
+  set('kpiThisMonth', cntThisMonth);
+  set('kpiThisWeek', cntThisWeek);
+  set('kpiBig', cntBig);
+  set('kpiNextMonth', cntNextMonth);
+
+  set('kpiThisMonthSub', (m + 1) + '月の案件（全社）');
+  var fmt = function(dt){ return (dt.getMonth() + 1) + '/' + dt.getDate(); };
+  set('kpiThisWeekSub', fmt(weekStart) + '〜' + fmt(weekEnd) + ' に開催');
+  set('kpiNextMonthSub', (nextM + 1) + '月の案件（見込み）');
+})();
+
+/* ===== 危険日カレンダー ===== */
+(function(){
+  var DOW = ['月','火','水','木','金','土','日'];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var cursor = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  // 曜日見出し（一度だけ）
+  var dowEl = document.getElementById('calDow');
+  DOW.forEach(function(d, i){
+    var c = document.createElement('div');
+    c.className = 'cal-dow' + (i===5?' sat':'') + (i===6?' sun':'');
+    c.textContent = d;
+    dowEl.appendChild(c);
+  });
+
+  // その月の各日について、開催される案件を集める
+  function casesByDay(y, m){
+    var map = {}; // 日(数値) -> [{scale,fmt,need,name}]
+    (window.ECS_CASES || []).forEach(function(c){
+      if (c.archived || c.draft) return;
+      var d = window.ECS_caseDate(c.off);
+      if (d.getFullYear() === y && d.getMonth() === m){
+        var day = d.getDate();
+        (map[day] = map[day] || []).push({ scale:c.scale, fmt:c.fmt, need:c.need, name:c.name });
+      }
+    });
+    return map;
+  }
+
+  function render(){
+    var y = cursor.getFullYear(), m = cursor.getMonth();
+    document.getElementById('calLabel').textContent = y + '年' + (m+1) + '月';
+
+    var map = casesByDay(y, m);
+    var firstDow = new Date(y, m, 1).getDay();           // 0=日
+    var lead = (firstDow + 6) % 7;                         // 月曜始まりの先頭空白
+    var daysInMonth = new Date(y, m+1, 0).getDate();
+
+    var grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    // 先頭の空白セル
+    for (var i=0; i<lead; i++){
+      var e = document.createElement('div');
+      e.className = 'cal-cell empty';
+      grid.appendChild(e);
+    }
+
+    var dangerDays = [];
+
+    for (var day=1; day<=daysInMonth; day++){
+      var cell = document.createElement('div');
+      var dow = new Date(y, m, day).getDay();
+      cell.className = 'cal-cell' + (dow===6?' sat':'') + (dow===0?' sun':'');
+      if (y===today.getFullYear() && m===today.getMonth() && day===today.getDate()) cell.className += ' today';
+
+      var items = map[day] || [];
+      var num = document.createElement('div');
+      num.className = 'dnum';
+      num.textContent = day;
+      cell.appendChild(num);
+
+      if (items.length){
+        cell.className += ' has';
+        var chk = window.ECS_dangerCheck(items);
+        var hasBig = items.some(function(it){ return it.scale === '大型'; });
+
+        var cnt = document.createElement('span');
+        cnt.className = 'cnum';
+        cnt.textContent = items.length + '件';
+        cell.appendChild(cnt);
+
+        if (hasBig){
+          var bm = document.createElement('span');
+          bm.className = 'big-mark';
+          bm.textContent = '大型';
+          cell.appendChild(document.createElement('br'));
+          cell.appendChild(bm);
+        }
+
+        if (chk.danger){
+          cell.className += ' danger';
+          cell.title = (m+1) + '/' + day + ' 危険日\n・' + chk.reasons.join('\n・');
+          var w = document.createElement('span');
+          w.className = 'warn-ico';
+          w.textContent = '⚠';
+          cell.appendChild(w);
+          dangerDays.push({ day:day, chk:chk, items:items });
+        }
+      }
+      grid.appendChild(cell);
+    }
+
+    // 危険日リスト
+    var list = document.getElementById('dgrList');
+    list.innerHTML = '';
+    if (!dangerDays.length){
+      var none = document.createElement('div');
+      none.className = 'alert ok';
+      none.innerHTML = '<span class="ico">✓</span><div>この月に危険日はありません。</div>';
+      list.appendChild(none);
+    } else {
+      var h = document.createElement('div');
+      h.style.cssText = 'font-size:13px; font-weight:700; margin-bottom:4px;';
+      h.textContent = '⚠ この月の危険日（' + dangerDays.length + '日）';
+      list.appendChild(h);
+      dangerDays.forEach(function(dd){
+        var row = document.createElement('div');
+        row.className = 'dgr-item';
+        var nm = dd.items.map(function(it){ return it.name; }).join('／');
+        row.innerHTML = '<span class="ddate">' + (m+1) + '/' + dd.day + '</span>' +
+          '<span class="drsn">' + dd.chk.reasons.join('。') + '。' +
+          '<span class="nm">（' + nm + '）</span></span>';
+        list.appendChild(row);
+      });
+    }
+  }
+
+  document.getElementById('calPrev').addEventListener('click', function(){
+    cursor.setMonth(cursor.getMonth() - 1); render();
+  });
+  document.getElementById('calNext').addEventListener('click', function(){
+    cursor.setMonth(cursor.getMonth() + 1); render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

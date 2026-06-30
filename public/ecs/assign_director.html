@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS D決め（ディレクター・カレンダー）</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ===== D決め（ディレクター・カレンダー）専用スタイル ===== */
+
+    /* 上部の操作バー（月切替） */
+    .dir-controls {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 16px; margin-bottom: 16px;
+    }
+    .month-nav { display: flex; align-items: center; gap: 10px; }
+    .month-nav button {
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+      border-radius: 8px; width: 32px; height: 32px; font-size: 16px; cursor: pointer; font-family: inherit;
+    }
+    .month-nav .mon { font-size: 16px; font-weight: 700; min-width: 110px; text-align: center; }
+    .dir-controls .spacer { flex: 1; }
+    .dir-controls label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); cursor: pointer; }
+
+    /* 全体：カレンダー（左・広め）＋ 担当バランス集計（右・固定幅） */
+    .dir-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+    @media (max-width: 1080px) { .dir-layout { grid-template-columns: 1fr; } }
+
+    /* ===== カレンダー本体 ===== */
+    .cal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+    .cal-dow > div { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 2px 0; }
+    .cal-dow > div.sun { color: var(--danger); }
+    .cal-dow > div.sat { color: var(--brand); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+
+    .cal-cell {
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      min-height: 116px; padding: 6px; display: flex; flex-direction: column; gap: 5px;
+    }
+    .cal-cell.other { background: #f6f1e8; }                 /* 当月外の日は薄く */
+    .cal-cell.today { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft) inset; }
+    .cal-cell .c-date { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .cal-cell.other .c-date { color: var(--muted); }
+    .cal-cell .c-date .sun { color: var(--danger); }
+    .cal-cell .c-date .sat { color: var(--brand); }
+    /* その日の希望休（ディレクター） */
+    .c-dayoff { font-size: 9.5px; font-weight: 700; color: #b4530a; background: #fdecd9; border-radius: 5px; padding: 0 5px; white-space: nowrap; }
+
+    /* 1日の中の案件カード（小） */
+    .dcase {
+      border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px;
+      background: #fff; display: flex; flex-direction: column; gap: 4px; position: relative;
+    }
+    .dcase.undecided { border-left: 4px solid var(--warn); background: #fff8ee; }  /* D未定＝決めるべき */
+    .dcase.decided   { border-left: 4px solid #16a34a; }                           /* D決定済み */
+    /* 大型案件＝金の太枠＋うすい背景で目立たせる */
+    .dcase.big { border: 2px solid #e0a800; background: #fffdf2; box-shadow: 0 1px 4px rgba(224,168,0,.18); }
+    .dcase.big.undecided { border-left: 5px solid var(--warn); }
+    .dcase.big.decided   { border-left: 5px solid #16a34a; }
+
+    .dc-name { font-size: 12px; font-weight: 700; line-height: 1.3; }
+    .dcase.big .dc-name { font-size: 13px; }
+    .dc-star { color: #e0a800; }
+    .dc-content { font-size: 10.5px; font-weight: 700; color: var(--brand-dark); }
+    .dc-badges { display: flex; gap: 3px; flex-wrap: wrap; }
+    .mini-badge { font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 5px; white-space: nowrap; }
+    .mini-badge.big   { background: #fde68a; color: #92600a; }              /* 大型 */
+    .mini-badge.real  { background: #e3edf7; color: #2c6ca0; }
+    .mini-badge.long  { background: #fdecd9; color: #b4530a; }
+    .mini-badge.online{ background: #efe6f6; color: #6d28d9; }
+    .mini-badge.daytype { background: #ece3d4; color: #7a6a58; }            /* 予備日/リハ/前日設営 */
+    .mini-badge.repeat { background: var(--ok-soft); color: #15803d; }      /* リピート案件 */
+
+    /* 案件の数値情報（参加者・チーム・時間など） */
+    .dc-info { font-size: 10px; color: var(--ink); display: flex; flex-wrap: wrap; gap: 2px 8px; }
+    .dc-info .need { color: var(--muted); }
+
+    /* メンバー充足のポジションランプ（FC・OPなどのアサイン状況） */
+    .dc-pos { display: flex; flex-wrap: wrap; gap: 3px; }
+    .plamp { font-size: 9.5px; font-weight: 700; padding: 0 5px; border-radius: 5px; line-height: 1.7; }
+    .plamp.ok    { background: var(--ok-soft);     color: #15803d; }
+    .plamp.short { background: var(--danger-soft); color: #b91c1c; }
+    .plamp.none  { background: #ece3d4;            color: #7a6a58; }
+
+    /* D・SD のプルダウン（Dは大きく・色つき／SDは控えめ） */
+    .dc-pick { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
+    .dc-pick .pk { display: flex; align-items: center; gap: 4px; }
+    .dc-pick .pk .lbl { font-weight: 700; text-align: center; border-radius: 5px; }
+    /* D行＝主役（大きめ・ブランド色） */
+    .dc-pick .pk.d-row .lbl { font-size: 11px; width: 26px; color: #fff; background: var(--brand); padding: 2px 0; }
+    .dc-pick .pk.d-row select { flex: 1; padding: 4px 6px; border: 1.5px solid var(--brand); border-radius: 6px; font-size: 12px; font-weight: 700; color: var(--brand-dark); font-family: inherit; background: #fff; min-width: 0; }
+    .dc-pick .pk.d-row select.undef { border-color: var(--warn); background: #fffbf3; color: #b45309; }
+    /* SD行＝控えめ（小さめ・グレー） */
+    .dc-pick .pk.sd-row .lbl { font-size: 9.5px; width: 26px; color: var(--muted); background: #ece3d4; padding: 1px 0; }
+    .dc-pick .pk.sd-row select { flex: 1; padding: 2px 5px; border: 1px solid var(--line); border-radius: 6px; font-size: 10.5px; color: var(--muted); font-family: inherit; background: #fbf8f2; min-width: 0; }
+
+    .dc-offwarn { font-size: 9.5px; font-weight: 700; color: #b91c1c; background: var(--danger-soft); border-radius: 5px; padding: 1px 5px; }
+
+    /* ===== 確定案件＝休みタグのように名前だけのチップ。クリックで詳細が開く ===== */
+    .dcase.locked-chip {
+      display: inline-flex; align-items: center; gap: 4px; width: fit-content; max-width: 100%;
+      background: var(--ok-soft); color: #15803d; border: 1px solid #cdeccf; border-radius: 999px;
+      padding: 2px 9px; cursor: pointer; position: relative;
+    }
+    .dcase.locked-chip.big { background: #fbf3d6; color: #92600a; border: 1px solid #ecd9a0; box-shadow: none; }
+    .dcase.locked-chip .chip-name { font-size: 11px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dcase.locked-chip .chip-arrow { font-size: 9px; transition: transform .12s; }
+    .dcase.locked-chip.open .chip-arrow { transform: rotate(90deg); }
+    /* クリックで開く詳細ふきだし */
+    .dc-tip {
+      display: none; position: absolute; top: 100%; left: 0; z-index: 60;
+      width: 230px; margin-top: 4px; background: #fff; border: 1px solid var(--line);
+      border-radius: 10px; box-shadow: 0 8px 24px rgba(60,40,20,.18); padding: 10px 12px;
+      font-size: 11.5px; line-height: 1.6; color: var(--ink); cursor: default; text-align: left;
+    }
+    .dcase.locked-chip.open .dc-tip { display: block; }
+    .dc-tip .t-name { font-weight: 700; font-size: 12.5px; margin-bottom: 4px; }
+    .dc-tip .t-row { display: flex; gap: 6px; }
+    .dc-tip .t-row .k { color: var(--muted); width: 56px; flex-shrink: 0; }
+    .dc-tip .t-row .v { font-weight: 600; }
+    .dc-tip .t-d  { color: var(--brand-dark); font-weight: 700; }
+    .dc-tip .t-sd { color: var(--muted); }
+    .dc-tip .t-pos { margin-top: 5px; }
+
+    .cell-empty { font-size: 10px; color: #cbbfae; text-align: center; padding-top: 6px; }
+
+    /* ===== 担当バランス集計（右パネル・ライブ） ===== */
+    .agg-panel { position: sticky; top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+    .agg-panel h3 { margin: 0 0 4px; font-size: 14px; }
+    .agg-panel .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--ok-soft); color: #15803d; margin-bottom: 8px; }
+    .agg-panel .live .dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+    table.agg-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.agg-tbl th, table.agg-tbl td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
+    table.agg-tbl th { font-size: 10.5px; color: var(--muted); font-weight: 700; text-align: right; white-space: nowrap; }
+    table.agg-tbl th.nm, table.agg-tbl td.nm { text-align: left; font-weight: 600; }
+    table.agg-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.agg-tbl td.dcnt { font-weight: 700; }
+    table.agg-tbl tr.most td.dcnt { color: #b91c1c; }   /* 一番多い人＝偏りに注意 */
+    .agg-panel .agg-note { font-size: 11px; color: var(--muted); line-height: 1.6; margin-top: 8px; }
+    .agg-bar { height: 5px; background: #ece3d4; border-radius: 999px; overflow: hidden; margin-top: 2px; }
+    .agg-bar > i { display: block; height: 100%; background: var(--brand); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== サイドバー（全画面共通） ===== -->
+  <aside class="sidebar">
+    <div class="logo">ECS<small>スタッフアサイン管理</small></div>
+    <nav>
+      <a href="dashboard.html"><span class="nav-icon">▣</span> ダッシュボード</a>
+      <div class="group-label">案件</div>
+      <a href="projects.html"><span class="nav-icon">▤</span> 案件一覧</a>
+      <a href="project_form.html"><span class="nav-icon">＋</span> 案件登録</a>
+      <a href="#" onclick="window.open('projects_agg.html','ecs_agg','width=820,height=640'); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
+      <div class="group-label">アサイン</div>
+      <a href="assign.html"><span class="nav-icon">▦</span> 日別ボード</a>
+      <a class="active" href="assign_director.html"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
+      <a href="employee_availability.html"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
+      <a href="assign_detail.html"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
+      <a href="assign_publish.html"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+      <a href="entries.html"><span class="nav-icon">🙋</span> エントリー一覧</a>
+      <a href="pickup.html"><span class="nav-icon">📌</span> ピックアップ</a>
+      <div class="group-label">スタッフ</div>
+      <a href="staff.html"><span class="nav-icon">☷</span> スタッフ管理</a>
+      <a href="employees.html"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+      <a href="staff_status.html"><span class="nav-icon">📊</span> 稼働状況</a>
+      <div class="group-label">その他</div>
+      <a href="mypage.html"><span class="nav-icon">🙍</span> マイページ</a>
+      <a href="mypage_finance.html"><span class="nav-icon">💰</span> 収支入力</a>
+      <a href="settings.html"><span class="nav-icon">⚙️</span> 共通設定</a>
+    </nav>
+    <div class="userbox">
+      <strong>baba さん</strong>
+      社員
+      <div style="margin-top:8px;"><a href="login.html" style="color:#a08a73;">ログアウト</a></div>
+    </div>
+  </aside>
+
+  <!-- ===== 本文 ===== -->
+  <div class="main">
+    <div class="topbar">
+      <h1>D決め（ディレクター）</h1>
+      <div class="spacer"></div>
+      <span class="role-pill">社員</span>
+    </div>
+
+    <div class="content">
+      <div class="mock-note">
+        これは見た目確認用のモックです。人数・担当・希望休はすべて仮の見本で、変更しても保存はされません。<br>
+        <b>月次MTGで「どの案件を誰がD（ディレクター）／SD（サブディレクター）で担当するか」を決める画面です。</b>
+        各案件カードのプルダウンでD・SDを選ぶと、右の「担当バランス」がその場で更新されます。
+        <span style="color:#b45309; font-weight:700;">黄色枠＝D未定</span>／<span style="color:#92600a; font-weight:700;">⭐金枠＝大型案件</span>／<span style="color:#15803d; font-weight:700;">🔒＝確定済み（チップをクリックすると詳細が開く）</span>。
+        日付の横の<span style="color:#b4530a; font-weight:700;">🏖休</span>はその日に希望休のディレクターです。
+      </div>
+
+      <!-- 操作バー -->
+      <div class="dir-controls">
+        <div class="month-nav">
+          <button onclick="alert('モックのため、月の切替はしません。')">◀</button>
+          <span class="mon" id="monLabel">2026年 7月</span>
+          <button onclick="alert('モックのため、月の切替はしません。')">▶</button>
+        </div>
+        <div class="spacer"></div>
+        <label class="chk"><input type="checkbox" id="undecidedOnly" onchange="render()"> D未定の案件だけ表示</label>
+      </div>
+
+      <div class="dir-layout">
+        <!-- カレンダー -->
+        <div class="cal">
+          <div class="cal-dow">
+            <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+
+        <!-- 担当バランス集計（ライブ） -->
+        <div class="agg-panel">
+          <h3>📊 担当バランス</h3>
+          <span class="live"><span class="dot"></span>この画面と連動中</span>
+          <table class="agg-tbl">
+            <thead>
+              <tr>
+                <th class="nm">社員</th>
+                <th>D計</th>
+                <th>大型D</th>
+                <th>大型SD</th>
+              </tr>
+            </thead>
+            <tbody id="aggBody"></tbody>
+          </table>
+          <p class="agg-note">
+            この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<br>
+            ※「リアルD」「オンラインD」も本番では集計します（別ウィンドウの「社員・ディレクター集計」と同じ数え方です）。
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 共通の案件データ（全画面で同じ1つのリストを読む） -->
+<script src="data/cases.js"></script>
+<script>
+  // ===== ディレクター候補（社員名簿の社員＝苗字で持つ。案件データの dir/sd と合わせる）=====
+  const DIRECTORS = ['佐藤', '鈴木', '田中', '高橋', '山本', '中村'];
+
+  // ===== ディレクターの希望休（モック用の仮データ）＝今日からの相対日(off)で持つ =====
+  // 近い案件のある日に重ねて、休みが効いて見えるようにしている。
+  const DIR_DAYOFF = { 10:['鈴木'], 12:['中村'], 14:['山本'], 17:['佐藤'] };
+
+  // ===== 作業用の案件リスト（過去アーカイブ・下書きは除く）。dir/sd をこの場で書き換える =====
+  const cases = ECS_CASES
+    .filter(c => !c.archived && !c.draft)
+    .map(c => ({
+      id:c.id, off:c.off, name:c.name, client:c.client, content:c.content,
+      need:c.need, filled:c.filled, scale:c.scale, format:c.format||'', fmt:c.fmt,
+      dir:c.dir || '未定', sd:c.sd || 'なし', dayType:c.dayType, status:c.status,
+      guests:c.guests, teams:c.teams, repeat:c.repeat,
+      evStart:c.evStart, evEnd:c.evEnd, meet:c.meet, leave:c.leave,
+      pos:(c.pos||[]).map(p => p.slice())
+    }));
+
+  // ===== 日付ユーティリティ =====
+  function addDays(n){ const x = new Date(); x.setHours(0,0,0,0); x.setDate(x.getDate()+n); return x; }
+  function ymd(d){ return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
+  const TODAY0 = addDays(0).getTime();
+  function offOfDate(d){ return Math.round((d.getTime() - TODAY0) / 86400000); }   // その日が今日から何日後か
+
+  // ===== 対象の月を決める（案件が一番多い月＝メインの月を自動で選ぶ）=====
+  function pickTargetMonth(){
+    const cnt = {};
+    cases.forEach(c => { const d = addDays(c.off); const k = d.getFullYear()+'-'+d.getMonth(); cnt[k] = (cnt[k]||0)+1; });
+    let best = null, bestN = -1;
+    Object.keys(cnt).forEach(k => { if (cnt[k] > bestN) { bestN = cnt[k]; best = k; } });
+    if (!best) { const t = addDays(0); return { y:t.getFullYear(), m:t.getMonth() }; }
+    const [y, m] = best.split('-').map(Number);
+    return { y, m };
+  }
+  const TARGET = pickTargetMonth();
+  document.getElementById('monLabel').textContent = TARGET.y + '年 ' + (TARGET.m + 1) + '月';
+
+  // 確定済み案件か（確定は名前だけ＋ホバー詳細にする）
+  function isLocked(c){ return c.status === '確定'; }
+
+  // 日付（y-m-d）→ その日の案件
+  function casesByDay(){
+    const map = {};
+    cases.forEach(c => {
+      const d = addDays(c.off);
+      if (d.getFullYear() !== TARGET.y || d.getMonth() !== TARGET.m) return;   // その月だけ
+      (map[ymd(d)] = map[ymd(d)] || []).push(c);
+    });
+    return map;
+  }
+
+  // ===== バッジ・情報 =====
+  function fmtBadge(c){
+    if (c.fmt === 'long')   return '<span class="mini-badge long">ロング</span>';
+    if (c.fmt === 'online') return '<span class="mini-badge online">オンライン</span>';
+    if ((c.format||'').indexOf('リアル') !== -1) return '<span class="mini-badge real">リアル</span>';
+    return '';
+  }
+  function dayTypeBadge(c){
+    if (c.dayType && c.dayType !== '本番') return `<span class="mini-badge daytype">${c.dayType}</span>`;
+    return '';
+  }
+  function repeatBadge(c){ return c.repeat ? '<span class="mini-badge repeat">🔁リピート</span>' : ''; }
+
+  // 時間（本番の開始〜終了。無ければ集合〜解散）
+  function timeOf(c){
+    if (c.evStart && c.evStart !== '—' && c.evEnd && c.evEnd !== '—') return c.evStart + '–' + c.evEnd;
+    if (c.meet && c.meet !== '—') return c.meet + '–' + (c.leave && c.leave !== '—' ? c.leave : '');
+    return '';
+  }
+  // 案件の数値情報（参加者・チーム・時間）
+  function infoLine(c){
+    const ok = v => v !== undefined && v !== null && v !== '' && v !== '—';
+    const bits = [];
+    if (ok(c.guests)) bits.push(`<span>👥参加${c.guests}</span>`);
+    if (ok(c.teams))  bits.push(`<span>🚩${c.teams}チーム</span>`);
+    const t = timeOf(c); if (t) bits.push(`<span>⏰${t}</span>`);
+    return bits.join('');
+  }
+
+  // ===== D・SD のプルダウン（dayOff＝その日に希望休のディレクター名）=====
+  function optionList(selected, dayOff){
+    return DIRECTORS.map(n => {
+      const off = dayOff.indexOf(n) !== -1 ? '（休）' : '';
+      return `<option value="${n}"${selected === n ? ' selected' : ''}>${n}${off}</option>`;
+    }).join('');
+  }
+  function dirSelect(c, dayOff){
+    const opts = `<option value="未定"${c.dir === '未定' ? ' selected' : ''}>未定</option>` + optionList(c.dir, dayOff);
+    const cls = c.dir === '未定' ? 'undef' : '';
+    return `<div class="pk d-row"><span class="lbl">D</span><select class="${cls}" onchange="setDir('${c.id}', this.value)">${opts}</select></div>`;
+  }
+  function sdSelect(c, dayOff){
+    const opts = `<option value="なし"${c.sd === 'なし' ? ' selected' : ''}>なし</option>` + optionList(c.sd, dayOff);
+    return `<div class="pk sd-row"><span class="lbl">SD</span><select onchange="setSd('${c.id}', this.value)">${opts}</select></div>`;
+  }
+  // 休みの人をD/SDに選んでいたら警告
+  function offWarn(c, dayOff){
+    const w = [];
+    if (c.dir !== '未定' && dayOff.indexOf(c.dir) !== -1) w.push('D ' + c.dir);
+    if (c.sd !== 'なし' && dayOff.indexOf(c.sd)  !== -1) w.push('SD ' + c.sd);
+    if (!w.length) return '';
+    return `<div class="dc-offwarn">⚠ ${w.join('・')}さんは希望休</div>`;
+  }
+
+  function setDir(id, v){ const c = cases.find(x => x.id === id); if (c) { c.dir = v; render(); } }
+  function setSd(id, v){ const c = cases.find(x => x.id === id); if (c) { c.sd = v; render(); } }
+
+  // ===== カード（編集できる通常案件）=====
+  function fullCard(c, dayOff){
+    const undecided = (c.dir === '未定');
+    const big = c.scale === '大型';
+    const star = big ? '<span class="dc-star">⭐</span>' : '';
+    const bigBadge = big ? '<span class="mini-badge big">大型</span>' : '';
+    return `
+      <div class="dcase ${big ? 'big ' : ''}${undecided ? 'undecided' : 'decided'}">
+        <div class="dc-name">${star}${c.name}</div>
+        <div class="dc-content">🎯 ${c.content}</div>
+        <div class="dc-badges">${bigBadge}${fmtBadge(c)}${repeatBadge(c)}${dayTypeBadge(c)}</div>
+        <div class="dc-info">${infoLine(c)}</div>
+        <div class="dc-pick">
+          ${dirSelect(c, dayOff)}
+          ${sdSelect(c, dayOff)}
+        </div>
+        ${offWarn(c, dayOff)}
+      </div>`;
+  }
+
+  // ===== カード（確定案件＝休みタグのようなチップ。クリックで詳細が開く）=====
+  function lockedCard(c){
+    const big = c.scale === '大型';
+    const star = big ? '⭐' : '';
+    const t = timeOf(c);
+    const sdTxt = (c.sd && c.sd !== 'なし') ? c.sd : 'なし';
+    return `
+      <div class="dcase locked-chip ${big ? 'big' : ''}" onclick="this.classList.toggle('open')">
+        <span class="chip-name">🔒 ${star}${c.name}</span><span class="chip-arrow">▸</span>
+        <div class="dc-tip" onclick="event.stopPropagation()">
+          <div class="t-name">${c.name}</div>
+          <div class="t-row"><span class="k">コンテンツ</span><span class="v">${c.content}</span></div>
+          <div class="t-row"><span class="k">クライアント</span><span class="v">${c.client}</span></div>
+          <div class="t-row"><span class="k">D / SD</span><span class="v"><span class="t-d">${c.dir}</span> ／ <span class="t-sd">${sdTxt}</span></span></div>
+          <div class="t-row"><span class="k">規模 / 形態</span><span class="v">${c.scale}${big ? '⭐' : ''}${c.repeat ? '・🔁リピート' : ''}</span></div>
+          ${(c.guests && c.guests !== '—') || (c.teams && c.teams !== '—') ? `<div class="t-row"><span class="k">規模感</span><span class="v">${[c.guests && c.guests !== '—' ? '参加' + c.guests : '', c.teams && c.teams !== '—' ? c.teams + 'チーム' : ''].filter(Boolean).join('・')}</span></div>` : ''}
+          ${t ? `<div class="t-row"><span class="k">時間</span><span class="v">${t}</span></div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  // ===== カレンダー描画 =====
+  const grid = document.getElementById('calGrid');
+  function render(){
+    const undecidedOnly = document.getElementById('undecidedOnly').checked;
+    const byDay = casesByDay();
+
+    // グリッドの始まり＝当月1日の週の月曜
+    const first = new Date(TARGET.y, TARGET.m, 1);
+    const startDow = (first.getDay() + 6) % 7;                 // 月曜=0
+    const gridStart = new Date(TARGET.y, TARGET.m, 1 - startDow);
+    const last = new Date(TARGET.y, TARGET.m + 1, 0);
+    const weeks = Math.ceil((startDow + last.getDate()) / 7);
+    const todayKey = ymd(addDays(0));
+
+    grid.innerHTML = '';
+    for (let i = 0; i < weeks * 7; i++){
+      const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      const inMonth = d.getMonth() === TARGET.m;
+      const dy = d.getDay();
+      const dowC = dy === 0 ? 'sun' : (dy === 6 ? 'sat' : '');
+      const dayOff = (DIR_DAYOFF[offOfDate(d)] || []);
+
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell' + (inMonth ? '' : ' other') + (ymd(d) === todayKey ? ' today' : '');
+
+      const offHtml = (inMonth && dayOff.length) ? `<span class="c-dayoff">🏖休 ${dayOff.join('・')}</span>` : '';
+      let inner = `<div class="c-date"><span class="${dowC}">${d.getDate()}</span>${offHtml}</div>`;
+
+      const dayCases = (inMonth ? (byDay[ymd(d)] || []) : []);
+      let shown = 0;
+      dayCases.forEach(c => {
+        if (undecidedOnly && c.dir !== '未定') return;   // 「未定だけ」時は決定済みを省く
+        inner += isLocked(c) ? lockedCard(c) : fullCard(c, dayOff);
+        shown++;
+      });
+      if (inMonth && dayCases.length && shown === 0) inner += `<div class="cell-empty">（未定なし）</div>`;
+      else if (inMonth && dayCases.length === 0)     inner += `<div class="cell-empty">—</div>`;
+
+      cell.innerHTML = inner;
+      grid.appendChild(cell);
+    }
+
+    renderAgg();
+  }
+
+  // ===== 担当バランス集計（この月の案件から数える。集計画面と同じ数え方）=====
+  function computeAgg(){
+    const map = {};
+    function ensure(n){ if (!map[n]) map[n] = { name:n, d:0, realD:0, bigD:0, bigSD:0, onlineD:0 }; return map[n]; }
+    DIRECTORS.forEach(n => ensure(n));   // 0件の社員も表に出す
+    cases.forEach(c => {
+      const d = addDays(c.off);
+      if (d.getFullYear() !== TARGET.y || d.getMonth() !== TARGET.m) return;  // その月だけ
+      const isReal   = (c.format || '').indexOf('リアル') !== -1;
+      const isOnline = (c.format || '').indexOf('オンライン') !== -1;
+      const isBig    = c.scale === '大型';
+      if (c.dir && c.dir !== '未定'){
+        const r = ensure(c.dir);
+        r.d++;
+        if (isReal)          r.realD++;
+        if (isOnline)        r.onlineD++;
+        if (isReal && isBig) r.bigD++;
+      }
+      if (c.sd && c.sd !== 'なし' && c.sd !== '未定' && isReal && isBig){
+        ensure(c.sd).bigSD++;
+      }
+    });
+    return Object.values(map).sort((a, b) => (b.d - a.d) || (b.bigD - a.bigD));
+  }
+
+  function renderAgg(){
+    const rows = computeAgg();
+    const maxD = Math.max(1, ...rows.map(r => r.d));
+    const body = document.getElementById('aggBody');
+    body.innerHTML = '';
+    rows.forEach(r => {
+      const most = r.d === maxD && r.d > 0;
+      const tr = document.createElement('tr');
+      if (most) tr.className = 'most';
+      tr.innerHTML = `
+        <td class="nm">${r.name}
+          <div class="agg-bar"><i style="width:${Math.round(r.d / maxD * 100)}%;"></i></div>
+        </td>
+        <td class="num dcnt">${r.d}</td>
+        <td class="num">${r.bigD}</td>
+        <td class="num">${r.bigSD}</td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  // 初期描画
+  render();
+</script>
+</body>
+</html>

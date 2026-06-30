@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>社員・ディレクター集計（ECS）</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: var(--bg); padding: 18px 20px; }
+    .agg-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .agg-top h1 { font-size: 18px; margin: 0; }
+    .agg-top .month-nav { display: flex; align-items: center; gap: 8px; }
+    .agg-top .month-nav button { border: 1px solid var(--line); background: #fff; border-radius: 8px; width: 30px; height: 30px; font-size: 15px; cursor: pointer; font-family: inherit; }
+    .agg-top .month-nav .mon { font-size: 14px; font-weight: 700; min-width: 96px; text-align: center; }
+    .agg-top .spacer { flex: 1; }
+    .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+    .live.on  { background: var(--ok-soft); color: #15803d; }
+    .live.off { background: #ece3d4;        color: #7a6a58; }
+    .live .dot { width: 9px; height: 9px; border-radius: 999px; background: currentColor; }
+    .note { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
+    table.tbl th.num, table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.tbl td.nm { font-weight: 600; }
+    tr.agg-total td { font-weight: 700; background: var(--brand-soft); color: var(--brand-dark); }
+  </style>
+</head>
+<body>
+  <div class="agg-top">
+    <h1>📊 社員・ディレクター集計</h1>
+    <div class="month-nav">
+      <button onclick="alert('モックのため、月の切替はしません。')">◀</button>
+      <span class="mon" id="monLabel">2026年 7月</span>
+      <button onclick="alert('モックのため、月の切替はしません。')">▶</button>
+    </div>
+    <div class="spacer"></div>
+    <span class="live off" id="live"><span class="dot"></span><span id="liveText">案件一覧と未接続</span></span>
+  </div>
+
+  <p class="note">
+    案件一覧で<b>ディレクター・規模（大型/通常）・SD担当</b>を変えると、この画面の数字が<b>自動で更新</b>されます（この窓は開いたままでOK）。<br>
+    数値はすべて仮の見本です。「総アサイン数（実際に現場へ入った数）」は、アサイン機能とつないだ後に追加します。
+  </p>
+
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>社員</th>
+        <th class="num">D計</th>
+        <th class="num">リアルD</th>
+        <th class="num">大型D</th>
+        <th class="num">大型SD</th>
+        <th class="num">オンラインD</th>
+      </tr>
+    </thead>
+    <tbody id="aggBody">
+      <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px 0;">案件一覧の「📊 社員・ディレクター集計」ボタンから開くと、ここに数字が出ます。</td></tr>
+    </tbody>
+  </table>
+
+  <p class="note" style="margin-top:12px;">
+    ※「大型D／大型SD」＝リアルの【大型】案件でD／SDを務めた回数。「リアルD」はリアル案件全体（通常＋ロング）でDを務めた回数です。
+  </p>
+
+  <script src="data/cases.js"></script>
+  <script>
+    // ===== 親ウィンドウ（案件一覧）から送られてくる集計データを受け取って表示 =====
+    function setLive(on) {
+      document.getElementById('live').className = 'live ' + (on ? 'on' : 'off');
+      document.getElementById('liveText').textContent = on ? '案件一覧と連動中' : '案件データから集計';
+    }
+
+    function render(rows) {
+      const body = document.getElementById('aggBody');
+      body.innerHTML = '';
+      if (!rows || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px 0;">ディレクターが割り当てられた案件がありません。</td></tr>';
+        return;
+      }
+      const sum = { d:0, realD:0, bigD:0, bigSD:0, onlineD:0 };
+      rows.forEach(r => {
+        ['d','realD','bigD','bigSD','onlineD'].forEach(k => sum[k] += r[k]);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="nm">${r.name}</td><td class="num">${r.d}</td><td class="num">${r.realD}</td><td class="num">${r.bigD}</td><td class="num">${r.bigSD}</td><td class="num">${r.onlineD}</td>`;
+        body.appendChild(tr);
+      });
+      const tr = document.createElement('tr');
+      tr.className = 'agg-total';
+      tr.innerHTML = `<td>合計</td><td class="num">${sum.d}</td><td class="num">${sum.realD}</td><td class="num">${sum.bigD}</td><td class="num">${sum.bigSD}</td><td class="num">${sum.onlineD}</td>`;
+      body.appendChild(tr);
+    }
+
+    // ===== 案件データ(cases.js)から自分で集計する（案件一覧から開いていなくても数字を出す）=====
+    function computeAggFromCases() {
+      const cases = window.ECS_CASES || [];
+      const map = {};
+      function ensure(name) {
+        if (!map[name]) map[name] = { name, d:0, realD:0, bigD:0, bigSD:0, onlineD:0 };
+        return map[name];
+      }
+      cases.forEach(c => {
+        if (c.draft) return;                                   // 下書きは数えない
+        const fmt = c.format || '';
+        const isReal   = fmt.indexOf('リアル') !== -1;
+        const isOnline = fmt.indexOf('オンライン') !== -1;
+        const isBig    = c.scale === '大型';
+        if (c.dir && c.dir !== '未定') {
+          const r = ensure(c.dir);
+          r.d++;
+          if (isReal)          r.realD++;
+          if (isOnline)        r.onlineD++;
+          if (isReal && isBig) r.bigD++;
+        }
+        if (c.sd && c.sd !== 'なし' && c.sd !== '未定' && isReal && isBig) {
+          ensure(c.sd).bigSD++;
+        }
+      });
+      return Object.values(map).sort((a, b) => (b.d - a.d) || (b.bigD - a.bigD));
+    }
+    function renderSelf() { setLive(false); render(computeAggFromCases()); }
+
+    window.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'agg-data') {
+        setLive(true);
+        if (e.data.month) document.getElementById('monLabel').textContent = e.data.month;
+        render(e.data.rows);
+      }
+    });
+
+    // まず自分で集計して表示（案件一覧から開いていなくても数字が出る）
+    renderSelf();
+
+    // 案件一覧から開いた場合は、最新データを要求してライブ連動に切り替える
+    function requestData() {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'agg-request' }, '*');
+      }
+    }
+    requestData();
+    window.addEventListener('focus', requestData);
+  </script>
+</body>
+</html>

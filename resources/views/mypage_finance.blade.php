@@ -1,0 +1,302 @@
+@extends('layouts.app')
+@section('title', '収支入力（マイページ）')
+@section('h1', '収支入力（M-5）')
+@php($active = 'mypage_finance')
+
+@push('head')
+@verbatim
+<style>
+    .mp-wrap { max-width: 1000px; }
+    .back-link { font-size: 13px; color: var(--brand-dark); font-weight: 700; }
+    .back-link:hover { color: var(--brand); }
+
+    /* 案件選択バー */
+    .pick-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pick-bar label { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .pick-bar select {
+      padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 13.5px; font-family: inherit; background: #fff; max-width: 100%;
+    }
+    .pick-bar #caseSelect { min-width: 320px; }
+
+    .case-head { font-size: 15px; font-weight: 800; color: var(--ink); margin: 0 0 2px; }
+    .case-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+
+    /* 売上欄 */
+    .rev-box { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+    .rev-box .yen-input { width: 160px; }
+
+    /* 金額入力 */
+    .yen-input {
+      width: 110px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 13.5px; font-family: inherit; text-align: right; background: #fff;
+    }
+    .qty-input { width: 76px; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .unit-cell { color: var(--muted); font-size: 12.5px; }
+    .price-cell { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .price-cell .jisshi { color: var(--muted); font-size: 12px; }
+    .amount-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .note-cell { font-size: 11.5px; color: var(--muted); }
+    /* 経費表の備考は1行に収め、はみ出しは「…」で省略（マウスで全文表示） */
+    #costBody td.note-cell {
+      max-width: 240px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #costBody td.note-cell:hover { cursor: help; }
+
+    tr.total-row td { background: var(--brand-soft); font-weight: 800; color: var(--brand-dark); }
+    tr.profit-row td { background: #eef6ee; font-weight: 800; }
+    tr.profit-row td.minus { color: var(--danger); }
+
+    .save-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+    .saved-ping { color: #2e7d32; font-weight: 700; font-size: 13px; opacity: 0; transition: opacity .2s; }
+    .saved-ping.show { opacity: 1; }
+    .empty-note { color: var(--muted); font-size: 13px; margin: 10px 2px; }
+  </style>
+@endverbatim
+@endpush
+
+@section('content')
+@verbatim
+      <div class="mock-note">これは見た目確認用のモックです。収支を入力するのは<b>自分がディレクター（D）として担当する案件のみ</b>です。項目は雛型「東京アサイン表」の収支シートに合わせています。入力はこのブラウザにだけ記憶されます。<a class="back-link" href="/mypage">← マイページに戻る</a></div>
+
+      <!-- 案件を選ぶ -->
+      <div class="panel mp-wrap">
+        <div class="pick-bar">
+          <label for="monthFilter">月：</label>
+          <select id="monthFilter" onchange="onMonthChange()"></select>
+          <label for="caseSelect">案件：</label>
+          <select id="caseSelect" onchange="loadCase()"></select>
+        </div>
+        <p class="empty-note" id="noCase" style="display:none; margin:10px 0 0;">この月に担当案件はありません。</p>
+      </div>
+
+      <!-- 収支シート -->
+      <div class="panel mp-wrap" id="finPanel" style="margin-top:20px;">
+        <div class="case-head" id="caseHead">—</div>
+        <div class="case-sub" id="caseSub"></div>
+
+        <!-- 売上 -->
+        <div class="rev-box">
+          <label style="font-size:14px; font-weight:700;">売上（受注額）</label>
+          <input class="yen-input" type="number" min="0" step="1000" id="revInput" oninput="recalc()" placeholder="0">
+          <span class="note-cell">※雛型の収支シートには無い項目です。利益を出すために追加しています（不要なら外せます）。</span>
+        </div>
+
+        <table class="tbl">
+          <thead>
+            <tr><th>種別（経費）</th><th class="num">単価</th><th class="num">数量</th><th>単位</th><th class="num">金額</th><th>備考</th></tr>
+          </thead>
+          <tbody id="costBody"></tbody>
+          <tfoot>
+            <tr class="total-row"><td>経費 合計</td><td></td><td></td><td></td><td class="num amount-cell" id="costTotal">¥0</td><td></td></tr>
+            <tr class="profit-row"><td>利益（売上 − 経費）</td><td></td><td></td><td></td><td class="num amount-cell" id="profitCell">¥0</td><td></td></tr>
+          </tfoot>
+        </table>
+
+        <div class="save-row">
+          <button class="btn primary" onclick="saveCase()">この案件の収支を保存する</button>
+          <span class="saved-ping" id="savedPing">✓ 保存しました</span>
+        </div>
+        <p class="note-cell" style="margin:12px 0 0;">
+          ※ 「実費」項目は <b>1,000円未満を四捨五入</b>（499円も1,000円）。<br>
+          ※ <b>入力しなくてよい項目</b>：販管費（正社員人件費）／準備・片付けスタッフ費／リハ・レクチャー費／IKUSAカーのガソリン費／謎解き等の印刷代／コンテンツの必要経費（開発費・衣装・今後も使う備品）／通信費／事務所での印刷費。<br>
+          ※ 単価・ルールの詳細は「収支の入力定義」を確認。本番では会計・請求の仕組みと連携する想定です。
+        </p>
+      </div>
+@endverbatim
+@endsection
+
+@push('scripts')
+<script src="/ecs/data/cases.js"></script>
+@verbatim
+<script>
+  const ME = 'baba';
+  const WK = ['日','月','火','水','木','金','土'];
+  const STORE = 'ecs_finance';   // { caseId: { rev:数値, items:{key:{qty,amount}}, memo } }
+
+  // マイページと同じ「アサインされた案件」の仮設定
+  const MY_ASSIGN = {
+    'past_fes':'ディレクター','undo_d1':'ディレクター','undo_d2':'ディレクター','undo_d3':'ディレクター',
+    'mizu':'ディレクター','shinkan':'ディレクター','konshin':'SD','enni1':'MC',
+    'bousai':'ディレクター','fes_setup':'ディレクター'
+  };
+
+  // 収支の入力定義（Notion）に合わせた経費項目
+  //   price 数値 … 単価が1つに決まる項目 → 数量を入れて金額を自動計算
+  //   price null … 単価が複数 or 実費の項目 → 金額を直接入力（自動計算はしない。料金表は備考に参考表示）
+  const COST_ITEMS = [
+    // ── 当日スタッフ費（形態別。単位=件＝1人1日） ──
+    { key:'staff_online', name:'当日スタッフ費（オンライン）',   price:7000,  unit:'件', note:'交通費込み' },
+    { key:'staff_real',   name:'当日スタッフ費（リアル）',       price:10000, unit:'件', note:'交通費込み' },
+    { key:'staff_long',   name:'当日スタッフ費（リアルロング）', price:12000, unit:'件', note:'交通費込み' },
+    { key:'stay_pre',     name:'前泊手当',                       price:2000,  unit:'件', note:'前泊ありの場合 ＋2,000/件' },
+    { key:'stay_post',    name:'後泊手当',                       price:2000,  unit:'件', note:'後泊ありの場合 ＋2,000/件' },
+    // ── 単価が決まっている費用 ──
+    { key:'food',          name:'飲食費（水分含む）', price:1000,  unit:'人',            note:'' },
+    { key:'print_conveni', name:'コンビニ印刷費',     price:1000,  unit:'件',            note:'コンビニで印刷した分' },
+    { key:'goods_move',    name:'輸送費',             price:2000,  unit:'コンテナ(片道)', note:'1コンテナ1箱・片道。大型/チャーターは下の実費へ' },
+    { key:'move_air',      name:'スタッフ移動費（飛行機）',   price:20000, unit:'片道', note:'' },
+    { key:'move_taxi',     name:'スタッフ移動費（タクシー）', price:2000,  unit:'片道', note:'' },
+    { key:'move_bus',      name:'スタッフ移動費（高速バス）', price:2000,  unit:'片道', note:'' },
+    { key:'parking',       name:'駐車場費',           price:3000,  unit:'日', note:'' },
+    { key:'lodging',       name:'宿泊費',             price:11000, unit:'泊', note:'5人で泊まったら5泊。前泊・後泊手当も含む' },
+    { key:'trainer',       name:'研修講師費',         price:77000, unit:'日', note:'OODAチャンバラ・サバ研はスタッフ費で計上' },
+    // ── 単価が複数 or 実費（金額を直接入力。料金表は備考の参考。1,000円未満は四捨五入） ──
+    { key:'highway',       name:'高速費（ガソリン・ETC含む）', price:null, unit:'実費', note:'片道：30km1,800/50km3,000/90km5,400/120km7,200/150km9,000/180km10,800/210km12,600' },
+    { key:'rentacar',      name:'レンタカー費',               price:null, unit:'実費', note:'ハイエース基準：1泊2日16,000/2泊3日29,000/3泊4日42,000/4泊5日55,000' },
+    { key:'food_cater',    name:'フード手配費',               price:null, unit:'実費', note:'ケータリング/オードブル/BBQ/格付け/マグロ等。業者別ルールは収支定義を参照' },
+    { key:'outsource',     name:'外注費',                     price:null, unit:'実費', note:'MC・音響・配信・警備・設備など' },
+    { key:'print_input',   name:'入稿印刷費',                 price:null, unit:'実費', note:'パッケージ以外' },
+    { key:'goods_buy',     name:'物品購入費',                 price:null, unit:'実費', note:'該当イベントのみで使う物品（今後使う物は計上しない）' },
+    { key:'move_irregular',name:'イレギュラー輸送費',         price:null, unit:'実費', note:'大型物品輸送・チャーター便など' },
+    { key:'onsite',        name:'緊急購入物品費',             price:null, unit:'実費', note:'現場で緊急的に購入した物品' }
+  ];
+
+  function dateOf(off){ return (window.ECS_caseDate ? window.ECS_caseDate(off)
+    : (function(){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+off); return d; })()); }
+  function fmtDate(off){ const d=dateOf(off); return (d.getMonth()+1)+'/'+d.getDate()+'('+WK[d.getDay()]+')'; }
+  function monthKey(off){ const d=dateOf(off); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function monthLabel(k){ const [y,m]=k.split('-'); return y+'年'+Number(m)+'月'; }
+  function yen(n){ return '¥' + Math.round(n||0).toLocaleString('ja-JP'); }
+  function loadStore(){ try { return JSON.parse(localStorage.getItem(STORE)||'{}'); } catch(e){ return {}; } }
+  function saveStore(o){ try { localStorage.setItem(STORE, JSON.stringify(o)); } catch(e){} }
+  function byId(id){ return (window.ECS_CASES||[]).find(c => c.id===id); }
+
+  // 収支の対象＝自分のポジションが「ディレクター（D）」の案件のみ
+  function targetCases(){
+    const map = {};
+    (window.ECS_CASES||[]).forEach(c => {
+      if (c.draft) return;
+      if (MY_ASSIGN[c.id] === 'ディレクター') map[c.id] = c;
+    });
+    return Object.values(map).sort((a,b)=>a.off-b.off);
+  }
+
+  function buildMonthOptions(){
+    const keys = new Set();
+    targetCases().forEach(c => keys.add(monthKey(c.off)));
+    const sorted = Array.from(keys).sort();
+    document.getElementById('monthFilter').innerHTML =
+      '<option value="">すべての月</option>' +
+      sorted.map(k => '<option value="'+k+'">'+monthLabel(k)+'</option>').join('');
+  }
+
+  function buildCaseOptions(){
+    const mf = document.getElementById('monthFilter').value;
+    const list = targetCases().filter(c => !mf || monthKey(c.off)===mf);
+    const sel = document.getElementById('caseSelect');
+    sel.innerHTML = list.map(c => '<option value="'+c.id+'">'+fmtDate(c.off)+'　'+c.name+'</option>').join('');
+    const has = list.length > 0;
+    sel.style.display = has ? '' : 'none';
+    document.getElementById('finPanel').style.display = has ? '' : 'none';
+    document.getElementById('noCase').style.display = has ? 'none' : 'block';
+    return has;
+  }
+
+  // 経費明細の行を生成
+  function buildCostRows(){
+    const body = document.getElementById('costBody');
+    body.innerHTML = COST_ITEMS.map(it => {
+      if (it.price !== null) {
+        return '<tr data-key="'+it.key+'">' +
+          '<td>'+it.name+'</td>' +
+          '<td class="num price-cell">'+yen(it.price)+'</td>' +
+          '<td class="num"><input class="yen-input qty-input" type="number" min="0" step="1" data-role="qty" value="0" oninput="recalc()"></td>' +
+          '<td class="unit-cell">'+it.unit+'</td>' +
+          '<td class="num amount-cell" data-role="amount">¥0</td>' +
+          '<td class="note-cell" title="'+it.note+'">'+it.note+'</td>' +
+        '</tr>';
+      }
+      return '<tr data-key="'+it.key+'">' +
+        '<td>'+it.name+'</td>' +
+        '<td class="num price-cell"><span class="jisshi">実費</span></td>' +
+        '<td class="num">—</td>' +
+        '<td class="unit-cell">'+it.unit+'</td>' +
+        '<td class="num"><input class="yen-input" type="number" min="0" step="1000" data-role="amount-input" value="0" oninput="recalc()"></td>' +
+        '<td class="note-cell" title="'+it.note+'">'+it.note+'</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // 金額の再計算
+  function recalc(){
+    let total = 0;
+    COST_ITEMS.forEach((it, i) => {
+      const tr = document.querySelector('#costBody tr[data-key="'+it.key+'"]');
+      let amount = 0;
+      if (it.price !== null) {
+        const qty = Number(tr.querySelector('[data-role="qty"]').value || 0);
+        amount = it.price * qty;
+        tr.querySelector('[data-role="amount"]').textContent = yen(amount);
+      } else {
+        amount = Number(tr.querySelector('[data-role="amount-input"]').value || 0);
+      }
+      total += amount;
+    });
+    const rev = Number(document.getElementById('revInput').value || 0);
+    document.getElementById('costTotal').textContent = yen(total);
+    const profit = rev - total;
+    const pc = document.getElementById('profitCell');
+    pc.textContent = yen(profit);
+    pc.classList.toggle('minus', profit < 0);
+  }
+
+  // 選んだ案件の保存内容を読み込んで表示
+  function loadCase(){
+    const id = document.getElementById('caseSelect').value;
+    const c = byId(id);
+    if (!c) return;
+    const role = (id in MY_ASSIGN) ? ('アサイン：' + MY_ASSIGN[id]) : '営業担当';
+    document.getElementById('caseHead').textContent = c.name + '（' + c.client + '）';
+    document.getElementById('caseSub').textContent = fmtDate(c.off) + '　/　' + role + '　/　必要人数 ' + (c.need||'—') + '名';
+
+    const f = loadStore()[id] || {};
+    document.getElementById('revInput').value = f.rev || '';
+    COST_ITEMS.forEach(it => {
+      const tr = document.querySelector('#costBody tr[data-key="'+it.key+'"]');
+      const saved = (f.items && f.items[it.key]) || {};
+      if (it.price !== null) {
+        tr.querySelector('[data-role="qty"]').value = saved.qty || 0;
+      } else {
+        tr.querySelector('[data-role="amount-input"]').value = saved.amount || 0;
+      }
+    });
+    recalc();
+  }
+
+  function saveCase(){
+    const id = document.getElementById('caseSelect').value;
+    if (!id) return;
+    const store = loadStore();
+    const items = {};
+    COST_ITEMS.forEach(it => {
+      const tr = document.querySelector('#costBody tr[data-key="'+it.key+'"]');
+      if (it.price !== null) {
+        const qty = Number(tr.querySelector('[data-role="qty"]').value || 0);
+        items[it.key] = { qty, amount: it.price * qty };
+      } else {
+        items[it.key] = { amount: Number(tr.querySelector('[data-role="amount-input"]').value || 0) };
+      }
+    });
+    store[id] = { rev: Number(document.getElementById('revInput').value || 0), items };
+    saveStore(store);
+    const ping = document.getElementById('savedPing');
+    ping.classList.add('show');
+    setTimeout(() => ping.classList.remove('show'), 2000);
+  }
+
+  function onMonthChange(){
+    if (buildCaseOptions()) loadCase();
+  }
+
+  // 初期化
+  buildMonthOptions();
+  buildCostRows();
+  if (buildCaseOptions()) loadCase();
+</script>
+@endverbatim
+@endpush

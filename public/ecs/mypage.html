@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS マイページ</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .mp-wrap { max-width: 960px; }
+
+    /* プロフィールの簡易カード */
+    .prof-card { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .prof-avatar {
+      width: 52px; height: 52px; border-radius: 50%; background: var(--brand-soft);
+      color: var(--brand-dark); display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800; flex-shrink: 0;
+    }
+    .prof-main { flex: 1; min-width: 180px; }
+    .prof-name { font-size: 17px; font-weight: 800; color: var(--ink); }
+    .prof-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .dept { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+    .dept.plan { background: #e3edff; color: #2456b8; }
+    .dept.sales { background: #e1f3e4; color: #2e7d32; }
+    .dept.creative { background: #efe6fb; color: #7a3fb8; }
+
+    /* 月絞り込みバー */
+    .mp-filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+    .mp-filter label { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .mp-filter select {
+      padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 13.5px; font-family: inherit; background: #fff;
+    }
+    .mp-filter .note { font-size: 12px; color: var(--muted); }
+
+    /* 案件テーブル */
+    .role-tag {
+      display: inline-block; padding: 1px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 700;
+      background: #e0f2fe; color: #0369a1; margin: 1px 2px 1px 0; white-space: nowrap;
+    }
+    .role-tag.sd { background: #ede9fe; color: #6d28d9; }
+    .role-tag.mc { background: #fde9d9; color: #b4530a; }
+    .sub-loc { font-size: 11.5px; color: var(--muted); }
+    .cal-btn {
+      background: #fff; color: var(--brand-dark); border: 1px solid var(--line);
+      border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+      font-family: inherit; white-space: nowrap;
+    }
+    .cal-btn:hover { background: #f3ece0; }
+
+    .sec-count { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+    .empty-note { color: var(--muted); font-size: 12.5px; margin: 8px 2px; }
+
+    /* アーカイブ折りたたみ */
+    .arch-toggle {
+      margin-top: 16px; background: none; border: none; cursor: pointer; font-family: inherit;
+      font-size: 13px; font-weight: 700; color: var(--brand-dark); padding: 4px 0;
+    }
+    .arch-toggle:hover { color: var(--brand); }
+    .arch-body { display: none; margin-top: 8px; }
+    .arch-body.open { display: block; }
+    .arch-body tr td { color: var(--muted); }
+
+    /* アカウント欄 */
+    .set-row {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+      padding: 14px 2px; border-bottom: 1px solid var(--line);
+    }
+    .set-row:last-child { border-bottom: none; }
+    .set-row .set-label { font-size: 14px; font-weight: 700; color: var(--ink); }
+    .set-row .set-note { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 3px; }
+    .acct-value { font-size: 14px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+    .line-btn {
+      background: #fff; color: var(--brand-dark); border: 1px solid var(--line);
+      border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer;
+      font-family: inherit;
+    }
+    .line-btn:hover { background: #f3ece0; }
+    .line-btn.danger { color: var(--danger); border-color: #f0b9b9; }
+    .line-btn.danger:hover { background: var(--danger-soft); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== サイドバー（全画面共通） ===== -->
+  <aside class="sidebar">
+    <div class="logo">ECS<small>スタッフアサイン管理</small></div>
+    <nav>
+      <a href="dashboard.html"><span class="nav-icon">▣</span> ダッシュボード</a>
+      <div class="group-label">案件</div>
+      <a href="projects.html"><span class="nav-icon">▤</span> 案件一覧</a>
+      <a href="project_form.html"><span class="nav-icon">＋</span> 案件登録</a>
+      <a href="#" onclick="window.open('projects_agg.html','ecs_agg','width=820,height=640'); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
+      <div class="group-label">アサイン</div>
+      <a href="assign.html"><span class="nav-icon">▦</span> 日別ボード</a>
+      <a href="assign_director.html"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
+      <a href="employee_availability.html"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
+      <a href="assign_detail.html"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
+      <a href="assign_publish.html"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+      <a href="entries.html"><span class="nav-icon">🙋</span> エントリー一覧</a>
+      <a href="pickup.html"><span class="nav-icon">📌</span> ピックアップ</a>
+      <a href="#" onclick="window.open('assign_wishlist.html','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">👥</span> スタッフ一覧</a>
+      <div class="group-label">スタッフ</div>
+      <a href="staff.html"><span class="nav-icon">☷</span> スタッフ管理</a>
+      <a href="employees.html"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+      <a href="staff_status.html"><span class="nav-icon">📊</span> 稼働状況</a>
+      <div class="group-label">その他</div>
+      <a class="active" href="mypage.html"><span class="nav-icon">🙍</span> マイページ</a>
+      <a href="mypage_finance.html"><span class="nav-icon">💰</span> 収支入力</a>
+      <a href="settings.html"><span class="nav-icon">⚙️</span> 共通設定</a>
+    </nav>
+    <div class="userbox">
+      <strong>baba さん</strong>
+      社員
+      <div style="margin-top:8px;"><a href="login.html" style="color:#a08a73;">ログアウト</a></div>
+    </div>
+  </aside>
+
+  <!-- ===== 本文 ===== -->
+  <div class="main">
+    <div class="topbar">
+      <h1>マイページ</h1>
+      <div class="spacer"></div>
+      <span class="role-pill">社員</span>
+    </div>
+
+    <div class="content">
+      <div class="mock-note">これは見た目確認用のモックです。「baba さん」でログイン中という想定で、自分の案件を表示しています（データは仮の見本です）。</div>
+
+      <!-- プロフィール -->
+      <div class="panel mp-wrap">
+        <div class="prof-card">
+          <div class="prof-avatar">馬</div>
+          <div class="prof-main">
+            <div class="prof-name">baba さん <span class="dept plan">イベプラ</span></div>
+            <div class="prof-sub">所属：イベント東（東京）　／　baba@ikusa.co.jp</div>
+          </div>
+          <button class="line-btn" onclick="location.href='mypage_finance.html'">💰 収支を入力する</button>
+          <button class="line-btn" onclick="alert('プロフィール編集の画面を開きます（モックのためダミーです）。氏名・拠点・区分は社員名簿と連動する想定です。')">プロフィールを編集</button>
+        </div>
+      </div>
+
+      <!-- 月の絞り込み -->
+      <div class="panel mp-wrap" style="margin-top:20px;">
+        <div class="mp-filter">
+          <label for="monthFilter">月で絞り込み：</label>
+          <select id="monthFilter" onchange="render()"></select>
+          <span class="note">「アサインされた案件」「営業担当の案件」の両方に効きます</span>
+        </div>
+      </div>
+
+      <!-- ① アサインされた案件 -->
+      <div class="panel mp-wrap" style="margin-top:20px;">
+        <div class="panel-head">
+          <h2>アサインされた案件</h2>
+          <div class="spacer"></div>
+          <button class="btn primary sm" onclick="alert('今後のアサイン案件をGoogleカレンダーにまとめて登録します（モックのためダミーです）。前後の「移動」予定も付ける想定です。E-1連携で実装予定）。')">📅 今後をまとめて登録</button>
+        </div>
+        <p class="sec-count">自分が現場メンバー（ディレクター等）としてアサインされた案件です。<span id="asgCount"></span></p>
+
+        <table class="tbl">
+          <thead>
+            <tr><th>日程</th><th>案件名</th><th>自分のポジション</th><th>集合・解散</th><th>会場</th><th>状況</th><th>操作</th></tr>
+          </thead>
+          <tbody id="asgBody"></tbody>
+        </table>
+        <p class="empty-note" id="asgEmpty" style="display:none;">この月にアサインされた案件はありません。</p>
+
+        <button class="arch-toggle" id="asgArchBtn" onclick="toggleArch('asg')">▸ アーカイブ（終了した案件） <span id="asgArchCnt"></span></button>
+        <div class="arch-body" id="asgArch">
+          <table class="tbl">
+            <thead>
+              <tr><th>日程</th><th>案件名</th><th>自分のポジション</th><th>集合・解散</th><th>会場</th><th>状況</th></tr>
+            </thead>
+            <tbody id="asgArchBody"></tbody>
+          </table>
+          <p class="empty-note" id="asgArchEmpty" style="display:none;">アーカイブはありません。</p>
+        </div>
+      </div>
+
+      <!-- ② 営業担当の案件 -->
+      <div class="panel mp-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>営業担当の案件</h2></div>
+        <p class="sec-count">自分が営業担当（セールス）として登録した案件です。<span id="salCount"></span></p>
+
+        <table class="tbl">
+          <thead>
+            <tr><th>日程</th><th>案件名</th><th>ディレクター</th><th>集合・解散</th><th>会場</th><th>状況</th></tr>
+          </thead>
+          <tbody id="salBody"></tbody>
+        </table>
+        <p class="empty-note" id="salEmpty" style="display:none;">この月に営業担当の案件はありません。</p>
+
+        <button class="arch-toggle" id="salArchBtn" onclick="toggleArch('sal')">▸ アーカイブ（終了した案件） <span id="salArchCnt"></span></button>
+        <div class="arch-body" id="salArch">
+          <table class="tbl">
+            <thead>
+              <tr><th>日程</th><th>案件名</th><th>ディレクター</th><th>集合・解散</th><th>会場</th><th>状況</th></tr>
+            </thead>
+            <tbody id="salArchBody"></tbody>
+          </table>
+          <p class="empty-note" id="salArchEmpty" style="display:none;">アーカイブはありません。</p>
+        </div>
+      </div>
+
+      <p class="muted" style="font-size:11.5px; margin:0 0 4px; max-width:960px;">
+        ※ 「アサインされた案件」は、本番ではログイン社員ごとの実際のアサインから自動表示します（モックでは baba さんの担当ぶんを仮に設定しています）。「営業担当」は案件の営業担当から自動で抽出しています。
+      </p>
+
+      <!-- アカウント -->
+      <div class="panel mp-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>アカウント</h2></div>
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">ログイン中のメールアドレス</span>
+            <span class="set-note">ログインに使うメールアドレスです。</span>
+          </div>
+          <div><span class="acct-value">baba@ikusa.co.jp</span></div>
+        </div>
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">パスワード</span>
+            <span class="set-note">定期的な変更をおすすめします。</span>
+          </div>
+          <div><button class="line-btn" onclick="alert('パスワード変更の画面を開きます（モックのためダミーです）。')">パスワードを変更する</button></div>
+        </div>
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">ログアウト</span>
+            <span class="set-note">この端末からサインアウトします。</span>
+          </div>
+          <div><button class="line-btn danger" onclick="doLogout()">ログアウト</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 共通の案件データ -->
+<script src="data/cases.js"></script>
+<script>
+  // ===== ログイン中の社員（モックでは baba 固定） =====
+  const ME = 'baba';
+  const WK = ['日','月','火','水','木','金','土'];
+
+  // baba が現場メンバーとしてアサインされた案件（モックの仮設定：案件ID→自分のポジション）
+  // ※本番ではログイン社員の実アサインから自動取得。cases.js は触らずここで持つ。
+  const MY_ASSIGN = {
+    'past_fes':  'ディレクター',   // 終了（アーカイブ確認用）
+    'undo_d1':   'ディレクター',
+    'undo_d2':   'ディレクター',
+    'undo_d3':   'ディレクター',
+    'mizu':      'ディレクター',
+    'shinkan':   'ディレクター',
+    'konshin':   'SD',
+    'enni1':     'MC',
+    'bousai':    'ディレクター',   // 翌月（月絞り確認用）
+    'fes_setup': 'ディレクター'    // さらに先（月絞り確認用）
+  };
+
+  // off → Date
+  function dateOf(off) {
+    return (window.ECS_caseDate ? window.ECS_caseDate(off)
+      : (function(){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+off); return d; })());
+  }
+  // off → 「7/20(日)」
+  function fmtDate(off) {
+    const d = dateOf(off);
+    return (d.getMonth() + 1) + '/' + d.getDate() + '(' + WK[d.getDay()] + ')';
+  }
+  // off → 月キー「2026-07」
+  function monthKey(off) {
+    const d = dateOf(off);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  // 月キー → 「2026年7月」
+  function monthLabel(key) {
+    const [y, m] = key.split('-');
+    return y + '年' + Number(m) + '月';
+  }
+
+  function statusBadge(status) {
+    const cls = status === '確定' ? 'ok' : (status === '調整中' ? 'blue' : 'amber');
+    return '<span class="badge ' + cls + '">' + (status || '—') + '</span>';
+  }
+  function posTag(pos) {
+    const cls = pos === 'SD' ? ' sd' : (pos === 'MC' ? ' mc' : '');
+    return '<span class="role-tag' + cls + '">' + pos + '</span>';
+  }
+  function byId(id) { return (window.ECS_CASES || []).find(c => c.id === id); }
+
+  // データの組み立て
+  function assignedCases() {
+    return Object.keys(MY_ASSIGN)
+      .map(id => { const c = byId(id); return c ? Object.assign({ myPos: MY_ASSIGN[id] }, c) : null; })
+      .filter(c => c && !c.draft);
+  }
+  function salesCases() {
+    return (window.ECS_CASES || []).filter(c => c.sales === ME && !c.draft);
+  }
+
+  // 月セレクトの選択肢を作る（両セクションの案件に出てくる月）
+  function buildMonthOptions() {
+    const keys = new Set();
+    assignedCases().forEach(c => keys.add(monthKey(c.off)));
+    salesCases().forEach(c => keys.add(monthKey(c.off)));
+    const sorted = Array.from(keys).sort();
+    const sel = document.getElementById('monthFilter');
+    sel.innerHTML = '<option value="">すべての月</option>' +
+      sorted.map(k => '<option value="' + k + '">' + monthLabel(k) + '</option>').join('');
+  }
+
+  // 行HTML（アサイン用：自分のポジション列あり）
+  function asgRow(c, isArch) {
+    const cal = isArch ? ''
+      : '<td><button class="cal-btn" onclick="alert(\'この案件をGoogleカレンダーに登録します（モックのためダミーです）。\')">📅 登録</button></td>';
+    return '<tr>' +
+      '<td>' + fmtDate(c.off) + '</td>' +
+      '<td><strong>' + c.name + '</strong><br><span class="sub-loc">' + c.client + '</span></td>' +
+      '<td>' + posTag(c.myPos) + '</td>' +
+      '<td>' + (c.meet || '—') + '〜' + (c.leave || '—') + '</td>' +
+      '<td>' + (c.placeShort || '—') + '</td>' +
+      '<td>' + statusBadge(c.status) + '</td>' +
+      (isArch ? '' : cal) +
+    '</tr>';
+  }
+  // 行HTML（営業用：ディレクター列）
+  function salRow(c) {
+    return '<tr>' +
+      '<td>' + fmtDate(c.off) + '</td>' +
+      '<td><strong>' + c.name + '</strong><br><span class="sub-loc">' + c.client + '</span></td>' +
+      '<td>' + (c.dir || '—') + '</td>' +
+      '<td>' + (c.meet || '—') + '〜' + (c.leave || '—') + '</td>' +
+      '<td>' + (c.placeShort || '—') + '</td>' +
+      '<td>' + statusBadge(c.status) + '</td>' +
+    '</tr>';
+  }
+
+  function render() {
+    const mf = document.getElementById('monthFilter').value;
+    const inMonth = c => !mf || monthKey(c.off) === mf;
+
+    // ① アサイン
+    const asg = assignedCases().filter(inMonth);
+    const asgUp  = asg.filter(c => !c.archived).sort((a, b) => a.off - b.off);
+    const asgArc = asg.filter(c => c.archived).sort((a, b) => b.off - a.off);
+    document.getElementById('asgBody').innerHTML = asgUp.map(c => asgRow(c, false)).join('');
+    document.getElementById('asgEmpty').style.display = asgUp.length ? 'none' : 'block';
+    document.getElementById('asgArchBody').innerHTML = asgArc.map(c => asgRow(c, true)).join('');
+    document.getElementById('asgArchEmpty').style.display = asgArc.length ? 'none' : 'block';
+    document.getElementById('asgArchCnt').textContent = '（' + asgArc.length + '件）';
+    document.getElementById('asgCount').textContent = '表示中 ' + asgUp.length + ' 件';
+
+    // ② 営業担当
+    const sal = salesCases().filter(inMonth);
+    const salUp  = sal.filter(c => !c.archived).sort((a, b) => a.off - b.off);
+    const salArc = sal.filter(c => c.archived).sort((a, b) => b.off - a.off);
+    document.getElementById('salBody').innerHTML = salUp.map(salRow).join('');
+    document.getElementById('salEmpty').style.display = salUp.length ? 'none' : 'block';
+    document.getElementById('salArchBody').innerHTML = salArc.map(salRow).join('');
+    document.getElementById('salArchEmpty').style.display = salArc.length ? 'none' : 'block';
+    document.getElementById('salArchCnt').textContent = '（' + salArc.length + '件）';
+    document.getElementById('salCount').textContent = '表示中 ' + salUp.length + ' 件';
+  }
+
+  function toggleArch(key) {
+    const body = document.getElementById(key + 'Arch');
+    const btn  = document.getElementById(key + 'ArchBtn');
+    const open = body.classList.toggle('open');
+    btn.innerHTML = (open ? '▾' : '▸') + ' アーカイブ（終了した案件） <span id="' + key + 'ArchCnt">' +
+      document.getElementById(key + 'ArchCnt').textContent + '</span>';
+  }
+
+  function doLogout() {
+    if (confirm('ログアウトします。よろしいですか？')) location.href = 'login.html';
+  }
+
+  buildMonthOptions();
+  render();
+</script>
+</body>
+</html>

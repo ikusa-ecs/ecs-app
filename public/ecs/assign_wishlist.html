@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS スタッフ一覧</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ===== 希望者一覧（別ウィンドウ）専用スタイル ===== */
+    body { background: var(--bg); margin: 0; }
+    .wl-wrap { padding: 18px 22px 30px; max-width: 1100px; margin: 0 auto; }
+    .wl-head h1 { font-size: 20px; margin: 0 0 4px; }
+    .wl-head .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
+
+    /* 上部の数値カード */
+    .wl-cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    .wl-card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: var(--shadow); padding: 12px 16px; min-width: 150px;
+    }
+    .wl-card .c-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .wl-card .c-num { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .wl-card .c-num small { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+    /* 可能ポジション別の人数カード */
+    .wl-poscard {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: var(--shadow); padding: 12px 16px; flex: 1 1 360px;
+    }
+    .wl-poscard .c-label { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+    .pos-counts { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pos-count { display: inline-flex; align-items: baseline; gap: 5px; font-size: 13px;
+      background: var(--brand-soft); color: var(--brand-dark); border-radius: 999px; padding: 4px 11px; font-weight: 700; }
+    .pos-count b { font-size: 15px; font-variant-numeric: tabular-nums; }
+
+    /* 絞り込み */
+    .wl-filter { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .wl-filter .f-item { display: flex; flex-direction: column; gap: 4px; }
+    .wl-filter label { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .wl-filter select, .wl-filter input {
+      padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 13px; font-family: inherit; background: #fff; min-width: 120px;
+    }
+
+    /* テーブル */
+    table.tbl th { white-space: nowrap; }
+    td.center { text-align: center; font-variant-numeric: tabular-nums; }
+    .lv { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+    .lv.new { background: var(--brand-soft); color: var(--brand-dark); }
+    .lv.mid { background: #ece3d4; color: #7a6a58; }
+    .lv.vet { background: var(--ok-soft); color: #15803d; }
+
+    /* 割合バー */
+    .rate { display: inline-flex; align-items: center; gap: 8px; }
+    .rate .rbar { width: 70px; height: 8px; background: #ece3d4; border-radius: 999px; overflow: hidden; }
+    .rate .rbar > i { display: block; height: 100%; }
+    .rate .rbar > i.hi { background: var(--ok); }
+    .rate .rbar > i.mid { background: var(--brand); }
+    .rate .rbar > i.low { background: var(--warn); }
+    .rate .rtxt { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; width: 36px; }
+
+    /* 可能ポジションのタグ */
+    .ptag { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; margin: 0 3px 3px 0;
+      display: inline-block; background: #ece3d4; color: #7a6a58; }
+    .ptag.key { background: var(--brand-soft); color: var(--brand-dark); } /* D/OP/MC/軍師＝経験者向け */
+
+    .note { font-size: 12px; color: var(--muted); margin-top: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wl-wrap">
+    <div class="wl-head">
+      <h1>👥 スタッフ一覧（2026年 7月）</h1>
+      <div class="sub">いま稼働希望を出してくれているスタッフの一覧です。希望日数・実アサイン数・その割合、できるポジションを確認できます。（見た目確認用のモックで、人数はすべて仮の見本です）</div>
+    </div>
+
+    <!-- 上部の数値カード -->
+    <div class="wl-cards">
+      <div class="wl-card">
+        <div class="c-label">希望提出者</div>
+        <div class="c-num" id="cTotal">0<small> 名</small></div>
+      </div>
+      <div class="wl-card">
+        <div class="c-label">希望日数の合計</div>
+        <div class="c-num" id="cWish">0<small> 日</small></div>
+      </div>
+      <div class="wl-card">
+        <div class="c-label">まだアサイン0の人</div>
+        <div class="c-num" id="cZero" style="color:var(--danger);">0<small> 名</small></div>
+      </div>
+      <div class="wl-poscard">
+        <div class="c-label">できるポジション別の人数（このポジションを担当できる希望者）</div>
+        <div class="pos-counts" id="posCounts"></div>
+      </div>
+    </div>
+
+    <!-- 絞り込み -->
+    <div class="wl-filter">
+      <div class="f-item">
+        <label>区分</label>
+        <select id="fLv" onchange="render()">
+          <option value="">すべて</option>
+          <option value="new">新人</option>
+          <option value="mid">中堅</option>
+          <option value="vet">古メンバー</option>
+        </select>
+      </div>
+      <div class="f-item">
+        <label>できるポジション</label>
+        <select id="fPos" onchange="render()">
+          <option value="">すべて</option>
+          <option value="D">D（ディレクター）</option>
+          <option value="OP">OP（音響）</option>
+          <option value="MC">MC（司会進行）</option>
+          <option value="FC">FC（巡回ファシリ）</option>
+          <option value="CK">CK（チェッカー）</option>
+          <option value="軍師・サポーター">軍師・サポーター</option>
+          <option value="受付">受付</option>
+        </select>
+      </div>
+      <div class="f-item">
+        <label>並べ替え</label>
+        <select id="fSort" onchange="render()">
+          <option value="wish">希望日数が多い順</option>
+          <option value="rate">アサイン割合が低い順</option>
+          <option value="assigned">アサイン数が少ない順</option>
+        </select>
+      </div>
+    </div>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>スタッフ</th>
+          <th>区分</th>
+          <th class="center">希望日数</th>
+          <th class="center">アサイン済</th>
+          <th>アサイン割合</th>
+          <th class="center">MCアサイン<br>回数</th>
+          <th>できるポジション</th>
+        </tr>
+      </thead>
+      <tbody id="wlBody"></tbody>
+    </table>
+
+    <div class="note">
+      ※「アサイン割合」＝アサイン済 ÷ 希望日数。割合が低い人は、希望を出しているのにまだ入れていない人です（優先的に検討の目安）。<br>
+      ※できるポジションの青タグ（D／OP／MC／軍師・サポーター）は経験者向けポジションです。
+    </div>
+  </div>
+
+<script>
+  // ===== 希望者の仮データ =====
+  // lv: new=新人 / mid=中堅 / vet=古メンバー
+  // wish: 今月の稼働希望を出した日数 ／ assigned: そのうち実際にアサインされた日数
+  // pos: できるポジション
+  const KEY_POS = ['D','OP','MC','軍師・サポーター']; // 経験者向け（青タグ）
+  const ALL_POS = ['D','OP','MC','FC','CK','軍師・サポーター','受付'];
+
+  // mc: 今月そのうちMCとしてアサインされた回数（MCができる人のみ。できない人は表示で「—」）
+  const people = [
+    { id:'S-001', name:'高橋 由依', lv:'vet', wish:8,  assigned:5, mc:3, pos:['D','MC','FC','受付'] },
+    { id:'S-007', name:'伊藤 健',   lv:'vet', wish:7,  assigned:5, mc:0, pos:['OP','FC'] },
+    { id:'S-003', name:'渡辺 さくら',lv:'vet', wish:6,  assigned:4, mc:4, pos:['MC','FC','受付'] },
+    { id:'S-027', name:'清水 陽',   lv:'vet', wish:9,  assigned:5, mc:0, pos:['FC','軍師・サポーター','受付'] },
+    { id:'S-030', name:'森 結菜',   lv:'vet', wish:7,  assigned:4, mc:0, pos:['FC','受付'] },
+    { id:'S-014', name:'鈴木 美咲', lv:'mid', wish:8,  assigned:0, mc:0, pos:['軍師・サポーター','FC','受付'] },
+    { id:'S-021', name:'山田 涼',   lv:'mid', wish:9,  assigned:2, mc:0, pos:['FC','CK'] },
+    { id:'S-009', name:'松本 美優', lv:'mid', wish:7,  assigned:4, mc:2, pos:['MC','FC','受付'] },
+    { id:'S-005', name:'井上 大輝', lv:'mid', wish:8,  assigned:5, mc:0, pos:['FC','CK','OP'] },
+    { id:'S-018', name:'木村 拓海', lv:'mid', wish:6,  assigned:3, mc:0, pos:['CK','FC'] },
+    { id:'S-011', name:'林 美月',   lv:'mid', wish:6,  assigned:4, mc:0, pos:['受付','FC'] },
+    { id:'S-024', name:'近藤 樹',   lv:'mid', wish:8,  assigned:6, mc:1, pos:['MC','FC','CK'] },
+    { id:'S-032', name:'佐藤 健太', lv:'new', wish:10, assigned:0, mc:0, pos:['FC','受付'] },
+    { id:'S-035', name:'池田 莉子', lv:'new', wish:6,  assigned:1, mc:0, pos:['受付','CK'] },
+    { id:'S-038', name:'橋本 颯',   lv:'new', wish:5,  assigned:1, mc:0, pos:['CK','受付'] },
+    { id:'S-041', name:'石川 葵',   lv:'new', wish:4,  assigned:0, mc:0, pos:['受付'] },
+  ];
+
+  const lvLabel = { new:'新人', mid:'中堅', vet:'古' };
+  const body = document.getElementById('wlBody');
+
+  function rateOf(p){ return p.wish ? Math.round(p.assigned / p.wish * 100) : 0; }
+  function rateClass(r){ return r >= 70 ? 'hi' : (r >= 40 ? 'mid' : 'low'); }
+
+  function render(){
+    const fLv   = document.getElementById('fLv').value;
+    const fPos  = document.getElementById('fPos').value;
+    const fSort = document.getElementById('fSort').value;
+
+    let list = people.filter(p => {
+      if (fLv && p.lv !== fLv) return false;
+      if (fPos && !p.pos.includes(fPos)) return false;
+      return true;
+    });
+
+    if (fSort === 'wish')      list.sort((a,b) => b.wish - a.wish);
+    if (fSort === 'rate')      list.sort((a,b) => rateOf(a) - rateOf(b));
+    if (fSort === 'assigned')  list.sort((a,b) => a.assigned - b.assigned);
+
+    // テーブル
+    body.innerHTML = '';
+    list.forEach(p => {
+      const r = rateOf(p);
+      const posHtml = p.pos.map(pos =>
+        `<span class="ptag ${KEY_POS.includes(pos) ? 'key' : ''}">${pos}</span>`
+      ).join('');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${p.name}</strong><br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
+        <td><span class="lv ${p.lv}">${lvLabel[p.lv]}</span></td>
+        <td class="center">${p.wish}</td>
+        <td class="center">${p.assigned}</td>
+        <td><span class="rate"><span class="rbar"><i class="${rateClass(r)}" style="width:${r}%;"></i></span><span class="rtxt">${r}%</span></span></td>
+        <td class="center">${p.pos.includes('MC') ? '<b>'+p.mc+'</b> 回' : '—'}</td>
+        <td>${posHtml}</td>`;
+      body.appendChild(tr);
+    });
+
+    // 上部カード（全データ基準＝絞り込みに左右されない）
+    document.getElementById('cTotal').innerHTML = people.length + '<small> 名</small>';
+    document.getElementById('cWish').innerHTML  = people.reduce((s,p)=>s+p.wish,0) + '<small> 日</small>';
+    document.getElementById('cZero').innerHTML  = people.filter(p=>p.assigned===0).length + '<small> 名</small>';
+
+    // できるポジション別の人数
+    const pc = document.getElementById('posCounts');
+    pc.innerHTML = ALL_POS.map(pos => {
+      const n = people.filter(p => p.pos.includes(pos)).length;
+      return `<span class="pos-count ${KEY_POS.includes(pos) ? '' : ''}">${pos} <b>${n}</b>名</span>`;
+    }).join('');
+  }
+
+  render();
+</script>
+</body>
+</html>

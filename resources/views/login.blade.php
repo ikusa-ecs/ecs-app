@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS ログイン</title>
+  <link rel="stylesheet" href="/ecs/style.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #3a2d20; }
+    .login-card {
+      background: #fff; width: 380px; max-width: 92vw; border-radius: 16px;
+      padding: 36px 34px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    .login-card .brand { font-size: 30px; font-weight: 800; letter-spacing: 2px; color: var(--brand); text-align: center; }
+    .login-card .brand small { display:block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
+    .login-card h1 { font-size: 17px; text-align: center; margin: 22px 0 6px; }
+    .login-card p.lead { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }
+    .sent { display:none; background: var(--ok-soft); color:#166534; border-radius:10px; padding:14px; font-size:13px; margin-bottom:16px; }
+    .mock-entry { margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--line, #e6cdb8); display: flex; flex-direction: column; gap: 10px; }
+    .mock-entry-label { text-align:center; color: var(--muted); font-size: 11.5px; margin: 0 0 2px; }
+    .mock-entry .btn { width: 100%; justify-content: center; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="brand">ECS<small>スタッフアサイン管理</small></div>
+    <h1>ログイン</h1>
+    <p class="lead">登録済みのメールアドレスにログイン用リンクをお送りします（パスワード不要）</p>
+
+    <div class="sent" id="sent">
+      ✉️ ログインリンクを送信しました（モックのため実際には送信されません）。<br>
+      下のボタンでアプリに入れます。
+    </div>
+
+    <div class="form-row">
+      <label>メールアドレス</label>
+      <input type="email" id="email" placeholder="you@example.com" value="baba@ikusa.co.jp">
+    </div>
+
+    <button class="btn primary" style="width:100%; justify-content:center;" onclick="sendLink()">ログインリンクを送る</button>
+
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line, #e6cdb8); text-align:center;">
+      <p class="muted" style="font-size:12px; margin:0 0 8px;">まだ登録していない方（スタッフ・社員）は</p>
+      <a class="btn ghost" style="width:100%; justify-content:center;" href="/register">＋ 新規登録</a>
+    </div>
+
+    <div class="mock-entry">
+      <p class="mock-entry-label">モック用：ログイン後の画面を直接見る</p>
+      <a class="btn primary" href="/dashboard">🧑‍💼 社員として入る（ダッシュボード）</a>
+      <a class="btn ghost" href="/staff-portal">🙋 スタッフとして入る（スタッフ画面）</a>
+    </div>
+
+    <p class="muted" style="text-align:center; font-size:11.5px; margin-top:20px;">
+      スタッフ・社員ともにご自身で新規登録できます（種別を選んで登録）。<br>
+      これは見た目確認用のモックです。<br>
+      ※本番は、入力されたメールアドレスから社員かスタッフかを判定し、自動で行き先を分ける想定（方式は要検討）。
+    </p>
+  </div>
+
+  <script>
+    function sendLink() {
+      document.getElementById('sent').style.display = 'block';
+    }
+  </script>
+</body>
+</html>

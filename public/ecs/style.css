@@ -1,0 +1,280 @@
+/* ECS モック共通スタイル
+   見た目と画面遷移の確認用。実データには接続していません。 */
+
+:root {
+  --bg: #f3ebdf;        /* くすみグレージュの背景 */
+  --panel: #fdfbf6;     /* あたたかい白 */
+  --ink: #4f4338;       /* くすみブラウンの文字 */
+  --muted: #9c8f80;     /* やわらかいグレージュ */
+  --line: #e6dccb;      /* くすみクリームの罫線 */
+  --brand: #c5876a;     /* くすみテラコッタ（メインカラー） */
+  --brand-dark: #a76a4e;/* 濃いくすみテラコッタ */
+  --brand-soft: #f1e5da;/* 淡いくすみベージュ */
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --ok-soft: #e7f6ec;
+  --warn-soft: #fdf3e3;
+  --danger-soft: #fde8e8;
+  --shadow: 0 1px 3px rgba(60, 40, 20, 0.08), 0 1px 2px rgba(60, 40, 20, 0.04);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== アプリ全体レイアウト（サイドバー＋本文） ===== */
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: #e7dcc8;
+  color: #6e5f4f;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  /* 画面の左に貼り付けて追従させる（下までスクロールしてもメニューが消えない）。
+     JSは使わずブラウザ標準の sticky なので動作は軽い。 */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar .logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #4b3a2c;
+  padding: 4px 22px 10px;
+  letter-spacing: 1px;
+}
+.sidebar .logo small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: #a08a73;
+  letter-spacing: 0;
+  margin-top: 2px;
+}
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+.sidebar nav a {
+  color: #6e5b49;
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar nav a:hover { background: #dccbb1; color: #4f4338; text-decoration: none; }
+.sidebar nav a.active { background: var(--brand); color: #fff; }
+.sidebar nav .group-label {
+  font-size: 11px;
+  color: #a08a73;
+  padding: 7px 14px 3px;
+  letter-spacing: 1px;
+}
+/* グループ見出し＝クリックで開閉。三角(▾)が開閉の向きを示す。 */
+.sidebar .nav-group .group-label {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sidebar .nav-group .group-label:hover { color: #6e5b49; }
+.sidebar .nav-group .caret { font-size: 9px; transition: transform .15s; }
+.sidebar .nav-group.collapsed .caret { transform: rotate(-90deg); }
+.sidebar .nav-group.collapsed .group-items { display: none; }
+.sidebar .nav-icon { width: 18px; text-align: center; }
+.sidebar .userbox {
+  margin-top: auto;
+  padding: 14px 22px 0;
+  border-top: 1px solid #e0cdb2;
+  font-size: 12px;
+  color: #9a8675;
+}
+.sidebar .userbox strong { color: #4b3a2c; display: block; font-size: 13px; }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  height: 58px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.topbar h1 { font-size: 18px; margin: 0; }
+.topbar .spacer { flex: 1; }
+.topbar .role-pill {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.content { padding: 24px; }
+
+/* ===== モック注記バナー ===== */
+.mock-note {
+  background: var(--warn-soft);
+  border: 1px solid #f6d9a7;
+  color: #8a5a00;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  margin-bottom: 20px;
+}
+
+/* ===== カード・パネル ===== */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.panel + .panel { margin-top: 20px; }
+.panel h2 { font-size: 16px; margin: 0 0 14px; }
+.panel-head { display: flex; align-items: center; margin: 0 0 14px; }
+.panel-head h2 { margin: 0; }
+.panel-head .spacer { flex: 1; }
+
+.grid { display: grid; gap: 20px; }
+.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* ===== 数値カード（ダッシュボード） ===== */
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+.stat .label { color: var(--muted); font-size: 13px; }
+.stat .value { font-size: 30px; font-weight: 700; margin-top: 4px; }
+.stat .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.stat .value.warn { color: var(--warn); }
+.stat .value.danger { color: var(--danger); }
+.stat .value.ok { color: var(--ok); }
+
+/* ===== テーブル ===== */
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.tbl th, table.tbl td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+table.tbl th { color: var(--muted); font-weight: 600; font-size: 12.5px; background: #f8f3ea; }
+table.tbl tbody tr:hover { background: #f7f1e6; }
+table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ===== バッジ ===== */
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.badge.gray { background: #ece3d4; color: #8a7a66; }
+.badge.blue { background: var(--brand-soft); color: var(--brand-dark); }
+.badge.green { background: var(--ok-soft); color: #15803d; }
+.badge.amber { background: var(--warn-soft); color: #b45309; }
+.badge.red { background: var(--danger-soft); color: #b91c1c; }
+
+/* 現場種別の色分け */
+.cat-体力 { background: #e0f2fe; color: #0369a1; }
+.cat-安定重視 { background: #ede9fe; color: #6d28d9; }
+.cat-育成 { background: #dcfce7; color: #15803d; }
+.cat-通常 { background: #ece3d4; color: #7a6a58; }
+
+/* ===== ボタン ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover { background: #f3ece0; text-decoration: none; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-dark); }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 5px 11px; font-size: 12.5px; }
+
+/* ===== フォーム ===== */
+.form-row { margin-bottom: 16px; }
+.form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+.form-row label .req { color: var(--danger); margin-left: 3px; }
+.form-row .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.form-row input[type="text"],
+.form-row input[type="number"],
+.form-row input[type="date"],
+.form-row input[type="time"],
+.form-row input[type="email"],
+.form-row select,
+.form-row textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+.form-row input:focus,
+.form-row select:focus,
+.form-row textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+
+/* ===== バー（充足率など） ===== */
+.bar { background: #ece3d4; border-radius: 999px; height: 8px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
+.bar > span.ok { background: var(--ok); }
+.bar > span.warn { background: var(--warn); }
+.bar > span.danger { background: var(--danger); }
+
+/* ===== 警告リスト ===== */
+.alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.alert.warn { background: var(--warn-soft); color: #92400e; }
+.alert.danger { background: var(--danger-soft); color: #991b1b; }
+.alert.ok { background: var(--ok-soft); color: #166534; }
+.alert .ico { font-weight: 700; }
+
+.muted { color: var(--muted); }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }

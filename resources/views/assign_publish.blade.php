@@ -1,0 +1,600 @@
+@extends('layouts.app')
+@section('title', 'スタッフ公開ボード')
+@section('h1', 'スタッフ公開ボード')
+@php($active = 'assign_publish')
+
+@push('head')
+@verbatim
+<style>
+    /* ===== スタッフ公開ボード（表）専用スタイル ===== */
+
+    /* スタッフ画面のお知らせ文の編集パネル */
+    .notice-edit { margin-bottom: 18px; }
+    .notice-edit .panel-head h2 { font-size: 15px; }
+    .notice-edit textarea {
+      width: 100%; box-sizing: border-box; min-height: 56px; resize: vertical;
+      border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px;
+      font-family: inherit; font-size: 13.5px; color: var(--ink); background: #fffdf9;
+    }
+    .notice-edit textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+    .notice-edit .row { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+    .notice-edit .saved { font-size: 12px; color: #15803d; opacity: 0; transition: opacity .2s; }
+    .notice-edit .saved.show { opacity: 1; }
+
+    /* 上部のサマリー＋一括操作バー */
+    .pub-bar {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 16px; margin-bottom: 16px;
+    }
+    .pub-bar .stat-mini { display: flex; align-items: baseline; gap: 6px; }
+    .pub-bar .stat-mini .n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pub-bar .stat-mini .n.on  { color: #15803d; }
+    .pub-bar .stat-mini .n.off { color: #b45309; }
+    .pub-bar .stat-mini .lbl { font-size: 12px; color: var(--muted); }
+    .pub-bar .spacer { flex: 1; }
+    .pub-bar select { padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; font-family: inherit; background: #fff; }
+    .bulk-info { font-size: 12.5px; color: var(--muted); }
+    .bulk-info b { color: var(--ink); }
+
+    /* 表 */
+    table.tbl th { white-space: nowrap; }
+    table.tbl td { vertical-align: middle; }
+    td.chk, th.chk { width: 34px; text-align: center; }
+    table.tbl input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+
+    /* 月グループ見出し（クリックで開閉） */
+    tr.group-row { cursor: pointer; }
+    tr.group-row td {
+      background: var(--brand-soft); color: var(--brand-dark);
+      font-weight: 700; font-size: 13px; padding: 9px 12px; border-bottom: 1px solid var(--line);
+    }
+    tr.group-row td:hover { filter: brightness(0.97); }
+    tr.group-row.past td { background: #f1ece3; color: var(--muted); }
+    tr.group-row .gcaret { display: inline-block; width: 14px; font-size: 11px; }
+    tr.group-row .g-count { color: var(--muted); font-weight: 600; margin-left: 8px; font-size: 12px; }
+
+    td.date-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.date-cell .dow { font-size: 11.5px; color: var(--muted); margin-left: 2px; }
+    td.date-cell .dow.sun { color: var(--danger); } td.date-cell .dow.sat { color: var(--brand); }
+
+    td.proj-cell strong { font-size: 14px; }
+    td.proj-cell .client { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+    td.proj-cell a.proj-link { color: var(--ink); text-decoration: none; }
+    td.proj-cell a.proj-link:hover strong { color: var(--brand-dark); text-decoration: underline; }
+
+    /* 会場（住所）／集合場所 */
+    td.place-cell { font-size: 12.5px; max-width: 260px; }
+    td.place-cell .mp { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    /* 集合〜解散 */
+    td.meet-cell .leave { font-size: 12px; color: var(--muted); }
+
+    /* 集合（社員／スタッフ）セル */
+    td.meet-cell { white-space: nowrap; }
+    td.meet-cell .emp { font-size: 12px; color: var(--muted); }
+    td.meet-cell .emp b { color: var(--ink); font-weight: 600; }
+    td.meet-cell .staff-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    td.meet-cell .staff-row .lab { font-size: 11px; color: var(--muted); }
+    td.meet-cell input.smeet {
+      width: 74px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px;
+      font-family: inherit; font-size: 12.5px; text-align: center;
+    }
+    td.meet-cell input.smeet:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+    td.meet-cell .diff { font-size: 10.5px; font-weight: 700; color: #b45309; background: var(--warn-soft); padding: 1px 6px; border-radius: 999px; }
+
+    /* 公開状態バッジ */
+    .pub-badge { font-size: 11.5px; font-weight: 700; padding: 2px 10px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+    .pub-badge .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+    .pub-badge.on  { background: var(--ok-soft);  color: #15803d; } .pub-badge.on .dot  { background: #16a34a; }
+    .pub-badge.off { background: var(--warn-soft); color: #b45309; } .pub-badge.off .dot { background: #d97706; }
+
+    /* 操作セル */
+    td.ops-cell { white-space: nowrap; }
+    .pub-toggle { border: none; border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .pub-toggle.go   { background: var(--brand); color: #fff; }
+    .pub-toggle.go:hover { background: var(--brand-dark); }
+    .pub-toggle.undo { background: #fff; color: #15803d; border: 1px solid #bbe3c6; }
+    .pub-toggle.undo:hover { background: var(--ok-soft); }
+    td.ops-cell a.detail-link { font-size: 12px; margin-left: 8px; white-space: nowrap; }
+    td.ops-cell .note-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 9px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; color: var(--ink); }
+    td.ops-cell .note-btn:hover { background: #f3ece0; }
+
+    /* 備考（折りたたみ行） */
+    tr.note-row > td { background: #faf6ee; padding: 10px 16px 12px; border-bottom: 1px solid var(--line); }
+    tr.note-row label { font-size: 11.5px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 5px; }
+    tr.note-row textarea {
+      width: 100%; box-sizing: border-box; min-height: 44px; resize: vertical; max-width: 720px;
+      border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+      font-family: inherit; font-size: 13px; color: var(--ink); background: #fff;
+    }
+    tr.note-row textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+    tr.note-row .saved { font-size: 11px; color: #15803d; margin-left: 8px; opacity: 0; transition: opacity .2s; }
+    tr.note-row .saved.show { opacity: 1; }
+
+    .empty-note { text-align: center; color: var(--muted); font-size: 13px; padding: 26px 0; }
+
+    /* サイドバーの年月ツリー（案件一覧と同じ） */
+    .ym-tree { margin: 2px 0 2px 8px; display: flex; flex-direction: column; gap: 1px; }
+    .ym-year-btn, .ym-month-btn {
+      display: flex; align-items: center; width: 100%; text-align: left; border: none;
+      background: none; color: #6e5b49; cursor: pointer; font-family: inherit; border-radius: 7px;
+    }
+    .ym-year-btn  { padding: 6px 10px; font-size: 12.5px; font-weight: 700; }
+    .ym-month-btn { padding: 5px 10px 5px 26px; font-size: 12.5px; }
+    .ym-year-btn:hover, .ym-month-btn:hover { background: #dccbb1; color: #4f4338; }
+    .ym-month-btn.active { background: var(--brand); color: #fff; font-weight: 700; }
+    .ym-caret { width: 14px; display: inline-block; font-size: 10px; }
+    .ym-year-btn .ym-ycount, .ym-month-btn .ym-mcount { margin-left: auto; font-size: 11px; color: #a08a73; }
+    .ym-month-btn.active .ym-mcount { color: rgba(255,255,255,.85); }
+    .ym-months { display: flex; flex-direction: column; gap: 1px; }
+    .ym-months.collapsed { display: none; }
+
+    /* 公開ボード / アーカイブ タブ */
+    .view-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .view-tab { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+      color: var(--muted); font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .view-tab:hover { background: #f3ece0; }
+    .view-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .view-tab .vt-count { font-weight: 600; opacity: .85; margin-left: 4px; }
+
+    /* 登録日（いつ追加したか） */
+    td.proj-cell .added { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    td.proj-cell .added b { color: var(--brand-dark); font-weight: 700; }
+
+    /* 追加案件（MTG後に入った案件）を目立たせる */
+    .badge.extra { background: #fde8e8; color: #b91c1c; border: 1px solid var(--danger); font-weight: 700; }
+    tr.extra-row td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+
+    /* 月見出しジャンプの点滅 */
+    @keyframes pubFlash { 0% { background: var(--warn-soft); } 100% { background: var(--brand-soft); } }
+    tr.group-row.flash td { animation: pubFlash 1.4s ease-out; }
+  </style>
+@endverbatim
+@endpush
+
+@section('content')
+@verbatim
+      <div class="mock-note">
+        この公開ボードは<b>案件データ・公開状態とも実際のDBにつながっています</b>（公開ボタンを押すとDBに保存され、閉じても・他のPCでも残ります）。<br>
+        <b>調整中は非公開のまま、固まったら「スタッフに公開」</b>してください。チェックを付けて<b>まとめて公開／非公開</b>もできます。<br>
+        ※ スタッフ画面（確定アサイン）への表示は、次の工程で接続予定です。
+      </div>
+
+      <!-- スタッフ画面のお知らせ文の編集 -->
+      <div class="panel notice-edit">
+        <div class="panel-head">
+          <h2>📣 スタッフ画面の上のお知らせ文</h2>
+          <div class="spacer"></div>
+          <span class="muted" style="font-size:12px;">スタッフ画面（募集タブ）の一番上に出る文です</span>
+        </div>
+        <textarea id="noticeInput" placeholder="例）7月分の募集が出ています。気になる案件は「エントリーする」を押してください。"></textarea>
+        <div class="row">
+          <button class="btn primary" onclick="saveNotice()">この文を保存</button>
+          <button class="btn" onclick="resetNotice()">既定の文に戻す</button>
+          <span class="saved" id="noticeSaved">✓ 保存しました（スタッフ画面に反映されます）</span>
+        </div>
+      </div>
+
+      <!-- サマリー＋一括操作 -->
+      <div class="pub-bar">
+        <div class="stat-mini"><span class="n on"  id="cntOn">0</span><span class="lbl">件 公開中</span></div>
+        <div class="stat-mini"><span class="n off" id="cntOff">0</span><span class="lbl">件 非公開</span></div>
+        <div class="spacer"></div>
+        <span class="bulk-info">選択 <b id="checkCount">0</b> 件：</span>
+        <button class="btn primary" onclick="bulkPublish(true)">まとめて公開</button>
+        <button class="btn" onclick="bulkPublish(false)">まとめて非公開</button>
+        <select id="sortMode" onchange="render()" title="並び順を切り替えます">
+          <option value="calendar">並び：カレンダー順（日付）</option>
+          <option value="registered">並び：登録順（新しい順・追加が上）</option>
+        </select>
+        <select id="filter" onchange="render()">
+          <option value="">表示：すべて</option>
+          <option value="on">公開中のみ</option>
+          <option value="off">非公開のみ</option>
+        </select>
+        <button class="btn" onclick="openStaffView()">👁 スタッフ画面を見る</button>
+      </div>
+
+      <!-- 公開ボード / アーカイブ（過去）の切替 -->
+      <div class="view-tabs">
+        <button class="view-tab active" id="tab-active"  onclick="setView('active')">スタッフ公開ボード<span class="vt-count" id="cntActive"></span></button>
+        <button class="view-tab"        id="tab-archive" onclick="setView('archive')">🗄 アーカイブ（過去）<span class="vt-count" id="cntArchive"></span></button>
+      </div>
+
+      <!-- 表 -->
+      <div class="panel">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="chk"><input type="checkbox" id="selAll" onclick="toggleAll(this.checked)" title="表示中をすべて選択"></th>
+              <th>日程</th>
+              <th>案件名</th>
+              <th>会場（住所）／集合場所</th>
+              <th>集合〜解散（スタッフ）</th>
+              <th>必要</th>
+              <th>公開</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="pubBody"></tbody>
+        </table>
+        <div class="empty-note" id="pubEmpty" style="display:none;">条件に合う案件がありません。</div>
+      </div>
+
+      <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
+        ※ 表示している<b>会場（住所）・集合場所・集合〜解散</b>は、スタッフ画面に出る情報と同じものです。<b>案件名をクリック</b>すると案件一覧の該当月へ移動します。<br>
+        ※「集合（スタッフ）」は、スタッフに見せる集合時間です。社員と違うときは入力して直せます（社員と違うと「別」マークが付きます）。<br>
+        ※「詳細 →」で案件詳細（アサイン画面）に飛びます。時間・場所など細かい変更はそちらでもできます。<br>
+        ※ 公開状態はDB（projects の staff_published）に保存され、案件詳細（アサイン画面）とも同じ列で連動します。<br>
+        ※ 備考は担当用メモです（このブラウザに保存され、次に開いても残ります）。
+      </p>
+@endverbatim
+@endsection
+
+@push('scripts')
+<!-- 案件データと公開状態は DB（projects）から渡される -->
+<script>
+  window.ECS_PUBLISH_CASES = @json($cases);
+  window.ECS_CSRF = '{{ csrf_token() }}';
+</script>
+@verbatim
+<script>
+  // ===== 案件データ（サーバ＝DBの projects から渡される）=====
+  // off … 今日から何日後の開催か／meet … 社員の集合時間／leave … 解散／place … 会場（住所）／meetPlace … 集合場所
+  // added … 今日から何日前に登録したか（マイナス）。published … 公開状態（DBの staff_published）。
+  const CASES = (window.ECS_PUBLISH_CASES || []).map(function(c){
+    return {
+      id: c.id, name: c.name, client: c.client, cat: c.cat, category: c.category, need: c.need, off: c.off,
+      added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published
+    };
+  });
+
+  const DEFAULT_NOTICE = '7月分の募集が出ています。気になる案件は「エントリーする」を押してください。';
+
+  // ===== 公開状態（DBの staff_published）=====
+  // サーバから渡された published を画面内の pubState に持ち、変更はサーバ（DB）へ保存する。
+  const pubState = {};
+  CASES.forEach(c => { pubState[c.id] = !!c.published; });
+  function isPublished(id){ return !!pubState[id]; }
+
+  // 公開ON/OFF をサーバ（DB）に保存する。先に画面を更新し、失敗したら元に戻す。
+  function persistPublish(ids, publish){
+    ids.forEach(id => { pubState[id] = publish; });
+    render();
+    fetch('/assign-publish/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ ids: ids, publish: publish })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); })
+    .catch(() => {
+      alert('保存に失敗しました。通信状態を確認して、もう一度お試しください。');
+      ids.forEach(id => { pubState[id] = !publish; });
+      render();
+    });
+  }
+
+  // ===== 備考（担当メモ・localStorage）=====
+  function noteKey(id){ return 'ecs_pubnote_' + id; }
+  function getNote(id){ try { return localStorage.getItem(noteKey(id)) || ''; } catch(e){ return ''; } }
+  function saveNote(id, el){
+    try { localStorage.setItem(noteKey(id), el.value); } catch(e){}
+    flash('nsaved-' + id);
+  }
+
+  // ===== スタッフ集合時間（localStorage）。既定は社員の集合時間と同じ =====
+  function smeetKey(id){ return 'ecs_staff_meet_' + id; }
+  function getStaffMeet(c){ try { return localStorage.getItem(smeetKey(c.id)) || c.meet; } catch(e){ return c.meet; } }
+  function saveStaffMeet(id, val){ try { localStorage.setItem(smeetKey(id), val); } catch(e){} render(); }
+
+  // ===== スタッフ画面のお知らせ文（localStorage 'ecs_staff_notice'）=====
+  function loadNotice(){
+    let t = '';
+    try { t = localStorage.getItem('ecs_staff_notice') || ''; } catch(e){}
+    document.getElementById('noticeInput').value = t || DEFAULT_NOTICE;
+  }
+  function saveNotice(){
+    const v = document.getElementById('noticeInput').value.trim();
+    try { localStorage.setItem('ecs_staff_notice', v); } catch(e){}
+    flash('noticeSaved');
+  }
+  function resetNotice(){
+    try { localStorage.removeItem('ecs_staff_notice'); } catch(e){}
+    document.getElementById('noticeInput').value = DEFAULT_NOTICE;
+    flash('noticeSaved');
+  }
+
+  // 「✓保存しました」を一瞬出す
+  function flash(elId){
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1300);
+  }
+
+  // ===== 日付・月グループ =====
+  const DOW = ['日','月','火','水','木','金','土'];
+  const today = (function(){ const x = new Date(); x.setHours(0,0,0,0); return x; })();
+  const todayY = today.getFullYear(), todayM = today.getMonth() + 1;
+  function dateOf(off){ const x = new Date(today); x.setDate(x.getDate() + off); return x; }
+
+  CASES.forEach(c => {
+    c.date = dateOf(c.off);
+    c.gy = c.date.getFullYear();
+    c.gm = c.date.getMonth() + 1;
+    c.gkey = c.gy + '-' + c.gm;
+    c.archived = c.date < today;               // 開催日が過ぎた＝アーカイブ
+    c.addedDate = dateOf(c.added || 0);        // 登録（追加）した日
+  });
+  // 案件のある年月を日付順に
+  const GROUPS = [];
+  (function(){
+    const seen = {};
+    CASES.slice().sort((a,b) => a.date - b.date).forEach(c => {
+      if (seen[c.gkey]) return;
+      seen[c.gkey] = true;
+      const past = (c.gy < todayY) || (c.gy === todayY && c.gm < todayM);
+      GROUPS.push({ key:c.gkey, label:c.gy + '年 ' + c.gm + '月', year:c.gy, month:c.gm, past });
+    });
+  })();
+
+  // ===== 状態（畳んだ月・選択中の案件）=====
+  const collapsedMonths = new Set();
+  const checkedIds = new Set();
+  let currentView = 'active';   // 'active'=スタッフ公開ボード（未来）/ 'archive'=過去
+  function toggleGroup(key){
+    if (collapsedMonths.has(key)) collapsedMonths.delete(key); else collapsedMonths.add(key);
+    render();
+  }
+
+  const tbody = document.getElementById('pubBody');
+  const empty = document.getElementById('pubEmpty');
+
+  function dateCell(c){
+    const dy = c.date.getDay();
+    const cls = dy === 0 ? 'sun' : (dy === 6 ? 'sat' : '');
+    return `${c.gm}/${c.date.getDate()}<span class="dow ${cls}">(${DOW[dy]})</span>`;
+  }
+
+  // ===== 1案件の行（＋備考の折りたたみ行）を表に追加。カレンダー順・登録順の両方で使う =====
+  function appendCaseRow(c){
+    const pub = isPublished(c.id);
+    const sm = getStaffMeet(c);
+    const diff = (sm !== c.meet);
+    const extra = (c.category === '追加案件');
+
+    const tr = document.createElement('tr');
+    if (extra) tr.className = 'extra-row';
+    tr.innerHTML = `
+      <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
+      <td class="date-cell">${dateCell(c)}</td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}<span class="badge cat-${c.cat}">${c.cat}</span><div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
+      <td class="meet-cell">
+        <div class="staff-row"><span class="lab">スタッフ</span>
+          <input class="smeet" type="text" value="${sm}" onchange="saveStaffMeet('${c.id}', this.value)" title="スタッフに見せる集合時間">
+          <span class="leave">〜 ${c.leave}</span>
+          ${diff ? '<span class="diff">別</span>' : ''}
+        </div>
+        <div class="emp">社員 <b>${c.meet}</b></div>
+      </td>
+      <td>${c.need}名</td>
+      <td>${pub ? '<span class="pub-badge on"><span class="dot"></span>公開中</span>' : '<span class="pub-badge off"><span class="dot"></span>非公開</span>'}</td>
+      <td class="ops-cell">
+        ${pub
+          ? `<button class="pub-toggle undo" onclick="toggle('${c.id}')">公開取消</button>`
+          : `<button class="pub-toggle go" onclick="toggle('${c.id}')">公開する</button>`}
+        <a class="detail-link" href="/assign-detail?case=${c.id}">詳細 →</a>
+        <button class="note-btn" onclick="toggleNote('${c.id}')">💬 備考</button>
+      </td>`;
+    tbody.appendChild(tr);
+
+    // 備考（折りたたみ行）
+    const nr = document.createElement('tr');
+    nr.className = 'note-row';
+    nr.id = 'note-' + c.id;
+    nr.style.display = 'none';
+    nr.innerHTML = `
+      <td colspan="8">
+        <label>備考（担当メモ・スタッフ画面には出ません）<span class="saved" id="nsaved-${c.id}">✓ 保存しました</span></label>
+        <textarea placeholder="例）前泊あり。〇〇さんに声かけ済み。集合場所は南口。" oninput="saveNote('${c.id}', this)">${escapeHtml(getNote(c.id))}</textarea>
+      </td>`;
+    tbody.appendChild(nr);
+  }
+
+  // ===== 描画 =====
+  function render(){
+    const f = document.getElementById('filter').value;
+
+    // 今のビューに属するか（公開ボード＝未来 / アーカイブ＝過去）
+    function inView(c){ return currentView === 'archive' ? c.archived : !c.archived; }
+
+    // タブの件数
+    document.getElementById('cntActive').textContent  = '（' + CASES.filter(c => !c.archived).length + '）';
+    document.getElementById('cntArchive').textContent = '（' + CASES.filter(c =>  c.archived).length + '）';
+
+    // サマリー（今のビューの件数）
+    let on = 0, off = 0;
+    CASES.filter(inView).forEach(c => { isPublished(c.id) ? on++ : off++; });
+    document.getElementById('cntOn').textContent  = on;
+    document.getElementById('cntOff').textContent = off;
+
+    function pass(c){
+      if (!inView(c)) return false;
+      const pub = isPublished(c.id);
+      if (f === 'on')  return pub;
+      if (f === 'off') return !pub;
+      return true;
+    }
+
+    tbody.innerHTML = '';
+    let shownTotal = 0;
+    const sortMode = document.getElementById('sortMode').value;
+
+    if (sortMode === 'registered') {
+      // 登録順＝月フォルダなしの1本リスト。新しく登録した順（追加案件は登録が遅いので自然に上に来る）
+      const items = CASES.filter(pass).sort((a,b) => b.addedDate - a.addedDate);
+      items.forEach(appendCaseRow);
+      shownTotal = items.length;
+    } else {
+      // カレンダー順＝月フォルダ＋各月の中を日付順（従来）
+      GROUPS.forEach(g => {
+        const items = CASES.filter(c => c.gkey === g.key && pass(c)).sort((a,b) => a.date - b.date);
+        if (items.length === 0) return;
+        shownTotal += items.length;
+        const collapsed = collapsedMonths.has(g.key);
+
+        // 月見出し
+        const gr = document.createElement('tr');
+        gr.className = 'group-row' + (g.past ? ' past' : '');
+        gr.id = 'group-' + g.key;
+        gr.setAttribute('onclick', `toggleGroup('${g.key}')`);
+        gr.innerHTML = `<td colspan="8"><span class="gcaret">${collapsed ? '▶' : '▼'}</span>${g.label}${g.past ? '（終了）' : ''}<span class="g-count">${items.length}件</span></td>`;
+        tbody.appendChild(gr);
+        if (collapsed) return;   // 畳んでいる月は案件行を出さない
+
+        items.forEach(appendCaseRow);
+      });
+    }
+
+    empty.style.display = shownTotal === 0 ? '' : 'none';
+    document.getElementById('checkCount').textContent = checkedIds.size;
+    syncSelAll();
+  }
+
+  function escapeHtml(s){ return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // 備考の開閉
+  function toggleNote(id){
+    const nr = document.getElementById('note-' + id);
+    if (!nr) return;
+    nr.style.display = nr.style.display === 'none' ? 'table-row' : 'none';
+  }
+
+  // ===== チェック（個別・全選択）=====
+  function onCheck(id, checked){
+    if (checked) checkedIds.add(id); else checkedIds.delete(id);
+    document.getElementById('checkCount').textContent = checkedIds.size;
+    syncSelAll();
+  }
+  function toggleAll(checked){
+    // 表示中の行だけを対象に全選択／解除
+    document.querySelectorAll('#pubBody input[type="checkbox"]').forEach(cb => {
+      const tr = cb.closest('tr');
+      const onchange = cb.getAttribute('onchange') || '';
+      const m = onchange.match(/onCheck\('([^']+)'/);
+      if (!m) return;
+      cb.checked = checked;
+      if (checked) checkedIds.add(m[1]); else checkedIds.delete(m[1]);
+    });
+    document.getElementById('checkCount').textContent = checkedIds.size;
+  }
+  function syncSelAll(){
+    const boxes = Array.from(document.querySelectorAll('#pubBody input[type="checkbox"]'));
+    const all = boxes.length > 0 && boxes.every(cb => cb.checked);
+    const sa = document.getElementById('selAll');
+    if (sa) sa.checked = all;
+  }
+
+  // ===== 公開ON/OFF（1件）=====
+  function toggle(id){
+    const c = CASES.find(x => x.id === id);
+    const willPublish = !isPublished(id);
+    if (willPublish){
+      if (!confirm(`「${c.name}」をスタッフに公開します。\nスタッフの「確定アサイン」に表示されます。\n\n公開してよろしいですか？`)) return;
+    } else {
+      if (!confirm(`「${c.name}」の公開を取り消します。\nスタッフの画面から見えなくなります。\n\n取り消してよろしいですか？`)) return;
+    }
+    persistPublish([id], willPublish);
+  }
+
+  // ===== まとめて公開／非公開（チェックしたもの）=====
+  function bulkPublish(toPublish){
+    if (checkedIds.size === 0){ alert('チェックボックスで案件を選んでください。'); return; }
+    const word = toPublish ? '公開' : '非公開に';
+    if (!confirm(`選んだ ${checkedIds.size} 件をまとめて${word}します。\n\nよろしいですか？`)) return;
+    const ids = Array.from(checkedIds);
+    checkedIds.clear();
+    persistPublish(ids, toPublish);
+  }
+
+  // ===== スタッフ画面を見る =====
+  function openStaffView(){
+    const w = window.open('/staff-portal', 'ecs_staff_view', 'width=900,height=760');
+    if (!w){ alert('ポップアップがブロックされたようです。ブラウザのポップアップ許可を確認してください。'); return; }
+    w.focus();
+  }
+
+  // ===== 登録日の表示 =====
+  function fmtAdded(d){ return (d.getMonth() + 1) + '/' + d.getDate(); }
+
+  // ===== 公開ボード / アーカイブ の切替 =====
+  function setView(v){
+    currentView = v;
+    document.getElementById('tab-active').classList.toggle('active', v === 'active');
+    document.getElementById('tab-archive').classList.toggle('active', v === 'archive');
+    buildYmTree();
+    render();
+  }
+
+  // ===== サイドバーの年月ツリー（今のビューの案件のある年月）=====
+  function buildYmTree(){
+    const tree = document.getElementById('ymTree');
+    if (!tree) return;
+    const list = CASES.filter(c => currentView === 'archive' ? c.archived : !c.archived);
+    const byYear = {}; const yearOrder = [];
+    GROUPS.forEach(g => {
+      const count = list.filter(c => c.gkey === g.key).length;
+      if (count === 0) return;
+      if (!byYear[g.year]) { byYear[g.year] = []; yearOrder.push(g.year); }
+      byYear[g.year].push({ key:g.key, month:g.month, count });
+    });
+    let html = '';
+    yearOrder.forEach(y => {
+      const months = byYear[y];
+      const total = months.reduce((s,m) => s + m.count, 0);
+      const open = (y === todayY);
+      html += '<div class="ym-year"><button class="ym-year-btn" onclick="toggleYear(' + y + ')">'
+        + '<span class="ym-caret" id="ymcaret-' + y + '">' + (open ? '▾' : '▸') + '</span>'
+        + y + '年<span class="ym-ycount">' + total + '</span></button>'
+        + '<div class="ym-months' + (open ? '' : ' collapsed') + '" id="ymmonths-' + y + '">';
+      months.forEach(m => {
+        html += '<button class="ym-month-btn" id="ymbtn-' + m.key + '" onclick="jumpToMonth(\'' + m.key + '\')">'
+          + m.month + '月<span class="ym-mcount">' + m.count + '</span></button>';
+      });
+      html += '</div></div>';
+    });
+    tree.innerHTML = html || '<div class="muted" style="font-size:11.5px; padding:4px 10px;">案件がありません</div>';
+  }
+  function toggleYear(y){
+    const box = document.getElementById('ymmonths-' + y);
+    const car = document.getElementById('ymcaret-' + y);
+    if (!box) return;
+    const collapsed = box.classList.toggle('collapsed');
+    if (car) car.textContent = collapsed ? '▸' : '▾';
+  }
+  let flashTimer = null;
+  function jumpToMonth(key){
+    document.querySelectorAll('.ym-month-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('ymbtn-' + key);
+    if (btn) btn.classList.add('active');
+    collapsedMonths.delete(key);   // 畳んでいたら開く
+    render();
+    const gr = document.getElementById('group-' + key);
+    if (!gr) return;
+    gr.scrollIntoView({ behavior:'smooth', block:'start' });
+    gr.classList.remove('flash'); void gr.offsetWidth; gr.classList.add('flash');
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => gr.classList.remove('flash'), 1500);
+  }
+
+  // 他タブで公開状態が変わったら反映
+  window.addEventListener('storage', render);
+  window.addEventListener('focus', render);
+
+  loadNotice();
+  buildYmTree();
+  render();
+</script>
+@endverbatim
+@endpush

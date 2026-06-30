@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECS 社員の出勤可能日（参加希望）</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ===== 社員の出勤可能日（参加希望）専用スタイル ===== */
+
+    /* タブ切替 */
+    .ea-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .ea-tab {
+      padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px;
+      background: #fff; cursor: pointer; font-size: 14px; color: #6b5544; font-weight: 600;
+    }
+    .ea-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+
+    /* 月切替バー */
+    .ea-monthbar { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 4px 0 16px; }
+    .ea-monthbar button {
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      width: 36px; height: 36px; font-size: 16px; cursor: pointer; color: #6b5544;
+    }
+    .ea-monthbar button:hover { background: #f3ece2; }
+    .ea-monthbar .mon { font-size: 18px; font-weight: 700; min-width: 150px; text-align: center; }
+
+    .ea-pane { display: none; }
+    .ea-pane.show { display: block; }
+
+    /* カレンダー */
+    .ea-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+    .ea-card h3 { margin: 0 0 4px; font-size: 15px; }
+    .ea-card .sub { font-size: 12px; color: var(--muted); margin: 0 0 14px; line-height: 1.6; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; max-width: 640px; }
+    .cal-grid .dow { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 4px; font-weight: 600; }
+    .cal-grid .dow.sat { color: var(--brand); }
+    .cal-grid .dow.sun { color: var(--danger); }
+    .cell {
+      min-height: 62px; border-radius: 10px; border: 1px solid var(--line);
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: 5px 2px 4px; font-size: 13px; background: #fff; position: relative;
+    }
+    .cell.empty { border: none; background: none; }
+    .cell .dnum { font-size: 12px; color: #8a7a66; align-self: flex-start; margin-left: 6px; }
+    .cell .badge {
+      position: absolute; top: 4px; right: 4px; font-size: 9px; line-height: 1;
+      padding: 2px 4px; border-radius: 4px; background: #f3e3c8; color: #92600a; font-weight: 700;
+    }
+    .cell .badge.big { background: #fde68a; color: #7a5200; border: 1px solid #e0b84a; }
+    .cell .st { font-size: 16px; font-weight: 700; margin-top: 4px; }
+    .cell .stsub { font-size: 9px; margin-top: 1px; }
+
+    /* イベント候補日（土日祝・長期休暇）＝クリックで 〇×△ */
+    .cell.event { cursor: pointer; }
+    .cell.event:hover { box-shadow: 0 0 0 2px rgba(180,140,90,.18) inset; }
+    .cell.v-ok    { background: var(--ok-soft);     border-color: #bbe3c6; }
+    .cell.v-ok .st    { color: #15803d; }
+    .cell.v-ng    { background: var(--danger-soft); border-color: #f4c2c2; }
+    .cell.v-ng .st    { color: #b91c1c; }
+    .cell.v-maybe { background: #fdf0d2;            border-color: #f0d79a; }
+    .cell.v-maybe .st { color: #b45309; }
+    /* 未入力の入力必須日（土日祝・長期休暇・大型）＝要入力の印 */
+    .cell.event.v-need { background: #f3effa; border: 2px dashed #b9a3e0; }
+    .cell.event.v-need .stsub { color: #7c5ec0; font-weight: 700; }
+
+    /* 平日＝クリックで希望休 */
+    .cell.weekday { cursor: pointer; }
+    .cell.weekday:hover { box-shadow: 0 0 0 2px rgba(180,140,90,.12) inset; }
+    .cell.weekday.off { background: #eef1f6; border-color: #cfd6e2; }
+    .cell.weekday.off .st { color: #556683; font-size: 12px; }
+    .cell.weekday.off .stsub { color: #6b7689; }
+
+    .ea-legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 14px 0 2px; font-size: 12px; color: #555; }
+    .ea-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .ea-legend i { width: 16px; height: 16px; border-radius: 5px; display: inline-block; border: 1px solid var(--line); }
+    .lg-ok { background: var(--ok-soft); border-color: #bbe3c6 !important; }
+    .lg-ng { background: var(--danger-soft); border-color: #f4c2c2 !important; }
+    .lg-maybe { background: #fdf0d2; border-color: #f0d79a !important; }
+    .lg-off { background: #eef1f6; border-color: #cfd6e2 !important; }
+    .lg-need { background: #f3effa; border-color: #b9a3e0 !important; border-style: dashed; }
+
+    /* 入力フォーム */
+    .ea-fields { display: grid; gap: 14px; max-width: 640px; }
+    .ea-field label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 5px; color: #4a3b2c; }
+    .ea-field .hint { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+    .ea-field input[type=number], .ea-field textarea {
+      width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 10px; font-size: 14px; font-family: inherit;
+    }
+    .ea-field input[type=number] { width: 120px; }
+    .ea-field textarea { min-height: 60px; resize: vertical; }
+    .ea-save { margin-top: 6px; }
+    .ea-save button {
+      background: var(--brand); color: #fff; border: none; border-radius: 8px;
+      padding: 10px 22px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .ea-save button:hover { background: var(--brand-dark); }
+    .ea-saved { margin-left: 12px; color: #15803d; font-size: 13px; font-weight: 700; display: none; }
+
+    /* 全社員一覧テーブル */
+    .ov-wrap { overflow-x: auto; }
+    table.ov-tbl { border-collapse: collapse; font-size: 13px; min-width: 600px; }
+    table.ov-tbl th, table.ov-tbl td { border: 1px solid var(--line); padding: 6px 8px; text-align: center; white-space: nowrap; }
+    table.ov-tbl thead th { background: #f3ece2; color: #5a4a38; font-weight: 700; }
+    table.ov-tbl th.namecol { text-align: left; position: sticky; left: 0; background: #f3ece2; z-index: 1; }
+    table.ov-tbl td.namecol { text-align: left; position: sticky; left: 0; background: #fff; font-weight: 600; }
+    table.ov-tbl tr.me td.namecol { background: #fff7ec; }
+    table.ov-tbl tr.me td { background: #fffaf2; }
+    table.ov-tbl .vh th.we { color: var(--brand); }
+    table.ov-tbl .vh th.holi { color: #b45309; }
+    .ov-mark.ok    { color: #15803d; font-weight: 700; }
+    .ov-mark.ng    { color: #b91c1c; }
+    .ov-mark.maybe { color: #b45309; font-weight: 700; }
+    .ov-mark.none  { color: #c7bba9; }
+    table.ov-tbl th.we.big, table.ov-tbl th.holi.big { color: #7a5200; }
+    table.ov-tbl td.offcol, table.ov-tbl th.offcol,
+    table.ov-tbl td.memocol, table.ov-tbl th.memocol {
+      text-align: left; white-space: normal; min-width: 130px; max-width: 220px;
+    }
+    table.ov-tbl td.offcol { color: #556683; }
+    table.ov-tbl td.memocol { color: #5a4a38; font-size: 12px; }
+    table.ov-tbl tfoot td { background: #faf5ee; font-weight: 700; color: #5a4a38; }
+    table.ov-tbl tfoot td.few { background: #fbe3e3; color: #b91c1c; }
+    .ov-note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== サイドバー（全画面共通） ===== -->
+  <aside class="sidebar">
+    <div class="logo">ECS<small>スタッフアサイン管理</small></div>
+    <nav>
+      <a href="dashboard.html"><span class="nav-icon">▣</span> ダッシュボード</a>
+      <div class="group-label">案件</div>
+      <a href="projects.html"><span class="nav-icon">▤</span> 案件一覧</a>
+      <a href="project_form.html"><span class="nav-icon">＋</span> 案件登録</a>
+      <a href="#" onclick="window.open('projects_agg.html','ecs_agg','width=820,height=640'); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
+      <div class="group-label">アサイン</div>
+      <a href="assign.html"><span class="nav-icon">▦</span> 日別ボード</a>
+      <a href="assign_director.html"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
+      <a class="active" href="employee_availability.html"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
+      <a href="assign_detail.html"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
+      <a href="assign_publish.html"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+      <a href="entries.html"><span class="nav-icon">🙋</span> エントリー一覧</a>
+      <a href="pickup.html"><span class="nav-icon">📌</span> ピックアップ</a>
+      <div class="group-label">スタッフ</div>
+      <a href="staff.html"><span class="nav-icon">☷</span> スタッフ管理</a>
+      <a href="employees.html"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+      <a href="staff_status.html"><span class="nav-icon">📊</span> 稼働状況</a>
+      <div class="group-label">その他</div>
+      <a href="mypage.html"><span class="nav-icon">🙍</span> マイページ</a>
+      <a href="mypage_finance.html"><span class="nav-icon">💰</span> 収支入力</a>
+      <a href="settings.html"><span class="nav-icon">⚙️</span> 共通設定</a>
+    </nav>
+    <div class="userbox">
+      <strong>baba さん</strong>
+      社員
+      <div style="margin-top:8px;"><a href="login.html" style="color:#a08a73;">ログアウト</a></div>
+    </div>
+  </aside>
+
+  <!-- ===== 本文 ===== -->
+  <div class="main">
+    <div class="topbar">
+      <h1>社員の出勤可能日（参加希望）</h1>
+      <div class="spacer"></div>
+      <span class="role-pill">社員</span>
+    </div>
+
+    <div class="content">
+      <div class="mock-note">
+        これは見た目確認用のモックです。入力内容は仮で、ブラウザ内（この端末）にだけ保存されます。<br>
+        <b>社員が「イベントに入れる日」を月ごとに登録する画面です。</b>
+        社員は普段は平日勤務で、イベントは主に<b>土日・祝日・長期休暇（お盆・正月）</b>に入るため、その日を
+        <span style="color:#15803d;font-weight:700;">〇＝出勤可</span>／<span style="color:#b91c1c;font-weight:700;">×＝不可</span>／<span style="color:#b45309;font-weight:700;">△＝条件つき・未定</span>
+        で入力します。平日は「希望休（休みたい日）」を登録できます。
+      </div>
+
+      <!-- タブ -->
+      <div class="ea-tabs">
+        <button class="ea-tab active" data-pane="mine" onclick="switchTab('mine')">🙋 自分の入力</button>
+        <button class="ea-tab" data-pane="all" onclick="switchTab('all')">👥 全社員の一覧</button>
+      </div>
+
+      <!-- 月切替（両タブ共通） -->
+      <div class="ea-monthbar">
+        <button onclick="moveMonth(-1)" title="前の月">‹</button>
+        <div class="mon" id="monLabel">―</div>
+        <button onclick="moveMonth(1)" title="次の月">›</button>
+      </div>
+
+      <!-- ===== タブ①：自分の入力 ===== -->
+      <div class="ea-pane show" id="pane-mine">
+        <div class="ea-card">
+          <h3>📅 出勤できる日・希望休</h3>
+          <p class="sub">
+            土日・祝日・長期休暇（色つきの枠）をクリックすると <b>〇 → × → △ → 未入力</b> と切り替わります。<br>
+            平日をクリックすると「希望休（休みたい日）」のオン／オフが切り替わります。
+          </p>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="ea-legend">
+            <span><i class="lg-need"></i>要入力（未入力の必須日）</span>
+            <span><i class="lg-ok"></i>〇 出勤可</span>
+            <span><i class="lg-ng"></i>× 不可</span>
+            <span><i class="lg-maybe"></i>△ 条件つき・未定</span>
+            <span><i class="lg-off"></i>平日の希望休</span>
+            <span><i style="background:#fde68a;border-color:#e0b84a;"></i>大型＝大型案件の日</span>
+            <span><i style="background:#f3e3c8;border-color:#f0d79a;"></i>祝／お盆・正月＝祝日・長期休暇</span>
+          </div>
+        </div>
+
+        <div class="ea-card">
+          <h3>📝 備考（参加したいイベント・希望件数なども）</h3>
+          <div class="ea-fields">
+            <div class="ea-field">
+              <label>備考 <span class="hint">参加したいイベント・希望件数・△にした理由・条件・連絡事項などを自由に書いてください</span></label>
+              <textarea id="memo" style="min-height:90px;" placeholder="例：今月は3件くらい参加したい／運動会系をやりたい／8/12は午後だけ可／お盆は実家のため要相談 など"></textarea>
+            </div>
+            <div class="ea-save">
+              <button onclick="saveMine()">この月の内容を保存</button>
+              <span class="ea-saved" id="savedMsg">✓ 保存しました</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== タブ②：全社員の一覧 ===== -->
+      <div class="ea-pane" id="pane-all">
+        <div class="ea-card">
+          <h3>👥 全社員の出勤可能日（この月の土日・祝日・長期休暇）</h3>
+          <p class="sub">アサイン担当が「その日に誰が出られるか」をまとめて見る表です。<b>〇＝出勤可／×＝不可／△＝条件つき・未定</b>。一番下に「〇の人数」を出します。</p>
+          <div class="ov-wrap">
+            <table class="ov-tbl" id="ovTbl"></table>
+          </div>
+          <p class="ov-note">
+            ※ 黄色い行が自分（baba さん）です。自分の行は「自分の入力」タブで入れた内容がそのまま反映されます。ほかの社員は仮の見本データです。<br>
+            ※ 一番下の「〇の人数」が少ない日（赤）は、イベントがあるのに出られる社員が少ない＝注意したい日です。
+          </p>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script src="data/cases.js"></script>
+<script>
+  // ===== 共通：表示中の月 =====
+  let cursor = new Date();
+  cursor = new Date(cursor.getFullYear(), cursor.getMonth(), 1); // その月の1日に固定
+
+  // ===== サンプルの祝日・長期休暇（モック用の見本） =====
+  // 祝日は "M/D" で指定（(例)は年によって動く祝日の見本）
+  const HOLIDAYS = {
+    '1/1':'祝','1/13':'祝','2/11':'祝','2/23':'祝','3/20':'祝',
+    '4/29':'祝','5/3':'祝','5/4':'祝','5/5':'祝','7/21':'祝',
+    '8/11':'祝','9/15':'祝','9/23':'祝','10/13':'祝','11/3':'祝','11/23':'祝'
+  };
+  function isObon(m,d){ return m===8 && d>=13 && d<=16; }      // お盆
+  function isNewYear(m,d){ return (m===12 && d>=29) || (m===1 && d<=3); } // 年末年始
+
+  // ===== 大型案件のある日（cases.js から、表示中の月だけ集計） =====
+  const bigDayMap = {}; // { 日(数値): コンテンツ名 }
+  function computeBig(){
+    for (const k in bigDayMap) delete bigDayMap[k];
+    const y = cursor.getFullYear(), mo = cursor.getMonth(); // mo=0..11
+    const base = new Date(); base.setHours(0,0,0,0);         // 今日（off の基準）
+    (window.ECS_CASES || []).forEach(c=>{
+      if (c.scale !== '大型' || c.draft) return;
+      const dt = new Date(base); dt.setDate(dt.getDate() + c.off);
+      if (dt.getFullYear()===y && dt.getMonth()===mo){
+        const d = dt.getDate();
+        if (!bigDayMap[d]) bigDayMap[d] = c.content;
+      }
+    });
+  }
+
+  // その日の種類を判定。input=true なら 〇×△ の入力対象（土日祝・長期休暇・大型案件の日）
+  function dayMeta(y,m,d){
+    if (bigDayMap[d])   return { input:true, badge:'大型', big:bigDayMap[d] }; // 大型を最優先で表示
+    const w = new Date(y, m-1, d).getDay(); // 0=日..6=土
+    if (isObon(m,d))    return { input:true, badge:'お盆' };
+    if (isNewYear(m,d)) return { input:true, badge:'正月' };
+    if (HOLIDAYS[m+'/'+d]) return { input:true, badge:'祝' };
+    if (w===0 || w===6) return { input:true };   // 土日
+    return { input:false };                       // 平日
+  }
+
+  // ===== 自分の入力データ（月をまたいで保持） =====
+  // キー＝"YYYY-M-D"、値＝イベント日:'ok'|'ng'|'maybe' / 平日:'off'
+  const myState = {};
+  const myFields = {}; // 月ごとの { memo }（キー＝"YYYY-M"）
+  function keyOf(y,m,d){ return y + '-' + m + '-' + d; }
+  function monKey(y,m){ return y + '-' + m; }
+
+  // ===== カレンダー描画 =====
+  function renderCalendar(){
+    computeBig();
+    const y = cursor.getFullYear(), m = cursor.getMonth()+1;
+    document.getElementById('monLabel').textContent = y + '年 ' + m + '月';
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    // 曜日見出し（月曜始まり）
+    ['月','火','水','木','金','土','日'].forEach((w,i)=>{
+      const h = document.createElement('div');
+      h.className = 'dow' + (i===5?' sat':'') + (i===6?' sun':'');
+      h.textContent = w;
+      grid.appendChild(h);
+    });
+    // 月初の空きセル（月曜始まり）
+    const firstDow = new Date(y, m-1, 1).getDay(); // 0=日..6=土
+    const lead = (firstDow + 6) % 7;               // 月曜始まりの先頭空き数
+    for (let i=0;i<lead;i++){
+      const e = document.createElement('div'); e.className='cell empty'; grid.appendChild(e);
+    }
+    const days = new Date(y, m, 0).getDate();
+    for (let d=1; d<=days; d++){
+      const kind = dayMeta(y, m, d);
+      const cell = document.createElement('div');
+      cell.className = 'cell ' + (kind.input ? 'event' : 'weekday');
+      cell.innerHTML = '<div class="dnum">' + d + '</div>'
+        + (kind.badge ? '<div class="badge' + (kind.badge==='大型'?' big':'') + '">' + kind.badge + '</div>' : '')
+        + '<div class="st"></div><div class="stsub"></div>';
+      if (kind.big) cell.title = '大型案件：' + kind.big;
+      const k = keyOf(y,m,d);
+      if (kind.input){
+        applyEvent(cell, myState[k]);
+        cell.addEventListener('click', ()=>{
+          const order = [undefined,'ok','ng','maybe'];
+          const cur = order.indexOf(myState[k]);
+          const next = order[(cur+1) % order.length];
+          if (next === undefined) delete myState[k]; else myState[k] = next;
+          applyEvent(cell, myState[k]);
+        });
+      } else {
+        applyWeekday(cell, myState[k]);
+        cell.addEventListener('click', ()=>{
+          if (myState[k] === 'off') delete myState[k]; else myState[k] = 'off';
+          applyWeekday(cell, myState[k]);
+        });
+      }
+      grid.appendChild(cell);
+    }
+    // 備考をこの月の保存値に
+    const f = myFields[monKey(y,m)] || {};
+    document.getElementById('memo').value = f.memo || '';
+    document.getElementById('savedMsg').style.display = 'none';
+  }
+  function applyEvent(cell, v){
+    cell.classList.remove('v-ok','v-ng','v-maybe','v-need');
+    const st = cell.querySelector('.st'), sub = cell.querySelector('.stsub');
+    if (v==='ok')    { cell.classList.add('v-ok');    st.textContent='〇'; sub.textContent='出勤可'; }
+    else if (v==='ng')   { cell.classList.add('v-ng');    st.textContent='×'; sub.textContent='不可'; }
+    else if (v==='maybe'){ cell.classList.add('v-maybe'); st.textContent='△'; sub.textContent='条件つき'; }
+    else { cell.classList.add('v-need'); st.textContent=''; sub.textContent='要入力'; } // 未入力＝必ず入れる日
+  }
+  function applyWeekday(cell, v){
+    cell.classList.toggle('off', v==='off');
+    const st = cell.querySelector('.st'), sub = cell.querySelector('.stsub');
+    if (v==='off'){ st.textContent='休'; sub.textContent='希望休'; }
+    else { st.textContent=''; sub.textContent=''; }
+  }
+
+  function saveMine(){
+    const y = cursor.getFullYear(), m = cursor.getMonth()+1;
+    myFields[monKey(y,m)] = {
+      memo: document.getElementById('memo').value
+    };
+    // モック：localStorage にも保存（端末内のみ）
+    try { localStorage.setItem('ecs_emp_avail', JSON.stringify({ state: myState, fields: myFields })); } catch(e){}
+    const msg = document.getElementById('savedMsg');
+    msg.style.display = 'inline';
+  }
+
+  // 保存済みデータの読み込み（あれば）
+  (function loadSaved(){
+    try {
+      const raw = localStorage.getItem('ecs_emp_avail');
+      if (raw){
+        const o = JSON.parse(raw);
+        Object.assign(myState, o.state||{});
+        Object.assign(myFields, o.fields||{});
+      }
+    } catch(e){}
+  })();
+
+  // ===== タブ②：全社員の一覧 =====
+  const EMPLOYEES = ['baba（自分）','佐藤 健太','鈴木 彩','田中 翔','高橋 由依','山本 拓真','中村 さくら','伊藤 健','渡辺 美優'];
+  // 名前＋日からブレない仮の〇×△を作る
+  function seedMark(name, d){
+    let h = d * 13;
+    for (let i=0;i<name.length;i++) h += name.charCodeAt(i) * (i+3);
+    const r = h % 10;
+    if (r <= 5) return 'ok';      // 6割くらい〇
+    if (r <= 7) return 'ng';
+    return 'maybe';
+  }
+  function markHtml(v){
+    if (v==='ok')    return '<span class="ov-mark ok">〇</span>';
+    if (v==='ng')    return '<span class="ov-mark ng">×</span>';
+    if (v==='maybe') return '<span class="ov-mark maybe">△</span>';
+    return '<span class="ov-mark none">−</span>';
+  }
+  // 他社員の仮の「備考」「平日希望休」
+  const MEMO_POOL = ['', 'お盆は実家のため要相談', '平日昼は会議が多めです', '遠方案件は前泊できると助かります',
+                     '特になし', '子どもの行事がある週は休み希望が多めです'];
+  function hashName(name){ let h=0; for (let i=0;i<name.length;i++) h += name.charCodeAt(i)*(i+3); return h; }
+  function seedMemo(name){ return MEMO_POOL[hashName(name) % MEMO_POOL.length]; }
+  // 平日のうち希望休にしている日（自分＝myState、他＝仮）を配列で返す
+  function weekdayOffDays(name, y, m, me){
+    const days = new Date(y, m, 0).getDate();
+    const out = [];
+    for (let d=1; d<=days; d++){
+      if (dayMeta(y, m, d).input) continue; // 平日のみ対象
+      if (me){
+        if (myState[keyOf(y,m,d)] === 'off') out.push(d);
+      } else {
+        if ((hashName(name) + d*7) % 11 === 0) out.push(d);
+      }
+    }
+    return out;
+  }
+  function renderOverview(){
+    computeBig();
+    const y = cursor.getFullYear(), m = cursor.getMonth()+1;
+    const days = new Date(y, m, 0).getDate();
+    // この月の入力対象日（土日祝・長期休暇・大型）だけを列にする
+    const cols = [];
+    for (let d=1; d<=days; d++){
+      const kind = dayMeta(y,m,d);
+      if (kind.input){
+        const w = ['日','月','火','水','木','金','土'][new Date(y,m-1,d).getDay()];
+        cols.push({ d, w, badge:kind.badge });
+      }
+    }
+    const tbl = document.getElementById('ovTbl');
+    if (cols.length === 0){
+      tbl.innerHTML = '<thead><tr><th class="namecol">社員</th><th>この月は対象日（土日・祝日・長期休暇・大型）がありません</th></tr></thead>';
+      return;
+    }
+    // ヘッダー（最後に「平日の希望休」「備考」列を追加）
+    let head = '<thead><tr class="vh"><th class="namecol">社員</th>';
+    cols.forEach(c=>{
+      const cls = (c.badge ? 'holi' : 'we') + (c.badge==='大型' ? ' big' : '');
+      head += '<th class="' + cls + '">' + c.d + '<br><small>(' + c.w + ')' + (c.badge?'<br>'+c.badge:'') + '</small></th>';
+    });
+    head += '<th class="offcol">平日の希望休</th><th class="memocol">備考</th></tr></thead>';
+    // 本体
+    const myMemo = document.getElementById('memo').value.trim(); // 自分は入力タブの内容を反映
+    let body = '<tbody>';
+    EMPLOYEES.forEach((name, idx)=>{
+      const me = idx === 0;
+      body += '<tr class="' + (me?'me':'') + '"><td class="namecol">' + name + '</td>';
+      cols.forEach(c=>{
+        const v = me ? myState[keyOf(y,m,c.d)] : seedMark(name, c.d);
+        body += '<td>' + markHtml(v) + '</td>';
+      });
+      const offs = weekdayOffDays(name, y, m, me);
+      const offTxt = offs.length ? offs.map(d=>d+'日').join('・') : '<span style="color:#c7bba9;">なし</span>';
+      const memo = me ? (myMemo || '<span style="color:#c7bba9;">（未入力）</span>') : (seedMemo(name) || '<span style="color:#c7bba9;">―</span>');
+      body += '<td class="offcol">' + offTxt + '</td><td class="memocol">' + memo + '</td>';
+      body += '</tr>';
+    });
+    body += '</tbody>';
+    // 〇の人数フッター（追加2列ぶんは空欄）
+    let foot = '<tfoot><tr><td class="namecol">〇の人数</td>';
+    cols.forEach(c=>{
+      let cnt = 0;
+      EMPLOYEES.forEach((name, idx)=>{
+        const v = idx===0 ? myState[keyOf(y,m,c.d)] : seedMark(name, c.d);
+        if (v==='ok') cnt++;
+      });
+      foot += '<td class="' + (cnt<=3?'few':'') + '">' + cnt + '人</td>';
+    });
+    foot += '<td class="offcol"></td><td class="memocol"></td></tr></tfoot>';
+    tbl.innerHTML = head + body + foot;
+  }
+
+  // ===== タブ切替・月移動 =====
+  function switchTab(pane){
+    document.querySelectorAll('.ea-tab').forEach(t=> t.classList.toggle('active', t.dataset.pane===pane));
+    document.getElementById('pane-mine').classList.toggle('show', pane==='mine');
+    document.getElementById('pane-all').classList.toggle('show', pane==='all');
+    if (pane==='all') renderOverview();
+  }
+  function moveMonth(diff){
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth()+diff, 1);
+    renderCalendar();
+    if (document.getElementById('pane-all').classList.contains('show')) renderOverview();
+  }
+
+  // 初期表示
+  renderCalendar();
+</script>
+</body>
+</html>
