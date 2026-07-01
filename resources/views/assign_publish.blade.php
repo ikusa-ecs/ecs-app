@@ -73,10 +73,11 @@
     td.meet-cell { white-space: nowrap; }
     td.meet-cell .emp { font-size: 12px; color: var(--muted); }
     td.meet-cell .emp b { color: var(--ink); font-weight: 600; }
-    td.meet-cell .staff-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    td.meet-cell .staff-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
     td.meet-cell .staff-row .lab { font-size: 11px; color: var(--muted); }
+    td.meet-cell .staff-row .leave { color: var(--muted); }
     td.meet-cell input.smeet {
-      width: 74px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px;
+      width: 52px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 4px;
       font-family: inherit; font-size: 12.5px; text-align: center;
     }
     td.meet-cell input.smeet:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
@@ -157,7 +158,7 @@
       <div class="mock-note">
         この公開ボードは<b>案件データ・公開状態とも実際のDBにつながっています</b>（公開ボタンを押すとDBに保存され、閉じても・他のPCでも残ります）。<br>
         <b>調整中は非公開のまま、固まったら「スタッフに公開」</b>してください。チェックを付けて<b>まとめて公開／非公開</b>もできます。<br>
-        ※ スタッフ画面（確定アサイン）への表示は、次の工程で接続予定です。
+        ※ 公開した案件は、スタッフ画面の「確定アサイン」に表示されます（集合・解散時間やお知らせ文の変更も、保存すればスタッフ画面に反映されます）。
       </div>
 
       <!-- スタッフ画面のお知らせ文の編集 -->
@@ -223,7 +224,7 @@
 
       <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
         ※ 表示している<b>会場（住所）・集合場所・集合〜解散</b>は、スタッフ画面に出る情報と同じものです。<b>案件名をクリック</b>すると案件一覧の該当月へ移動します。<br>
-        ※「集合（スタッフ）」は、スタッフに見せる集合時間です。社員と違うときは入力して直せます（社員と違うと「別」マークが付きます）。<br>
+        ※「集合〜解散（スタッフ）」は、スタッフに見せる集合・解散時間です。社員と違うときは入力して直せます（直すと「別」マークが付き、スタッフ画面にも反映されます）。<br>
         ※「詳細 →」で案件詳細（アサイン画面）に飛びます。時間・場所など細かい変更はそちらでもできます。<br>
         ※ 公開状態はDB（projects の staff_published）に保存され、案件詳細（アサイン画面）とも同じ列で連動します。<br>
         ※ 備考は担当用メモです（このブラウザに保存され、次に開いても残ります）。
@@ -235,6 +236,7 @@
 <!-- 案件データと公開状態は DB（projects）から渡される -->
 <script>
   window.ECS_PUBLISH_CASES = @json($cases);
+  window.ECS_STAFF_NOTICE = @json($notice);
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -245,7 +247,8 @@
   const CASES = (window.ECS_PUBLISH_CASES || []).map(function(c){
     return {
       id: c.id, name: c.name, client: c.client, cat: c.cat, category: c.category, need: c.need, off: c.off,
-      added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published
+      added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published,
+      staffMeet: c.staffMeet, staffLeave: c.staffLeave
     };
   });
 
@@ -282,26 +285,54 @@
     flash('nsaved-' + id);
   }
 
-  // ===== スタッフ集合時間（localStorage）。既定は社員の集合時間と同じ =====
-  function smeetKey(id){ return 'ecs_staff_meet_' + id; }
-  function getStaffMeet(c){ try { return localStorage.getItem(smeetKey(c.id)) || c.meet; } catch(e){ return c.meet; } }
-  function saveStaffMeet(id, val){ try { localStorage.setItem(smeetKey(id), val); } catch(e){} render(); }
+  // ===== スタッフ集合・解散時間（DB保存）。既定は社員の時間と同じ =====
+  // staffMeet/staffLeave に値が入っていれば担当が直した時間、無ければ社員の時間を使う。
+  function getStaffMeet(c){ return c.staffMeet || c.meet; }
+  function getStaffLeave(c){ return c.staffLeave || c.leave; }
+  // 直した時間を DB に保存する（kind='meet' か 'leave'）。先に画面を更新し、失敗したら元に戻す。
+  function saveStaffTime(id, kind, val){
+    const c = CASES.find(x => x.id === id);
+    if (!c) return;
+    const prev = (kind === 'meet') ? c.staffMeet : c.staffLeave;
+    if (kind === 'meet') c.staffMeet = val; else c.staffLeave = val;
+    render();
+    const body = { id: id };
+    body[kind === 'meet' ? 'staff_meet' : 'staff_leave'] = val;
+    fetch('/assign-publish/time', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify(body)
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); })
+    .catch(() => {
+      alert('保存に失敗しました。通信状態を確認して、もう一度お試しください。');
+      if (kind === 'meet') c.staffMeet = prev; else c.staffLeave = prev;
+      render();
+    });
+  }
 
-  // ===== スタッフ画面のお知らせ文（localStorage 'ecs_staff_notice'）=====
+  // ===== スタッフ画面のお知らせ文（DB保存）=====
+  // サーバから渡された文（window.ECS_STAFF_NOTICE）を出し、保存はサーバ（DB）へ。
   function loadNotice(){
-    let t = '';
-    try { t = localStorage.getItem('ecs_staff_notice') || ''; } catch(e){}
+    const t = (window.ECS_STAFF_NOTICE || '').trim();
     document.getElementById('noticeInput').value = t || DEFAULT_NOTICE;
   }
   function saveNotice(){
-    const v = document.getElementById('noticeInput').value.trim();
-    try { localStorage.setItem('ecs_staff_notice', v); } catch(e){}
-    flash('noticeSaved');
+    persistNotice(document.getElementById('noticeInput').value.trim());
   }
   function resetNotice(){
-    try { localStorage.removeItem('ecs_staff_notice'); } catch(e){}
     document.getElementById('noticeInput').value = DEFAULT_NOTICE;
-    flash('noticeSaved');
+    persistNotice('');   // 空＝既定文に戻す（スタッフ画面では既定文が出る）
+  }
+  // お知らせ文を DB に保存する。
+  function persistNotice(v){
+    fetch('/assign-publish/notice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ notice: v })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('noticeSaved'); })
+    .catch(() => alert('お知らせ文の保存に失敗しました。もう一度お試しください。'));
   }
 
   // 「✓保存しました」を一瞬出す
@@ -360,7 +391,9 @@
   function appendCaseRow(c){
     const pub = isPublished(c.id);
     const sm = getStaffMeet(c);
-    const diff = (sm !== c.meet);
+    const sl = getStaffLeave(c);
+    const diffM = (sm !== c.meet);
+    const diffL = (sl !== c.leave);
     const extra = (c.category === '追加案件');
 
     const tr = document.createElement('tr');
@@ -368,15 +401,16 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}<span class="badge cat-${c.cat}">${c.cat}</span><div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row"><span class="lab">スタッフ</span>
-          <input class="smeet" type="text" value="${sm}" onchange="saveStaffMeet('${c.id}', this.value)" title="スタッフに見せる集合時間">
-          <span class="leave">〜 ${c.leave}</span>
-          ${diff ? '<span class="diff">別</span>' : ''}
+          <input class="smeet" type="text" value="${sm}" onchange="saveStaffTime('${c.id}', 'meet', this.value)" title="スタッフに見せる集合時間">
+          <span class="leave">〜</span>
+          <input class="smeet" type="text" value="${sl}" onchange="saveStaffTime('${c.id}', 'leave', this.value)" title="スタッフに見せる解散時間">
+          ${(diffM || diffL) ? '<span class="diff">別</span>' : ''}
         </div>
-        <div class="emp">社員 <b>${c.meet}</b></div>
+        <div class="emp">社員 <b>${c.meet}</b> 〜 <b>${c.leave}</b></div>
       </td>
       <td>${c.need}名</td>
       <td>${pub ? '<span class="pub-badge on"><span class="dot"></span>公開中</span>' : '<span class="pub-badge off"><span class="dot"></span>非公開</span>'}</td>

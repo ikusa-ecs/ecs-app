@@ -302,29 +302,10 @@
 
       <!-- ===== タブ1：募集中の案件（エントリーできる） ===== -->
       <div class="tab-panel active" id="tab-jobs">
+        {{-- お知らせ文は DB（settings.staff_notice）から。担当が公開ボードで保存すると全スタッフに反映される。空なら既定文。 --}}
         <div class="notice" id="staffNotice">
-          📣 <b>7月分</b>の募集が出ています。気になる案件は「エントリーする」を押してください。
-          担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）
+          📣 @if(!empty($notice)){{ $notice }}@else<b>7月分</b>の募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）@endif
         </div>
-        @verbatim
-        <script>
-          // スタッフ公開ボード（社員側）で編集したお知らせ文があれば、それを表示する。
-          // 同じブラウザの localStorage 'ecs_staff_notice' を読む。空なら上の既定文のまま。
-          (function () {
-            try {
-              var t = localStorage.getItem('ecs_staff_notice');
-              if (t && t.trim()) document.getElementById('staffNotice').textContent = '📣 ' + t;
-            } catch (e) {}
-          })();
-          // 公開ボードで保存→このタブに戻ったときにも反映
-          window.addEventListener('focus', function () {
-            try {
-              var t = localStorage.getItem('ecs_staff_notice');
-              if (t && t.trim()) document.getElementById('staffNotice').textContent = '📣 ' + t;
-            } catch (e) {}
-          });
-        </script>
-        @endverbatim
 
         <div class="notice extra-notice" id="extraNotice" style="display:none;"></div>
 
@@ -691,7 +672,7 @@
           <div class="assign-date"><div class="d">${(d.getMonth()+1)}/${d.getDate()}</div><div class="dow">${DOW_CIRCLE[d.getDay()]}</div></div>
           <div class="assign-info">
             <div class="t">${j.content} ${j.client} <span style="font-size:11px;color:#15803d;font-weight:700;">★公開されました</span></div>
-            <div class="meta">集合 ${j.meet}　／　${j.meetPlace}　／　${j.place}</div>
+            <div class="meta">集合 ${j.meet}〜${j.leave}　／　${j.meetPlace}　／　${j.place}</div>
           </div>
           <div class="assign-arrow">›</div>
         </div>`;

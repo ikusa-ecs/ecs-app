@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
+use App\Models\Setting;
 use Illuminate\Support\Carbon;
 
 /**
@@ -41,7 +42,9 @@ class StaffPortalController extends Controller
                     'client'    => $p->client ?? '',
                     'place'     => $p->location ?? '',
                     'meetPlace' => $p->assembly_type ?? '',
-                    'meet'      => $p->start_time ?? '—',   // スタッフ集合時間
+                    // スタッフ向けの集合・解散時間。担当が公開ボードで直していれば優先、無ければ社員の時間。
+                    'meet'      => $p->staff_meet_time ?? $p->start_time ?? '—',
+                    'leave'     => $p->staff_leave_time ?? $p->end_time ?? '—',
                     'off'       => $off,
                 ];
             })
@@ -50,6 +53,7 @@ class StaffPortalController extends Controller
         return view('staff_portal', [
             'published' => $published,
             'recruitJobs' => $this->recruitJobs($today),
+            'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
         ]);
     }
 
