@@ -98,6 +98,7 @@
 
         <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>
 
+        <div class="tbl-scroll" style="overflow-x:auto;">
         <table class="tbl">
           <thead>
             <tr>
@@ -114,6 +115,7 @@
           </thead>
           <tbody id="tbody"><!-- JSで生成 --></tbody>
         </table>
+        </div>
         <div class="muted" style="font-size:12px; margin-top:10px;">
           稼働率＝今月のアサイン日数 ÷ 本人の希望日数（＝希望充足率と同じ意味なので1列に統合。目安30%を担保）。「今月」の◯/20の20は月上限＝過重労働防止のため全員一律20件（稼働率の分母ではなく上限の目安）。活性度＝その月のエントリー率で判定（月ごと）。<br>
           選ばれた率＝アサイン回数 ÷ エントリー（応募）回数。何回も応募しているのに低い人は新人離脱のサイン（赤字）。ご無沙汰＝最後にアサインされてからの日数。長い人ほど声がかかっていない（14日以上で橙・30日以上で赤）。

@@ -234,9 +234,12 @@
       <!-- 操作バー -->
       <div class="board-controls">
         <div class="month-nav">
-          <button onclick="alert('モックのため、月の切替はしません。')">◀</button>
-          <span class="mon">2026年 7月</span>
-          <button onclick="alert('モックのため、月の切替はしません。')">▶</button>
+          <label for="fromDate" style="font-size:12.5px; font-weight:600; white-space:nowrap;">表示開始日</label>
+          <button type="button" onclick="shiftAnchor(-7)" title="1週間前へ">◀</button>
+          <input type="date" id="fromDate" onchange="jumpToDate(this.value)"
+                 style="padding:5px 8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px;">
+          <button type="button" onclick="shiftAnchor(7)" title="1週間後へ">▶</button>
+          <button type="button" class="btn sm" onclick="jumpToDate('')" style="margin-left:4px; width:auto; height:auto; padding:6px 12px; white-space:nowrap; flex:0 0 auto;">今日に戻る</button>
         </div>
         <div class="spacer"></div>
         <select id="stateFilter" onchange="render()">
@@ -285,6 +288,8 @@
 <!-- 希望者カラム用：その日に稼働可/希望のスタッフ（off→一覧）と、今月のアサイン件数（名前→件数）。 -->
 <script>window.ECS_BOARD_AVAIL = @json($boardAvail ?? []);</script>
 <script>window.ECS_BOARD_MONTH = @json($boardMonth ?? []);</script>
+<!-- 表示の基準日（先頭の日）。日付計算の起点・日付ピッカーの初期値に使う。 -->
+<script>window.ECS_BOARD_ANCHOR = @json($anchor ?? null);</script>
 @verbatim
 <script>
   // ===== 案件データ（共通リスト data/cases.js から作る）=====
@@ -611,7 +616,28 @@
 
   // ===== 日付ユーティリティ =====
   const DOW = ['日','月','火','水','木','金','土'];
-  function addDays(n){ const x = new Date(); x.setHours(0,0,0,0); x.setDate(x.getDate()+n); return x; }
+  // 表示の基準日（先頭の日）。?from で来た日。無ければ今日。off はこの日からの日数。
+  function boardAnchorDate(){
+    const s = window.ECS_BOARD_ANCHOR;
+    if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const p = s.split('-').map(Number);
+      return new Date(p[0], p[1]-1, p[2]);
+    }
+    return new Date();
+  }
+  function addDays(n){ const x = boardAnchorDate(); x.setHours(0,0,0,0); x.setDate(x.getDate()+n); return x; }
+  function ymd(d){ const m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+m+'-'+day; }
+
+  // 基準日を変えてボードを開き直す（空文字＝今日に戻る）。focus 等の他パラメータは引き継がない。
+  function jumpToDate(v){
+    location.href = (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? ('/assign?from=' + v) : '/assign';
+  }
+  // 今の基準日から n 日ずらして開き直す（◀▶ボタン用）。
+  function shiftAnchor(n){
+    const d = boardAnchorDate(); d.setHours(0,0,0,0); d.setDate(d.getDate()+n);
+    jumpToDate(ymd(d));
+  }
+
   const stateLabel = { todo:'未着手', adj:'調整中', fix:'確定', pub:'公開済' };
 
   const body  = document.getElementById('boardBody');
@@ -805,6 +831,13 @@
     el.style.boxShadow = '0 0 0 3px #e8833a, 0 8px 24px rgba(0,0,0,.14)';
     setTimeout(() => { el.style.boxShadow = ''; }, 4000);
   }
+
+  // 日付ピッカーに現在の基準日を表示（空なら今日）。
+  (function initFromDate(){
+    const el = document.getElementById('fromDate');
+    if (el) el.value = (window.ECS_BOARD_ANCHOR && /^\d{4}-\d{2}-\d{2}$/.test(window.ECS_BOARD_ANCHOR))
+      ? window.ECS_BOARD_ANCHOR : ymd(new Date());
+  })();
 
   // 初期描画
   render();

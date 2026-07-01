@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -34,15 +35,34 @@ class AssignBoardController extends Controller
     /** 主ポジションを選ぶ優先順（重要・経験者向けの役割を上に）。 */
     private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'GUN', 'FC', 'UKE', 'CK'];
 
-    /** アサインボード（日別）/assign。案件＋割当メンバー＋希望者・稼働可・今月件数を DB から渡す。 */
-    public function assign()
+    /** アサインボード（日別）/assign。案件＋割当メンバー＋希望者・稼働可・今月件数を DB から渡す。
+     *  ?from=YYYY-MM-DD が来たら、その日を基準（先頭）に 3週間分を表示する（既定＝今日）。 */
+    public function assign(Request $request)
     {
+        $anchor = $this->boardAnchor($request);
+
         return view('assign', [
             'staffPool' => $this->staffPool(),
-            'boardCases' => $this->boardCases(),
-            'boardAvail' => $this->boardAvail(),       // off → その日に稼働可/希望のスタッフ一覧
-            'boardMonth' => $this->boardMonthCount(),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
+            'boardCases' => $this->boardCases($anchor),
+            'boardAvail' => $this->boardAvail($anchor),       // off → その日に稼働可/希望のスタッフ一覧
+            'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
+            'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
         ]);
+    }
+
+    /** 表示の基準日。?from=YYYY-MM-DD が正しい日付ならその日、無ければ今日。 */
+    private function boardAnchor(Request $request): Carbon
+    {
+        $from = (string) $request->query('from', '');
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
+            try {
+                return Carbon::createFromFormat('Y-m-d', $from)->startOfDay();
+            } catch (\Throwable $e) {
+                // 不正な日付は今日に倒す
+            }
+        }
+
+        return Carbon::today();
     }
 
     /** エントリー一覧 /entries。案件＋応募者（applications）を DB から渡す。 */
@@ -82,15 +102,13 @@ class AssignBoardController extends Controller
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function boardCases(): Collection
+    private function boardCases(Carbon $anchor): Collection
     {
-        $today = Carbon::today();
-
-        // ボード対象＝完了/下書きでなく、開催日があり、今日〜21日先の案件。
+        // ボード対象＝完了/下書きでなく、開催日があり、基準日〜21日先の案件。
         $projects = Project::orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
-            ->map(fn (Project $p) => [$p, $this->offDays($p->start_date, $today)])
+            ->map(fn (Project $p) => [$p, $this->offDays($p->start_date, $anchor)])
             ->filter(fn (array $pair) => $pair[1] >= 0 && $pair[1] <= 21)
             ->values();
 
@@ -196,12 +214,11 @@ class AssignBoardController extends Controller
      *
      * @return array<int, array<int, array<string, string>>>
      */
-    private function boardAvail(): array
+    private function boardAvail(Carbon $anchor): array
     {
-        $today = Carbon::today();
-        $end = $today->copy()->addDays(21);
+        $end = $anchor->copy()->addDays(21);
 
-        $prefs = ShiftPreference::whereBetween('date', [$today->format('Y-m-d'), $end->format('Y-m-d')])
+        $prefs = ShiftPreference::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
             ->whereIn('availability', ['稼働可', '希望'])
             ->get(['staff_id', 'date']);
 
@@ -213,7 +230,7 @@ class AssignBoardController extends Controller
 
         $out = [];
         foreach ($prefs as $pref) {
-            $off = $this->offDays($pref->date, $today);
+            $off = $this->offDays($pref->date, $anchor);
             $person = $people->get($pref->staff_id);
             $out[$off][] = [
                 'name' => $person->name ?? $pref->staff_id,
@@ -231,12 +248,11 @@ class AssignBoardController extends Controller
      *
      * @return array<string, int>
      */
-    private function boardMonthCount(): array
+    private function boardMonthCount(Carbon $anchor): array
     {
-        $today = Carbon::today();
-        $end = $today->copy()->addDays(21);
+        $end = $anchor->copy()->addDays(21);
 
-        $rows = Assignment::whereBetween('date', [$today->format('Y-m-d'), $end->format('Y-m-d')])
+        $rows = Assignment::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
             ->where('status', '!=', 'キャンセル')
             ->get(['staff_id']);
 

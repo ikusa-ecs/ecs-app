@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\AssignmentRole;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -37,12 +38,13 @@ class DemoMyPageSeeder extends Seeder
 
         // ── ② baba のアサイン（案件ID → 自分のポジション）──
         // 案件が DB に在るものだけ入れる（無い ID はスキップ）。日付は案件の開催日に合わせる。
+        // 役割は必ず正本（AssignmentRole）のコードで作る＝「ディレクター」等の別表記を入れない。
         $myAssigns = [
-            ['undo_d1', 'D'],   // 今月・大型
-            ['konshin', 'SD'],            // 今月
-            ['shinkan', 'MC'],            // 今月
-            ['bousai', 'D'],    // 翌月（月絞り込みの確認用）
-            ['past_fes', 'D'],  // 過去（アーカイブの確認用）
+            ['undo_d1', AssignmentRole::D],    // 今月・大型
+            ['konshin', AssignmentRole::SD],   // 今月
+            ['shinkan', AssignmentRole::MC],   // 今月
+            ['bousai', AssignmentRole::D],     // 翌月（月絞り込みの確認用）
+            ['past_fes', AssignmentRole::D],   // 過去（アーカイブの確認用）
         ];
         foreach ($myAssigns as [$pid, $role]) {
             $project = Project::find($pid);

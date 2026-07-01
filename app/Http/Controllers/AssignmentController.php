@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,16 +24,7 @@ class AssignmentController extends Controller
     // 月間アサイン上限（過重労働防止・一律20件／設計書11章F）。超えても保存はできる＝警告のみ。
     private const MONTH_CAP = 20;
 
-    // 役割キー → 表示ラベル（staff_role_eligibility は D/OP/MC/FC/CK/GUN/UKE で持つ）
-    private const ROLE_LABELS = [
-        'D' => 'D（ディレクター）',
-        'OP' => 'OP（音響）',
-        'MC' => 'MC（司会進行）',
-        'FC' => 'FC（巡回ファシリ）',
-        'CK' => 'CK（チェッカー）',
-        'GUN' => '軍師・サポーター',
-        'UKE' => '受付',
-    ];
+    // ※ 役割コード／ラベルの正本は App\Support\AssignmentRole（別表記を作らないため一本化）。
 
     /** アサイン画面（案件1件＋スタッフ名簿＋保存済みアサインを渡す）。 */
     public function show(Request $request)
@@ -67,7 +59,7 @@ class AssignmentController extends Controller
             ->get()
             ->map(function (Person $p) {
                 $can = $p->roleEligibilities->pluck('position')->all();
-                $posLabels = array_map(fn ($k) => self::ROLE_LABELS[$k] ?? $k, $can);
+                $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $can);
 
                 return [
                     'id' => $p->id,
@@ -116,7 +108,7 @@ class AssignmentController extends Controller
             'date' => $date,
             'staff' => $staff,
             'existing' => $existing,
-            'roleLabels' => self::ROLE_LABELS,
+            'roleLabels' => AssignmentRole::positionLabels(),
             'sameDay' => $sameDay,
             'monthCount' => $monthCount,
             'monthCap' => self::MONTH_CAP,
@@ -157,7 +149,8 @@ class AssignmentController extends Controller
                     'project_id' => $project->id,
                     'staff_id' => $sid,
                     'date' => $date,
-                    'role' => $roles[$sid] ?? null,
+                    // 正規の役割コード以外（空・別表記）は「役割なし（''）」に倒す＝表記ゆれを入れない
+                    'role' => AssignmentRole::isValid($roles[$sid] ?? null) ? $roles[$sid] : '',
                     'status' => $data['status'],
                     'assigned_by' => null,        // 認証導入後に操作者を入れる
                     'assigned_at' => $now,

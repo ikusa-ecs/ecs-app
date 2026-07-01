@@ -27,8 +27,14 @@
     .proj-head .spacer { flex: 1; }
 
     /* メイン2カラム（提案チーム / 編成サマリ） */
-    .assign-grid { display: grid; grid-template-columns: 1.9fr 1fr; gap: 20px; align-items: start; }
-    @media (max-width: 1100px) { .assign-grid { grid-template-columns: 1fr; } }
+    /* 縦並び：上に「編成サマリ＋チェック警告」、下に「提案チーム」をフル幅（横長）で置く */
+    .assign-grid { display: flex; flex-direction: column; gap: 20px; }
+    .assign-grid > .panel { order: 2; }       /* 提案チーム（表）を下＝フル幅で横長に */
+    .assign-grid > .top-grid { order: 1; }    /* 編成サマリ＋チェック警告を上へ */
+    .top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 900px) { .top-grid { grid-template-columns: 1fr; } }
+    .assign-grid > * { min-width: 0; }   /* 中の表を縮められるように */
+    .tbl-scroll { overflow-x: auto; }    /* 表が広いときは表の中だけ横スクロール（画面全体ははみ出さない） */
 
     /* スコアのバッジ・バー */
     .score { display: inline-flex; align-items: center; gap: 8px; }
@@ -255,6 +261,7 @@
             <span id="posFilterHit"></span>
           </div>
 
+          <div class="tbl-scroll">
           <table class="tbl">
             <thead>
               <tr>
@@ -272,10 +279,11 @@
               <!-- 行はJSで生成 -->
             </tbody>
           </table>
+          </div>
         </div>
 
-        <!-- ===== 右：編成サマリ ===== -->
-        <div>
+        <!-- ===== 上：編成サマリ＋チェック警告（横並び。CSSで提案チームの上に表示） ===== -->
+        <div class="top-grid">
           <div class="panel">
             <div class="panel-head"><h2>編成サマリ</h2></div>
 
@@ -315,7 +323,7 @@
           </div>
 
           <!-- 警告 -->
-          <div class="panel" style="margin-top:20px;">
+          <div class="panel">
             <div class="panel-head"><h2>チェック・警告</h2></div>
             <div class="alert warn"><span class="ico">⚠</span><div><strong>鈴木 美咲</strong>（中堅）は今月の希望がまだ <strong>0件</strong>。0件回避のため優先的に組み込み済み。</div></div>
             <div class="alert ok"><span class="ico">✓</span><div>新人のみの編成ではありません（ベテラン5名・フォロー役2名）。</div></div>

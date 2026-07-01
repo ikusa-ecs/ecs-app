@@ -66,6 +66,18 @@
     .ptag.key { background: var(--brand-soft); color: var(--brand-dark); } /* D/OP/MC/軍師＝経験者向け */
 
     .note { font-size: 12px; color: var(--muted); margin-top: 14px; line-height: 1.6; }
+
+    /* ===== 一覧を1画面に多く出すための密度調整（本番は人数が多い）===== */
+    .wl-wrap { padding: 14px 22px 24px; }
+    .wl-cards { gap: 10px; margin-bottom: 12px; }
+    .wl-card { padding: 9px 14px; }
+    .wl-card .c-num { font-size: 21px; }
+    .wl-filter { margin-bottom: 8px; }
+    /* 表：行を詰めて1行=1行高に。縦書き化を防ぎつつ余白を最小化 */
+    table.tbl th, table.tbl td { padding: 4px 9px; font-size: 12.5px; line-height: 1.35; }
+    table.tbl thead th { white-space: nowrap; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+    .ptag { margin: 0 2px 0 0; padding: 1px 6px; }   /* ポジションタグも詰める（折返し分の高さを抑える） */
+    .rate .rbar { width: 60px; }
   </style>
   @endverbatim
 </head>
@@ -73,7 +85,7 @@
   <div class="wl-wrap">
     <div class="wl-head">
       <h1>👥 スタッフ一覧（2026年 7月）</h1>
-      <div class="sub">いま稼働希望を出してくれているスタッフの一覧です。希望日数・実アサイン数・その割合、できるポジションを確認できます。（見た目確認用のモックで、人数はすべて仮の見本です）</div>
+      <div class="sub">いま稼働希望を出してくれているスタッフの一覧です。希望日数・実アサイン数・その割合、できるポジションを確認できます。（数値はすべて本物の希望・アサインから計算しています。対象月＝2026年7月）</div>
     </div>
 
     <!-- 上部の数値カード -->
@@ -89,10 +101,6 @@
       <div class="wl-card">
         <div class="c-label">まだアサイン0の人</div>
         <div class="c-num" id="cZero" style="color:var(--danger);">0<small> 名</small></div>
-      </div>
-      <div class="wl-poscard">
-        <div class="c-label">できるポジション別の人数（このポジションを担当できる希望者）</div>
-        <div class="pos-counts" id="posCounts"></div>
       </div>
     </div>
 
@@ -151,9 +159,14 @@
     </div>
   </div>
 
+<!-- 本物の希望者データ（Controllerが対象月の希望・アサインから作成）をJSへ渡す。
+     ここだけBladeで埋め込み、下の表示ロジック（テンプレートリテラルを使う）はそのまま温存する。 -->
+<script>
+  window.WISHLIST = @json($people);
+</script>
 @verbatim
 <script>
-  // ===== 希望者の仮データ =====
+  // ===== 希望者データ（本物のDB由来。受け渡しは window.WISHLIST）=====
   // lv: new=新人 / mid=中堅 / vet=ベテラン
   // wish: 今月の稼働希望を出した日数 ／ assigned: そのうち実際にアサインされた日数
   // pos: できるポジション
@@ -161,24 +174,8 @@
   const ALL_POS = ['D','OP','MC','FC','CK','軍師・サポーター','受付'];
 
   // mc: 今月そのうちMCとしてアサインされた回数（MCができる人のみ。できない人は表示で「—」）
-  const people = [
-    { id:'S-001', name:'高橋 由依', lv:'vet', wish:8,  assigned:5, mc:3, pos:['D','MC','FC','受付'] },
-    { id:'S-007', name:'伊藤 健',   lv:'vet', wish:7,  assigned:5, mc:0, pos:['OP','FC'] },
-    { id:'S-003', name:'渡辺 さくら',lv:'vet', wish:6,  assigned:4, mc:4, pos:['MC','FC','受付'] },
-    { id:'S-027', name:'清水 陽',   lv:'vet', wish:9,  assigned:5, mc:0, pos:['FC','軍師・サポーター','受付'] },
-    { id:'S-030', name:'森 結菜',   lv:'vet', wish:7,  assigned:4, mc:0, pos:['FC','受付'] },
-    { id:'S-014', name:'鈴木 美咲', lv:'mid', wish:8,  assigned:0, mc:0, pos:['軍師・サポーター','FC','受付'] },
-    { id:'S-021', name:'山田 涼',   lv:'mid', wish:9,  assigned:2, mc:0, pos:['FC','CK'] },
-    { id:'S-009', name:'松本 美優', lv:'mid', wish:7,  assigned:4, mc:2, pos:['MC','FC','受付'] },
-    { id:'S-005', name:'井上 大輝', lv:'mid', wish:8,  assigned:5, mc:0, pos:['FC','CK','OP'] },
-    { id:'S-018', name:'木村 拓海', lv:'mid', wish:6,  assigned:3, mc:0, pos:['CK','FC'] },
-    { id:'S-011', name:'林 美月',   lv:'mid', wish:6,  assigned:4, mc:0, pos:['受付','FC'] },
-    { id:'S-024', name:'近藤 樹',   lv:'mid', wish:8,  assigned:6, mc:1, pos:['MC','FC','CK'] },
-    { id:'S-032', name:'佐藤 健太', lv:'new', wish:10, assigned:0, mc:0, pos:['FC','受付'] },
-    { id:'S-035', name:'池田 莉子', lv:'new', wish:6,  assigned:1, mc:0, pos:['受付','CK'] },
-    { id:'S-038', name:'橋本 颯',   lv:'new', wish:5,  assigned:1, mc:0, pos:['CK','受付'] },
-    { id:'S-041', name:'石川 葵',   lv:'new', wish:4,  assigned:0, mc:0, pos:['受付'] },
-  ];
+  // データの中身は Controller（AssignWishlistController）が本物のDBから作成済み。
+  const people = window.WISHLIST || [];
 
   const lvLabel = { new:'新人', mid:'中堅', vet:'ベテラン' };
   const body = document.getElementById('wlBody');
@@ -210,7 +207,7 @@
       ).join('');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${p.name}</strong><br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
+        <td><strong>${p.name}</strong> <span class="muted" style="font-size:11px;">${p.id}</span></td>
         <td><span class="lv ${p.lv}">${lvLabel[p.lv]}</span></td>
         <td class="center">${p.wish}</td>
         <td class="center">${p.assigned}</td>
@@ -224,13 +221,6 @@
     document.getElementById('cTotal').innerHTML = people.length + '<small> 名</small>';
     document.getElementById('cWish').innerHTML  = people.reduce((s,p)=>s+p.wish,0) + '<small> 日</small>';
     document.getElementById('cZero').innerHTML  = people.filter(p=>p.assigned===0).length + '<small> 名</small>';
-
-    // できるポジション別の人数
-    const pc = document.getElementById('posCounts');
-    pc.innerHTML = ALL_POS.map(pos => {
-      const n = people.filter(p => p.pos.includes(pos)).length;
-      return `<span class="pos-count ${KEY_POS.includes(pos) ? '' : ''}">${pos} <b>${n}</b>名</span>`;
-    }).join('');
   }
 
   render();

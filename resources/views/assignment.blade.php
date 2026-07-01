@@ -121,6 +121,7 @@
       </div>
 
       <div class="panel" style="padding-top:6px;">
+        <div class="tbl-scroll" style="overflow-x:auto;">
         <table class="tbl">
           <thead>
             <tr>
@@ -183,6 +184,7 @@
             @endforelse
           </tbody>
         </table>
+        </div>
       </div>
 
       <div class="save-bar">

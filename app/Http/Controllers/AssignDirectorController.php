@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +48,7 @@ class AssignDirectorController extends Controller
 
         // この案件のD/SDを assignments から引く（role='D' / 'SD'）。
         // project_id => ['D'=>['id'=>staff_id,'status'=>...], 'SD'=>...]
-        $dirByProject = Assignment::whereIn('role', ['D', 'SD'])
+        $dirByProject = Assignment::whereIn('role', [AssignmentRole::D, AssignmentRole::SD])
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id', 'role', 'status'])
             ->groupBy('project_id')
@@ -61,7 +62,7 @@ class AssignDirectorController extends Controller
 
         // FC（フロアコーディネーター）もこの画面で選べるようにする。
         // project_id => [staff_id, ...]（role='FC'・キャンセル除く・重複排除）。
-        $fcByProject = Assignment::where('role', 'FC')
+        $fcByProject = Assignment::where('role', AssignmentRole::FC)
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
@@ -128,7 +129,7 @@ class AssignDirectorController extends Controller
         // FCはこの画面で選べるので $fcByProject 側で扱い、ここでは二重に数えないよう除外する。
         // 形：日付(Y-m-d) => [ staff_id => [role, ...] ]
         $empBusy = [];
-        Assignment::whereNotIn('role', ['D', 'SD', 'FC'])
+        Assignment::whereNotIn('role', [AssignmentRole::D, AssignmentRole::SD, AssignmentRole::FC])
             ->where('status', '!=', 'キャンセル')
             ->get(['staff_id', 'date', 'role'])
             ->each(function ($a) use (&$empBusy) {
@@ -206,14 +207,14 @@ class AssignDirectorController extends Controller
                 //   文字列 'Y-m-d' の完全一致だと取りこぼして重複エラーになる）。
                 Assignment::where('project_id', $pid)
                     ->whereDate('date', $date)
-                    ->whereIn('role', ['D', 'SD'])
+                    ->whereIn('role', [AssignmentRole::D, AssignmentRole::SD])
                     ->when($keep, fn ($q) => $q->whereNotIn('staff_id', $keep))
                     ->delete();
 
                 // 選ばれたD/SDを保存。同じ案件×人×日が既にあれば role/status を更新するだけ。
                 // ※ 既存行を探すときも whereDate で「日付部分」だけ照合する（DB保存は 00:00:00 付き。
                 //   updateOrCreate は date を完全一致で探すため取りこぼし→新規作成→重複エラーになる）。
-                foreach (['D' => $dId, 'SD' => $sId] as $role => $staffId) {
+                foreach ([AssignmentRole::D => $dId, AssignmentRole::SD => $sId] as $role => $staffId) {
                     if ($staffId === '') {
                         continue;   // 未定／なし＝行を作らない
                     }
@@ -245,7 +246,7 @@ class AssignDirectorController extends Controller
                 ));
                 Assignment::where('project_id', $pid)
                     ->whereDate('date', $date)
-                    ->where('role', 'FC')
+                    ->where('role', AssignmentRole::FC)
                     ->when($fcIds, fn ($q) => $q->whereNotIn('staff_id', $fcIds))
                     ->delete();
                 foreach ($fcIds as $sid) {
@@ -258,13 +259,13 @@ class AssignDirectorController extends Controller
                         ->whereDate('date', $date)
                         ->first();
                     if ($existing) {
-                        $existing->update(['role' => 'FC', 'status' => $status, 'assigned_at' => $now]);
+                        $existing->update(['role' => AssignmentRole::FC, 'status' => $status, 'assigned_at' => $now]);
                     } else {
                         Assignment::create([
                             'project_id' => $pid,
                             'staff_id' => $sid,
                             'date' => $date,
-                            'role' => 'FC',
+                            'role' => AssignmentRole::FC,
                             'status' => $status,
                             'assigned_by' => null,
                             'assigned_at' => $now,
