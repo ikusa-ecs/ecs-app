@@ -65,7 +65,7 @@ class ProjectController extends Controller
                 'sales'      => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
                 'dir'        => $p->director->name ?? '未定',
                 'goods'      => $p->goodsOwner->name ?? '未定',
-                'sd'         => 'なし',                     // SD担当は未保存（後の工程で対応）
+                'sd'         => '未設定',                   // SD担当は未保存（後の工程で対応）。固定「なし」は嘘なので「未設定」に
                 'meet'       => $p->start_time ?? '—',
                 'leave'      => $p->end_time ?? '—',
                 'enter'      => $p->event_enter_time ?? '—',
