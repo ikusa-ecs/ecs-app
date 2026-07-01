@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Content;
 use App\Models\Person;
 use App\Support\AssignmentRole;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
@@ -44,7 +46,45 @@ class PersonController extends Controller
             })
             ->values();
 
-        return view('employees', ['employees' => $employees]);
+        // 経験コンテンツ編集のプルダウン候補＝コンテンツ台帳（有効なもの・名前順）。
+        $contentOptions = Content::where('active', true)
+            ->orderBy('content_name')
+            ->pluck('content_name')
+            ->filter()
+            ->unique()
+            ->values();
+
+        return view('employees', [
+            'employees'      => $employees,
+            'contentOptions' => $contentOptions,
+        ]);
+    }
+
+    /**
+     * 社員名簿の詳細から「経験のあるコンテンツ／Dの経験のあるコンテンツ」を保存する
+     * （POST /employees/experience）。ケータリング保存と同じ「その項目だけ更新」のやり方。
+     * exp ＝経験コンテンツ名の配列／dexp ＝Dの経験コンテンツ名の配列。どちらも来た方だけ更新。
+     */
+    public function saveExperience(Request $request)
+    {
+        $data = $request->validate([
+            'id'     => ['required', 'string'],
+            'exp'    => ['sometimes', 'array'],
+            'exp.*'  => ['string', 'max:100'],
+            'dexp'   => ['sometimes', 'array'],
+            'dexp.*' => ['string', 'max:100'],
+        ]);
+
+        $person = Person::employees()->findOrFail($data['id']);
+        if ($request->has('exp')) {
+            $person->experienced_contents = array_values(array_unique($data['exp'] ?? []));
+        }
+        if ($request->has('dexp')) {
+            $person->director_contents = array_values(array_unique($data['dexp'] ?? []));
+        }
+        $person->save();
+
+        return response()->json(['ok' => true]);
     }
 
     /** スタッフ名簿（/staff）。 */

@@ -111,9 +111,10 @@
     /* 2段目：実施形態・大型・リピートのタグ */
     .jr-tags { display: flex; flex-wrap: wrap; gap: 5px; }
     .fbadge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; }
-    .fbadge.fmt-real   { background: #e7f0e9; color: #3f7d52; }
+    /* 実施形態バッジ＝マイページと同じやわらかい配色（リアル＝緑／オンライン＝青）。リアルロングは独自の橙で区別。 */
+    .fbadge.fmt-real   { background: #eef6f0; color: #4f8a63; }
     .fbadge.fmt-long   { background: #fdecd9; color: #b4530a; }
-    .fbadge.fmt-online { background: #e3edf7; color: #2c6ca0; }
+    .fbadge.fmt-online { background: #eef3fb; color: #4f74ad; }
     .tag-mini { font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 700; }
     /* 強調（注目してほしい）：追加・宿泊 */
     .tag-mini.add  { background: #b91c1c;            color: #fff; }

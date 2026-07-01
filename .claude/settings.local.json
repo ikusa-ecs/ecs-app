@@ -126,7 +126,12 @@
       "Bash(echo \"assign-wishlist => $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/assign-wishlist\\)\")",
       "PowerShell(php artisan view:clear; php artisan route:clear)",
       "PowerShell(Stop-Process *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(php *)",
+      "Bash(echo \"status: $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/project-import\\)\")",
+      "Bash(kill %1)",
+      "Bash(start \"\" \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\46ee2fc0-68fc-4f7e-9c4b-1280cc00c32d\\\\scratchpad\\\\badge_preview.html\")",
+      "Bash(echo \"status: $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/employees\\)\")"
     ]
   }
 }

@@ -47,6 +47,8 @@
     }
     .dropzone .big { font-size: 28px; }
     .dropzone .file-name { margin-top: 8px; color: var(--ink); font-weight: 600; }
+    /* CSVをドラッグして枠の上に来たとき＝はっきりハイライト */
+    .dropzone.dragover { border-color: var(--brand); background: #f3ece0; color: var(--brand-dark); }
 
     /* プレビューのサマリ */
     .summary { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -58,6 +60,13 @@
     /* プレビュー表の行状態 */
     tr.row-ok td { background: #fff; }
     tr.row-err td { background: var(--danger-soft); }
+    /* エラー行＝クリックで1件ずつ登録画面を開いて直せる */
+    tr.row-err.fixable { cursor: pointer; }
+    tr.row-err.fixable:hover td { background: #fbd0d0; }
+    .fix-hint { font-size: 11.5px; color: #b45309; font-weight: 700; }
+    /* 別タブで直して登録した行＝緑の「✓ 登録済み」 */
+    tr.row-done td { background: #e7f0e9 !important; }
+    .res-done { color: #16a34a; font-weight: 700; }
     .res-ok { color: var(--ok); font-weight: 600; }
     .res-err { color: var(--danger); font-weight: 600; }
     .err-detail { font-size: 12px; color: #b91c1c; }
@@ -154,6 +163,9 @@
           <div class="s-item err">エラー：<b id="cErr">0</b> 件</div>
         </div>
 
+        <!-- 別タブで直して登録した行の件数（タブに戻ると反映） -->
+        <div id="doneNote" style="display:none; margin:0 0 12px; padding:10px 14px; border-radius:10px; background:#e7f0e9; border:1px solid #cdeccf; color:#15803d; font-size:13px;"></div>
+
         <!-- M-7 危険日（高負荷日）の警告 -->
         <div class="danger-box" id="dangerBox">
           <h4>⚠ 危険日（高負荷日）が見つかりました</h4>
@@ -246,13 +258,69 @@
       fmt:   (window.ECS_fmtCode ? window.ECS_fmtCode(g(row, '実施形態')) : 'real'),
       need:  g(row, '運営人数'),
       kbn:   g(row, '日程種別') || '本番',
+      // 「クリックで直して登録」で登録フォームに流し込む用の全項目（editProjectと同じ形）。
+      prefill: rowToPrefill(row, g),
     }));
+  }
+
+  // CSVの1行 → 登録フォームの流し込み用データ（project_form.blade の applyEdit が読む形）。
+  // 空欄は null。エラーだった欄（案件名・開催日・運営人数など）は空のまま＝フォームで直してもらう。
+  function rowToPrefill(row, g) {
+    const val = (n) => { const v = String(g(row, n) || '').trim(); return v === '' ? null : v; };
+    const eq  = (n, x) => String(g(row, n) || '').trim() === x;
+    const yn  = (n) => { const v = String(g(row, n) || '').trim(); return v === '屋外' ? true : (v === '屋内' ? false : null); };
+    return {
+      content_names:    val('案件名') ? [val('案件名')] : [],
+      category:         val('区分'),
+      is_toc:           ['toC', 'toc', 'あり', '○', '◯', 'はい', '1'].includes(String(g(row, 'toC') || '').trim()),
+      yomi:             val('確度'),
+      start_date:       val('開催日'),
+      lodging:          val('宿泊'),
+      scale:            val('案件規模'),
+      sales_owner:      val('営業担当'),
+      format:           val('実施形態'),
+      broadcast:        val('配信種別'),
+      client:           val('クライアント'),
+      agency:           val('代理店名'),
+      is_multi:         eq('複数案件', 'あり'),
+      date_type:        val('日程種別') || '本番',
+      parent_project_id: val('紐づく本番案件'),
+      operation_place:  val('運営場所'),
+      staff_role:       val('担当体制'),
+      start_time:       val('集合時間'),
+      end_time:         val('解散時間'),
+      event_enter_time: val('イベント入場'),
+      event_start_time: val('イベント開始'),
+      event_end_time:   val('イベント終了'),
+      required_count:   val('運営人数'),
+      guest_count:      val('お客様人数'),
+      team_count:       val('チーム数'),
+      is_repeat:        eq('リピート', 'あり'),
+      audio_equipment:  val('音響機材'),
+      pub_logo:         val('ロゴ'),
+      pub_camera:       val('カメラ'),
+      pub_article:      val('事例記事'),
+      pub_video:        val('動画'),
+      location:         val('会場住所'),
+      is_outdoor:       yn('屋内外'),
+      assembly_type:    val('集合形式'),
+      alcohol:          eq('お酒', 'あり') ? true : (eq('お酒', 'なし') ? false : null),
+      catering:         val('ケータリング'),
+      transport:        val('移動車両'),
+      is_recruiting:    !eq('スタッフ募集', '募集しない'),
+      ops_sheet_url:    val('運営シートURL'),
+      note:             val('備考'),
+    };
   }
 
   // ===== STEP2-3：ファイル選択（実際に中身を読んでプレビュー）=====
   function onFilePicked(input) {
-    if (!(input.files && input.files[0])) return;
-    const file = input.files[0];
+    if (input.files && input.files[0]) readAndPreview(input.files[0]);
+  }
+
+  // ファイル1つ（選択でもドロップでも）を読み込んでプレビュー表示する共通処理。
+  function readAndPreview(file) {
+    if (!file) return;
     document.getElementById('fileName').textContent = '選択：' + file.name;
     const reader = new FileReader();
     reader.onload = function (e) {
@@ -265,6 +333,38 @@
     };
     reader.readAsText(file);    // テンプレートはUTF-8(BOM付き)。既定のUTF-8で読む。
   }
+
+  // ===== ドラッグ＆ドロップ（枠にCSVを落として読み込む）=====
+  function setupDropzone() {
+    const dz = document.querySelector('.dropzone');
+    if (!dz) return;
+    // 枠の上にドラッグ中はハイライト
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.add('dragover'); });
+    });
+    ['dragleave', 'dragend'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.remove('dragover'); });
+    });
+    dz.addEventListener('drop', function (e) {
+      e.preventDefault(); e.stopPropagation(); dz.classList.remove('dragover');
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) return;
+      const file = files[0];
+      if (!/\.csv$/i.test(file.name)) { alert('CSVファイル（.csv）をドロップしてください。'); return; }
+      // 「この内容で取り込む」（フォーム送信）でも使えるよう、ファイル選択欄にも入れておく。
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        document.getElementById('csvFile').files = dt.files;
+      } catch (err) { /* 古いブラウザでも読み込み自体はできるよう続行 */ }
+      readAndPreview(file);
+    });
+    // 枠の外に落としてもブラウザがそのファイルを開いてしまわないように無効化。
+    ['dragover', 'drop'].forEach(function (ev) {
+      window.addEventListener(ev, function (e) { e.preventDefault(); }, false);
+    });
+  }
+  setupDropzone();
 
   // ===== サンプルの取込内容（わざとエラー行を混ぜています）=====
   // scale=案件規模 / fmt=実施形態コード(real,long,online)＝危険日の判定に使います
@@ -294,6 +394,8 @@
   let previewIsReal = false;
   function renderRows(rows, isReal) {
     previewIsReal = !!isReal;
+    // 新しいCSVを読み込んだら、前回の「別タブで登録済み」の記録はリセットする。
+    if (isReal) { try { localStorage.setItem('ecs_csv_done', '[]'); } catch (e) {} }
     const tbody = document.getElementById('previewBody');
     tbody.innerHTML = '';
     let ok = 0, err = 0;
@@ -301,8 +403,10 @@
       const errs = validate(r);
       const isOk = errs.length === 0;
       isOk ? ok++ : err++;
+      // 実ファイルのエラー行だけ「クリックで1件ずつ登録画面を開いて直す」を可能にする。
+      const canFix = !isOk && isReal && r.prefill;
       const tr = document.createElement('tr');
-      tr.className = isOk ? 'row-ok' : 'row-err';
+      tr.className = (isOk ? 'row-ok' : 'row-err') + (canFix ? ' fixable' : '');
       tr.innerHTML = `
         <td class="num">${i + 1}</td>
         <td>${r.name ? '<strong>' + r.name + '</strong>' : '<span class="err-detail">（空）</span>'}</td>
@@ -311,7 +415,16 @@
         <td>${r.kbn}</td>
         <td>${isOk
           ? '<span class="res-ok">✓ OK</span>'
-          : '<span class="res-err">✕ エラー</span><br><span class="err-detail">' + errs.join('／') + '</span>'}</td>`;
+          : '<span class="res-err">✕ エラー</span><br><span class="err-detail">' + errs.join('／') + '</span>'
+            + (canFix ? '<br><span class="fix-hint">✎ クリックで直して登録</span>' : '')}</td>`;
+      if (canFix) {
+        tr.dataset.line = i + 1;   // 別タブ登録の「✓済み」を後で当てるための行番号
+        tr.title = 'クリックすると、この行の内容が入った1件ずつ登録画面が別タブで開きます';
+        tr.addEventListener('click', () => {
+          if (tr.classList.contains('row-done')) return;   // 登録済みの行は反応しない
+          openFixForm(r, i + 1);
+        });
+      }
       tbody.appendChild(tr);
     });
     document.getElementById('cTotal').textContent = rows.length;
@@ -334,6 +447,52 @@
 
     document.getElementById('previewArea').style.display = 'block';
     document.getElementById('previewArea').scrollIntoView({ behavior: 'smooth' });
+    applyCsvDone();   // すでに別タブで登録済みの行があれば「✓済み」を当てる
+  }
+
+  // ===== 別タブでの登録を受けて、該当行を「✓ 登録済み」に変える =====
+  // 登録フォーム(別タブ)が localStorage['ecs_csv_done'] に行番号を追記する。
+  // それを storage イベント／このタブに戻った時（focus）に読み取り、行の色と表示を変える。
+  function applyCsvDone() {
+    let done = [];
+    try { done = JSON.parse(localStorage.getItem('ecs_csv_done') || '[]'); } catch (e) {}
+    let count = 0;
+    document.querySelectorAll('#previewBody tr[data-line]').forEach(tr => {
+      const line = parseInt(tr.dataset.line, 10);
+      if (done.indexOf(line) !== -1) { markRowDone(tr); }
+      if (tr.classList.contains('row-done')) count++;
+    });
+    const note = document.getElementById('doneNote');
+    if (note) {
+      if (count > 0) {
+        note.textContent = '✓ ' + count + '件を別タブで直して登録しました（この行は登録済みです）。残りのエラー行も同じようにクリックで直せます。';
+        note.style.display = '';
+      } else {
+        note.style.display = 'none';
+      }
+    }
+  }
+  function markRowDone(tr) {
+    if (tr.classList.contains('row-done')) return;
+    tr.classList.remove('fixable');
+    tr.classList.add('row-done');
+    tr.title = 'この行は別タブで登録済みです';
+    const last = tr.querySelector('td:last-child');
+    if (last) last.innerHTML = '<span class="res-done">✓ 登録済み</span>';
+  }
+  // 別タブ（登録フォーム）が localStorage を書き換えたら反映。
+  window.addEventListener('storage', function (e) { if (e.key === 'ecs_csv_done') applyCsvDone(); });
+  // このタブに戻ってきた時にも念のため反映（storageイベントを取りこぼした場合の保険）。
+  window.addEventListener('focus', applyCsvDone);
+
+  // エラー行クリック＝その行の内容を1件ずつ登録画面（別タブ）に流し込んで直してもらう。
+  // 別タブで開くので、この取込画面（エラー一覧）は開いたまま残る＝直して登録→次のエラー行、と回せる。
+  function openFixForm(r, lineNo) {
+    if (!r || !r.prefill) return;
+    const data = Object.assign({}, r.prefill, { _csvLine: lineNo });
+    try { localStorage.setItem('ecs_csv_prefill', JSON.stringify(data)); }
+    catch (e) { alert('この行のデータを渡せませんでした。お手数ですが「1件ずつ入力」から登録してください。'); return; }
+    window.open('/project-form?fromcsv=1', '_blank');
   }
 
   // 「サンプルで試す」＝見本データで動きを確認（登録はしない）。実ファイルの選択は解除する。

@@ -20,6 +20,16 @@
     .pick-bar #caseSelect { min-width: 320px; }
 
     .case-head { font-size: 15px; font-weight: 800; color: var(--ink); margin: 0 0 2px; }
+    /* 案件の種別色（マイページと同じ：大型＝赤／オンライン＝青／リアル＝緑・やわらかい色）。見出しの左に色帯。 */
+    .case-head.type-big    { border-left: 4px solid #e8a0a0; padding-left: 9px; }
+    .case-head.type-online { border-left: 4px solid #9bb9e0; padding-left: 9px; }
+    .case-head.type-real   { border-left: 4px solid #9ccbaa; padding-left: 9px; }
+    /* 種別の小バッジ（見出しの横に「大型／リアル／オンライン」を表示） */
+    .type-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px;
+      border-radius: 999px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
+    .type-badge.type-big    { background: #fdf0f0; color: #c25b5b; }
+    .type-badge.type-online { background: #eef3fb; color: #4f74ad; }
+    .type-badge.type-real   { background: #eef6f0; color: #4f8a63; }
     .case-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
     /* 宿泊バッジ（前泊有・後泊あり など。会社名の横に表示） */
     .stay-badge {
@@ -178,6 +188,12 @@
   function dateOf(off){ return (window.ECS_caseDate ? window.ECS_caseDate(off)
     : (function(){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+off); return d; })()); }
   function fmtDate(off){ const d=dateOf(off); return (d.getMonth()+1)+'/'+d.getDate()+'('+WK[d.getDay()]+')'; }
+  // 案件の種別（マイページと同じ判定：大型を最優先→オンライン→リアル）。見出しの色帯とバッジに使う。
+  function typeInfo(c){
+    if (c.scale === '大型') return { cls: 'type-big', label: '大型' };
+    if (c.fmt === 'online') return { cls: 'type-online', label: 'オンライン' };
+    return { cls: 'type-real', label: 'リアル' };
+  }
   function monthKey(off){ const d=dateOf(off); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
   function monthLabel(k){ const [y,m]=k.split('-'); return y+'年'+Number(m)+'月'; }
   function yen(n){ return '¥' + Math.round(n||0).toLocaleString('ja-JP'); }
@@ -277,6 +293,13 @@
     const role = (id in MY_ASSIGN) ? ('アサイン：' + roleShort(MY_ASSIGN[id])) : '営業担当';
     const head = document.getElementById('caseHead');
     head.textContent = c.name + '（' + c.client + '）';
+    // 種別で見出しの左に色帯＋横に種別バッジ（マイページと同配色）。
+    const ti = typeInfo(c);
+    head.className = 'case-head ' + ti.cls;
+    const tb = document.createElement('span');
+    tb.className = 'type-badge ' + ti.cls;
+    tb.textContent = ti.label;
+    head.appendChild(tb);
     // 宿泊が「無」以外なら、会社名の横に宿泊バッジ（前泊有・後泊あり など）を出す。
     const lg = (c.lodging || '').trim();
     if (lg && lg !== '無') {

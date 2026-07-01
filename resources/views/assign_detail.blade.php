@@ -184,7 +184,7 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">これは見た目確認用のモックです。スコア・理由・人数はすべて仮の見本で、実際の計算はしていません。</div>
+      <div class="mock-note" id="mainNote">これは見た目確認用のモックです。スコア・理由・人数はすべて仮の見本で、実際の計算はしていません。</div>
 
       <!-- 提案チームがサンプルのときの注記（水合戦以外で表示） -->
       <div class="mock-note" id="sampleNote" style="display:none; background:var(--warn-soft); border-color:#f6d9a7; color:#b45309;">
@@ -381,6 +381,8 @@
 @push('scripts')
 <script src="/ecs/data/cases.js"></script>
 <script src="/ecs/data/people.js"></script>
+<!-- 本物データ（案件ヘッダー＋提案チーム＝実アサイン＋代替候補＝応募）。見つからないときは null＝見本にフォールバック。 -->
+<script>window.ECS_DETAIL = @json($detail ?? null);</script>
 @verbatim
 <script>
   // ===== 設定 =====
@@ -396,10 +398,16 @@
       detail: (c.id === 'mizu')   // 名簿まで作り込んであるのは今は水合戦のみ
     };
   });
+  // 本物データがあれば、その案件を CASES に登録（detail:true＝提案チームは実アサインで表示）。
+  const ECS_D = (window.ECS_DETAIL && window.ECS_DETAIL.found) ? window.ECS_DETAIL : null;
+  if (ECS_D) {
+    CASES[ECS_D.case.id] = Object.assign({}, ECS_D.case, { detail: true });
+  }
   const DIR_OPTS = ['未定','田中','鈴木','佐藤','高橋','山本'];
 
-  // URLから案件IDを取得（例：assign_detail.html?case=mizu）。無ければ水合戦。
+  // URLから案件IDを取得。本物データがあればその案件、無ければ従来の見本（水合戦）。
   function getCaseId(){
+    if (ECS_D) return ECS_D.case.id;
     try {
       const id = new URLSearchParams(location.search).get('case');
       return (id && CASES[id]) ? id : 'mizu';
@@ -464,13 +472,20 @@
       document.getElementById('sampleNote').style.display = '';
       document.getElementById('sampleName').textContent = CUR.name;
     }
+
+    // 本物データのときは、上部の注記を実態に合わせる（嘘表示を出さない）。
+    if (ECS_D) {
+      const note = document.getElementById('mainNote');
+      if (note) note.innerHTML = '案件・提案チーム（＝実際のアサイン）・代替候補（＝この案件への応募者）・稼働率は、登録済みのデータ（DB）を表示しています。<br>※「スコア」は自動提案がまだ未実装のため<b>暫定（通算回数ベースの並び）</b>です。また、この画面でのチーム追加・除外・ポジション変更・確定/公開は、現在まだ保存に対応していません（保存は「手動アサイン」「D決め」「公開ボード」から）。';
+    }
   }
   applyCase();
 
-  // ===== 提案チームの仮データ（体力現場・水合戦）=====
+  // ===== 提案チーム＋代替候補 =====
+  // 本物データ（ECS_D）があればそれを使う（in:true=実アサイン / in:false=応募者）。
+  // 無ければ従来の見本（体力現場・水合戦）で動く。
   // lv: new=新人 / mid=中堅 / vet=ベテラン
-  // in:true=提案チームに採用中 / false=代替候補プールにいる
-  const roster = [
+  const roster = ECS_D ? ECS_D.roster : [
     { id:'S-001', name:'高橋 由依', lv:'vet', pos:'D（ディレクター）',     rate:58, fill:'ok',  fillTxt:'4/6', score:82, in:true, reason:[['+', 'ベテラン・現場リーダー適性'],['+','クライアント評価が高い'],['+','イレギュラー対応可']] },
     { id:'S-007', name:'伊藤 健',   lv:'vet', pos:'OP（音響）',           rate:55, fill:'ok',  fillTxt:'5/7', score:74, in:true, reason:[['+','音響の得意ポジション'],['+','自社専属'],['-','連勤気味で小さく減点']] },
     { id:'S-003', name:'渡辺 さくら',lv:'vet', pos:'MC（司会進行）',        rate:60, fill:'ok',  fillTxt:'3/5', score:71, in:true, reason:[['+','リピート案件で前回と同じMC'],['+','盛り上げ系コンテンツと相性良']] },
@@ -534,6 +549,8 @@
     'S-051':['FC','CK','受付'],                 'S-052':['FC','受付'],
     'S-053':['FC','CK','受付'],                 'S-054':['OP','FC','CK','受付'],
   };
+  // 本物データの「できる役割」を反映（DBの可否＝正）。見本のCANより優先。
+  if (ECS_D) { ECS_D.roster.forEach(p => { if (p.can) CAN[p.id] = p.can; }); }
   // 役割の表示ラベル → 短いキー（例：D（ディレクター）→ D）
   function posKey(label){
     const s = String(label);

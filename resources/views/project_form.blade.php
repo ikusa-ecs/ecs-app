@@ -147,6 +147,8 @@
   ✎ 既存案件「{{ $editProject['id'] }}」を編集しています。内容を直して「確定」を押すと、この案件に上書き保存されます。
 </div>
 @endif
+{{-- CSV取込のエラー行から来たときの案内（JSで表示）。 --}}
+<div class="mock-note" id="csvPrefillNote" style="display:none;background:#fff7e6;border-color:#f0d9a8;color:#b45309;"></div>
 @verbatim
       <!-- 1件ずつ / CSV取込 の切替タブ -->
       <div class="mode-tabs">
@@ -737,6 +739,21 @@
 @push('scripts')
 {{-- 編集モードの値（Bladeが直接埋め込む生出力。新規登録のときは null）。 --}}
 <script>window.ECS_EDIT = @json($editProject ?? null);</script>
+{{-- CSV取込のエラー行「クリックで直して登録」から来たとき（?fromcsv=1）：
+     取込画面が localStorage に置いた行データを、編集用データ(window.ECS_EDIT)として流し込む。
+     ＝新規登録扱い（project_id は空のまま）なので「確定」で新しい案件として登録される。
+     既存案件の編集（サーバ側 editProject あり）のときは触らない。 --}}
+<script>
+  (function () {
+    if (window.ECS_EDIT) return;                          // 既存案件の編集中は何もしない
+    if (!/[?&]fromcsv=1/.test(location.search)) return;   // CSV由来でなければ何もしない
+    try {
+      const raw = localStorage.getItem('ecs_csv_prefill');
+      if (raw) { window.ECS_EDIT = JSON.parse(raw); window.ECS_FROM_CSV = true; }
+    } catch (e) {}
+    localStorage.removeItem('ecs_csv_prefill');            // 一度使ったら消す（再読込で残らない）
+  })();
+</script>
 {{-- 「紐づく本番案件」の選択肢＝本物の本番案件一覧（id と表示名）。 --}}
 <script>window.ECS_PARENTS = @json($parentProjects ?? []);</script>
 {{-- 営業担当プルダウンの選択肢＝社員（role=employee）の名前一覧。 --}}
@@ -888,7 +905,20 @@
     if (!confirmDanger()) return;
     document.getElementById('contentNamesField').value = selectedContents.join(',');
     document.getElementById('intentField').value = intent;
+    markCsvDoneBeforeSubmit();
     document.getElementById('projForm').submit();
+  }
+  // CSV取込のエラー行から来て登録するとき、その行番号を localStorage に記録する。
+  // → 取込タブがこれを受け取り、その行を「✓ 登録済み」に変える（登録できたと分かる）。
+  function markCsvDoneBeforeSubmit() {
+    if (!window.ECS_FROM_CSV) return;
+    const line = window.ECS_EDIT && window.ECS_EDIT._csvLine;
+    if (!line) return;
+    try {
+      const done = JSON.parse(localStorage.getItem('ecs_csv_done') || '[]');
+      if (done.indexOf(line) === -1) done.push(line);
+      localStorage.setItem('ecs_csv_done', JSON.stringify(done));
+    } catch (e) {}
   }
   // 第1段では「次の日程を追加」も通常の保存として扱う（連続登録は次の段で対応）
   function saveAndNext() { submitForm('publish'); }
@@ -899,6 +929,7 @@
     if (!confirm('この案件を確定して保存しますか？')) return;
     document.getElementById('contentNamesField').value = selectedContents.join(',');
     document.getElementById('intentField').value = 'publish';
+    markCsvDoneBeforeSubmit();
     document.getElementById('projForm').submit();
   }
 
@@ -1213,6 +1244,16 @@
   })();
 
   applyEdit(); // 編集モードなら値を流し込む（新規は素通り）
+
+  // CSV取込のエラー行から来たときの案内を表示（applyEdit で値を入れたあと）。
+  if (window.ECS_FROM_CSV) {
+    const note = document.getElementById('csvPrefillNote');
+    if (note) {
+      const ln = (window.ECS_EDIT && window.ECS_EDIT._csvLine) ? '（CSVの' + window.ECS_EDIT._csvLine + '行目）' : '';
+      note.textContent = '⬆ CSVの行から取り込みました' + ln + '。赤かった箇所（案件名・開催日・運営人数など）を直して「確定」で登録してください。登録後はこのタブを閉じ、取込画面で次のエラー行をクリックしてください。';
+      note.style.display = '';
+    }
+  }
 
 </script>
 @endverbatim

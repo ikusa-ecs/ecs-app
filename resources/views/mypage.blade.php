@@ -100,12 +100,29 @@
     .mp-cell.sun .dnum { color: var(--danger); }
     .mp-ev {
       background: #fff; border: 1px solid var(--line); border-radius: 6px;
-      padding: 3px 4px; font-size: 10.5px; line-height: 1.25; cursor: pointer; text-align: left;
+      padding: 3px 4px 3px 5px; font-size: 10.5px; line-height: 1.25; cursor: pointer; text-align: left;
     }
-    .mp-ev:hover { background: #f3ece0; }
+    /* 案件の種別でカードを色分け（大型＝赤／オンライン＝青／リアル＝緑）。一覧バッジと同じ考え方で、カレンダーでもひと目で分かるように。 */
+    .mp-ev.ev-big    { background: #fdf5f5; border-color: #efd6d6; border-left: 3px solid #e8a0a0; }
+    .mp-ev.ev-online { background: #f4f8fd; border-color: #d6e2f0; border-left: 3px solid #9bb9e0; }
+    .mp-ev.ev-real   { background: #f4faf6; border-color: #d5e7db; border-left: 3px solid #9ccbaa; }
+    .mp-ev:hover { filter: brightness(0.96); }
     .mp-ev .ev-name { font-weight: 700; color: var(--ink); display: block; overflow-wrap: anywhere; }
     .mp-ev .ev-pos { color: var(--muted); }
     .mp-cal-empty { color: var(--muted); font-size: 12.5px; margin: 8px 2px; }
+
+    /* カレンダーの色の凡例 */
+    .mp-cal-legend { display: flex; gap: 14px; margin: 0 0 8px; font-size: 11.5px; flex-wrap: wrap; }
+    .mp-cal-legend .lg { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+    .mp-cal-legend .lg::before { content: ''; width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .mp-cal-legend .lg-big::before    { background: #e8a0a0; }
+    .mp-cal-legend .lg-real::before   { background: #9ccbaa; }
+    .mp-cal-legend .lg-online::before { background: #9bb9e0; }
+
+    /* リスト行の種別色（左端に色帯・カレンダーと同じ配色） */
+    tr.row-big    td:first-child { box-shadow: inset 4px 0 0 #e8a0a0; }
+    tr.row-online td:first-child { box-shadow: inset 4px 0 0 #9bb9e0; }
+    tr.row-real   td:first-child { box-shadow: inset 4px 0 0 #9ccbaa; }
 
     /* アーカイブ折りたたみ */
     .arch-toggle {
@@ -236,6 +253,11 @@
 
         <!-- カレンダー表示 -->
         <div class="mp-cal" id="asgCalView">
+          <div class="mp-cal-legend">
+            <span class="lg lg-big">大型</span>
+            <span class="lg lg-real">リアル</span>
+            <span class="lg lg-online">オンライン</span>
+          </div>
           <div class="mp-cal-grid" id="asgCalGrid"></div>
           <p class="mp-cal-empty" id="asgCalEmpty" style="display:none;">この月にアサインされた案件はありません。</p>
         </div>
@@ -444,6 +466,20 @@
   }
   function byId(id) { return (window.ECS_CASES || []).find(c => c.id === id); }
 
+  // カレンダーのカード色クラス：大型＝赤／オンライン＝青／リアル(ロング含む)＝緑。
+  // 大型を最優先（一番目立たせたいため）。fmt は PersonalCases が real/online/long で渡す。
+  function evClass(c) {
+    if (c.scale === '大型') return ' ev-big';
+    if (c.fmt === 'online') return ' ev-online';
+    return ' ev-real';
+  }
+  // リスト行用の色クラス（判定はカレンダーと同じ：大型＝赤／オンライン＝青／リアル＝緑）
+  function rowClass(c) {
+    if (c.scale === '大型') return ' row-big';
+    if (c.fmt === 'online') return ' row-online';
+    return ' row-real';
+  }
+
   // 案件の特徴バッジ（大型・前泊・予備日・リハ）。リストの案件名の後ろに付ける。
   function caseTags(c) {
     let t = '';
@@ -487,7 +523,7 @@
     const actBtn = isArch
       ? '<button class="fin-btn" onclick="goFinance(\'' + c.id + '\')">💰 収支入力</button>'
       : '<button class="cal-btn" onclick="addCal(\'' + c.id + '\')">📅 登録</button>';
-    return '<tr>' +
+    return '<tr class="' + rowClass(c).trim() + '">' +
       '<td>' + fmtDate(c.off) + '</td>' +
       '<td><strong>' + c.name + '</strong>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
       '<td>' + posTag(c.myPos) + '</td>' +
@@ -499,7 +535,7 @@
   }
   // 行HTML（営業用：ディレクター列）。操作列に「収支入力」ボタン。
   function salRow(c) {
-    return '<tr>' +
+    return '<tr class="' + rowClass(c).trim() + '">' +
       '<td>' + fmtDate(c.off) + '</td>' +
       '<td><strong>' + c.name + '</strong>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
       '<td>' + (c.dir || '—') + '</td>' +
@@ -635,7 +671,7 @@
       html += '<div class="mp-cell' + (evs.length ? ' has' : '') + dowCls + '">' +
         '<div class="dnum">' + d + '</div>' +
         evs.map(c =>
-          '<button class="mp-ev" onclick="addCal(\'' + c.id + '\')" title="クリックでGoogleカレンダー登録">' +
+          '<button class="mp-ev' + evClass(c) + '" onclick="addCal(\'' + c.id + '\')" title="クリックでGoogleカレンダー登録">' +
             '<span class="ev-name">' + (c.content || c.name) + '</span>' +
             '<span class="ev-pos">' + roleLabel(c.myPos) + (c.placeShort ? ' / ' + c.placeShort : '') + '</span>' +
           '</button>'

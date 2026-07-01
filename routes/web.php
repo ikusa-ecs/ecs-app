@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AssignBoardController;
 use App\Http\Controllers\AssignDashboardController;
+use App\Http\Controllers\AssignDetailController;
 use App\Http\Controllers\AssignDirectorController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AssignPublishController;
@@ -73,9 +74,9 @@ Route::post('/assign-director/save', [AssignDirectorController::class, 'save']);
 // ※ 2026-06-25 並行作業：サブエージェント1が EmployeeAvailabilityController を作成中。
 Route::get('/employee-availability', [EmployeeAvailabilityController::class, 'index']);
 Route::post('/employee-availability/save', [EmployeeAvailabilityController::class, 'save']);
-Route::get('/assign-detail', function () {
-    return view('assign_detail');
-});
+// アサイン画面（案件詳細）。?case=<案件ID> で本物の案件ヘッダー＋提案チーム（実アサイン）＋代替候補（応募）を表示。
+// 案件が見つからないときは従来の見本（水合戦サンプル）にフォールバック。
+Route::get('/assign-detail', [AssignDetailController::class, 'show']);
 // 手動アサインのDB保存（A-2）。案件一覧の「アサイン」から ?project=<案件ID> で開く。
 // 本物の案件×本物のスタッフ（people）を assignments テーブルに保存する。
 Route::get('/project-assign', [AssignmentController::class, 'show']);
@@ -97,6 +98,8 @@ Route::get('/pickup', [AssignBoardController::class, 'pickup']);
 Route::get('/staff', [PersonController::class, 'staff']);
 // 社員名簿は DB（people テーブルの社員）から読む。
 Route::get('/employees', [PersonController::class, 'employees']);
+// 社員名簿の詳細から「経験コンテンツ／Dの経験コンテンツ」だけを保存する。
+Route::post('/employees/experience', [PersonController::class, 'saveExperience']);
 // 稼働状況は「スタッフ」画面（/staff）の中のタブに統合済み。
 // 旧URL・旧リンク（アサインダッシュボード等）から来ても迷子にならないよう /staff へ転送する。
 Route::get('/staff-status', fn () => redirect('/staff'));

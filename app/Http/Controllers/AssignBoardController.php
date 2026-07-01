@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
+use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -47,6 +48,7 @@ class AssignBoardController extends Controller
             'boardAvail' => $this->boardAvail($anchor),       // off → その日に稼働可/希望のスタッフ一覧
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
             'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
+            'roleOptions' => AssignmentRole::positionLabels(), // ポジション編集プルダウンの選択肢（正本）
         ]);
     }
 
@@ -121,7 +123,7 @@ class AssignBoardController extends Controller
         // この案件群の割当（キャンセル以外）。
         $assignments = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'role']);
+            ->get(['project_id', 'staff_id', 'role', 'status']);
 
         // この案件群への応募（applications）＝希望者カラムの元。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
@@ -134,8 +136,15 @@ class AssignBoardController extends Controller
         $assignedByProject = $assignments->groupBy('project_id');
         $appsByProject = $apps->groupBy('project_id');
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people) {
+        // コンテンツ未登録の判定用＝マスタに存在するコンテンツID一覧。
+        $validContentIds = Content::pluck('id')->all();
+
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds) {
             [$p, $off] = $pair;
+
+            // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
+            $cids = is_array($p->content_ids) ? $p->content_ids : [];
+            $contentMissing = empty($cids) || empty(array_intersect($cids, $validContentIds));
 
             // 割当メンバー（assignments → 表示用 {name, lv, pos, type}）。
             $assigned = ($assignedByProject->get($p->id) ?? collect())
@@ -144,8 +153,11 @@ class AssignBoardController extends Controller
 
                     return [
                         'name' => $person->name ?? $a->staff_id,
+                        'id' => $a->staff_id,          // ポジション編集の保存に使う（案件×人）
                         'lv' => '-',   // 経験レベルは希望者カラム用。メンバー行では未表示。
                         'pos' => self::POS_LABELS[$a->role] ?? ($a->role ?: '—'),
+                        'roleCode' => $a->role ?: '',  // 保存用の役割コード（プルダウンの初期選択）
+                        'status' => $a->status,        // 仮/確定（保存時に維持する）
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
                     ];
                 })
@@ -184,6 +196,7 @@ class AssignBoardController extends Controller
                 'id' => $p->id,
                 'off' => $off,
                 'name' => $p->project_name,
+                'contentMissing' => $contentMissing,
                 'client' => $p->client ?? '',
                 'cat' => $p->site_category ?: '通常',
                 'need' => $p->required_count ?? 0,

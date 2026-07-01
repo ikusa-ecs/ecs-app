@@ -7,6 +7,8 @@
 {{-- 社員データは DB から（Controller が people テーブルの社員を整えて渡す）。 --}}
 <script>
   window.ECS_EMPLOYEES = @json($employees);
+  window.ECS_CONTENT_OPTIONS = @json($contentOptions ?? []);   // 経験コンテンツ編集のプルダウン候補
+  window.ECS_CSRF = '{{ csrf_token() }}';                      // 保存に使う合言葉
 </script>
 @verbatim
 <style>
@@ -35,6 +37,13 @@
     .contags { display: flex; flex-wrap: wrap; gap: 4px; }
     .ctag { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: #f8f3ea; color: #7a6a58; border: 1px solid var(--line); white-space: nowrap; }
     .ctag.dir { background: var(--ok-soft); color: #15803d; border-color: #cdeccf; } /* Dの経験があるコンテンツ */
+    /* タグを外す × ボタン */
+    .ctag .tag-x { margin-left: 6px; color: #b91c1c; cursor: pointer; font-weight: 700; }
+    .ctag .tag-x:hover { color: #7f1d1d; }
+    /* タグ追加のプルダウン＋ボタン */
+    .tag-add { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .tag-add select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 12.5px; background: #fff; }
+    .save-ok { color: #16a34a; font-weight: 700; font-size: 12px; }
 
     /* 詳細トグル */
     .row-toggle { cursor: pointer; color: var(--brand); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
@@ -57,7 +66,7 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">これは見た目確認用のモックです。社員・区分・経験コンテンツ・サイズなどはすべて仮の見本で、編集しても保存はされません。</div>
+      <div class="mock-note">社員の情報は<b>登録された本物のデータ</b>を表示しています。氏名の横で新人（入社半年以内）が分かり、行の「詳細」で内容を確認できます。<br>※ 詳細の<b>「経験コンテンツ」「Dの経験コンテンツ」はここで追加・削除して保存できます</b>。社員の追加やサイズ等の編集の保存は次の工程で対応します。</div>
 
       <div class="panel">
         <div class="filterbar">
@@ -73,7 +82,7 @@
             <option value="fresh">新人（入社半年以内）のみ</option>
           </select>
           <div class="spacer"></div>
-          <button class="btn primary" onclick="alert('モックのため、追加は行いません。')">＋ 社員を追加</button>
+          <a class="btn primary" href="/register">＋ 社員を追加</a>
         </div>
 
         <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>
@@ -129,7 +138,7 @@
             <br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
         <td><span class="dept ${p.dept}">${deptLabel[p.dept]}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.office || '—'}</span></td>
-        <td><span class="muted" style="font-size:12.5px;">${p.wear} / ${p.shoe}</span></td>
+        <td><span class="muted" style="font-size:12.5px;">${p.wear || '—'} / ${p.shoe || '—'}</span></td>
         <td class="right"><span class="row-toggle" onclick="toggleDetail(${idx}, this)">詳細 ▾</span></td>`;
       tbody.appendChild(tr);
 
@@ -152,28 +161,29 @@
           <div>
             <div class="exp-block">
               <h4>経験のあるコンテンツ</h4>
-              <div class="contags">${p.exp.length ? p.exp.map(c=>`<span class="ctag">${c}</span>`).join('') : '<span class="muted" style="font-size:12px;">（なし）</span>'}</div>
+              ${expEditorHtml(idx, 'exp')}
             </div>
 
             <div class="exp-block">
               <h4>Dの経験があるコンテンツ</h4>
-              <div class="contags">${p.dexp.length ? p.dexp.map(c=>`<span class="ctag dir">${c}</span>`).join('') : '<span class="muted" style="font-size:12px;">（まだなし）</span>'}</div>
+              ${expEditorHtml(idx, 'dexp')}
             </div>
           </div>
           <div>
             <h4>サイズ</h4>
             <div class="size-row">
-              <div class="size-item">服：<span class="v">${p.wear}</span></div>
-              <div class="size-item">靴：<span class="v">${p.shoe}</span></div>
+              <div class="size-item">服：<span class="v">${p.wear || '—'}</span></div>
+              <div class="size-item">靴：<span class="v">${p.shoe || '—'}</span></div>
             </div>
 
             ${fresh ? `<div class="muted" style="font-size:12px; margin-top:12px;">🌱 入社半年以内の新人です。経験コンテンツとDの経験コンテンツを重点的に確認してください。</div>` : ''}
           </div>
         </div>
         <div class="save-row">
-          <button class="btn primary sm" onclick="alert('モックのため保存はしません。')">保存</button>
+          <button class="btn primary sm" onclick="saveExperience(${idx})">経験コンテンツを保存</button>
+          <span class="save-ok" id="expSaved-${idx}" style="display:none;">✓ 保存しました</span>
           <button class="btn sm" onclick="toggleDetail(${idx})">閉じる</button>
-          <span class="muted" style="font-size:12px;">※社員はエントリーしません。この名簿はアサインとは別管理です。</span>
+          <span class="muted" style="font-size:12px;">※「経験コンテンツ」「Dの経験コンテンツ」の変更は保存されます。社員はエントリーしません（この名簿はアサインとは別管理）。</span>
         </div>
       </div>`;
   }
@@ -185,6 +195,60 @@
     dr.style.display = open ? '' : 'none';
     const toggle = tbody.querySelector(`tr.main-row[data-idx="${idx}"] .row-toggle`);
     if (toggle) toggle.innerHTML = open ? '詳細 ▴' : '詳細 ▾';
+  }
+
+  // ===== 経験コンテンツ／Dの経験コンテンツの編集 =====
+  // タグ（現在のコンテンツ）＋「＋コンテンツを選ぶ」プルダウンと追加ボタンを組み立てる。
+  function expEditorHtml(idx, kind){
+    const p = employees[idx];
+    const arr = (kind === 'dexp') ? (p.dexp || []) : (p.exp || []);
+    const cls = (kind === 'dexp') ? 'ctag dir' : 'ctag';
+    const emptyMsg = (kind === 'dexp') ? '（まだなし）' : '（なし）';
+    const tags = arr.length
+      ? arr.map((c, ti) => `<span class="${cls}">${c}<a class="tag-x" title="外す" onclick="removeTag(${idx},'${kind}',${ti})">×</a></span>`).join('')
+      : `<span class="muted" style="font-size:12px;">${emptyMsg}</span>`;
+    const opts = (window.ECS_CONTENT_OPTIONS || []).map(o => `<option value="${o}">${o}</option>`).join('');
+    return `
+      <div class="contags">${tags}</div>
+      <div class="tag-add">
+        <select id="add-${kind}-${idx}"><option value="">＋コンテンツを選ぶ</option>${opts}</select>
+        <button class="btn sm" type="button" onclick="addTag(${idx},'${kind}')">追加</button>
+      </div>`;
+  }
+  // タグを外す（配列の位置で消す＝名前に記号があっても安全）
+  function removeTag(idx, kind, ti){
+    const p = employees[idx];
+    const arr = (kind === 'dexp') ? p.dexp : p.exp;
+    if (Array.isArray(arr) && ti >= 0 && ti < arr.length) { arr.splice(ti, 1); renderDetail(idx); }
+  }
+  // プルダウンで選んだコンテンツを追加（重複は無視）
+  function addTag(idx, kind){
+    const sel = document.getElementById(`add-${kind}-${idx}`);
+    if (!sel || !sel.value) return;
+    const p = employees[idx];
+    if (kind === 'dexp') { p.dexp = p.dexp || []; if (p.dexp.indexOf(sel.value) === -1) p.dexp.push(sel.value); }
+    else                 { p.exp  = p.exp  || []; if (p.exp.indexOf(sel.value)  === -1) p.exp.push(sel.value); }
+    renderDetail(idx);
+  }
+  // 詳細行を今の内容で描き直す（開いたまま）
+  function renderDetail(idx){
+    const dr = tbody.querySelector(`tr.detail-row[data-for="${idx}"]`);
+    if (dr) dr.innerHTML = `<td colspan="5">${detailHtml(employees[idx], idx)}</td>`;
+  }
+  // 経験コンテンツ／Dの経験コンテンツを DB に保存
+  function saveExperience(idx){
+    const p = employees[idx];
+    fetch('/employees/experience', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ id: p.id, exp: p.exp || [], dexp: p.dexp || [] })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+    .then(() => {
+      const m = document.getElementById(`expSaved-${idx}`);
+      if (m) { m.style.display = ''; setTimeout(() => { m.style.display = 'none'; }, 1800); }
+    })
+    .catch(() => alert('保存に失敗しました。もう一度お試しください。'));
   }
 
   // 絞り込み

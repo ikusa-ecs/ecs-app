@@ -56,13 +56,15 @@
     .case-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
     .case-card {
-      flex: 1 1 480px; max-width: 680px;
+      flex: 1 1 360px; max-width: 460px;
       background: #fff; border: 1px solid var(--line); border-radius: 12px;
       box-shadow: var(--shadow); padding: 9px 11px; display: flex; flex-direction: column; gap: 6px;
     }
     /* メンバー｜希望者 を横並び（ノートPC1画面でアサインしやすく） */
     .cc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 0; }
     @media (max-width: 560px) { .cc-cols { grid-template-columns: 1fr; } }
+    /* グリッドの子は既定で min-width:auto ＝中身の最小幅で膨らみ、カードからはみ出す。0にして縮めるように。 */
+    .cc-col { min-width: 0; }
     .cc-col .col-h { font-size: 12px; font-weight: 700; color: var(--brand-dark); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
     .cc-col .col-h .cl-toggle { cursor: pointer; user-select: none; }
     .cc-col .col-h .cl-toggle:hover { text-decoration: underline; }
@@ -75,18 +77,27 @@
     #boardBody.lh-normal  .col-list { height: 240px; }
     #boardBody.lh-all     .col-list { height: auto; overflow: visible; }
 
-    /* メンバーが他に出ている案件の小タグ（同日=赤＝かぶり／別日=緑＝連続起用OK） */
+    /* メンバーが他に出ている案件の小タグ（同日=赤＝かぶり／別日=緑＝連続起用OK）＝旧方式。今は未使用 */
     .xcase { font-size: 9.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; margin-left: 3px; white-space: nowrap; }
     .xcase.same { background: var(--danger-soft); color: #b91c1c; }
     .xcase.cont { background: var(--ok-soft);     color: #15803d; }
+    /* 連勤まとめバッジ（この期間に何日ぶん出ているか）。2〜3日=控えめ／4日以上=赤（働きすぎ注意）。 */
+    .renkin-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+      background: #ece3d4; color: #7a6a58; }
+    .renkin-badge.hi { background: var(--danger-soft); color: #b91c1c; }
     .case-card.todo { border-left: 4px solid #d97706; }
     .case-card.adj  { border-left: 4px solid #2c6ca0; }
     .case-card.fix  { border-left: 4px solid #16a34a; }
     .case-card.pub  { border-left: 4px solid #16a34a; }
 
     .cc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .cc-headmain { flex: 1 1 auto; min-width: 150px; }
-    .cc-name { font-size: 15px; font-weight: 700; line-height: 1.35; }
+    .cc-headmain { flex: 1 1 auto; min-width: 0; }
+    /* タイトルは1行で、長い分は「…」。全文はマウスを乗せると出る（title属性）。カードが横長にならないように。 */
+    .cc-name { font-size: 15px; font-weight: 700; line-height: 1.35;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* コンテンツ未登録の印（案件名で仮表示していることを一目で示す） */
+    .cc-nocontent { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+      background: var(--warn-soft); color: #b45309; white-space: nowrap; }
     .cc-client { font-size: 12px; color: var(--muted); font-weight: 400; }
     /* 時間・開催場所（日別ボードのアサイン作業用） */
     .cc-meta { font-size: 11.5px; color: var(--ink); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
@@ -150,10 +161,15 @@
     /* ↓ display:none を既定にし、.open のときだけ開く（hidden属性はflexに負けるため使わない） */
     .mem-list { display: none; margin-top: 6px; border-top: 1px dashed var(--line); padding-top: 6px; flex-direction: column; gap: 3px; }
     .mem-list.open { display: flex; }
-    .mem-row { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
-    .mem-row .m-no { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .mem-row .m-name { flex: 1; }
+    /* 要素が多いので、入り切らない分は下の行へ回す（flex-wrap）＝名前が潰れて縦書きになるのを防ぐ */
+    .mem-row { display: flex; align-items: center; gap: 6px; font-size: 11.5px; flex-wrap: wrap; }
+    .mem-row .m-no { flex: 0 0 auto; width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    /* 名前は最低幅を確保し、はみ出す分は「…」で省略（1文字ずつ縦に折り返さない） */
+    .mem-row .m-name { flex: 1 1 60px; min-width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mem-row .m-pos { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--brand-soft); color: var(--brand-dark); white-space: nowrap; }
+    /* 手動編集中のポジション選択プルダウン（選ぶと保存） */
+    .mem-row .m-pos-sel { flex: 0 0 auto; font-family: inherit; font-size: 10.5px; font-weight: 700;
+      padding: 1px 4px; border: 1px solid var(--brand); border-radius: 6px; background: #fff; color: var(--brand-dark); max-width: 110px; }
     .mem-row .m-lv { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
     .mem-row .m-lv.new { background: var(--brand-soft); color: var(--brand-dark); }
     .mem-row .m-lv.mid { background: #ece3d4; color: #7a6a58; }
@@ -291,6 +307,12 @@
 <script>window.ECS_BOARD_MONTH = @json($boardMonth ?? []);</script>
 <!-- 表示の基準日（先頭の日）。日付計算の起点・日付ピッカーの初期値に使う。 -->
 <script>window.ECS_BOARD_ANCHOR = @json($anchor ?? null);</script>
+<!-- ポジション編集：選択肢（役割コードの正本）＋保存先＋CSRF。メンバーのポジションをDB(assignments)に保存する。 -->
+<script>
+  window.ECS_ROLE_OPTIONS = @json($roleOptions ?? []);
+  window.ECS_QUICK_URL = '/entries/assign';
+  window.ECS_CSRF = '{{ csrf_token() }}';
+</script>
 @verbatim
 <script>
   // ===== 案件データ（共通リスト data/cases.js から作る）=====
@@ -304,13 +326,13 @@
   const cases = (ECS_BOARD || ECS_CASES)
     .filter(c => !c.archived && !c.draft && c.off >= 0 && c.off <= 21)
     .map(c => ({
-      id:c.id, off:c.off, name:c.name, client:c.client, cat:c.cat,
+      id:c.id, off:c.off, name:c.name, contentMissing:c.contentMissing, client:c.client, cat:c.cat,
       need:c.need, filled:c.filled, state:c.state, mine:c.mine,
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
-      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type }))
+      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, status:m.status }))
     }));
 
   // 各日の「稼働可スタッフ数」（仮）。off → その日に稼働可と出している人数。
@@ -608,6 +630,55 @@
     document.querySelectorAll('.lh-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.h === v));
   }
 
+  // 案件カードのタイトル部分のHTML。タイトルは1行省略（長い分は「…」・ホバーで全文）。
+  // コンテンツ未登録の案件は先頭に小さな「⚠未登録」バッジを付け、案件名で仮表示する。
+  function titleBlockHtml(c){
+    const name = c.name || '';
+    const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツがマスタに未登録です。案件名で仮表示しています。">⚠未登録</span> ' : '';
+    return `<div class="cc-name" title="${name}">${badge}${name}</div>`;
+  }
+
+  // メンバーのポジション欄。手動編集中でスタッフIDがあればプルダウン（選ぶとDB保存）、それ以外は表示のみ。
+  function posCellHtml(c, m){
+    const label = m.pos || '—';
+    if (!editing.has(c.id) || !m.id) return `<span class="m-pos">${label}</span>`;
+    const opts = window.ECS_ROLE_OPTIONS || {};
+    // 役割が未設定のときの初期選択は FC（先頭のDにしない）。
+    const current = m.roleCode || 'FC';
+    let html = '';
+    let found = false;
+    for (const code in opts){
+      const sel = code === current ? ' selected' : '';
+      if (code === current) found = true;
+      html += `<option value="${code}"${sel}>${opts[code]}</option>`;
+    }
+    // 今のコードが選択肢に無い場合（旧コード等）は、消えないよう先頭に足して選択済みにする
+    if (!found && current) html = `<option value="${current}" selected>${opts[current] || label}</option>` + html;
+    return `<select class="m-pos-sel" title="ポジションを変更（選ぶと保存されます）" onchange="changeMemberPos('${c.id}','${m.id}', this.value)">${html}</select>`;
+  }
+
+  // ポジション変更を assignments に保存（エントリー一覧と同じ quickToggle を再利用）。状態(仮/確定)は維持する。
+  function changeMemberPos(caseId, staffId, roleCode){
+    const c = cases.find(z => z.id === caseId);
+    const m = c && c.assigned.find(x => x.id === staffId);
+    const status = (m && m.status) ? m.status : '確定';
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: staffId, action: 'assign', role: roleCode, status: status })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok){
+          if (m){ m.roleCode = roleCode; m.pos = (window.ECS_ROLE_OPTIONS || {})[roleCode] || roleCode; }
+        } else {
+          alert('ポジションの保存に失敗しました。' + (res && res.message ? '\n' + res.message : ''));
+          render();
+        }
+      })
+      .catch(() => { alert('通信エラーでポジションを保存できませんでした。'); render(); });
+  }
+
   // 希望者一覧を別ウィンドウで開く
   function openWishlist(){
     const w = window.open('/assign-wishlist', 'ecs_wishlist', 'width=880,height=700');
@@ -743,14 +814,24 @@
     const memRows = members.map((m, i) => {
       const dup = dupNames.has(m.name) ? 'dup' : '';
       const x = editMode ? `<span class="m-x" title="外す" onclick="removeMember('${c.id}',${i})">×</span>` : '';
-      const others = (amap[m.name] || []).filter(id => id !== c.id);
-      const xtags = others.map(id => {
-        const oc = cases.find(z => z.id === id);
-        const same = oc && oc.off === c.off;
-        return `<span class="xcase ${same ? 'same' : 'cont'}" title="${oc ? oc.name : ''}">${shortOf(id)}</span>`;
-      }).join('');
+      // 連勤（この期間に何日ぶん出ているか）を1個のまとめバッジで表示。
+      // 案件ごとの細かいタグ（旧xcase）はやめて、行を短く保つ。同日かぶりは名前の⚠(dup)で警告する。
+      // バッジにカーソルを合わせると「どの日・どの案件か」の内訳が出る（title属性）。
+      const myCases = (amap[m.name] || [])
+        .map(id => cases.find(z => z.id === id))
+        .filter(Boolean)
+        .sort((a, b) => a.off - b.off);
+      const myOffs = new Set(myCases.map(oc => oc.off));
+      const dayN = myOffs.size;
+      const renkinList = myCases.map(oc => {
+        const d = addDays(oc.off);
+        return `・${d.getMonth() + 1}/${d.getDate()} ${oc.name}`;
+      }).join('\n');
+      const renkinTag = dayN >= 2
+        ? `<span class="renkin-badge ${dayN >= 4 ? 'hi' : ''}" title="連勤の内訳（この期間に ${dayN}日ぶん）：\n${renkinList}">連${dayN}日</span>`
+        : '';
       const capb = m.type === 'staff' ? capBadge(m.name, amap) : '';
-      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}<span class="m-pos">${m.pos}</span>${capb}${xtags}${x}</div>`;
+      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${posCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
     const memCol =
       `<div class="cc-col">
@@ -785,7 +866,7 @@
     card.innerHTML = `
       <div class="cc-head">
         <div class="cc-headmain">
-          <div class="cc-name">${c.name}</div>
+          ${titleBlockHtml(c)}
           <div class="cc-client">${c.client}</div>
           <div class="cc-meta">
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>
