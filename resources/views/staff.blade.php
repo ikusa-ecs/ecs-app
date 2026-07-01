@@ -125,9 +125,9 @@
           </select>
           <select id="fPos" onchange="rosterFilter()">
             <option value="">できるポジション：すべて</option>
-            <option value="OP">OP（オペレーター）</option>
-            <option value="MC">MC</option>
-            <option value="SP">SP（サポート）</option>
+            <option value="OP">OP（音響）</option>
+            <option value="MC">MC（司会進行）</option>
+            <option value="SP">軍師・サポーター</option>
           </select>
           <div class="spacer"></div>
           <button class="btn primary" onclick="alert('モックのため、招待は行いません。')">＋ スタッフを招待</button>
@@ -159,7 +159,7 @@
 
       <!-- ===================== 稼働状況タブ ===================== -->
       <div class="pane" id="pane-work">
-      <div class="mock-note">稼働率・連勤・選ばれた率・ご無沙汰・活性度は、登録済みのアサイン・希望・応募データ（DB）から計算して表示しています（対象月＝2026年7月）。データが無い場合は下の見本値を表示します。</div>
+      <div class="mock-note">稼働率・連勤・選ばれた率・ご無沙汰・活性度は、登録済みのアサイン・希望・応募データ（DB）から計算して表示しています（対象月＝2026年7月）。データが無い場合は下の見本値を表示します。<br>※「気にかけたい人」のまとめは<b>アサインダッシュボード</b>に移動しました。</div>
 
       <!-- 数値カード -->
       <div class="grid cols-4" style="margin-bottom:20px;">
@@ -179,9 +179,13 @@
           <div class="sub">0件回避で優先したい人</div>
         </div>
         <div class="stat">
-          <div class="label">非アクティブ</div>
-          <div class="value warn" id="cInactive">0</div>
-          <div class="sub">その月エントリーなし</div>
+          <div class="label">活性度（人数）</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 6px;">
+            <span class="act active">アクティブ <b id="cActive">0</b></span>
+            <span class="act semi">準 <b id="cSemi">0</b></span>
+            <span class="act inactive">非 <b id="cInactive">0</b></span>
+          </div>
+          <div class="sub">その月のエントリー率で判定</div>
         </div>
       </div>
 
@@ -205,6 +209,7 @@
             <option value="month">並び：今月アサインが多い順</option>
             <option value="pick">並び：選ばれた率が低い順</option>
             <option value="gobusata">並び：ご無沙汰が長い順</option>
+            <option value="reg">並び：登録した順（番号順）</option>
           </select>
           <div class="spacer"></div>
           <button class="btn" onclick="alert('モックのため、CSV出力は行いません。')">CSV出力</button>
@@ -235,16 +240,6 @@
           選ばれた率＝アサイン回数 ÷ エントリー（応募）回数。何回も応募しているのに低い人は新人離脱のサイン（赤字）。ご無沙汰＝最後にアサインされてからの日数。長い人ほど声がかかっていない（14日以上で橙・30日以上で赤）。
         </div>
       </div>
-
-      <!-- 警告リスト -->
-      <div class="panel">
-        <div class="panel-head"><h2>気にかけたい人</h2></div>
-        <div id="warnZero"></div>
-        <div id="warnRenkin"></div>
-        <div id="warnFill"></div>
-        <div id="warnPick"></div>
-        <div id="warnGobusata"></div>
-      </div>
       </div><!-- /pane-work -->
 @endverbatim
 @endsection
@@ -272,14 +267,14 @@
   const lvLabel = window.ECS_LV_LABEL;
   // 区分は入社日／登録日からの年数で判定（新人=1年未満／中堅=1〜3年/ベテラン=3年以上）
   function lvOf(p){ return window.ECS_lvOf(p); }
-  // スタッフが「できる」として持つポジションは OP / MC / SP の3つに限定。
-  // （D はできるスタッフがほぼいない・FC/RP/ET は誰でもやる前提なので「できること」管理の対象外）
+  // スタッフが「できる」として持つポジションは OP / MC / 軍師 の3つに限定。
+  // （D はできるスタッフがほぼいない・FC/CK/受付 は誰でもやる前提なので「できること」管理の対象外）
   const POS = [
-    { k:'OP', label:'OP', key:true },
-    { k:'MC', label:'MC', key:true },
-    { k:'SP', label:'SP', key:true },
+    { k:'OP',  label:'OP',       key:true },
+    { k:'MC',  label:'MC',       key:true },
+    { k:'SP', label:'軍師・サポ', key:true },
   ];
-  const posFull = { OP:'OP（オペレーター）', MC:'MC', SP:'SP（サポート）' };
+  const posFull = { OP:'OP（音響）', MC:'MC（司会進行）', SP:'軍師・サポーター' };
 
   // ===== スタッフ設定（staff_portal.html）で本人が入力した内容を、ここに反映する =====
   // このモックでのログイン中の本人＝佐藤 健太（S-032）。
@@ -518,6 +513,7 @@
       if (sortKey === 'month')   return b.month - a.month;
       if (sortKey === 'pick')    return (pickRateOf(a) ?? 999) - (pickRateOf(b) ?? 999);
       if (sortKey === 'gobusata')return (b.lastDays ?? -1) - (a.lastDays ?? -1);
+      if (sortKey === 'reg')     return String(a.id).localeCompare(String(b.id), 'ja', {numeric:true}); // 登録した順＝スタッフ番号の若い順
       return 0;
     });
 
@@ -559,55 +555,21 @@
     applyFilter();
   }
 
-  // 数値カード＆警告リスト
+  // 数値カード（「気にかけたい人」の一覧はアサインダッシュボードへ移動済み）
   function renderSummary(){
     const total = status.reduce((s,p) => s + p.month, 0);
     const rated = status.map(rateOf).filter(v => v !== null && v !== undefined);
     const avg = rated.length ? Math.round(rated.reduce((s,v) => s + v, 0) / rated.length) : 0;
     const zero = status.filter(p => p.zeroPref);
+    const active = status.filter(p => p.active === 'active');
+    const semi = status.filter(p => p.active === 'semi');
     const inactive = status.filter(p => p.active === 'inactive');
+    document.getElementById('cActive').textContent = active.length;
+    document.getElementById('cSemi').textContent = semi.length;
     document.getElementById('cTotal').textContent = total;
     document.getElementById('cAvg').textContent = avg + '%';
     document.getElementById('cZero').textContent = zero.length;
     document.getElementById('cInactive').textContent = inactive.length;
-
-    // 希望0件
-    const zEl = document.getElementById('warnZero');
-    if (zero.length) {
-      zEl.innerHTML = `<div class="alert danger"><span class="ico">⚠</span><div><strong>今月の希望が0件：</strong>${zero.map(p=>p.name).join('、')}。<br>0件回避のため、次のアサインで優先的に検討しましょう。</div></div>`;
-    } else { zEl.innerHTML = ''; }
-
-    // 連勤注意（4連勤以上）
-    const renkin = status.filter(p => p.renkin >= 4);
-    const rEl = document.getElementById('warnRenkin');
-    if (renkin.length) {
-      rEl.innerHTML = `<div class="alert warn"><span class="ico">⚠</span><div><strong>連勤に注意：</strong>${renkin.map(p=>`${p.name}（${p.renkin}連勤）`).join('、')}。<br>夏場の3連勤・通年5連勤超えは避けたいラインです。</div></div>`;
-    } else { rEl.innerHTML = ''; }
-
-    // 稼働率が低い（希望を出しているのに30%未満）＝希望に対してアサインが少ない
-    const lowRate = status.filter(p => { const r = rateOf(p); return r !== null && r > 0 && r < 30; });
-    const fEl = document.getElementById('warnFill');
-    if (lowRate.length) {
-      fEl.innerHTML = `<div class="alert warn"><span class="ico">▲</span><div><strong>稼働率が30%未満：</strong>${lowRate.map(p=>`${p.name}（${rateOf(p)}%）`).join('、')}。<br>希望を出してくれているのにアサインが少なめです。</div></div>`;
-    } else { fEl.innerHTML = ''; }
-
-    // 選ばれた率が低い（4回以上応募して30%未満）＝応募してくれているのに選ばれていない＝離脱リスク
-    const lowPick = status.filter(p => p.applied >= 4 && pickRateOf(p) < 30);
-    const pEl = document.getElementById('warnPick');
-    if (lowPick.length) {
-      pEl.innerHTML = `<div class="alert warn"><span class="ico">▲</span><div><strong>応募が多いのに選ばれた率が低い：</strong>${lowPick.map(p=>`${p.name}（${pickRateOf(p)}%・${p.picked}/${p.applied}）`).join('、')}。<br>エントリーしてくれているのに選ばれていません。新人離脱を防ぐため次のアサインで検討を。</div></div>`;
-    } else { pEl.innerHTML = ''; }
-
-    // ご無沙汰（最終アサインから30日以上）
-    const gobusata = status.slice().filter(p => p.lastDays >= 30).sort((a,b)=>b.lastDays-a.lastDays);
-    const gEl = document.getElementById('warnGobusata');
-    if (gobusata.length) {
-      gEl.innerHTML = `<div class="alert warn"><span class="ico">⌛</span><div><strong>しばらくアサインがない：</strong>${gobusata.map(p=>`${p.name}（${p.lastDays}日）`).join('、')}。<br>声をかけて状況を確認したい人です。</div></div>`;
-    } else { gEl.innerHTML = ''; }
-
-    if (!zero.length && !renkin.length && !lowRate.length && !lowPick.length && !gobusata.length) {
-      document.getElementById('warnZero').innerHTML = '<div class="alert ok"><span class="ico">✓</span><div>特に気にかけるべき人はいません。</div></div>';
-    }
   }
 
   // 絞り込み

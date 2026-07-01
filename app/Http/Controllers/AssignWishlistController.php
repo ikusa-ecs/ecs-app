@@ -30,13 +30,13 @@ class AssignWishlistController extends Controller
 {
     /** DBのポジション記号 → 画面の表示ラベル。並び順もこの順で揃える。 */
     private const POS_LABELS = [
-        'D'  => 'D',
-        'MC' => 'MC',
-        'FC' => 'FC',
-        'OP' => 'OP',
-        'SP' => 'SP',
-        'RP' => 'RP',
-        'ET' => 'ET',
+        'D'   => 'D',
+        'OP'  => 'OP',
+        'MC'  => 'MC',
+        'FC'  => 'FC',
+        'CK'  => 'CK',
+        'SP'  => '軍師・サポーター',
+        'RP'  => '受付',
     ];
 
     public function index()

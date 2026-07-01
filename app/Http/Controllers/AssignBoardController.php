@@ -29,11 +29,11 @@ class AssignBoardController extends Controller
     /** 役割キー → ボード表示用のポジション名（assignments.role の値に対応）。 */
     private const POS_LABELS = [
         'D' => 'D', 'SD' => 'SD', 'MC' => 'MC', 'OP' => 'OP',
-        'FC' => 'FC', 'SP' => 'SP', 'RP' => 'RP', 'ET' => 'ET',
+        'FC' => 'FC', 'CK' => 'CK', 'RP' => '受付', 'SP' => '軍師・サポーター',
     ];
 
     /** 主ポジションを選ぶ優先順（重要・経験者向けの役割を上に）。 */
-    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'FC', 'SP', 'RP', 'ET'];
+    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'SP', 'FC', 'RP', 'CK'];
 
     /** アサインボード（日別）/assign。案件＋割当メンバー＋希望者・稼働可・今月件数を DB から渡す。
      *  ?from=YYYY-MM-DD が来たら、その日を基準（先頭）に 3週間分を表示する（既定＝今日）。 */

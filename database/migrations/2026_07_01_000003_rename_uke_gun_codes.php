@@ -4,10 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 役割コードの作り替え（2026-07-01 baba確定の正式定義に合わせる）。
- *   UKE → RP（受付→レセプション）
- *   GUN → SP（軍師・サポーター→サポート）
- *   CK  → ET（チェッカーは廃止。得点係などと同じ「その他」へ寄せる）
+ * 役割コードの一部変更（2026-07-01 baba）。表示は従来どおり（受付／軍師・サポーター）。
+ *   UKE → RP（受付）
+ *   GUN → SP（軍師・サポーター）
  * 対象＝見本データ（staff_role_eligibility.position・assignments.role）。
  */
 return new class extends Migration
@@ -15,7 +14,6 @@ return new class extends Migration
     private array $map = [
         'UKE' => 'RP',
         'GUN' => 'SP',
-        'CK' => 'ET',
     ];
 
     public function up(): void

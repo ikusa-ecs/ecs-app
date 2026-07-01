@@ -176,12 +176,12 @@
   @verbatim
   <script>
     // できるポジションの一覧（スタッフ管理・スタッフ設定と同じ並び）
-    // スタッフが「できる」として選ぶのは OP / MC / SP の3つに限定。
-    // （D はできるスタッフがほぼいない・FC/RP/ET は誰でもやる前提なので選択対象外）
+    // スタッフが「できる」として選ぶのは OP / MC / 軍師 の3つに限定。
+    // （D はできるスタッフがほぼいない・FC/CK/受付 は誰でもやる前提なので選択対象外）
     const POS = [
-      { k:'OP',  label:'OP（オペレーター）' },
-      { k:'MC',  label:'MC' },
-      { k:'SP',  label:'SP（サポート）' },
+      { k:'OP',  label:'OP（音響）' },
+      { k:'MC',  label:'MC（司会進行）' },
+      { k:'SP', label:'軍師・サポーター' },
     ];
     document.getElementById('posList').innerHTML = POS.map(p =>
       `<label><input type="checkbox" value="${p.k}"> ${p.label}</label>`).join('');

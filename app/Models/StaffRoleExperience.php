@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * ポジション経験。テーブルは staff_role_experience。設計書8章に対応。
- * role は D/OP/MC/FC/CK/GUN(軍師・サポーター)/UKE(受付)。
+ * role は D/OP/MC/FC/CK/SP(軍師・サポーター)/RP(受付)。
  * total_count（合計）は保存せず、auto_count＋manual_adjust を都度計算する。
  */
 class StaffRoleExperience extends Model

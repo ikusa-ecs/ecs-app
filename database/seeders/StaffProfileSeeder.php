@@ -17,21 +17,21 @@ class StaffProfileSeeder extends Seeder
     {
         // できるポジション（people.js の pos が true のものだけ）
         // 役割コード：D=ディレクター / OP=音響 / MC=司会 / FC=巡回ファシリ /
-        //             CK=チェッカー / GUN=軍師・サポーター / UKE=受付
+        //             CK=チェッカー / SP=軍師・サポーター / RP=受付
         $eligibility = [
-            'S-001' => ['D', 'MC', 'FC', 'CK', 'GUN', 'UKE'],
-            'S-007' => ['D', 'OP', 'FC', 'CK', 'GUN'],
-            'S-003' => ['MC', 'FC', 'CK', 'UKE'],
-            'S-027' => ['MC', 'FC', 'CK', 'GUN', 'UKE'],
-            'S-009' => ['FC', 'CK', 'UKE'],
-            'S-005' => ['FC', 'CK', 'GUN', 'UKE'],
-            'S-014' => ['FC', 'CK', 'GUN', 'UKE'],
+            'S-001' => ['D', 'MC', 'FC', 'CK', 'SP', 'RP'],
+            'S-007' => ['D', 'OP', 'FC', 'CK', 'SP'],
+            'S-003' => ['MC', 'FC', 'CK', 'RP'],
+            'S-027' => ['MC', 'FC', 'CK', 'SP', 'RP'],
+            'S-009' => ['FC', 'CK', 'RP'],
+            'S-005' => ['FC', 'CK', 'SP', 'RP'],
+            'S-014' => ['FC', 'CK', 'SP', 'RP'],
             'S-018' => ['OP', 'FC', 'CK'],
-            'S-021' => ['FC', 'CK', 'UKE'],
-            'S-032' => ['FC', 'UKE'],
-            'S-035' => ['CK', 'UKE'],
+            'S-021' => ['FC', 'CK', 'RP'],
+            'S-032' => ['FC', 'RP'],
+            'S-035' => ['CK', 'RP'],
             'S-038' => ['FC', 'CK'],
-            'S-041' => ['UKE'],
+            'S-041' => ['RP'],
         ];
 
         foreach ($eligibility as $staffId => $positions) {

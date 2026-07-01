@@ -16,54 +16,45 @@ namespace App\Support;
  */
 class AssignmentRole
 {
-    // ── 役割コード（assignments.role に入る値）＝2026-07-01 baba確定の正式定義 ──
-    public const D = 'D';       // Director / ディレクター
-    public const SD = 'SD';     // Sub-Director / サブディレクター（D決め画面のみ）
-    public const MC = 'MC';     // MC
-    public const FC = 'FC';     // Facili / ファシリテーター
-    public const OP = 'OP';     // Operater / オペレーター
-    public const SP = 'SP';     // Support / サポート
-    public const RP = 'RP';     // Reception / レセプション
-    public const ET = 'ET';     // Etc / その他
+    // ── 役割コード（assignments.role に入る値）──
+    // ※2026-07-01 baba：受付=RP・軍師=SP にコードを変更（表示は「受付」「軍師・サポーター」のまま）。
+    public const D = 'D';       // ディレクター
+    public const SD = 'SD';     // サブディレクター（D決め画面のみ）
+    public const OP = 'OP';     // 音響
+    public const MC = 'MC';     // 司会進行
+    public const FC = 'FC';     // 巡回ファシリ
+    public const CK = 'CK';     // チェッカー
+    public const SP = 'SP';     // 軍師・サポーター（旧コード GUN）
+    public const RP = 'RP';     // 受付（旧コード UKE）
 
-    /** コード → 表示ラベル（全コード）。mypage 等は括弧内を省いてコードだけ出す。 */
+    /** コード → 表示ラベル（全コード）。表示は従来どおり。 */
     public const LABELS = [
         self::D => 'D（ディレクター）',
         self::SD => 'SD（サブディレクター）',
-        self::MC => 'MC',
-        self::FC => 'FC（ファシリテーター）',
-        self::OP => 'OP（オペレーター）',
-        self::SP => 'SP（サポート）',
-        self::RP => 'RP（レセプション）',
-        self::ET => 'ET（その他）',
+        self::OP => 'OP（音響）',
+        self::MC => 'MC（司会進行）',
+        self::FC => 'FC（巡回ファシリ）',
+        self::CK => 'CK（チェッカー）',
+        self::SP => '軍師・サポーター',
+        self::RP => '受付',
     ];
 
-    /** コード → 英語名（正式）。 */
+    /**
+     * コード → 英語名（参考。baba提供・2026-07-01）。表示には使わない＝コード整理の参考メモ。
+     */
     public const ENGLISH = [
         self::D => 'Director',
         self::SD => 'Sub-Director',
+        self::OP => 'Operater',
         self::MC => 'MC',
         self::FC => 'Facili',
-        self::OP => 'Operater',
+        self::CK => 'Checker',
         self::SP => 'Support',
         self::RP => 'Reception',
-        self::ET => 'Etc',
     ];
 
-    /** コード → 意味（役割の説明）。 */
-    public const MEANINGS = [
-        self::D => '案件全体の責任者・進行管理',
-        self::SD => 'ディレクターの補佐（D決め画面で使用）',
-        self::MC => '司会進行',
-        self::FC => 'オンライン=巡回／リアル=企業のメイン軍師／自治体=大将 に相当',
-        self::OP => 'オンライン=スライド／リアル=音響・映像',
-        self::SP => 'オンライン=ひよこ／リアル=サポートスタッフ・自治体の大将サポート（目付）',
-        self::RP => 'リアル=受付',
-        self::ET => 'その他の役割（仏・特別対応・得点係 など）',
-    ];
-
-    /** スタッフの「できる役割（staff_role_eligibility）」で使うポジション（SDを除く）。 */
-    public const POSITIONS = [self::D, self::MC, self::FC, self::OP, self::SP, self::RP, self::ET];
+    /** スタッフの「できる役割（staff_role_eligibility）」で使うポジション（SDを除く7種）。 */
+    public const POSITIONS = [self::D, self::OP, self::MC, self::FC, self::CK, self::SP, self::RP];
 
     /** assignments.role に入りうる全コード（配列）。 */
     public static function all(): array
