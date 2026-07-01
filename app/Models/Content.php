@@ -21,6 +21,8 @@ class Content extends Model
         return [
             'is_physical' => 'boolean',
             'active' => 'boolean',
+            'needs_paper' => 'boolean',
+            'sheets_per_team' => 'integer',
         ];
     }
 }
