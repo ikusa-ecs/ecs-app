@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    // チャットワーク（人数確定リマインド用）。
+    // token は「鍵」なのでコードに書かず .env の CHATWORK_TOKEN に置く。
+    // room / test_room は機密ではないので既定値を持たせておく（.env で上書き可）。
+    'chatwork' => [
+        'token' => env('CHATWORK_TOKEN'),
+        'room' => env('CHATWORK_ROOM_ID', '320609834'),
+        'test_room' => env('CHATWORK_TEST_ROOM_ID', '412985590'),
+    ],
+
 ];
