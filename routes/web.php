@@ -5,11 +5,13 @@ use App\Http\Controllers\AssignDashboardController;
 use App\Http\Controllers\AssignDirectorController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AssignPublishController;
+use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeAvailabilityController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StaffStatusController;
 use Illuminate\Support\Facades\Route;
@@ -38,12 +40,10 @@ Route::get('/project-import', function () {
 // CSV一括取込の保存先（記入済みCSVを読んで projects に複数登録）。
 Route::post('/project-import', [ProjectController::class, 'import']);
 // 別ウィンドウで開くポップアップ画面（Blade化済み）
-Route::get('/projects-agg', function () {
-    return view('projects_agg');
-});
-Route::get('/assign-wishlist', function () {
-    return view('assign_wishlist');
-});
+// 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。
+Route::get('/projects-agg', [ProjectsAggController::class, 'index']);
+// 希望まとめ（別ウィンドウ）。対象月の希望者一覧を DB（希望＋アサイン＋ポジション可否）から作る。
+Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
 
 // アサイン関連の画面（Blade化済み）
 // アサインダッシュボード＝担当者向けの状況まとめ。「アサインが必要な案件」だけ本物の案件から作る。
@@ -68,6 +68,9 @@ Route::post('/project-assign/save', [AssignmentController::class, 'save']);
 // スタッフ公開ボードは DB（projects）から読む。公開ON/OFFは staff_published に保存。
 Route::get('/assign-publish', [AssignPublishController::class, 'index']);
 Route::post('/assign-publish/set', [AssignPublishController::class, 'setPublish']);
+// スタッフ向けの集合・解散時間／スタッフ画面のお知らせ文も DB に保存する。
+Route::post('/assign-publish/time', [AssignPublishController::class, 'setTime']);
+Route::post('/assign-publish/notice', [AssignPublishController::class, 'setNotice']);
 // 仮データの名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
 Route::get('/entries', [AssignBoardController::class, 'entries']);
 Route::get('/pickup', [AssignBoardController::class, 'pickup']);
