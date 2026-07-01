@@ -122,7 +122,11 @@
       "PowerShell(php artisan tinker --execute=\"foreach\\(\\\\App\\\\Models\\\\Content::orderBy\\('id'\\)->get\\(\\) as \\\\$c\\){ echo \\\\$c->id.'  '.\\\\$c->content_name.'  needs_paper='.\\(int\\)\\\\$c->needs_paper.PHP_EOL; }\")",
       "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\877680e8-b4be-4522-a895-7d6b2903d3ff\\\\scratchpad\\\\paper_check.php\")",
       "PowerShell(Get-Process *)",
-      "Bash(grep -o 'window.ECS_CASES = .\\\\{0,400\\\\}')"
+      "Bash(grep -o 'window.ECS_CASES = .\\\\{0,400\\\\}')",
+      "Bash(echo \"assign-wishlist => $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/assign-wishlist\\)\")",
+      "PowerShell(php artisan view:clear; php artisan route:clear)",
+      "PowerShell(Stop-Process *)",
+      "Bash(git commit *)"
     ]
   }
 }

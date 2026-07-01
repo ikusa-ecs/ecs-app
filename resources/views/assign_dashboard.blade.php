@@ -107,21 +107,33 @@
           @endif
         </div>
 
-        <!-- 要注意（希望充足）＝希望はあるのにアサインが少ない人（充足率30%未満） -->
+        <!-- 気にかけたい人（稼働状況から移動）＝見落とし防止のためダッシュボードに置く。
+             指標は稼働状況と同じ単一ソース（StaffStatusController）から計算。 -->
         <div class="panel">
           <div class="panel-head">
-            <h2>希望充足の要注意スタッフ</h2>
+            <h2>⚠ 気にかけたい人</h2>
             <div class="spacer"></div>
-            <a class="btn sm" href="/staff-status">稼働状況へ</a>
+            <a class="btn sm" href="/staff">スタッフ画面へ</a>
           </div>
-          @forelse ($alerts as $a)
-          <div class="alert {{ $a['level'] }}"><span class="ico">⚠</span><div><strong>{{ $a['name'] }}</strong>（{{ $a['lv'] }}）— 今月の希望 {{ $a['want'] }}件に対しアサイン <strong>{{ $a['month'] }}件</strong>（充足{{ $a['rate'] }}%）。@if ($a['rate'] === 0)0件回避のため優先検討。@else30%担保に未達。@endif</div></div>
-          @empty
-          <div class="alert ok"><span class="ico">✓</span><div>希望のあるスタッフは全員、30%の希望担保を満たしています。</div></div>
-          @endforelse
-          @if (count($alerts))
-          <div class="alert ok"><span class="ico">✓</span><div>上記以外のスタッフは30%の希望担保を満たしています。</div></div>
+          @php($careAny = count($careZero) || count($careRenkin) || count($careLowRate) || count($carePick) || count($careGobusata))
+          @if (count($careZero))
+          <div class="alert danger"><span class="ico">⚠</span><div><strong>今月の希望が0件：</strong>{{ implode('、', $careZero) }}。<br>0件回避のため、次のアサインで優先的に検討しましょう。</div></div>
           @endif
+          @if (count($careRenkin))
+          <div class="alert warn"><span class="ico">⚠</span><div><strong>連勤に注意：</strong>{{ implode('、', array_map(fn ($c) => $c['name'].'（'.$c['renkin'].'連勤）', $careRenkin)) }}。<br>夏場の3連勤・通年5連勤超えは避けたいラインです。</div></div>
+          @endif
+          @if (count($careLowRate))
+          <div class="alert warn"><span class="ico">▲</span><div><strong>稼働率が30%未満：</strong>{{ implode('、', array_map(fn ($c) => $c['name'].'（'.$c['rate'].'%）', $careLowRate)) }}。<br>希望を出してくれているのにアサインが少なめです。</div></div>
+          @endif
+          @if (count($carePick))
+          <div class="alert warn"><span class="ico">▲</span><div><strong>応募が多いのに選ばれた率が低い：</strong>{{ implode('、', array_map(fn ($c) => $c['name'].'（'.$c['rate'].'%・'.$c['picked'].'/'.$c['applied'].'）', $carePick)) }}。<br>エントリーしてくれているのに選ばれていません。新人離脱を防ぐため次のアサインで検討を。</div></div>
+          @endif
+          @if (count($careGobusata))
+          <div class="alert warn"><span class="ico">⌛</span><div><strong>しばらくアサインがない：</strong>{{ implode('、', array_map(fn ($c) => $c['name'].'（'.$c['days'].'日）', $careGobusata)) }}。<br>声をかけて状況を確認したい人です。</div></div>
+          @endif
+          @unless ($careAny)
+          <div class="alert ok"><span class="ico">✓</span><div>特に気にかけるべき人はいません。</div></div>
+          @endunless
         </div>
 
       </div>

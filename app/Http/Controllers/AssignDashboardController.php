@@ -164,6 +164,22 @@ class AssignDashboardController extends Controller
             ];
         });
 
+        // ── 気にかけたい人（稼働状況の「気にかけたい人」カードをここへ移動）──────────
+        // 指標は稼働状況（StaffStatusController::buildStatus）と同じ単一ソースを使い、画面間でブレさせない。
+        $statusList = app(StaffStatusController::class)->buildStatus();
+        $pickRate = fn ($s) => $s['applied'] > 0 ? (int) round($s['picked'] / $s['applied'] * 100) : null;
+
+        $careZero = $statusList->filter(fn ($s) => $s['zeroPref'])->pluck('name')->all();
+        $careRenkin = $statusList->filter(fn ($s) => $s['renkin'] >= 4)
+            ->map(fn ($s) => ['name' => $s['name'], 'renkin' => $s['renkin']])->values()->all();
+        $careLowRate = $statusList->filter(fn ($s) => $s['rate'] !== null && $s['rate'] > 0 && $s['rate'] < 30)
+            ->map(fn ($s) => ['name' => $s['name'], 'rate' => $s['rate']])->values()->all();
+        $carePick = $statusList->filter(fn ($s) => $s['applied'] >= 4 && $pickRate($s) !== null && $pickRate($s) < 30)
+            ->map(fn ($s) => ['name' => $s['name'], 'rate' => $pickRate($s), 'picked' => $s['picked'], 'applied' => $s['applied']])->values()->all();
+        $careGobusata = $statusList->filter(fn ($s) => $s['lastDays'] !== null && $s['lastDays'] >= 30)
+            ->sortByDesc('lastDays')
+            ->map(fn ($s) => ['name' => $s['name'], 'days' => $s['lastDays']])->values()->all();
+
         return view('assign_dashboard', [
             'needAssign'       => $needAssign,
             'recruitCount'     => $recruitCount,
@@ -174,6 +190,11 @@ class AssignDashboardController extends Controller
             'avgRate'          => $avgRate,
             'alerts'           => $alerts,
             'recentConfirmed'  => $recentConfirmed,
+            'careZero'         => $careZero,
+            'careRenkin'       => $careRenkin,
+            'careLowRate'      => $careLowRate,
+            'carePick'         => $carePick,
+            'careGobusata'     => $careGobusata,
         ]);
     }
 }
