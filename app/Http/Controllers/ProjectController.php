@@ -452,6 +452,8 @@ class ProjectController extends Controller
                 'project_name' => $name,
                 'content_ids' => $contentIds,
                 'category' => $get($row, '区分') ?: null,
+                // toC列に「toC/toc/あり/○/はい/1」があれば一般消費者向け＝true。空欄はtoB扱い。
+                'is_toc' => in_array($get($row, 'toC'), ['toC', 'toc', 'あり', '○', '◯', 'はい', '1'], true),
                 'yomi' => $get($row, '確度') ?: null,
                 'scale' => $get($row, '案件規模') ?: null,
                 'is_recruiting' => $get($row, 'スタッフ募集') !== '募集しない',
