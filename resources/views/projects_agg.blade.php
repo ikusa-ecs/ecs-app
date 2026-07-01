@@ -21,6 +21,10 @@
     .note { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
     table.tbl th.num, table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
     table.tbl td.nm { font-weight: 600; }
+    /* 名前の文字色＝所属（D決め画面と同じ配色） */
+    table.tbl td.nm.dep-plan     { color: #c2410c; }   /* イベプラ＝オレンジ */
+    table.tbl td.nm.dep-sales    { color: #4338ca; }   /* セールス＝藍 */
+    table.tbl td.nm.dep-creative { color: #16a34a; }   /* クリエイティブ＝緑 */
     tr.agg-total td { font-weight: 700; background: var(--brand-soft); color: var(--brand-dark); }
   </style>
   @endverbatim
@@ -29,23 +33,28 @@
   <div class="agg-top">
     <h1>📊 社員・ディレクター集計</h1>
     <div class="month-nav">
-      <button onclick="alert('モックのため、月の切替はしません。')">◀</button>
-      <span class="mon" id="monLabel">2026年 7月</span>
-      <button onclick="alert('モックのため、月の切替はしません。')">▶</button>
+      <span class="mon" id="monLabel">D／SD担当 累計</span>
     </div>
     <div class="spacer"></div>
     <span class="live off" id="live"><span class="dot"></span><span id="liveText">案件一覧と未接続</span></span>
   </div>
 
   <p class="note">
-    案件一覧で<b>ディレクター・規模（大型/通常）・SD担当</b>を変えると、この画面の数字が<b>自動で更新</b>されます（この窓は開いたままでOK）。<br>
-    数値はすべて仮の見本です。「総アサイン数（実際に現場へ入った数）」は、アサイン機能とつないだ後に追加します。
+    <b>D決め画面（/assign-director）</b>で保存したD／SD担当の実績を、社員ごとに数えた本物の集計です。<br>
+    下書きの案件は数えません。表示は累計（全期間）です。
   </p>
+
+  @if (($summary['records'] ?? 0) > 0)
+  <p class="note" style="margin:-4px 0 12px; font-size:13.5px; color:var(--ink);">
+    全部で <b>{{ $summary['records'] }}</b> 件（D <b>{{ $summary['d'] }}</b> 件・SD <b>{{ $summary['sd'] }}</b> 件）／対象 社員 <b>{{ $summary['staff'] }}</b> 名・案件 <b>{{ $summary['projects'] }}</b> 件
+  </p>
+  @endif
 
   <table class="tbl">
     <thead>
       <tr>
         <th>社員</th>
+        <th class="num" title="その社員がD・SDを担当した合計（D＋SD）">担当合計</th>
         <th class="num">D計</th>
         <th class="num">リアルD</th>
         <th class="num">大型D</th>
@@ -54,40 +63,52 @@
       </tr>
     </thead>
     <tbody id="aggBody">
-      <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px 0;">案件一覧の「📊 社員・ディレクター集計」ボタンから開くと、ここに数字が出ます。</td></tr>
+      <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px 0;">案件一覧の「📊 社員・ディレクター集計」ボタンから開くと、ここに数字が出ます。</td></tr>
     </tbody>
   </table>
 
   <p class="note" style="margin-top:12px;">
+    ※名前の<b>文字色は所属</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>）。<br>
     ※「大型D／大型SD」＝リアルの【大型】案件でD／SDを務めた回数。「リアルD」はリアル案件全体（通常＋ロング）でDを務めた回数です。
   </p>
 
   <script src="/ecs/data/cases.js"></script>
+  <!-- 本物の集計（ControllerがD決めの保存先＝assignmentsから作成）をJSへ渡す。下のロジックはそのまま温存。 -->
+  <script>
+    window.ECS_AGG = @json($rows);
+  </script>
   @verbatim
   <script>
     // ===== 親ウィンドウ（案件一覧）から送られてくる集計データを受け取って表示 =====
+    // 本物の集計データがあるか（Controllerが渡す。空なら従来の案件データ集計にフォールバック）。
+    const HAS_DB_AGG = Array.isArray(window.ECS_AGG) && window.ECS_AGG.length > 0;
+
     function setLive(on) {
       document.getElementById('live').className = 'live ' + (on ? 'on' : 'off');
-      document.getElementById('liveText').textContent = on ? '案件一覧と連動中' : '案件データから集計';
+      document.getElementById('liveText').textContent = on ? '案件一覧と連動中'
+        : (HAS_DB_AGG ? 'D決めの実績から集計' : '案件データから集計');
     }
 
     function render(rows) {
       const body = document.getElementById('aggBody');
       body.innerHTML = '';
       if (!rows || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px 0;">ディレクターが割り当てられた案件がありません。</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px 0;">ディレクターが割り当てられた案件がありません。</td></tr>';
         return;
       }
-      const sum = { d:0, realD:0, bigD:0, bigSD:0, onlineD:0 };
+      const sum = { total:0, d:0, realD:0, bigD:0, bigSD:0, onlineD:0 };
       rows.forEach(r => {
+        // 担当合計＝本物データは r.total、案件データ集計（見本）は D＋SD で算出。
+        const total = (r.total != null) ? r.total : (r.d + (r.sd || 0));
+        sum.total += total;
         ['d','realD','bigD','bigSD','onlineD'].forEach(k => sum[k] += r[k]);
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="nm">${r.name}</td><td class="num">${r.d}</td><td class="num">${r.realD}</td><td class="num">${r.bigD}</td><td class="num">${r.bigSD}</td><td class="num">${r.onlineD}</td>`;
+        tr.innerHTML = `<td class="nm ${r.deptCls || ''}" title="${r.dept || ''}">${r.name}</td><td class="num"><b>${total}</b></td><td class="num">${r.d}</td><td class="num">${r.realD}</td><td class="num">${r.bigD}</td><td class="num">${r.bigSD}</td><td class="num">${r.onlineD}</td>`;
         body.appendChild(tr);
       });
       const tr = document.createElement('tr');
       tr.className = 'agg-total';
-      tr.innerHTML = `<td>合計</td><td class="num">${sum.d}</td><td class="num">${sum.realD}</td><td class="num">${sum.bigD}</td><td class="num">${sum.bigSD}</td><td class="num">${sum.onlineD}</td>`;
+      tr.innerHTML = `<td>合計</td><td class="num">${sum.total}</td><td class="num">${sum.d}</td><td class="num">${sum.realD}</td><td class="num">${sum.bigD}</td><td class="num">${sum.bigSD}</td><td class="num">${sum.onlineD}</td>`;
       body.appendChild(tr);
     }
 
@@ -118,10 +139,16 @@
       });
       return Object.values(map).sort((a, b) => (b.d - a.d) || (b.bigD - a.bigD));
     }
-    function renderSelf() { setLive(false); render(computeAggFromCases()); }
+    // 本物データがあればそれを表示（無ければ従来どおり案件データから自前集計）。
+    function renderSelf() {
+      setLive(false);
+      render(HAS_DB_AGG ? window.ECS_AGG : computeAggFromCases());
+    }
 
     window.addEventListener('message', function (e) {
       if (e.data && e.data.type === 'agg-data') {
+        // 本物のD決め実績がある場合は、親ウィンドウ（旧・計画用のディレクター欄）で上書きしない。
+        if (HAS_DB_AGG) return;
         setLive(true);
         if (e.data.month) document.getElementById('monLabel').textContent = e.data.month;
         render(e.data.rows);

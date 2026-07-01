@@ -109,8 +109,12 @@
     td.pt-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
     td.pt-cell .sep { color: var(--muted); margin: 0 2px; }
 
-    /* 営業担当 */
+    /* 担当（営業＋ディレクターを上下2段に） */
     td.person { white-space: nowrap; }
+    td.person .dir-line { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+    /* 状況（募集＋アサインを上下2段に） */
+    td.status-cell .st-asgn { margin-top: 4px; }
 
     /* 状況 */
     td.status-cell { white-space: nowrap; }
@@ -134,6 +138,13 @@
     .detail-panel .d-label { font-size: 11px; font-weight: 700; color: var(--muted); }
     .detail-panel .checks { display: flex; gap: 12px; align-items: center; padding-top: 3px; }
     .detail-panel .checks label { font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+
+    /* 準備チェックの横に制作・記録（ロゴ/カメラ/事例記事/動画）を並べる */
+    .detail-panel .prep-pub { display: flex; gap: 14px 28px; align-items: flex-start; flex-wrap: wrap; padding-top: 3px; }
+    .detail-panel .pub-inline { display: flex; gap: 6px 16px; align-items: center; flex-wrap: wrap; }
+    .detail-panel .pub-inline .pub-cap { font-size: 11px; font-weight: 700; color: var(--muted); }
+    .detail-panel .pub-inline .pub-item { font-size: 12.5px; }
+    .detail-panel .pub-inline .pub-item .pub-k { color: var(--muted); margin-right: 4px; }
 
     /* 運営シート（スプレッドシート）リンク */
     .sheet-link {
@@ -352,11 +363,8 @@
               <th></th>
               <th>日程</th>
               <th>案件名</th>
-              <th>営業担当</th>
-              <th>ディレクター</th>
+              <th>担当</th>
               <th>集合・解散</th>
-              <th>参加者/チーム数</th>
-              <th>募集</th>
               <th>状況</th>
               <th>操作</th>
             </tr>
@@ -534,7 +542,7 @@
   }
 
   // ===== テーブル描画 =====
-  const COLSPAN = 10;
+  const COLSPAN = 7;
   const tbody = document.getElementById('projBody');
 
   GROUPS.forEach(g => {
@@ -613,12 +621,12 @@
           <div class="sub-info"><span class="fbadge ${formatClass(p.format)}">${p.format}</span></div>
           <div class="sub-info">${p.agency ? `${p.client}（${p.agency}）` : p.client}</div>
         </td>
-        <td class="person">${p.sales}</td>
-        <td class="person"><span id="dir-${p._i}">${p.director}</span></td>
+        <td class="person">
+          <div>${p.sales}</div>
+          <div class="dir-line">D：<span id="dir-${p._i}">${p.director}</span></div>
+        </td>
         <td class="time-cell">${p.meet}〜${p.leave}${evHtml}</td>
-        <td class="pt-cell">${p.guests}<span class="sep">/</span>${p.teams}${p.tentative ? '<span class="sep" style="color:var(--warn);font-weight:700;">仮</span>' : ''}</td>
-        <td class="recruit-cell">${recruitHtml}</td>
-        <td class="status-cell">${statusHtml}</td>
+        <td class="status-cell">${recruitHtml}<div class="st-asgn">${statusHtml}</div></td>
         <td class="ops" onclick="event.stopPropagation()">
           <a href="/project-assign?project=${encodeURIComponent(p.id)}">アサイン</a>
           <a href="/project-form?project=${encodeURIComponent(p.id)}">編集</a>
@@ -637,9 +645,9 @@
         ? `<div class="d-item"><span class="d-label">ケータリング</span><span style="font-weight:600;">${p.catering}</span></div>` : '';
       const PUB = [['ロゴ', p.logo], ['カメラ', p.camera], ['事例記事', p.article], ['動画', p.video]];
       const pubShown = PUB.filter(([k, v]) => v && !['', '-', '−'].includes(v));
-      const pubHtml = pubShown.length
-        ? `<div class="d-item"><span class="d-label">制作・記録</span>${pubShown.map(([k, v]) => `<div class="mini-field"><span class="mini-label" style="width:auto;margin-right:6px;">${k}</span><span style="font-weight:600;">${v}</span></div>`).join('')}</div>`
-        : '';
+      const pubInline = pubShown.length
+        ? pubShown.map(([k, v]) => `<span class="pub-item"><span class="pub-k">${k}</span><b>${v}</b></span>`).join('')
+        : '<span style="color:var(--muted);font-size:12px;">（指定なし）</span>';
       dr.innerHTML = `
         <td colspan="${COLSPAN}" onclick="event.stopPropagation()">
           <div class="detail-panel">
@@ -661,16 +669,23 @@
               <span style="font-weight:600;">${p.area ? p.area : '<span style=\"color:var(--muted);font-weight:400;\">（未設定）</span>'}</span>
             </div>
             <div class="d-item">
+              <span class="d-label">お客様人数・チーム数</span>
+              <span style="font-weight:600;">${p.guests}名${p.tentative ? '（仮）' : ''}<span style="color:var(--muted);margin:0 5px;">/</span>${p.teams}チーム</span>
+            </div>
+            <div class="d-item">
               <span class="d-label">移動・音響</span>
               <div class="mini-field"><span class="mini-label">移動</span>${selectHtml(TRANSPORTS, p.transport, 'transport', p._i)}</div>
               <div class="mini-field"><span class="mini-label">音響</span>${selectHtml(SOUND, p.sound, 'sound', p._i)}</div>
             </div>
-            <div class="d-item">
-              <span class="d-label">準備チェック</span>
-              <div class="checks">
-                <label><input type="checkbox" ${p.lineSent ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'lineSent', this.checked)"> LINE概要送付</label>
-                <label><input type="checkbox" ${p.handover ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'handover', this.checked)"> 引き継ぎ</label>
-                <label><input type="checkbox" ${p.script ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'script', this.checked)"> 台本</label>
+            <div class="d-item" style="flex-basis:100%;">
+              <span class="d-label">準備チェック・制作記録</span>
+              <div class="prep-pub">
+                <div class="checks">
+                  <label><input type="checkbox" ${p.lineSent ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'lineSent', this.checked)"> LINE概要送付</label>
+                  <label><input type="checkbox" ${p.handover ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'handover', this.checked)"> 引き継ぎ</label>
+                  <label><input type="checkbox" ${p.script ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'script', this.checked)"> 台本</label>
+                </div>
+                <div class="pub-inline"><span class="pub-cap">制作・記録</span>${pubInline}</div>
               </div>
             </div>
             <div class="d-item" style="flex-basis:100%;">
@@ -678,12 +693,11 @@
               <div class="note-text">${hasNote ? p.note : '<span style="color:var(--muted);">（なし）</span>'}</div>
             </div>
             ${cateringHtml}
-            ${pubHtml}
             <div class="d-item">
               <span class="d-label">運営シート</span>
               ${p.opSheet
-                ? `<a class="sheet-link" href="https://docs.google.com/spreadsheets/" target="_blank" onclick="event.stopPropagation()">📄 シートを開く</a>`
-                : `<a class="sheet-link create" href="#" onclick="event.stopPropagation(); event.preventDefault(); createSheet(${p._i}, this);">＋ 雛型シートを作成</a>`}
+                ? `<a class="sheet-link" href="${p.opSheet}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 シートを開く</a>`
+                : `<a class="sheet-link" href="/project-form?project=${encodeURIComponent(p.id)}" onclick="event.stopPropagation()" style="color:var(--muted);">＋ 編集画面でURLを登録</a>`}
             </div>
           </div>
         </td>`;

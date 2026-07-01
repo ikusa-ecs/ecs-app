@@ -118,6 +118,14 @@
     [data-need]:disabled { opacity: .6; }
     .contentBox-tbd { opacity: .6; }
 
+    /* 運動会のときの注意（種目を備考へ）＝赤太文字で目立たせる */
+    .undokai-note {
+      color: var(--danger); font-weight: 800; font-size: 14px; line-height: 1.6;
+      background: #fde8e8; border: 2px solid var(--danger); border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 14px;
+    }
+    .undokai-note u { text-underline-offset: 2px; }
+
     /* M-7 危険日ヒント（開催日の下） */
     .danger-hint { margin-top: 8px; font-size: 12.5px; line-height: 1.6; padding: 8px 11px; border-radius: 8px;
       background: var(--brand-soft); border: 1px solid var(--line); color: var(--muted); }
@@ -219,7 +227,7 @@
             <div id="dangerHint" class="danger-hint" style="display:none;"></div>
           </div>
           <div class="form-row non-arena">
-            <label>宿泊<span class="req-mark yellow">後で必要</span></label>
+            <label>宿泊<span class="req-mark yellow">必須</span></label>
             <select name="lodging" data-need="later">
               <option value="" selected>未定</option>
               <option>無</option>
@@ -244,6 +252,8 @@
               <label for="contentTbd">コンテンツ未定（まだ決まっていない）</label>
             </div>
             <div class="auto-hint" id="catNote" style="display:none;"></div>
+            <!-- コンテンツに「運動会」が含まれるときだけ出す注意（案件名のすぐ下にも表示） -->
+            <div id="undokaiNoteTop" class="undokai-note" style="display:none;margin-top:8px;">⚠ 運動会が選ばれています。<u>種目を備考に入力してください。</u></div>
           </div>
 
           <!-- 5. 案件規模 ｜ 営業担当 -->
@@ -258,12 +268,12 @@
           </div>
           <div class="form-row">
             <label>営業担当<span class="req-mark red">必須</span></label>
-            <input type="text" list="salesList" name="sales_owner" data-need="req" value="baba" placeholder="入力して検索／一覧になければそのまま入力">
-            <datalist id="salesList">
-              <option>baba</option>
-              <option>onuma</option>
-            </datalist>
-            <div class="hint">社員マスタから選びます（既定はログイン中の社員）。他拠点のセールスなど一覧にない方は、そのまま名前を入力できます。</div>
+            <select id="salesOwnerSel" name="sales_owner" data-need="req" onchange="onSalesChange()">
+              <option value="">（選択してください）</option>
+              <option value="__other__">その他（直接入力）</option>
+            </select>
+            <input type="text" id="salesOwnerOther" data-need="req" autocomplete="off" placeholder="社員名を入力" style="display:none;margin-top:8px;">
+            <div class="hint">社員マスタ（社員）から選びます。既定はログイン中の社員です。一覧にない方は「その他（直接入力）」を選ぶと手入力できます。</div>
           </div>
 
           <!-- 6. 実施形態 -->
@@ -364,7 +374,7 @@
 
           <!-- 7. クライアント ｜ 代理店名 -->
           <div class="form-row">
-            <label>クライアント（正式名称）<span class="req-mark yellow">後で必要</span></label>
+            <label>クライアント（正式名称）<span class="req-mark yellow">必須</span></label>
             <input type="text" id="client" name="client" data-need="later" placeholder="例）〇〇株式会社">
             <div class="hint">正式名称で記載ください。</div>
           </div>
@@ -458,8 +468,8 @@
           <div class="full">
             <div class="triple">
               <div class="form-row">
-                <label>集合時間（スタッフ）<span class="req-mark yellow">後で必要</span></label>
-                <input type="time" id="startTime" name="start_time" data-need="later" value="08:00" onchange="updateDuration()">
+                <label>集合時間（スタッフ）<span class="req-mark yellow">必須</span></label>
+                <input type="time" id="startTime" name="start_time" data-need="later" onchange="updateDuration()">
                 <div class="hint">移動時間を含む時間を記載ください。</div>
                 <div class="tbd-row">
                   <input type="checkbox" id="startTimeTbd" class="tbd-check" data-tbd-for="startTime">
@@ -467,8 +477,8 @@
                 </div>
               </div>
               <div class="form-row">
-                <label>解散時間（スタッフ）<span class="req-mark yellow">後で必要</span></label>
-                <input type="time" id="endTime" name="end_time" data-need="later" value="17:00" onchange="updateDuration()">
+                <label>解散時間（スタッフ）<span class="req-mark yellow">必須</span></label>
+                <input type="time" id="endTime" name="end_time" data-need="later" onchange="updateDuration()">
                 <div class="tbd-row">
                   <input type="checkbox" id="endTimeTbd" class="tbd-check" data-tbd-for="endTime">
                   <label for="endTimeTbd">未定</label>
@@ -486,15 +496,15 @@
             <div class="triple">
               <div class="form-row">
                 <label>イベント入場</label>
-                <input type="time" name="event_enter_time" value="09:30">
+                <input type="time" name="event_enter_time">
               </div>
               <div class="form-row">
                 <label>イベント開始</label>
-                <input type="time" name="event_start_time" value="10:00">
+                <input type="time" name="event_start_time">
               </div>
               <div class="form-row">
                 <label>イベント終了</label>
-                <input type="time" name="event_end_time" value="16:00">
+                <input type="time" name="event_end_time">
               </div>
             </div>
           </div>
@@ -503,8 +513,8 @@
           <div class="full">
             <div class="triple">
               <div class="form-row">
-                <label>運営人数<span class="req-mark yellow">後で必要</span></label>
-                <input type="number" id="requiredCount" name="required_count" data-need="later" value="16" min="1">
+                <label>運営人数<span class="req-mark yellow">必須</span></label>
+                <input type="number" id="requiredCount" name="required_count" data-need="later" min="1" placeholder="例）16">
                 <div class="check-row tbd-row" style="margin-top:8px;">
                   <input type="checkbox" id="countTentative" name="count_tentative" class="tbd-check" data-tbd-for="requiredCount">
                   <label for="countTentative">人数は仮（未定）</label>
@@ -512,7 +522,7 @@
                 <div class="hint">当日の運営に入る人数（＝アサインする人数）。</div>
               </div>
               <div class="form-row">
-                <label>お客様（参加者）の人数<span class="req-mark yellow">後で必要</span></label>
+                <label>お客様（参加者）の人数<span class="req-mark yellow">必須</span></label>
                 <input type="number" id="guestNum" name="guest_count" data-need="later" min="0" placeholder="例）120">
                 <div class="radio-row" style="margin-top:8px;flex-wrap:wrap;">
                   <label><input type="radio" name="guestCount" value="確定" checked> 確定</label>
@@ -525,7 +535,7 @@
                 <div class="hint">当日参加されるお客様の人数。スタッフの運営人数とは別です。</div>
               </div>
               <div class="form-row non-arena">
-                <label>チーム数<span class="req-mark yellow">後で必要</span></label>
+                <label>チーム数<span class="req-mark yellow">必須</span></label>
                 <input type="number" id="teamCount" name="team_count" data-need="later" min="0" placeholder="例）8">
                 <div class="check-row tbd-row" style="margin-top:8px;">
                   <input type="checkbox" id="teamTentative" name="team_tentative" class="tbd-check" data-tbd-for="teamCount">
@@ -602,11 +612,19 @@
             </div>
           </div>
 
+          <!-- 運営シートURL（運営用スプレッドシートのリンクを貼る） -->
+          <div class="full">
+            <div class="form-row">
+              <label>運営シートURL</label>
+              <input type="text" name="ops_sheet_url" placeholder="https://docs.google.com/spreadsheets/d/... を貼り付け">
+            </div>
+          </div>
+
           <!-- 場所（会場住所） ｜ 屋内/屋外 ｜ 集合形式（横3列） -->
           <div class="full">
             <div class="triple">
               <div class="form-row">
-                <label>会場住所<span class="req-mark yellow">後で必要</span></label>
+                <label>会場住所<span class="req-mark yellow">必須</span></label>
                 <input type="text" id="venue" name="location" data-need="later" placeholder="例）東京都江東区夢の島2-1-3 〇〇公園">
                 <div class="tbd-row">
                   <input type="checkbox" id="venueTbd" class="tbd-check" data-tbd-for="venue">
@@ -621,7 +639,7 @@
                 </div>
               </div>
               <div class="form-row non-arena">
-                <label>集合形式<span class="req-mark yellow">後で必要</span></label>
+                <label>集合形式<span class="req-mark yellow">必須</span></label>
                 <select name="assembly_type" data-need="later">
                   <option value="" selected>未定</option>
                   <option>会場現地</option>
@@ -686,6 +704,8 @@
       <!-- ===== 備考 ===== -->
       <div class="panel">
         <div class="sec-title">備考</div>
+        <!-- コンテンツに「運動会」が含まれるときだけ出す注意（種目を備考に書いてもらう） -->
+        <div id="undokaiNote" class="undokai-note" style="display:none;">⚠ 運動会が選ばれています。<u>種目を備考に入力してください。</u></div>
         <div class="form-row full" style="margin-bottom:0;">
           <label>メモ・連絡事項（任意）</label>
           <textarea rows="3" name="note" placeholder="例）持ち物：着替え・タオル　／　雨天時は△△へ変更"></textarea>
@@ -709,6 +729,8 @@
 <script>window.ECS_EDIT = @json($editProject ?? null);</script>
 {{-- 「紐づく本番案件」の選択肢＝本物の本番案件一覧（id と表示名）。 --}}
 <script>window.ECS_PARENTS = @json($parentProjects ?? []);</script>
+{{-- 営業担当プルダウンの選択肢＝社員（role=employee）の名前一覧。 --}}
+<script>window.ECS_SALES = @json($salesOwners ?? []);</script>
 <script src="/ecs/data/cases.js"></script>
 @verbatim
 <script>
@@ -803,6 +825,15 @@
       return '<span class="tag">' + c + '<b onclick="removeContent(' + i + ')">×</b></span>';
     }).join('');
     if (typeof refreshNeedById === 'function') refreshNeedById('contentBox'); // M-2 色更新
+    updateUndokaiNote(); // 「運動会」が含まれていれば備考の注意を出す
+  }
+  // コンテンツに「運動会」が含まれるとき、備考に「種目を入力」の注意を出す
+  function updateUndokaiNote() {
+    var hasUndokai = selectedContents.some(function (c) { return c.indexOf('運動会') !== -1; });
+    ['undokaiNote', 'undokaiNoteTop'].forEach(function (id) {
+      var note = document.getElementById(id);
+      if (note) note.style.display = hasUndokai ? '' : 'none';
+    });
   }
   function removeContent(i) { selectedContents.splice(i, 1); renderContentTags(); renderContentSuggest(); }
   function addContent(c) {
@@ -1049,13 +1080,14 @@
     setByName('audio_equipment', E.audio_equipment);
     setByName('transport', E.transport);
     setByName('note', E.note);
-    setByName('sales_owner', E.sales_owner);
+    // 営業担当は buildSalesOptions で扱うのでここでは触らない（プルダウン＋手入力のため）。
     setByName('yomi_expected', E.yomi_expected);
     setByName('agency', E.agency);
     setByName('pub_logo', E.pub_logo);
     setByName('pub_camera', E.pub_camera);
     setByName('pub_article', E.pub_article);
     setByName('pub_video', E.pub_video);
+    setByName('ops_sheet_url', E.ops_sheet_url);
 
     // --- ラジオ（値が一致するものを選ぶ）---
     const setRadio = function (name, v) {
@@ -1128,6 +1160,45 @@
       opt.textContent = p.label;
       sel.appendChild(opt);
     });
+  })();
+
+  // ===== 営業担当：プルダウン（社員一覧）＋「その他（直接入力）」で手入力も可 =====
+  // 「その他」を選ぶと手入力欄が出る。送信は選んだ方だけ name="sales_owner" になる。
+  function onSalesChange() {
+    const sel = document.getElementById('salesOwnerSel');
+    const other = document.getElementById('salesOwnerOther');
+    if (!sel || !other) return;
+    if (sel.value === '__other__') {
+      other.style.display = '';
+      other.setAttribute('name', 'sales_owner');
+      sel.removeAttribute('name');           // 送信は手入力欄の値だけにする
+      if (!other.value) other.focus();
+    } else {
+      other.style.display = 'none';
+      other.removeAttribute('name');
+      sel.setAttribute('name', 'sales_owner'); // 送信はプルダウンの値
+    }
+    if (typeof refreshAllNeed === 'function') refreshAllNeed();
+  }
+  // 社員一覧を「その他」の前に並べ、初期値（編集＝保存値／新規＝baba）を入れる。
+  (function buildSalesOptions() {
+    const sel = document.getElementById('salesOwnerSel');
+    if (!sel || !Array.isArray(window.ECS_SALES)) return;
+    const otherOpt = sel.querySelector('option[value="__other__"]');
+    window.ECS_SALES.forEach(function (n) {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.insertBefore(opt, otherOpt);       // 「その他（直接入力）」の前に社員を並べる
+    });
+    const init = window.ECS_EDIT ? (window.ECS_EDIT.sales_owner || '') : 'baba';
+    if (init && window.ECS_SALES.indexOf(init) !== -1) {
+      sel.value = init;                      // 一覧にいる人＝そのまま選択
+    } else if (init) {
+      sel.value = '__other__';               // 一覧に無い名前＝その他（手入力）へ
+      const other = document.getElementById('salesOwnerOther');
+      if (other) other.value = init;
+    }
+    onSalesChange();                         // 手入力欄の表示・name付け替えを反映
   })();
 
   applyEdit(); // 編集モードなら値を流し込む（新規は素通り）

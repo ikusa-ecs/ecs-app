@@ -174,6 +174,7 @@ class ProjectController extends Controller
                     'pub_camera'       => $p->pub_camera,
                     'pub_article'      => $p->pub_article,
                     'pub_video'        => $p->pub_video,
+                    'ops_sheet_url'    => $p->ops_sheet_url,
                     'note'             => $p->note,
                     'status'           => $p->status,
                 ];
@@ -193,9 +194,19 @@ class ProjectController extends Controller
             ])
             ->values();
 
+        // 営業担当プルダウン用：社員（role=employee）の名前一覧（名前順）。
+        $salesOwners = Person::employees()
+            ->orderBy('name')
+            ->pluck('name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         return view('project_form', [
             'editProject'    => $editProject,
             'parentProjects' => $parentProjects,
+            'salesOwners'    => $salesOwners,
         ]);
     }
 
@@ -320,6 +331,7 @@ class ProjectController extends Controller
             'pub_camera' => $request->input('pub_camera'),
             'pub_article' => $request->input('pub_article'),
             'pub_video' => $request->input('pub_video'),
+            'ops_sheet_url' => $request->input('ops_sheet_url'),
             'note' => $request->input('note'),
             // status はアサインの進み具合（上で編集／新規を考慮して決めた値）。
             'status' => $status,
