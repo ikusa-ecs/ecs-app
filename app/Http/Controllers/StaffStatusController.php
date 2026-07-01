@@ -28,6 +28,15 @@ class StaffStatusController extends Controller
 {
     public function index()
     {
+        return view('staff_status', ['status' => $this->buildStatus()]);
+    }
+
+    /**
+     * 稼働指標の一覧を組み立てて返す（スタッフ画面の「稼働状況」タブでも再利用する）。
+     * 画面（view）に依存しないので、他のコントローラからも呼べる。
+     */
+    public function buildStatus()
+    {
         $today = Carbon::today();
         $monthStart = Carbon::create(2026, 7, 1)->startOfDay();
         $monthEnd = Carbon::create(2026, 7, 31)->endOfDay();
@@ -97,7 +106,7 @@ class StaffStatusController extends Controller
                 ];
             })->values();
 
-        return view('staff_status', ['status' => $status]);
+        return $status;
     }
 
     /** 並んだ日付（Y-m-d昇順・重複なし）の中で最長の連続日数を返す。 */

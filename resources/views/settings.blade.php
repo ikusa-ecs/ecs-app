@@ -87,51 +87,7 @@
         </p>
       </div>
 
-      <!-- ② 通知設定 -->
-      <div class="panel settings-wrap" style="margin-top:20px;">
-        <div class="panel-head"><h2>通知設定</h2></div>
-        <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
-          システムから送る通知のオン・オフです（社員全員に適用されます）。
-        </p>
-
-        <div class="set-row">
-          <div>
-            <span class="set-label">新人の初回フォロー所感が共有されたとき</span>
-            <span class="set-note">新人が初めて入った案件で、イベプラが入力した所感のお知らせ（F-014）。</span>
-          </div>
-          <div class="set-control">
-            <label class="switch"><input type="checkbox" id="ntFollow"><span class="track"></span></label>
-          </div>
-        </div>
-
-        <div class="set-row">
-          <div>
-            <span class="set-label">案件のアサインが確定したとき</span>
-            <span class="set-note">案件のメンバーが確定したら、その案件の担当者へお知らせします。</span>
-          </div>
-          <div class="set-control">
-            <label class="switch"><input type="checkbox" id="ntAssign"><span class="track"></span></label>
-          </div>
-        </div>
-
-        <div class="set-row">
-          <div>
-            <span class="set-label">エントリー（応募）の締切が近いとき</span>
-            <span class="set-note">募集中の案件で、締切が近づいたらお知らせします。</span>
-          </div>
-          <div class="set-control">
-            <label class="switch"><input type="checkbox" id="ntDeadline"><span class="track"></span></label>
-          </div>
-        </div>
-
-        <div class="save-bar">
-          <button class="btn primary" onclick="saveNotify()">この内容で保存する</button>
-          <span class="saved-msg" id="ntSaved">✓ 保存しました</span>
-        </div>
-        <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
-          ※ 通知の届け方（メール／チャットワーク等）は今後決めます。今はオン・オフだけ保存します。
-        </p>
-      </div>
+      <!-- ② 通知設定は「個人ごとの設定」なので マイページ へ移動（2026-07-01 baba） -->
 
       <!-- ③ マスタ管理 -->
       <div class="panel settings-wrap" style="margin-top:20px;">
@@ -142,41 +98,44 @@
 
         <div class="set-row">
           <div>
-            <span class="set-label">拠点</span>
-            <span class="set-note">イベント東／東北／他拠点 など（現在 5件）</span>
+            <span class="set-label">拠点（事務所）</span>
+            <span class="set-note"><span id="mcOfficeEx">東京／大阪 など</span>（現在 <span id="mcOffice">-</span>件）</span>
           </div>
-          <div class="set-control"><button class="line-btn" onclick="alert('拠点マスタの管理画面を開きます（モックのためダミーです）。')">管理する</button></div>
+          <div class="set-control"><button class="line-btn" onclick="location.href='/masters#offices'">管理する</button></div>
         </div>
 
         <div class="set-row">
           <div>
             <span class="set-label">コンテンツ</span>
-            <span class="set-note">水合戦／運動会／縁日 など、案件名に使うコンテンツ（現在 12件）</span>
+            <span class="set-note">水合戦／運動会／縁日 など、案件名に使うコンテンツ（現在 <span id="mcContent">-</span>件）</span>
           </div>
-          <div class="set-control"><button class="line-btn" onclick="alert('コンテンツマスタの管理画面を開きます（モックのためダミーです）。')">管理する</button></div>
+          <div class="set-control"><button class="line-btn" onclick="location.href='/masters#contents'">管理する</button></div>
         </div>
 
         <div class="set-row">
           <div>
             <span class="set-label">ポジション（役割）</span>
-            <span class="set-note">D／SD／OP／MC／FC／CK／軍師・サポーター／受付／カメラマン／運営（現在 10件）</span>
+            <span class="set-note"><span id="mcPosEx">D／SD／OP／MC／FC／CK／軍師・サポーター／受付</span>（現在 <span id="mcPos">-</span>件）</span>
           </div>
-          <div class="set-control"><button class="line-btn" onclick="alert('ポジションマスタの管理画面を開きます（モックのためダミーです）。')">管理する</button></div>
+          <div class="set-control"><button class="line-btn" onclick="location.href='/masters#positions'">一覧を見る</button></div>
         </div>
 
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
-          ※ いまは入口だけのモックです。各マスタの追加・編集画面は今後作ります。
+          ※ コンテンツ・拠点は「管理する」から追加・編集・削除できます。ポジション（役割）はシステムの土台のため一覧表示のみです。
         </p>
       </div>
 @endverbatim
 @endsection
 
 @push('scripts')
+<script>
+  // マスタ件数（SettingsController が DB から数えた実データ）。
+  window.ECS_SETTINGS_COUNTS = @json($masterCounts ?? null);
+</script>
 @verbatim
 <script>
   // ===== 保存先のキー（このブラウザに記憶） =====
   const MTG_KEY    = 'ecs_emp_mtgdate';
-  const NOTIFY_KEY = 'ecs_emp_notify';
 
   // --- 「保存しました」を一定時間だけ表示 ---
   function flashSaved(id) {
@@ -197,26 +156,19 @@
     flashSaved('mtgSaved');
   }
 
-  // --- ③ 通知設定 ---
-  const NOTIFY_IDS = ['ntFollow', 'ntAssign', 'ntDeadline'];
-  function loadNotify() {
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}'); } catch (e) {}
-    NOTIFY_IDS.forEach(id => {
-      // 既定はすべてオン。保存があればそれに従う
-      document.getElementById(id).checked = (id in saved) ? !!saved[id] : true;
-    });
-  }
-  function saveNotify() {
-    const sel = {};
-    NOTIFY_IDS.forEach(id => { sel[id] = document.getElementById(id).checked; });
-    try { localStorage.setItem(NOTIFY_KEY, JSON.stringify(sel)); } catch (e) {}
-    flashSaved('ntSaved');
+  // --- マスタ件数を DB の実データで表示（嘘の固定件数を置き換え）---
+  function fillMasterCounts() {
+    const mc = window.ECS_SETTINGS_COUNTS;
+    if (!mc) return;
+    const setText = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.textContent = v; };
+    if (mc.offices)   { setText('mcOffice', mc.offices.count);   setText('mcOfficeEx', mc.offices.examples); }
+    if (mc.contents)  { setText('mcContent', mc.contents.count); }
+    if (mc.positions) { setText('mcPos', mc.positions.count);    setText('mcPosEx', mc.positions.examples); }
   }
 
   // 初期表示
   loadMtgDate();
-  loadNotify();
+  fillMasterCounts();
 </script>
 @endverbatim
 @endpush

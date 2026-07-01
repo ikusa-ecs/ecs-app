@@ -163,4 +163,69 @@ class AssignmentController extends Controller
         return redirect('/project-assign?project=' . urlencode($project->id))
             ->with('status', "「{$project->project_name}」に {$n}名を「{$data['status']}」で保存しました（{$date}）。");
     }
+
+    /**
+     * エントリー一覧からの1人ぶんアサイン切替（A案）。
+     * 「月ごと」の表でセルをクリックしたときに呼ばれ、その案件×その人（×本番日）を
+     * assignments に1行だけ追加（assign）／削除（unassign）する。
+     * 上書き一括保存の save() とは違い、他の人のアサインには触らない（1セルだけ動かす）。
+     */
+    public function quickToggle(Request $request)
+    {
+        $data = $request->validate([
+            'project_id' => ['required', 'string'],
+            'staff_id' => ['required', 'string'],
+            'action' => ['required', 'in:assign,unassign'],
+            'role' => ['nullable', 'string'],
+            'status' => ['nullable', 'in:仮,確定'],
+        ]);
+
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        if (! $project->start_date) {
+            return response()->json(['ok' => false, 'message' => 'この案件は開催日が未設定です。先に案件登録で日付を入れてください。'], 422);
+        }
+
+        $date = $project->start_date->format('Y-m-d');
+        $sid = $data['staff_id'];
+
+        // 同じ案件×人×日は1行だけ（unique制約）。date は 'date' キャストで時刻付き保存になるため
+        // 取りこぼし防止に whereDate（日付部分だけ）で照合する（D決めの500対策と同じ考え方）。
+        $existing = Assignment::where('project_id', $project->id)
+            ->where('staff_id', $sid)
+            ->whereDate('date', $date)
+            ->first();
+
+        if ($data['action'] === 'assign') {
+            $role = AssignmentRole::isValid($data['role'] ?? null) ? $data['role'] : '';
+            $status = $data['status'] ?? '確定';
+            if ($existing) {
+                $existing->update([
+                    'status' => $status,
+                    'role' => $role !== '' ? $role : $existing->role,
+                ]);
+            } else {
+                Assignment::create([
+                    'project_id' => $project->id,
+                    'staff_id' => $sid,
+                    'date' => $date,
+                    'role' => $role,
+                    'status' => $status,
+                    'assigned_by' => null,          // 認証導入後に操作者を入れる
+                    'assigned_at' => Carbon::now(),
+                ]);
+            }
+
+            return response()->json(['ok' => true, 'assigned' => true, 'status' => $status]);
+        }
+
+        // unassign：その行を消す（応募＝applications はそのまま＝また〇に戻る）。
+        if ($existing) {
+            $existing->delete();
+        }
+
+        return response()->json(['ok' => true, 'assigned' => false, 'status' => null]);
+    }
 }

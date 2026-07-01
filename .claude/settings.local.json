@@ -98,7 +98,31 @@
       "mcp__claude_ai_Google_Drive__search_files",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "PowerShell(php -l app\\\\Http\\\\Controllers\\\\ProjectController.php; php artisan view:clear)"
+      "PowerShell(php -l app\\\\Http\\\\Controllers\\\\ProjectController.php; php artisan view:clear)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/)",
+      "Bash(php artisan *)",
+      "Bash(curl -s http://127.0.0.1:8000/settings)",
+      "Bash(curl -s http://127.0.0.1:8000/mypage)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/projects)",
+      "Bash(curl -s http://127.0.0.1:8000/projects)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8000/projects)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://127.0.0.1:8000/employee-availability\")",
+      "Bash(php -l app/Http/Controllers/MasterController.php)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/masters)",
+      "Bash(echo \"masters => $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/masters\\)\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/settings)",
+      "Bash(echo \"settings => $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/settings\\)\")",
+      "Bash(curl -s http://127.0.0.1:8000/masters)",
+      "Bash(curl *)",
+      "Bash(echo \"mypage-finance => $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/mypage-finance\\)\")",
+      "Bash(grep -c \"CHATWORK\" .env)",
+      "Bash(cat routes/console.php)",
+      "Bash(ls -la bootstrap/cache/)",
+      "Bash(grep -rn \"projects/catering\\\\|Route::fallback\\\\|Route::redirect\" routes/)",
+      "PowerShell(php artisan tinker --execute=\"foreach\\(\\\\App\\\\Models\\\\Content::orderBy\\('id'\\)->get\\(\\) as \\\\$c\\){ echo \\\\$c->id.'  '.\\\\$c->content_name.'  needs_paper='.\\(int\\)\\\\$c->needs_paper.PHP_EOL; }\")",
+      "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\877680e8-b4be-4522-a895-7d6b2903d3ff\\\\scratchpad\\\\paper_check.php\")",
+      "PowerShell(Get-Process *)",
+      "Bash(grep -o 'window.ECS_CASES = .\\\\{0,400\\\\}')"
     ]
   }
 }

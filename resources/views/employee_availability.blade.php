@@ -32,7 +32,7 @@
     .ea-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
     .ea-card h3 { margin: 0 0 4px; font-size: 15px; }
     .ea-card .sub { font-size: 12px; color: var(--muted); margin: 0 0 14px; line-height: 1.6; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; max-width: 640px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; max-width: 640px; margin: 0 auto; }
     .cal-grid .dow { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 4px; font-weight: 600; }
     .cal-grid .dow.sat { color: var(--brand); }
     .cal-grid .dow.sun { color: var(--danger); }
@@ -71,7 +71,7 @@
     .cell.weekday.off .st { color: #556683; font-size: 12px; }
     .cell.weekday.off .stsub { color: #6b7689; }
 
-    .ea-legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 14px 0 2px; font-size: 12px; color: #555; }
+    .ea-legend { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin: 14px 0 2px; font-size: 12px; color: #555; }
     .ea-legend span { display: inline-flex; align-items: center; gap: 6px; }
     .ea-legend i { width: 16px; height: 16px; border-radius: 5px; display: inline-block; border: 1px solid var(--line); }
     .lg-ok { background: var(--ok-soft); border-color: #bbe3c6 !important; }
@@ -97,6 +97,15 @@
     }
     .ea-save button:hover { background: var(--brand-dark); }
     .ea-saved { margin-left: 12px; color: #15803d; font-size: 13px; font-weight: 700; display: none; }
+
+    /* 常に見える「保存」ボタン（右下に浮く）＝下までスクロールしなくても押せる */
+    .ea-float-save {
+      position: fixed; right: 28px; bottom: 24px; z-index: 50;
+      background: var(--brand); color: #fff; border: none; border-radius: 999px;
+      padding: 14px 26px; font-size: 15px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0,0,0,.18);
+    }
+    .ea-float-save:hover { background: var(--brand-dark); }
 
     /* 全社員一覧テーブル */
     .ov-wrap { overflow-x: auto; }
@@ -130,11 +139,11 @@
 @section('content')
 @verbatim
       <div class="mock-note">
-        これは見た目確認用のモックです。入力内容は仮で、ブラウザ内（この端末）にだけ保存されます。<br>
         <b>社員が「イベントに入れる日」を月ごとに登録する画面です。</b>
         社員は普段は平日勤務で、イベントは主に<b>土日・祝日・長期休暇（お盆・正月）</b>に入るため、その日を
         <span style="color:#15803d;font-weight:700;">〇＝出勤可</span>／<span style="color:#b91c1c;font-weight:700;">×＝不可</span>／<span style="color:#b45309;font-weight:700;">△＝条件つき・未定</span>
-        で入力します。平日は「希望休（休みたい日）」を登録できます。
+        で入力します。平日は「希望休（休みたい日）」を登録できます。<br>
+        入力して<b>「保存」</b>を押すと内容は保存され、次に開いたときも同じ内容が表示されます。
       </div>
 
       <!-- タブ -->
@@ -183,6 +192,9 @@
             </div>
           </div>
         </div>
+
+        <!-- 常に見える保存ボタン（右下・下までスクロール不要） -->
+        <button class="ea-float-save" id="floatSave" onclick="saveMine()">💾 この月の内容を保存</button>
       </div>
 
       <!-- ===== タブ②：全社員の一覧 ===== -->
@@ -194,7 +206,7 @@
             <table class="ov-tbl" id="ovTbl"></table>
           </div>
           <p class="ov-note">
-            ※ 黄色い行が自分（baba さん）です。自分の行は「自分の入力」タブで入れた内容がそのまま反映されます。ほかの社員は仮の見本データです。<br>
+            ※ 黄色い行があなた自身の行です。自分の行は「自分の入力」タブで入れた内容がそのまま反映されます。ほかの社員は、出勤可能日を登録済みならその内容、未登録ならグレーの仮データを表示します。<br>
             ※ 一番下の「〇の人数」が少ない日（赤）は、イベントがあるのに出られる社員が少ない＝注意したい日です。
           </p>
         </div>
@@ -370,14 +382,17 @@
       })
       .then(r => r.json())
       .then(res => {
-        msg.textContent = res && res.ok ? '✓ 保存しました' : '保存に失敗しました';
+        const ok = !!(res && res.ok);
+        msg.textContent = ok ? '✓ 保存しました' : '保存に失敗しました';
         msg.style.display = 'inline';
+        flashFloat(ok);
       })
-      .catch(() => { msg.textContent = '保存に失敗しました（通信エラー）'; msg.style.display = 'inline'; });
+      .catch(() => { msg.textContent = '保存に失敗しました（通信エラー）'; msg.style.display = 'inline'; flashFloat(false); });
     } else {
       // モック（DBに社員が無い）：従来どおり端末内保存のみ。
       msg.textContent = '✓ 保存しました';
       msg.style.display = 'inline';
+      flashFloat(true);
     }
   }
 
@@ -522,7 +537,17 @@
     document.querySelectorAll('.ea-tab').forEach(t=> t.classList.toggle('active', t.dataset.pane===pane));
     document.getElementById('pane-mine').classList.toggle('show', pane==='mine');
     document.getElementById('pane-all').classList.toggle('show', pane==='all');
+    // 浮く保存ボタンは「自分の入力」タブでだけ出す（一覧タブは見るだけなので隠す）
+    document.getElementById('floatSave').style.display = (pane==='mine') ? 'block' : 'none';
     if (pane==='all') renderOverview();
+  }
+
+  // 浮く保存ボタンに保存結果を一瞬だけ表示（下までスクロールしなくても分かるように）
+  function flashFloat(ok){
+    const fb = document.getElementById('floatSave');
+    if (!fb) return;
+    fb.textContent = ok ? '✓ 保存しました' : '保存に失敗しました';
+    setTimeout(()=>{ fb.textContent = '💾 この月の内容を保存'; }, 1800);
   }
   function moveMonth(diff){
     cursor = new Date(cursor.getFullYear(), cursor.getMonth()+diff, 1);

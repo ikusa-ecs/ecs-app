@@ -28,6 +28,7 @@ class Project extends Model
             'is_recruiting' => 'boolean',
             'is_multi' => 'boolean',
             'is_outdoor' => 'boolean',
+            'is_toc' => 'boolean',
             'count_tentative' => 'boolean',
             'team_tentative' => 'boolean',
             'is_repeat' => 'boolean',

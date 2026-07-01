@@ -186,6 +186,16 @@
             <div class="auto-hint" id="addtlNote"></div>
           </div>
 
+          <!-- 1.5 toC -->
+          <div class="form-row full">
+            <label>toC</label>
+            <div class="check-row">
+              <input type="checkbox" id="isToc" name="is_toc">
+              <label for="isToc">toCの案件</label>
+            </div>
+            <div class="hint">toCの案件のときにチェックします。未チェック＝toB扱い。</div>
+          </div>
+
           <!-- 2. 確度（ヨミ） ｜ スタッフ募集（横並び） -->
           <div class="form-row">
             <label>確度（ヨミ）</label>
@@ -1120,6 +1130,7 @@
     // --- チェックボックス ---
     const setCheck = function (id, on) { const el = document.getElementById(id); if (el) el.checked = !!on; };
     setCheck('noRecruit', !E.is_recruiting);   // 募集する＝noRecruit外す
+    setCheck('isToc', E.is_toc);               // toC（一般消費者向け）
     setCheck('countTentative', E.count_tentative);
     setCheck('teamTentative', E.team_tentative);
     setCheck('isRepeat', E.is_repeat);

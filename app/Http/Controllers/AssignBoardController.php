@@ -29,11 +29,11 @@ class AssignBoardController extends Controller
     /** 役割キー → ボード表示用のポジション名（assignments.role の値に対応）。 */
     private const POS_LABELS = [
         'D' => 'D', 'SD' => 'SD', 'MC' => 'MC', 'OP' => 'OP',
-        'FC' => 'FC', 'CK' => 'CK', 'UKE' => '受付', 'GUN' => '軍師・サポーター',
+        'FC' => 'FC', 'SP' => 'SP', 'RP' => 'RP', 'ET' => 'ET',
     ];
 
     /** 主ポジションを選ぶ優先順（重要・経験者向けの役割を上に）。 */
-    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'GUN', 'FC', 'UKE', 'CK'];
+    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'FC', 'SP', 'RP', 'ET'];
 
     /** アサインボード（日別）/assign。案件＋割当メンバー＋希望者・稼働可・今月件数を DB から渡す。
      *  ?from=YYYY-MM-DD が来たら、その日を基準（先頭）に 3週間分を表示する（既定＝今日）。 */
@@ -294,10 +294,10 @@ class AssignBoardController extends Controller
 
         // 応募（applications）＝この案件に「エントリーする」を出した人。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
-        // 確定/仮アサイン（assignments・キャンセル除く）＝アサイン済みかの判定に使う。
+        // 確定/仮アサイン（assignments・キャンセル除く）＝アサイン済みかの判定に使う。status も取る。
         $assignedRows = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id']);
+            ->get(['project_id', 'staff_id', 'status']);
 
         $people = $this->peopleWithPos(
             $apps->pluck('staff_id')->merge($assignedRows->pluck('staff_id'))->unique()->all()
@@ -306,23 +306,38 @@ class AssignBoardController extends Controller
         $appsByProject = $apps->groupBy('project_id');
         $assignedByProject = $assignedRows->groupBy('project_id')
             ->map(fn ($rows) => $rows->pluck('staff_id')->unique()->all());
+        // 案件×人 → アサイン状態（'確定'/'仮'）。同じ人に複数行あれば確定を優先。
+        $statusByProject = $assignedRows->groupBy('project_id')->map(function ($rows) {
+            $map = [];
+            foreach ($rows as $r) {
+                if (! isset($map[$r->staff_id]) || $r->status === '確定') {
+                    $map[$r->staff_id] = $r->status;
+                }
+            }
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $people) {
+            return $map;
+        });
+
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $people) {
             $assignedIds = $assignedByProject->get($p->id, []);
+            $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
             $off = $this->offDays($p->start_date ?? $today, $today);
 
-            // 応募者リスト（applications → 表示用 {no, name, lv, pos, assigned}）。
+            // 応募者リスト（applications → 表示用 {no, name, lv, pos, assigned, status}）。
             $entrants = ($appsByProject->get($p->id) ?? collect())
                 ->pluck('staff_id')->unique()->values()
-                ->map(function ($sid, $i) use ($people, $assignedIds) {
+                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus) {
                     $person = $people->get($sid);
 
                     return [
                         'no' => $i + 1,
+                        'id' => $sid,                              // スタッフID（エントリー一覧からのアサイン保存に使う）
                         'name' => $person->name ?? $sid,
                         'lv' => $this->lvCode($person?->skill_level),
-                        'pos' => $this->primaryPos($person),
+                        'pos' => $this->primaryPos($person),       // 表示用ラベル
+                        'roleCode' => $this->primaryPosCode($person), // 保存用の役割コード（D/OP/…）
                         'assigned' => in_array($sid, $assignedIds, true),
+                        'status' => $assignedStatus[$sid] ?? null,   // '確定'/'仮'/null（未アサイン）
                     ];
                 })->all();
 
@@ -514,6 +529,29 @@ class AssignBoardController extends Controller
         }
 
         return self::POS_LABELS[$have[0]] ?? $have[0];
+    }
+
+    /**
+     * その人の主ポジションを「役割コード（D/OP/MC/…）」で返す。primaryPos の表示ラベルではなく
+     * assignments.role にそのまま入れられるコードが欲しい場面（エントリー一覧からのアサイン保存）で使う。
+     * できる役割が無ければ 'FC'。
+     */
+    private function primaryPosCode(?Person $person): string
+    {
+        if (! $person) {
+            return 'FC';
+        }
+        $have = $person->roleEligibilities->pluck('position')->all();
+        if (empty($have)) {
+            return 'FC';
+        }
+        foreach (self::POS_PRIORITY as $key) {
+            if (in_array($key, $have, true)) {
+                return $key;
+            }
+        }
+
+        return $have[0];
     }
 
     /** 開催日が今日から何日後か（過去はマイナス）。タイムゾーンに左右されない日数差。 */

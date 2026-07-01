@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\AssignmentRole;
 use Illuminate\Support\Carbon;
 
 /**
@@ -58,7 +59,7 @@ class PersonController extends Controller
                 // できるポジション → people.js と同じ {D:true, OP:false, ...} の形に戻す
                 $can = $p->roleEligibilities->pluck('position')->all();
                 $pos = [];
-                foreach (['D', 'OP', 'MC', 'FC', 'CK', 'GUN', 'UKE'] as $k) {
+                foreach (AssignmentRole::POSITIONS as $k) {
                     $pos[$k] = in_array($k, $can, true);
                 }
 
@@ -83,6 +84,9 @@ class PersonController extends Controller
             })
             ->values();
 
-        return view('staff', ['people' => $people]);
+        // 「稼働状況」タブぶんのデータ。計算は StaffStatusController に一本化して再利用する。
+        $status = app(StaffStatusController::class)->buildStatus();
+
+        return view('staff', ['people' => $people, 'status' => $status]);
     }
 }

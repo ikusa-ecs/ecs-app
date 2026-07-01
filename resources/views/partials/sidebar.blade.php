@@ -17,6 +17,7 @@
         <div class="ym-tree" id="ymTree"></div>
         <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>
         <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+        <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">⏰</span> 人数確定リマインド</a>
         <a href="#" onclick="(window.openAggWindow ? openAggWindow() : window.open('/projects-agg','ecs_agg','width=820,height=640')); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
       </div>
     </div>
@@ -34,12 +35,18 @@
       </div>
     </div>
 
+    <div class="nav-group" data-group="その他">
+      <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> その他</div>
+      <div class="group-items">
+        <a class="{{ ($active ?? '') === 'paper_stock' ? 'active' : '' }}" href="/paper-stock"><span class="nav-icon">📄</span> 謎解きの紙 在庫</a>
+      </div>
+    </div>
+
     <div class="nav-group" data-group="管理">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> 管理</div>
       <div class="group-items">
-        <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">☷</span> スタッフ管理</a>
+        <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">☷</span> スタッフ（名簿・稼働状況）</a>
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
-        <a class="{{ ($active ?? '') === 'staff_status' ? 'active' : '' }}" href="/staff-status"><span class="nav-icon">📊</span> 稼働状況</a>
         <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">⚙️</span> 共通設定</a>
       </div>
     </div>

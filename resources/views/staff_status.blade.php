@@ -52,7 +52,7 @@
         <div class="stat">
           <div class="label">今月のアサイン総数</div>
           <div class="value" id="cTotal">0</div>
-          <div class="sub">7月（モック）</div>
+          <div class="sub">2026年7月</div>
         </div>
         <div class="stat">
           <div class="label">平均稼働率</div>

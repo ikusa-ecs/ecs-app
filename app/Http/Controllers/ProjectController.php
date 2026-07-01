@@ -58,6 +58,7 @@ class ProjectController extends Controller
                 'meetPlace'  => $p->assembly_type ?? '',      // 集合形式。アサイン表書き出し用
                 'need'       => $p->required_count ?? '',      // 運営人数（必要人数）。アサイン表書き出し用
                 'category'   => $p->category ?? '',
+                'toc'        => (bool) $p->is_toc,     // toC（一般消費者向け）＝一覧の絞り込み用
                 'yomi'       => $p->yomi ?? '',
                 'format'     => $p->format ?? '',
                 'scale'      => $p->scale ?? '',
@@ -88,6 +89,7 @@ class ProjectController extends Controller
                 'note'       => $p->note ?? '',
                 // 開いた詳細で条件表示するための項目（第1弾）。
                 'catering'   => $p->catering ?? '',        // 「無し」以外のとき詳細に表示
+                'cateringNote' => $p->catering_note ?? '', // ケータリングの内容・時間・食数などのメモ
                 'agency'     => $p->agency ?? '',          // 代理店ありのとき「企業名（代理店名）」表示
                 'logo'       => $p->pub_logo ?? '',        // 「−」以外のとき詳細に表示
                 'camera'     => $p->pub_camera ?? '',
@@ -132,6 +134,7 @@ class ProjectController extends Controller
                     'id'               => $p->id,
                     'content_names'    => $contentNames,
                     'category'         => $p->category,
+                    'is_toc'           => (bool) $p->is_toc,
                     'yomi'             => $p->yomi,
                     'yomi_expected'    => $p->yomi_expected,
                     'scale'            => $p->scale,
@@ -286,6 +289,7 @@ class ProjectController extends Controller
             'project_name' => $projectName,
             'content_ids' => $contentIds,
             'category' => $request->input('addtl'),
+            'is_toc' => $request->has('is_toc'),   // toC（一般消費者向け）チェック
             'yomi' => $request->input('yomi'),
             'yomi_expected' => $request->input('yomi_expected'),
             'scale' => $request->input('scale'),
@@ -351,6 +355,31 @@ class ProjectController extends Controller
         }
 
         return redirect('/projects')->with('status', $message);
+    }
+
+    /**
+     * ケータリングの種類・メモを DB に保存する（案件一覧の詳細から・POST /projects/catering）。
+     * 公開ボードの時間保存と同じ「1項目だけ更新」のやり方。送られた項目だけ書き換える。
+     * catering ＝「無」や空なら実質「なし」。catering_note ＝内容・時間・食数などの自由メモ。
+     */
+    public function saveCatering(Request $request)
+    {
+        $data = $request->validate([
+            'id'            => ['required', 'string'],
+            'catering'      => ['sometimes', 'nullable', 'string', 'max:50'],
+            'catering_note' => ['sometimes', 'nullable', 'string', 'max:500'],
+        ]);
+
+        $project = Project::findOrFail($data['id']);
+        if ($request->has('catering')) {
+            $project->catering = trim((string) $request->input('catering')) ?: null;
+        }
+        if ($request->has('catering_note')) {
+            $project->catering_note = trim((string) $request->input('catering_note')) ?: null;
+        }
+        $project->save();
+
+        return response()->json(['ok' => true]);
     }
 
     /**

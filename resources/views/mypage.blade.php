@@ -40,6 +40,29 @@
     .role-tag.sd { background: #ede9fe; color: #6d28d9; }
     .role-tag.mc { background: #fde9d9; color: #b4530a; }
     .sub-loc { font-size: 11.5px; color: var(--muted); }
+
+    /* 案件の特徴バッジ（大型・前泊・予備日・リハ）＝リストでもひと目で分かるように */
+    .mtag {
+      display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px;
+      border-radius: 999px; margin-left: 4px; vertical-align: middle; white-space: nowrap;
+    }
+    .mtag.big  { background: #fde2e2; color: #b91c1c; }  /* 大型 */
+    .mtag.stay { background: #fdecd8; color: #b4530a; }  /* 前泊 */
+    .mtag.yobi { background: #e5e7eb; color: #374151; }  /* 予備日 */
+    .mtag.reha { background: #e0e7ff; color: #3730a3; }  /* リハ */
+
+    /* 密度アップ（1画面に多く表示）：表の余白と見出し周りを詰める */
+    .mp-wrap .tbl th, .mp-wrap .tbl td { padding: 5px 8px; font-size: 12.5px; }
+    .mp-wrap.panel { padding: 12px 14px; }
+    .sec-count { margin: 0 0 6px; }
+
+    /* 収支入力ボタン（アーカイブ・営業担当の操作列） */
+    .fin-btn {
+      background: #fff; color: #b4530a; border: 1px solid #f0c9a0;
+      border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+      font-family: inherit; white-space: nowrap;
+    }
+    .fin-btn:hover { background: #fdf0e2; }
     .cal-btn {
       background: #fff; color: var(--brand-dark); border: 1px solid var(--line);
       border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
@@ -112,6 +135,23 @@
     .line-btn.danger { color: var(--danger); border-color: #f0b9b9; }
     .line-btn.danger:hover { background: var(--danger-soft); }
 
+    /* 通知のオン・オフ トグル（設定画面から移設） */
+    .set-row .set-control { flex-shrink: 0; }
+    .switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; display: inline-block; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track {
+      position: absolute; inset: 0; background: #d8cfc0; border-radius: 999px;
+      transition: background .15s; cursor: pointer;
+    }
+    .switch .track::before {
+      content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px;
+      background: #fff; border-radius: 50%; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+    }
+    .switch input:checked + .track { background: var(--brand); }
+    .switch input:checked + .track::before { transform: translateX(20px); }
+    .save-bar { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+    .saved-msg { display: none; color: #2e7d32; font-weight: 700; font-size: 13px; }
+
     /* カレンダー一括登録モーダル */
     .cal-modal-bg {
       position: fixed; inset: 0; background: rgba(0,0,0,.4);
@@ -144,15 +184,15 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">これは見た目確認用のモックです。「baba さん」でログイン中という想定で、自分の案件を表示しています（データは仮の見本です）。</div>
+      <div class="mock-note">この画面は登録済みのデータ（DB）から、あなたの案件を表示しています。ログイン機能は準備中のため、今は社員「baba さん」を自分として表示中です（本番はログインした本人に切り替わります）。</div>
 
       <!-- プロフィール -->
       <div class="panel mp-wrap">
         <div class="prof-card">
-          <div class="prof-avatar">馬</div>
+          <div class="prof-avatar" id="profAvatar">馬</div>
           <div class="prof-main">
-            <div class="prof-name">baba さん <span class="dept plan">イベプラ</span></div>
-            <div class="prof-sub">所属：イベント東（東京）　／　baba@ikusa.co.jp</div>
+            <div class="prof-name"><span id="profName">baba</span> さん <span class="dept plan" id="profDept">イベプラ</span></div>
+            <div class="prof-sub"><span id="profEmail">baba@ikusa.co.jp</span></div>
           </div>
           <button class="line-btn" onclick="location.href='/mypage-finance'">💰 収支を入力する</button>
           <button class="line-btn" onclick="alert('プロフィール編集の画面を開きます（モックのためダミーです）。氏名・拠点・区分は社員名簿と連動する想定です。')">プロフィールを編集</button>
@@ -160,7 +200,7 @@
       </div>
 
       <!-- 月の絞り込み -->
-      <div class="panel mp-wrap" style="margin-top:20px;">
+      <div class="panel mp-wrap" style="margin-top:12px;">
         <div class="mp-filter">
           <label for="monthFilter">月で絞り込み：</label>
           <select id="monthFilter" onchange="render()"></select>
@@ -169,7 +209,7 @@
       </div>
 
       <!-- ① アサインされた案件 -->
-      <div class="panel mp-wrap" style="margin-top:20px;">
+      <div class="panel mp-wrap" style="margin-top:12px;">
         <div class="panel-head">
           <h2>アサインされた案件</h2>
           <div class="spacer"></div>
@@ -204,7 +244,7 @@
         <div class="arch-body" id="asgArch">
           <table class="tbl">
             <thead>
-              <tr><th>日程</th><th>案件名</th><th>自分のポジション</th><th>集合・解散</th><th>会場</th><th>状況</th></tr>
+              <tr><th>日程</th><th>案件名</th><th>自分のポジション</th><th>集合・解散</th><th>会場</th><th>状況</th><th>操作</th></tr>
             </thead>
             <tbody id="asgArchBody"></tbody>
           </table>
@@ -213,13 +253,13 @@
       </div>
 
       <!-- ② 営業担当の案件 -->
-      <div class="panel mp-wrap" style="margin-top:20px;">
+      <div class="panel mp-wrap" style="margin-top:12px;">
         <div class="panel-head"><h2>営業担当の案件</h2></div>
         <p class="sec-count">自分が営業担当（セールス）として登録した案件です。<span id="salCount"></span></p>
 
         <table class="tbl">
           <thead>
-            <tr><th>日程</th><th>案件名</th><th>ディレクター</th><th>集合・解散</th><th>会場</th><th>状況</th></tr>
+            <tr><th>日程</th><th>案件名</th><th>ディレクター</th><th>集合・解散</th><th>会場</th><th>状況</th><th>操作</th></tr>
           </thead>
           <tbody id="salBody"></tbody>
         </table>
@@ -229,7 +269,7 @@
         <div class="arch-body" id="salArch">
           <table class="tbl">
             <thead>
-              <tr><th>日程</th><th>案件名</th><th>ディレクター</th><th>集合・解散</th><th>会場</th><th>状況</th></tr>
+              <tr><th>日程</th><th>案件名</th><th>ディレクター</th><th>集合・解散</th><th>会場</th><th>状況</th><th>操作</th></tr>
             </thead>
             <tbody id="salArchBody"></tbody>
           </table>
@@ -238,11 +278,55 @@
       </div>
 
       <p class="muted" style="font-size:11.5px; margin:0 0 4px; max-width:960px;">
-        ※ 「アサインされた案件」は、本番ではログイン社員ごとの実際のアサインから自動表示します（モックでは baba さんの担当ぶんを仮に設定しています）。「営業担当」は案件の営業担当から自動で抽出しています。
+        ※ 「アサインされた案件」は、登録済みのアサイン（DB）から自動で表示しています。ログインは準備中のため、今は「baba さん」を自分として表示中です。「営業担当」も案件の営業担当から自動で抽出しています。
       </p>
 
+      <!-- 通知設定（個人ごと・設定画面から移設） -->
+      <div class="panel mp-wrap" style="margin-top:12px;">
+        <div class="panel-head"><h2>通知設定</h2></div>
+        <p class="sec-count">あなたへの通知のオン・オフです（この設定はあなた個人に適用されます）。</p>
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">新人の初回フォロー所感が共有されたとき</span>
+            <span class="set-note">新人が初めて入った案件で、イベプラが入力した所感のお知らせ（F-014）。</span>
+          </div>
+          <div class="set-control">
+            <label class="switch"><input type="checkbox" id="ntFollow"><span class="track"></span></label>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">案件のアサインが確定したとき</span>
+            <span class="set-note">あなたが関わる案件のメンバーが確定したらお知らせします。</span>
+          </div>
+          <div class="set-control">
+            <label class="switch"><input type="checkbox" id="ntAssign"><span class="track"></span></label>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">エントリー（応募）の締切が近いとき</span>
+            <span class="set-note">募集中の案件で、締切が近づいたらお知らせします。</span>
+          </div>
+          <div class="set-control">
+            <label class="switch"><input type="checkbox" id="ntDeadline"><span class="track"></span></label>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <button class="btn primary sm" onclick="saveNotify()">この内容で保存する</button>
+          <span class="saved-msg" id="ntSaved">✓ 保存しました</span>
+        </div>
+        <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
+          ※ 通知の届け方（メール／チャットワーク等）は今後決めます。今はオン・オフだけ記憶します。
+        </p>
+      </div>
+
       <!-- アカウント -->
-      <div class="panel mp-wrap" style="margin-top:20px;">
+      <div class="panel mp-wrap" style="margin-top:12px;">
         <div class="panel-head"><h2>アカウント</h2></div>
 
         <div class="set-row">
@@ -250,7 +334,7 @@
             <span class="set-label">ログイン中のメールアドレス</span>
             <span class="set-note">ログインに使うメールアドレスです。</span>
           </div>
-          <div><span class="acct-value">baba@ikusa.co.jp</span></div>
+          <div><span class="acct-value" id="acctEmail">baba@ikusa.co.jp</span></div>
         </div>
 
         <div class="set-row">
@@ -297,6 +381,8 @@
   window.ECS_ME = @json($me);
   window.MY_ASSIGN_DB = @json($myAssign);
   window.ECS_CASES_DB = @json($cases);
+  // 役割コード（D/SD/MC…）→ 表示ラベル（「D（ディレクター）」等）の正本。暗号表示を避けるため。
+  window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
   if (window.ECS_CASES_DB && window.ECS_CASES_DB.length) { window.ECS_CASES = window.ECS_CASES_DB; }
 </script>
 @verbatim
@@ -348,11 +434,31 @@
     const cls = status === '確定' ? 'ok' : (status === '調整中' ? 'blue' : 'amber');
     return '<span class="badge ' + cls + '">' + (status || '—') + '</span>';
   }
+  // 役割コード → 短い表示（「D（ディレクター）」→「D」）。括弧内の役割名は付けない（baba要望）。
+  // 軍師・サポーター／受付 は括弧が無いのでそのまま出る。
+  const ROLE_LABELS = window.ROLE_LABELS || {};
+  function roleLabel(code) { return (ROLE_LABELS[code] || code).replace(/（.*?）/g, ''); }
   function posTag(pos) {
     const cls = pos === 'SD' ? ' sd' : (pos === 'MC' ? ' mc' : '');
-    return '<span class="role-tag' + cls + '">' + pos + '</span>';
+    return '<span class="role-tag' + cls + '">' + roleLabel(pos) + '</span>';
   }
   function byId(id) { return (window.ECS_CASES || []).find(c => c.id === id); }
+
+  // 案件の特徴バッジ（大型・前泊・予備日・リハ）。リストの案件名の後ろに付ける。
+  function caseTags(c) {
+    let t = '';
+    if (c.scale === '大型') t += '<span class="mtag big">大型</span>';
+    if (c.dateType === '予備日') t += '<span class="mtag yobi">予備日</span>';
+    else if (c.dateType === 'リハ') t += '<span class="mtag reha">リハ</span>';
+    return t;
+  }
+  // 宿泊バッジ＝会社名の横に出す。前泊有／後泊あり／一部前泊有／前後泊あり など「無」以外はそのまま表示。
+  function lodgingTag(c) {
+    const lg = (c.lodging || '').trim();
+    return (lg && lg !== '無') ? '<span class="mtag stay">' + lg + '</span>' : '';
+  }
+  // アーカイブ／営業担当の案件をクリック → 収支入力画面へ（その案件を選んだ状態で開く）
+  function goFinance(id) { location.href = '/mypage-finance?case=' + encodeURIComponent(id); }
 
   // データの組み立て
   function assignedCases() {
@@ -377,27 +483,30 @@
 
   // 行HTML（アサイン用：自分のポジション列あり）
   function asgRow(c, isArch) {
-    const cal = isArch ? ''
-      : '<td><button class="cal-btn" onclick="addCal(\'' + c.id + '\')">📅 登録</button></td>';
+    // 操作列：これからの案件は「📅登録」、終了案件（アーカイブ）は「💰収支入力」
+    const actBtn = isArch
+      ? '<button class="fin-btn" onclick="goFinance(\'' + c.id + '\')">💰 収支入力</button>'
+      : '<button class="cal-btn" onclick="addCal(\'' + c.id + '\')">📅 登録</button>';
     return '<tr>' +
       '<td>' + fmtDate(c.off) + '</td>' +
-      '<td><strong>' + c.name + '</strong><br><span class="sub-loc">' + c.client + '</span></td>' +
+      '<td><strong>' + c.name + '</strong>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
       '<td>' + posTag(c.myPos) + '</td>' +
       '<td>' + (c.meet || '—') + '〜' + (c.leave || '—') + '</td>' +
       '<td>' + (c.placeShort || '—') + '</td>' +
       '<td>' + statusBadge(c.status) + '</td>' +
-      (isArch ? '' : cal) +
+      '<td>' + actBtn + '</td>' +
     '</tr>';
   }
-  // 行HTML（営業用：ディレクター列）
+  // 行HTML（営業用：ディレクター列）。操作列に「収支入力」ボタン。
   function salRow(c) {
     return '<tr>' +
       '<td>' + fmtDate(c.off) + '</td>' +
-      '<td><strong>' + c.name + '</strong><br><span class="sub-loc">' + c.client + '</span></td>' +
+      '<td><strong>' + c.name + '</strong>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
       '<td>' + (c.dir || '—') + '</td>' +
       '<td>' + (c.meet || '—') + '〜' + (c.leave || '—') + '</td>' +
       '<td>' + (c.placeShort || '—') + '</td>' +
       '<td>' + statusBadge(c.status) + '</td>' +
+      '<td><button class="fin-btn" onclick="goFinance(\'' + c.id + '\')">💰 収支入力</button></td>' +
     '</tr>';
   }
 
@@ -418,7 +527,7 @@
   // 案件1件 → Googleカレンダー予定追加URL
   function gcalUrl(c) {
     const d = dateOf(c.off);
-    const title = c.content + '（' + c.client + '）｜' + c.myPos;
+    const title = c.content + '（' + c.client + '）｜' + roleLabel(c.myPos);
     const loc = (c.place && c.place !== '（未定）') ? c.place : (c.placeShort || '');
     const hasTime = c.meet && c.leave && c.meet !== '—' && c.leave !== '—';
 
@@ -438,7 +547,7 @@
       '顧客名：' + c.client,
       '営業担当：' + (c.sales || '—'),
       'ディレクター：' + (c.dir || '—'),
-      '自分の役割：' + c.myPos,
+      '自分の役割：' + roleLabel(c.myPos),
       '集合〜解散：' + (c.meet || '—') + '〜' + (c.leave || '—') +
         (hasTime ? '（カレンダーの時間は前後1時間の移動枠を含みます）' : '（時間未定のため終日で登録）')
     ];
@@ -465,7 +574,7 @@
           '<div class="bulk-row">' +
             '<span class="bulk-date">' + fmtDate(c.off) + '</span>' +
             '<span class="bulk-name"><strong>' + c.content + '</strong>（' + c.client + '）' +
-              '<br><span class="sub-loc">' + c.myPos + ' / ' + (c.placeShort || '—') + '</span></span>' +
+              '<br><span class="sub-loc">' + roleLabel(c.myPos) + ' / ' + (c.placeShort || '—') + '</span></span>' +
             '<a class="cal-btn" href="' + gcalUrl(c).replace(/&/g, '&amp;') + '" target="_blank" rel="noopener">📅 登録</a>' +
           '</div>'
         ).join('')
@@ -528,7 +637,7 @@
         evs.map(c =>
           '<button class="mp-ev" onclick="addCal(\'' + c.id + '\')" title="クリックでGoogleカレンダー登録">' +
             '<span class="ev-name">' + (c.content || c.name) + '</span>' +
-            '<span class="ev-pos">' + c.myPos + (c.placeShort ? ' / ' + c.placeShort : '') + '</span>' +
+            '<span class="ev-pos">' + roleLabel(c.myPos) + (c.placeShort ? ' / ' + c.placeShort : '') + '</span>' +
           '</button>'
         ).join('') +
       '</div>';
@@ -588,6 +697,40 @@
     if (confirm('ログアウトします。よろしいですか？')) location.href = '/';
   }
 
+  // ログイン中の社員（ECS_ME）を画面に反映。認証前は MyPageController が固定した「自分」。
+  function fillProfile() {
+    const me = window.ECS_ME || {};
+    const nm = me.name || 'baba';
+    const setText = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.textContent = v; };
+    setText('profName', nm);
+    setText('profDept', me.dept);
+    setText('profEmail', me.email);
+    setText('acctEmail', me.email);
+    const av = document.getElementById('profAvatar');
+    if (av && nm) av.textContent = Array.from(nm)[0];
+  }
+
+  // 通知設定（個人ごと・このブラウザに記憶。本番はサーバ保存＝MTG後）
+  const NOTIFY_KEY = 'ecs_emp_notify';
+  const NOTIFY_IDS = ['ntFollow', 'ntAssign', 'ntDeadline'];
+  function loadNotify() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}'); } catch (e) {}
+    NOTIFY_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.checked = (id in saved) ? !!saved[id] : true;   // 既定はすべてオン
+    });
+  }
+  function saveNotify() {
+    const sel = {};
+    NOTIFY_IDS.forEach(id => { const el = document.getElementById(id); if (el) sel[id] = el.checked; });
+    try { localStorage.setItem(NOTIFY_KEY, JSON.stringify(sel)); } catch (e) {}
+    const msg = document.getElementById('ntSaved');
+    if (msg) { msg.style.display = 'inline'; setTimeout(() => { msg.style.display = 'none'; }, 2500); }
+  }
+
+  fillProfile();
+  loadNotify();
   buildMonthOptions();
   render();
 </script>

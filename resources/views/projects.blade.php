@@ -8,6 +8,7 @@
      これまでの <script src="/ecs/data/cases.js"> の代わり。表示JSはそのまま動く。 --}}
 <script>
   window.ECS_CASES = @json($cases);
+  window.ECS_CSRF = '{{ csrf_token() }}';   // ケータリング等の保存に使う合言葉
 </script>
 @verbatim
 <style>
@@ -134,10 +135,11 @@
     /* ===== 詳細（折りたたみ）行 ===== */
     tr.detail-row > td { background: #faf6ee; padding: 10px 16px 11px; border-bottom: 1px solid var(--line); }
     .detail-panel { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: flex-start; }
-    .detail-panel .d-item { display: flex; flex-direction: column; gap: 4px; }
+    .detail-panel .d-item { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
     .detail-panel .d-label { font-size: 11px; font-weight: 700; color: var(--muted); }
     .detail-panel .checks { display: flex; gap: 12px; align-items: center; padding-top: 3px; }
     .detail-panel .checks label { font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+    .detail-panel .checks span { font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; }
 
     /* 準備チェックの横に制作・記録（ロゴ/カメラ/事例記事/動画）を並べる */
     .detail-panel .prep-pub { display: flex; gap: 14px 28px; align-items: flex-start; flex-wrap: wrap; padding-top: 3px; }
@@ -145,6 +147,18 @@
     .detail-panel .pub-inline .pub-cap { font-size: 11px; font-weight: 700; color: var(--muted); }
     .detail-panel .pub-inline .pub-item { font-size: 12.5px; }
     .detail-panel .pub-inline .pub-item .pub-k { color: var(--muted); margin-right: 4px; }
+
+    /* ケータリング：選べるプルダウン＋「無」以外のとき出るメモ欄 */
+    .detail-panel .pub-inline .cat-ctl { display: inline-flex; align-items: center; gap: 6px; }
+    .detail-panel .cat-select {
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      padding: 4px 6px; font-family: inherit; font-size: 12.5px; color: var(--ink); cursor: pointer;
+    }
+    .detail-panel .cat-note {
+      border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px;
+      font-family: inherit; font-size: 12.5px; min-width: 220px;
+    }
+    .detail-panel .cat-select:focus, .detail-panel .cat-note:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
 
     /* 運営シート（スプレッドシート）リンク */
     .sheet-link {
@@ -277,7 +291,7 @@
 <div class="mock-note" style="background:#e7f0e9; border-color:#cdeccf; color:#15803d;">✓ {{ session('status') }}</div>
 @endif
 @verbatim
-      <div class="mock-note">これは見た目確認用のモックです。案件・人数・担当者名はすべて仮の見本です。<b>各行をクリックすると下に開き</b>、物品担当・移動・音響・準備チェックなどを変更できます。<br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます（モックなので保存はされず、読み込み直すと元に戻ります）。</div>
+      <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（物品担当・移動・音響・準備チェック）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>いまはまだ保存されません</b>（次の工程で対応予定。読み込み直すと元に戻ります）。</div>
 
       <!-- 絞り込みバー -->
       <div class="panel">
@@ -307,22 +321,19 @@
             </select>
           </div>
           <div class="f-item">
-            <label>募集状態</label>
-            <select id="recruit" onchange="applyFilter()">
+            <label>toC / toB</label>
+            <select id="toc" onchange="applyFilter()">
               <option value="">すべて</option>
-              <option value="募集中">募集中</option>
-              <option value="募集前">募集前</option>
-              <option value="締切">締切</option>
-              <option value="なし">募集なし</option>
+              <option value="toc">toC</option>
+              <option value="tob">toB</option>
             </select>
           </div>
           <div class="f-item">
-            <label>アサイン状況</label>
-            <select id="status" onchange="applyFilter()">
+            <label>ケータリング</label>
+            <select id="catering" onchange="applyFilter()">
               <option value="">すべて</option>
-              <option value="未着手">未着手</option>
-              <option value="調整中">調整中</option>
-              <option value="確定">確定</option>
+              <option value="あり">あり</option>
+              <option value="なし">なし</option>
             </select>
           </div>
           <div class="f-item">
@@ -422,6 +433,10 @@
                       'IKUSAカー+レンタカー', '電車+IKUSAカー', '電車+レンタカー', '飛行機', '飛行機+レンタカー'];
   const SOUND = ['会場音響', 'クラシックプロ大', 'クラシックプロ中', 'クラシックプロ小', 'CUBE', 'SANWA', 'TOA', '不要'];
   const SDLIST = ['未設定', 'なし', '田中', '鈴木', '佐藤', '高橋', '山本'];   // サブディレクター（仮の見本）。未設定＝未記録／なし＝あえて付けない
+  // ケータリングの選択肢（案件登録フォームと同じ並び）。詳細で選べる。
+  const CATERING_OPTS = ['無', 'ケータリング', 'オードブル', 'お弁当', 'キッチンカー', 'BBQ', 'LH発注あり（格付け）', 'LH発注あり（ゴチ）', 'その他'];
+  // ケータリングが「あり」（＝無・空・なし系ではない）か
+  function isCateringOn(v) { return !!v && !['', '-', '−', '無', '無し', 'なし'].includes(String(v).trim()); }
 
   // ===== 案件一覧（共通リスト data/cases.js から作る）=====
   // 案件一覧は全案件を表示（過去・下書きも含む）。月グループ／フォルダで月またぎを見せる。
@@ -437,7 +452,8 @@
       offset:c.off, multi:(c.parentId != null) || isParent, tentative:!!c.tentative,
       area:c.area, catering:c.catering, agency:c.agency,
       logo:c.logo, camera:c.camera, article:c.article, video:c.video,
-      note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, scale:c.scale, sd:c.sd, id:c.id
+      note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, scale:c.scale, sd:c.sd, id:c.id,
+      toc:!!c.toc, cateringNote:c.cateringNote
     };
   });
   projects.forEach((p, i) => { p._i = i; });   // 編集・展開用に番号を保持
@@ -526,6 +542,27 @@
     if (field === 'director' || field === 'sd') pushAgg();
   }
 
+  // ===== ケータリング（選択＋メモ）をDBに保存 =====
+  // 「無」以外を選ぶと横にメモ欄を出す。プルダウン・メモを変えるたびに保存する。
+  function onCateringPick(id, sel) {
+    const wrap = sel.closest('.cat-ctl');
+    const note = wrap ? wrap.querySelector('.cat-note') : null;
+    if (note) note.style.display = isCateringOn(sel.value) ? '' : 'none';
+    saveCatering({ id: id, catering: sel.value });
+  }
+  function onCateringNote(id, inp) {
+    saveCatering({ id: id, catering_note: inp.value });
+  }
+  function saveCatering(payload) {
+    fetch('/projects/catering', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify(payload)
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); })
+    .catch(() => alert('ケータリングの保存に失敗しました。もう一度お試しください。'));
+  }
+
   // 運営シート（スプシ）の作成（モック）：押すと「作成済」になり「シートを開く」に切り替わる
   // ★連携ポイント：本番では、ここで「コンテンツごとの雛型ドライブを作成する既存スクリプト」を呼び出して
   //   作られたスプレッドシートのURLを opSheet に入れる（いまbabaさんが動かしているスクリプトと後でがっちゃんこする）。
@@ -609,6 +646,8 @@
       tr.dataset.format = p.format;
       tr.dataset.kbn    = kk;
       tr.dataset.recruit = rs;
+      tr.dataset.toc     = p.toc ? '1' : '0';
+      tr.dataset.catering = isCateringOn(p.catering) ? 'あり' : 'なし';
       tr.dataset.draft  = p.draft ? '1' : '0';
       tr.dataset.archived = p.archived ? '1' : '0';
       tr.setAttribute('onclick', `toggleDetail(${p._i})`);
@@ -641,28 +680,38 @@
       dr.dataset.group = g.key;
       dr.style.display = 'none';
       // 第1弾：詳細に条件表示する項目を組み立てる
-      const cateringHtml = (p.catering && !['', '-', '−', '無し', 'なし'].includes(p.catering))
-        ? `<div class="d-item"><span class="d-label">ケータリング</span><span style="font-weight:600;">${p.catering}</span></div>` : '';
+      // 制作・記録（ロゴ/カメラ/事例記事/動画）を横並びで出す。
       const PUB = [['ロゴ', p.logo], ['カメラ', p.camera], ['事例記事', p.article], ['動画', p.video]];
-      const pubShown = PUB.filter(([k, v]) => v && !['', '-', '−'].includes(v));
-      const pubInline = pubShown.length
-        ? pubShown.map(([k, v]) => `<span class="pub-item"><span class="pub-k">${k}</span><b>${v}</b></span>`).join('')
+      const inlineItems = PUB
+        .filter(([k, v]) => v && !['', '-', '−'].includes(v))
+        .map(([k, v]) => `<span class="pub-item"><span class="pub-k">${k}</span><b>${v}</b></span>`);
+      const pubInline = inlineItems.length
+        ? inlineItems.join('')
         : '<span style="color:var(--muted);font-size:12px;">（指定なし）</span>';
+      // ケータリングは動画の横に「選べるプルダウン」で出す。「無」以外を選ぶとメモ欄が現れる。変更はDB保存。
+      const catCur = (p.catering && p.catering !== '−' && p.catering !== '-') ? p.catering : '無';
+      const catOpts = CATERING_OPTS.map(o => `<option${o === catCur ? ' selected' : ''}>${o}</option>`).join('');
+      const catNoteVal = (p.cateringNote || '').replace(/"/g, '&quot;');
+      const cateringCtl = `<span class="pub-item cat-ctl">
+        <span class="pub-k">ケータリング</span>
+        <select class="cat-select" onchange="onCateringPick('${p.id}', this)">${catOpts}</select>
+        <input type="text" class="cat-note" placeholder="メモ（内容・時間・食数など）" value="${catNoteVal}" onchange="onCateringNote('${p.id}', this)"${isCateringOn(catCur) ? '' : ' style="display:none;"'}>
+      </span>`;
       dr.innerHTML = `
         <td colspan="${COLSPAN}" onclick="event.stopPropagation()">
           <div class="detail-panel">
             <div class="d-item">
               <span class="d-label">ディレクター</span>
-              ${selectHtml(DIRECTORS, p.director, 'director', p._i)}
+              <span style="font-weight:600;">${p.director}</span>
             </div>
             <div class="d-item">
               <span class="d-label">規模・SD担当</span>
               <div class="mini-field"><span class="mini-label">規模</span><span style="font-weight:600;">${p.scale}</span><span style="color:var(--muted);font-size:11px;margin-left:6px;">（案件登録で設定）</span></div>
-              <div class="mini-field"><span class="mini-label">SD</span>${selectHtml(SDLIST, p.sd, 'sd', p._i)}</div>
+              <div class="mini-field"><span class="mini-label">SD</span><span style="font-weight:600;">${p.sd}</span></div>
             </div>
             <div class="d-item">
               <span class="d-label">物品担当</span>
-              ${selectHtml(IVENTPLANNERS, p.goods, 'goods', p._i)}
+              <span style="font-weight:600;">${p.goods}</span>
             </div>
             <div class="d-item">
               <span class="d-label">運営場所</span>
@@ -674,30 +723,32 @@
             </div>
             <div class="d-item">
               <span class="d-label">移動・音響</span>
-              <div class="mini-field"><span class="mini-label">移動</span>${selectHtml(TRANSPORTS, p.transport, 'transport', p._i)}</div>
-              <div class="mini-field"><span class="mini-label">音響</span>${selectHtml(SOUND, p.sound, 'sound', p._i)}</div>
+              <div class="mini-field"><span class="mini-label">移動</span><span style="font-weight:600;">${p.transport && p.transport !== 'ー' ? p.transport : '（未設定）'}</span></div>
+              <div class="mini-field"><span class="mini-label">音響</span><span style="font-weight:600;">${p.sound || '（未設定）'}</span></div>
             </div>
             <div class="d-item" style="flex-basis:100%;">
               <span class="d-label">準備チェック・制作記録</span>
               <div class="prep-pub">
                 <div class="checks">
-                  <label><input type="checkbox" ${p.lineSent ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'lineSent', this.checked)"> LINE概要送付</label>
-                  <label><input type="checkbox" ${p.handover ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'handover', this.checked)"> 引き継ぎ</label>
-                  <label><input type="checkbox" ${p.script ? 'checked' : ''} onchange="onCellEdit(${p._i}, 'script', this.checked)"> 台本</label>
+                  <span>${p.lineSent ? '✅' : '⬜'} LINE概要送付</span>
+                  <span>${p.handover ? '✅' : '⬜'} 引き継ぎ</span>
+                  <span>${p.script ? '✅' : '⬜'} 台本</span>
                 </div>
-                <div class="pub-inline"><span class="pub-cap">制作・記録</span>${pubInline}</div>
+                <div class="pub-inline"><span class="pub-cap">制作・記録</span>${pubInline}${cateringCtl}</div>
               </div>
             </div>
             <div class="d-item" style="flex-basis:100%;">
               <span class="d-label">備考</span>
               <div class="note-text">${hasNote ? p.note : '<span style="color:var(--muted);">（なし）</span>'}</div>
             </div>
-            ${cateringHtml}
             <div class="d-item">
               <span class="d-label">運営シート</span>
               ${p.opSheet
                 ? `<a class="sheet-link" href="${p.opSheet}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 シートを開く</a>`
                 : `<a class="sheet-link" href="/project-form?project=${encodeURIComponent(p.id)}" onclick="event.stopPropagation()" style="color:var(--muted);">＋ 編集画面でURLを登録</a>`}
+            </div>
+            <div class="d-item" style="flex-basis:100%;">
+              <span style="font-size:11.5px;color:var(--muted);">※ この詳細は表示が中心です。<b>ケータリングだけ</b>はここで変更・メモを保存できます（自動保存）。担当・移動・音響・準備チェックの変更保存は次の工程で対応します。案件の内容を直すときは上の「編集」からどうぞ。</span>
             </div>
           </div>
         </td>`;
@@ -757,8 +808,8 @@
     const kw      = document.getElementById('kw').value.trim();
     const yomi    = document.getElementById('yomi').value;
     const format  = document.getElementById('format').value;
-    const recruit = document.getElementById('recruit').value;
-    const status  = document.getElementById('status').value;
+    const toc      = document.getElementById('toc').value;         // ''=すべて / 'toc' / 'tob'
+    const catering = document.getElementById('catering').value;    // ''=すべて / 'あり' / 'なし'
     const kbn     = document.getElementById('kbn').value;
 
     let shown = 0, total = 0, draftTotal = 0, archivedTotal = 0;
@@ -778,11 +829,11 @@
       const okKw  = !kw     || tr.dataset.name.includes(kw);
       const okYo  = !yomi   || tr.dataset.yomi === yomi;
       const okFmt = formatMatches(tr.dataset.format, format);
-      const okRc  = !recruit || tr.dataset.recruit === recruit;
-      const okSt  = !status  || tr.dataset.status === status;
+      const okToc = !toc    || (toc === 'toc' ? tr.dataset.toc === '1' : tr.dataset.toc === '0');
+      const okCat = !catering || tr.dataset.catering === catering;
       const okKbn = !kbn     || tr.dataset.kbn === kbn;
       // 絞り込みに一致するか（matched）と、その月が畳まれているか（collapsed）は別。
-      const matched = okTab && okKw && okYo && okFmt && okRc && okSt && okKbn;
+      const matched = okTab && okKw && okYo && okFmt && okToc && okCat && okKbn;
       const collapsed = collapsedMonths.has(tr.dataset.group);
       tr.style.display = (matched && !collapsed) ? '' : 'none';
       // 詳細はいったん閉じる
