@@ -76,6 +76,13 @@
       font-size: 14px; font-family: inherit; background: #fff;
     }
     .job-filter input { flex: 1; min-width: 150px; }
+    .job-filter input[type="date"] { flex: 0 0 auto; min-width: 0; }
+    .job-filter .jf-today {
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
+      font-size: 14px; font-family: inherit; background: #fff; color: var(--ink);
+      cursor: pointer; white-space: nowrap;
+    }
+    .job-filter .jf-today:active { background: var(--brand-soft); }
 
     /* 募集案件の並び（広い画面では自動で2列に／狭い画面では幅に合わせて1列に縮む） */
     .job-grid {
@@ -323,6 +330,8 @@
             <option value="open">募集中のみ</option>
             <option value="applied">エントリー中のみ</option>
           </select>
+          <input type="date" id="jobFrom" onchange="renderJobs()" title="この日以降の案件を表示します">
+          <button type="button" class="jf-today" onclick="setJobToday()">今日から</button>
         </div>
 
         <div class="sec-title" id="jobSecTitle">募集中の案件</div>
@@ -487,7 +496,8 @@
         id:c.id, content:c.content, client:c.client, place:c.place, meetPlace:c.meetPlace,
         area:c.area, format:c.fmt, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
-        deadline:(_dl.getMonth()+1) + '/' + _dl.getDate(),
+        // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。見本cases.jsのときは従来の簡易計算にフォールバック。
+        deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
         need:c.need, filled:c.filled, meet:c.meet, leave:c.leave,
         enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, offset:c.off,
         state:(c.filled >= c.need ? 'closed' : (c.state === 'adj' ? 'applied' : 'open')),
@@ -517,6 +527,8 @@
       const kw    = document.getElementById('jobKw').value.trim();
       const area  = document.getElementById('jobArea').value;
       const state = document.getElementById('jobState').value;
+      const fromStr = document.getElementById('jobFrom').value;
+      const fromDate = fromStr ? (function(){ const p = fromStr.split('-'); return new Date(+p[0], (+p[1]) - 1, +p[2]); })() : null;
       const grid  = document.getElementById('jobGrid');
       grid.innerHTML = '';
 
@@ -524,6 +536,7 @@
         .filter(j => !kw    || (j.content + j.client + j.place).includes(kw))
         .filter(j => !area  || j.area === area)
         .filter(j => !state || j.state === state)
+        .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
         .sort((a,b) => {
           const pa = anchorJob(a), pb = anchorJob(b);
           // 追加案件を先頭に
@@ -571,7 +584,7 @@
         let slotChip = '';
         if (j.state === 'closed' || remain === 0) slotChip = '<span class="chip full">満員</span>';
         else if (remain !== null)                 slotChip = `<span class="chip slots${remain <= 2 ? ' few' : ''}">あと${remain}名</span>`;
-        const deadlineChip = j.deadline ? `<span class="chip deadline">📅 締切 ${j.deadline}</span>` : '';
+        const deadlineChip = j.deadline ? `<span class="chip deadline" title="締切を過ぎても応募は受け付けます（目安の日付です）">📅 締切 ${j.deadline}</span>` : '';
 
         // コメントの保存内容（再描画でも消えないように保持）
         const cmt = commentState[j.id] || { text: '', open: false };
@@ -855,6 +868,11 @@
 
     loadProfile();
     renderPositions();
+
+    // 募集の「この日から」＝既定は今日。ボタンで今日に戻せる。
+    function ymd(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function setJobToday(){ document.getElementById('jobFrom').value = ymd(today); renderJobs(); }
+    document.getElementById('jobFrom').value = ymd(today);
 
     // 初期描画
     renderJobs();

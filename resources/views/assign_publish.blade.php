@@ -58,6 +58,7 @@
     td.date-cell .dow { font-size: 11.5px; color: var(--muted); margin-left: 2px; }
     td.date-cell .dow.sun { color: var(--danger); } td.date-cell .dow.sat { color: var(--brand); }
 
+    td.proj-cell { min-width: 190px; }
     td.proj-cell strong { font-size: 14px; }
     td.proj-cell .client { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
     td.proj-cell a.proj-link { color: var(--ink); text-decoration: none; }
@@ -99,6 +100,9 @@
     td.ops-cell a.detail-link { font-size: 12px; margin-left: 8px; white-space: nowrap; }
     td.ops-cell .note-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 9px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; color: var(--ink); }
     td.ops-cell .note-btn:hover { background: #f3ece0; }
+    td.ops-cell .cat-toggle { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 6px 9px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; color: var(--ink); }
+    td.ops-cell .cat-toggle:hover { background: #f3ece0; }
+    td.ops-cell .cat-toggle.is-extra { background: #fde8e8; color: #b91c1c; border-color: var(--danger); font-weight: 700; }
 
     /* 備考（折りたたみ行） */
     tr.note-row > td { background: #faf6ee; padding: 10px 16px 12px; border-bottom: 1px solid var(--line); }
@@ -176,6 +180,25 @@
         </div>
       </div>
 
+      <!-- 通常案件の一斉締切日（全体で1つ） -->
+      <div class="panel notice-edit">
+        <div class="panel-head">
+          <h2>🗓 通常案件の締切日（一斉）</h2>
+          <div class="spacer"></div>
+          <span class="muted" style="font-size:12px;">月まとめで公開した通常案件の締切として、スタッフ画面に表示されます</span>
+        </div>
+        <div class="row">
+          <input id="deadlineInput" type="date" style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+          <button class="btn primary" onclick="saveDeadline()">締切日を保存</button>
+          <button class="btn" onclick="clearDeadline()">未設定に戻す</button>
+          <span class="saved" id="deadlineSaved">✓ 保存しました（スタッフ画面に反映されます）</span>
+        </div>
+        <p class="muted" style="font-size:11.5px; margin:8px 0 0;">
+          ※ 締切は<b>表示だけ</b>です（過ぎても応募は受け付けます）。<br>
+          ※「追加」にした案件は、この日付ではなく<b>公開した日＋3日（土日なら月曜）</b>が自動で締切になります。
+        </p>
+      </div>
+
       <!-- サマリー＋一括操作 -->
       <div class="pub-bar">
         <div class="stat-mini"><span class="n on"  id="cntOn">0</span><span class="lbl">件 公開中</span></div>
@@ -184,6 +207,7 @@
         <span class="bulk-info">選択 <b id="checkCount">0</b> 件：</span>
         <button class="btn primary" onclick="bulkPublish(true)">まとめて公開</button>
         <button class="btn" onclick="bulkPublish(false)">まとめて非公開</button>
+        <button class="btn" onclick="bulkCategory(false)" title="チェックした案件の「追加」をまとめて外します">追加をまとめて外す</button>
         <select id="sortMode" onchange="render()" title="並び順を切り替えます">
           <option value="calendar">並び：カレンダー順（日付）</option>
           <option value="registered">並び：登録順（新しい順・追加が上）</option>
@@ -237,6 +261,7 @@
 <script>
   window.ECS_PUBLISH_CASES = @json($cases);
   window.ECS_STAFF_NOTICE = @json($notice);
+  window.ECS_ENTRY_DEADLINE = @json($entryDeadline ?? '');
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -317,6 +342,9 @@
     const t = (window.ECS_STAFF_NOTICE || '').trim();
     document.getElementById('noticeInput').value = t || DEFAULT_NOTICE;
   }
+  function loadDeadline(){
+    document.getElementById('deadlineInput').value = (window.ECS_ENTRY_DEADLINE || '').trim();
+  }
   function saveNotice(){
     persistNotice(document.getElementById('noticeInput').value.trim());
   }
@@ -387,6 +415,59 @@
     return `${c.gm}/${c.date.getDate()}<span class="dow ${cls}">(${DOW[dy]})</span>`;
   }
 
+  // ===== 追加案件バッジの手動オン/オフ（DBの category と extra_published_at を更新）=====
+  // 追加にすると「追加」バッジが付き、スタッフ画面の締切が「公開日＋3日（土日は月曜）」になる。
+  function toggleCategory(id){
+    const c = CASES.find(x => x.id === id);
+    if (!c) return;
+    const makeExtra = (c.category !== '追加案件');
+    const prev = c.category;
+    c.category = makeExtra ? '追加案件' : '通常案件';
+    render();
+    fetch('/assign-publish/category', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ id: id, is_extra: makeExtra })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); })
+    .catch(() => { c.category = prev; render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
+  }
+
+  // ===== 追加案件バッジを「まとめて」外す（チェックした案件が対象）=====
+  function bulkCategory(makeExtra){
+    if (checkedIds.size === 0){ alert('チェックボックスで案件を選んでください。'); return; }
+    const word = makeExtra ? '「追加案件」に' : '「追加」を';
+    if (!confirm(`選んだ ${checkedIds.size} 件の${word}まとめて${makeExtra ? 'します' : '外します'}。\n\nよろしいですか？`)) return;
+    const ids = Array.from(checkedIds);
+    const prev = {};
+    ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c){ prev[id] = c.category; c.category = makeExtra ? '追加案件' : '通常案件'; } });
+    checkedIds.clear();
+    render();
+    fetch('/assign-publish/category-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ ids: ids, is_extra: makeExtra })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); })
+    .catch(() => { ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c) c.category = prev[id]; }); render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
+  }
+
+  // ===== 通常案件の一斉締切日（全体で1つ・DBの settings に保存）=====
+  function saveDeadline(){
+    const v = (document.getElementById('deadlineInput').value || '').trim();
+    fetch('/assign-publish/deadline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ date: v || null })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('deadlineSaved'); })
+    .catch(() => alert('保存に失敗しました。通信を確認してもう一度お試しください。'));
+  }
+  function clearDeadline(){
+    document.getElementById('deadlineInput').value = '';
+    saveDeadline();
+  }
+
   // ===== 1案件の行（＋備考の折りたたみ行）を表に追加。カレンダー順・登録順の両方で使う =====
   function appendCaseRow(c){
     const pub = isPublished(c.id);
@@ -418,6 +499,7 @@
         ${pub
           ? `<button class="pub-toggle undo" onclick="toggle('${c.id}')">公開取消</button>`
           : `<button class="pub-toggle go" onclick="toggle('${c.id}')">公開する</button>`}
+        <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します">${extra ? '追加解除' : '＋追加'}</button>
         <a class="detail-link" href="/assign-detail?case=${c.id}">詳細 →</a>
         <button class="note-btn" onclick="toggleNote('${c.id}')">💬 備考</button>
       </td>`;
@@ -627,6 +709,7 @@
   window.addEventListener('focus', render);
 
   loadNotice();
+  loadDeadline();
   buildYmTree();
   render();
 </script>

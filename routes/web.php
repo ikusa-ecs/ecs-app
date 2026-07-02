@@ -87,6 +87,10 @@ Route::post('/assign-publish/set', [AssignPublishController::class, 'setPublish'
 // スタッフ向けの集合・解散時間／スタッフ画面のお知らせ文も DB に保存する。
 Route::post('/assign-publish/time', [AssignPublishController::class, 'setTime']);
 Route::post('/assign-publish/notice', [AssignPublishController::class, 'setNotice']);
+// 追加案件バッジの手動オン/オフ・通常案件の一斉締切日も DB に保存する。
+Route::post('/assign-publish/category', [AssignPublishController::class, 'setCategory']);
+Route::post('/assign-publish/category-bulk', [AssignPublishController::class, 'setCategoryBulk']);
+Route::post('/assign-publish/deadline', [AssignPublishController::class, 'setDeadline']);
 // 仮データの名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
 Route::get('/entries', [AssignBoardController::class, 'entries']);
 // エントリー一覧「月ごと」の表からの1人ぶんアサイン切替（A案）。assignments に追加/削除する。

@@ -25,6 +25,7 @@ class Project extends Model
             'base_locations' => 'array',
             'arena_options' => 'array',
             'start_date' => 'date',
+            'extra_published_at' => 'date',
             'is_recruiting' => 'boolean',
             'is_multi' => 'boolean',
             'is_outdoor' => 'boolean',

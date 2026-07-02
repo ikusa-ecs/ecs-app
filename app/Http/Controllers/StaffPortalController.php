@@ -83,7 +83,10 @@ class StaffPortalController extends Controller
 
         $contentNames = Content::pluck('content_name', 'id');
 
-        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames) {
+        // 通常案件の締切＝全体で1つの「一斉締切日」（settings）。追加案件は下の deadlineLabel で個別計算。
+        $bulkDeadline = trim((string) Setting::get('entry_deadline', ''));
+
+        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline) {
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
@@ -124,10 +127,44 @@ class StaffPortalController extends Controller
                 'evStart' => $p->event_start_time ?? '—',
                 'evEnd' => $p->event_end_time ?? '—',
                 'category' => $p->category ?? '通常案件',
+                'deadline' => $this->deadlineLabel($p, $bulkDeadline),
                 'recruit' => true,
                 'archived' => $off < 0,   // 過去のイベントは募集タブに出さない
                 'draft' => false,
             ];
         })->values();
+    }
+
+    /**
+     * スタッフ画面に出す「締切」の表示ラベル（例 "7/5"）。締切は表示だけ＝過ぎても応募は受け付ける。
+     *  - 通常案件＝全体で1つの一斉締切日（未設定なら空文字＝表示しない）。
+     *  - 追加案件＝公開した日（extra_published_at・無ければ登録日）＋3日。その日が土日なら月曜にずらす。
+     */
+    private function deadlineLabel(Project $p, string $bulkDeadline): string
+    {
+        if (($p->category ?? '通常案件') === '追加案件') {
+            $base = $p->extra_published_at ?? $p->created_at;
+            if (!$base) {
+                return '';
+            }
+            $d = Carbon::parse($base)->startOfDay()->addDays(3);
+            if ($d->isSaturday()) {
+                $d->addDays(2);   // 土曜 → 月曜
+            } elseif ($d->isSunday()) {
+                $d->addDay();     // 日曜 → 月曜
+            }
+
+            return $d->format('n/j');
+        }
+
+        // 通常案件＝一斉締切日（未設定なら空＝チップを出さない）。
+        if ($bulkDeadline === '') {
+            return '';
+        }
+        try {
+            return Carbon::parse($bulkDeadline)->format('n/j');
+        } catch (\Exception $e) {
+            return '';
+        }
     }
 }

@@ -58,6 +58,7 @@ class AssignPublishController extends Controller
         return view('assign_publish', [
             'cases'  => $cases,
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
+            'entryDeadline' => Setting::get('entry_deadline', ''), // 通常案件の一斉締切日（DB保存・空=未設定）
         ]);
     }
 
@@ -114,6 +115,80 @@ class AssignPublishController extends Controller
         ]);
 
         Setting::put('staff_notice', trim((string) ($data['notice'] ?? '')));
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 案件を「追加案件」にする／戻す（バッジの手動オン/オフ）。
+     * 受け取り：id（案件ID）＋ is_extra（true=追加案件・false=通常案件）。
+     * 追加にした時は「公開した日」extra_published_at を今日で記録（締切=公開日+3日の起点）。
+     * 通常に戻した時は extra_published_at を空（null）に戻す。
+     */
+    public function setCategory(Request $request)
+    {
+        $data = $request->validate([
+            'id'       => ['required', 'string'],
+            'is_extra' => ['required', 'boolean'],
+        ]);
+
+        $project = Project::findOrFail($data['id']);
+        if ($data['is_extra']) {
+            $project->category = '追加案件';
+            // すでに公開日があればそのまま（付け直しで締切がずれないように）、無ければ今日を記録。
+            if (empty($project->extra_published_at)) {
+                $project->extra_published_at = Carbon::today();
+            }
+        } else {
+            $project->category = '通常案件';
+            $project->extra_published_at = null;
+        }
+        $project->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 追加案件バッジを「まとめて」オン/オフする（チェックした複数案件が対象）。
+     * 受け取り：ids（案件IDの配列）＋ is_extra（true=追加案件・false=通常案件）。
+     * 1件版 setCategory と同じルール（追加ONで公開日を今日記録・OFFで null に戻す）。
+     */
+    public function setCategoryBulk(Request $request)
+    {
+        $data = $request->validate([
+            'ids'      => ['required', 'array', 'min:1'],
+            'ids.*'    => ['string'],
+            'is_extra' => ['required', 'boolean'],
+        ]);
+
+        $projects = Project::whereIn('id', $data['ids'])->get();
+        foreach ($projects as $project) {
+            if ($data['is_extra']) {
+                $project->category = '追加案件';
+                if (empty($project->extra_published_at)) {
+                    $project->extra_published_at = Carbon::today();
+                }
+            } else {
+                $project->category = '通常案件';
+                $project->extra_published_at = null;
+            }
+            $project->save();
+        }
+
+        return response()->json(['ok' => true, 'updated' => $projects->count()]);
+    }
+
+    /**
+     * 通常案件の「一斉の締切日」を DB に保存する（全体で1つ・空＝未設定に戻す）。
+     * 受け取り：date（YYYY-MM-DD もしくは空）。
+     */
+    public function setDeadline(Request $request)
+    {
+        $data = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        Setting::put('entry_deadline', $data['date'] ?? '');
 
         return response()->json(['ok' => true]);
     }
