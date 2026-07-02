@@ -57,6 +57,28 @@
     .staff-row.ng-hit > td { background: var(--danger-soft); }
     #ngWarn .ng-list { font-weight: 700; }
 
+    /* ポジション雛型（必要ポジション人数の枠） */
+    .pos-tpl { padding: 12px 16px; margin-top: 14px; }
+    .pos-tpl .ttl { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+    .pos-tpl .ttl .sub { color: var(--muted); font-weight: 400; font-size: 11.5px; margin-left: 6px; }
+    .pos-slots { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pos-slot {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px;
+      font-size: 12.5px; background: #fff;
+    }
+    .pos-slot .nm { font-weight: 700; }
+    .pos-slot .cnt { font-variant-numeric: tabular-nums; color: var(--muted); }
+    .pos-slot .cnt b { font-size: 13.5px; }
+    /* 過不足で色分け（不足=赤・ちょうど=緑・超過=橙） */
+    .pos-slot.under { border-color: var(--danger); background: var(--danger-soft); }
+    .pos-slot.under .cnt b { color: var(--danger); }
+    .pos-slot.exact { border-color: #86c99a; background: var(--ok-soft); }
+    .pos-slot.exact .cnt b { color: #15803d; }
+    .pos-slot.over  { border-color: #e8b877; background: #fdecd2; }
+    .pos-slot.over  .cnt b { color: #b45309; }
+    .pos-tpl .note { color: var(--muted); font-size: 12px; }
+
     /* 下部の保存バー（画面下に貼り付く） */
     .save-bar {
       position: sticky; bottom: 0; background: var(--panel); border: 1px solid var(--line);
@@ -111,6 +133,25 @@
         <div class="spacer"></div>
         <input type="text" id="staffSearch" placeholder="名前でしぼり込み" oninput="filterStaff()">
       </div>
+
+      {{-- ポジション雛型：コンテンツ×規模の必要人数から「枠」を出し、下で選ぶと現在数が動く --}}
+      @if (count($roleReq))
+        <div class="panel pos-tpl">
+          <div class="ttl">ポジション枠<span class="sub">コンテンツ×規模の必要人数（下で役割を選ぶと「現在」が動きます）</span></div>
+          <div class="pos-slots">
+            @foreach ($roleReq as $code => $need)
+              <span class="pos-slot" data-role="{{ $code }}" data-need="{{ $need }}">
+                <span class="nm">{{ $roleLabels[$code] ?? $code }}</span>
+                <span class="cnt"><b class="cur">{{ $roleAssigned[$code] ?? 0 }}</b> / {{ $need }}</span>
+              </span>
+            @endforeach
+          </div>
+        </div>
+      @else
+        <div class="panel pos-tpl">
+          <span class="note">このコンテンツ・規模の<b>ポジション別人数が未登録</b>のため、枠は表示していません。コンテンツマスタの「必要人数」で登録すると、ここに枠が出ます。</span>
+        </div>
+      @endif
 
       {{-- NGペア（相性が悪い2人）が両方チェックされたら警告（同席を止めはしない＝警告のみ） --}}
       <div class="alert danger" id="ngWarn" style="display:none; margin-bottom:12px;">
@@ -232,6 +273,24 @@
     }
     return pairs;
   }
+  // ポジション枠の「現在◯」を、チェック済みの人が選んでいる役割から数え直す。
+  function updatePositions() {
+    const counts = {};
+    checkedRows().forEach(tr => {
+      const sel = tr.querySelector('select.role-sel');
+      const r = sel ? sel.value : '';
+      if (r) counts[r] = (counts[r] || 0) + 1;
+    });
+    document.querySelectorAll('.pos-slot').forEach(slot => {
+      const role = slot.dataset.role;
+      const need = parseInt(slot.dataset.need || '0', 10);
+      const cur = counts[role] || 0;
+      const b = slot.querySelector('.cur');
+      if (b) b.textContent = cur;
+      slot.classList.remove('under', 'exact', 'over');
+      slot.classList.add(cur < need ? 'under' : (cur > need ? 'over' : 'exact'));
+    });
+  }
   function updateCount() {
     const n = selectedCount();
     const el = document.getElementById('selCount');
@@ -242,8 +301,13 @@
       wrap.classList.remove('under', 'exact', 'over');
       if (!isNaN(NEED)) wrap.classList.add(n < NEED ? 'under' : (n > NEED ? 'over' : 'exact'));
     }
-    ngPairs();   // NGペアの警告も更新
+    ngPairs();          // NGペアの警告も更新
+    updatePositions();  // ポジション枠の現在数も更新
   }
+  // 役割セレクトを変えたときも枠を数え直す（チェックはそのまま）。
+  document.querySelectorAll('select.role-sel').forEach(sel => {
+    sel.addEventListener('change', updatePositions);
+  });
   function filterStaff() {
     const q = document.getElementById('staffSearch').value.trim();
     document.querySelectorAll('.staff-row').forEach(tr => {

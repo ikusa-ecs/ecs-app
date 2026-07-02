@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Content;
+use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignmentRole;
@@ -102,6 +103,21 @@ class AssignmentController extends Controller
                 ->all();
         }
 
+        // ── ポジション雛型（コンテンツ×規模 → 必要ポジション人数）──
+        // マスタ（content_role_requirements）に人数が登録されていれば、D×1・MC×2… の「枠」を出す。
+        // 未登録なら空配列＝画面は従来どおり（全スタッフ一覧＋役割セレクト）で使える。
+        $roleReq = $this->positionTemplate($project);
+
+        // すでに役割つきで入っている人数を役割ごとに数える（枠の初期「現在◯」＝サーバ側の目安）。
+        // 画面側でチェック／役割を動かすとJSで即時に上書きされる。
+        $roleAssigned = [];
+        foreach ($existing as $info) {
+            $r = $info['role'] ?? '';
+            if ($r !== '' && ($info['status'] ?? '') !== 'キャンセル') {
+                $roleAssigned[$r] = ($roleAssigned[$r] ?? 0) + 1;
+            }
+        }
+
         return view('assignment', [
             'project' => $project,
             'contentName' => $contentName,
@@ -109,10 +125,51 @@ class AssignmentController extends Controller
             'staff' => $staff,
             'existing' => $existing,
             'roleLabels' => AssignmentRole::positionLabels(),
+            'roleReq' => $roleReq,
+            'roleAssigned' => $roleAssigned,
             'sameDay' => $sameDay,
             'monthCount' => $monthCount,
             'monthCap' => self::MONTH_CAP,
         ]);
+    }
+
+    /**
+     * この案件の「必要ポジション人数（雛型）」を返す＝[役割コード => 人数]。
+     *
+     * 元データは content_role_requirements（コンテンツ×規模×ポジション×人数）。
+     * 案件が複数コンテンツ（projects.content_ids は配列）なら、同じ規模の行を役割ごとに合計する。
+     * コンテンツ未指定・規模未設定・人数未登録のときは空配列（＝枠を出さず従来どおり）。
+     */
+    private function positionTemplate(Project $project): array
+    {
+        $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
+        $scale = $project->scale;
+        if (empty($contentIds) || ! $scale) {
+            return [];
+        }
+
+        $rows = ContentRoleRequirement::whereIn('content_id', $contentIds)
+            ->where('scale', $scale)
+            ->where('count', '>', 0)
+            ->get(['position', 'count']);
+
+        $sum = [];
+        foreach ($rows as $r) {
+            if (! AssignmentRole::isValid($r->position)) {
+                continue; // 表記ゆれ・未知コードは無視（正本 AssignmentRole に寄せる）
+            }
+            $sum[$r->position] = ($sum[$r->position] ?? 0) + (int) $r->count;
+        }
+
+        // 表示順は AssignmentRole の定義順（D→SD→OP→…）にそろえる。
+        $ordered = [];
+        foreach (array_keys(AssignmentRole::LABELS) as $code) {
+            if (! empty($sum[$code])) {
+                $ordered[$code] = $sum[$code];
+            }
+        }
+
+        return $ordered;
     }
 
     /** アサインを保存（いま選ばれている人で、その案件×その日を上書き）。 */
