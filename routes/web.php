@@ -7,6 +7,7 @@ use App\Http\Controllers\AssignDetailController;
 use App\Http\Controllers\AssignDirectorController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AssignPublishController;
+use App\Http\Controllers\AssignSheetController;
 use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\CountDeadlineReminderController;
 use App\Http\Controllers\DashboardController;
@@ -75,6 +76,8 @@ Route::post('/paper-stock/receipts', [PaperStockController::class, 'updateReceip
 Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
 
 // アサイン関連の画面（Blade化済み）
+// アサイン表（東京アサイン表そっくりの縦カード）。案件情報＋割り当てメンバーを1画面で見る。月を選んで表示。
+Route::get('/assign-sheet', [AssignSheetController::class, 'index']);
 // アサインダッシュボード＝担当者向けの状況まとめ。「アサインが必要な案件」だけ本物の案件から作る。
 Route::get('/assign-dashboard', [AssignDashboardController::class, 'index']);
 // 割当メンバーの仮データに使う名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
