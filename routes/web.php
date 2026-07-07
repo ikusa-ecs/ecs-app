@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AssignBoardController;
 use App\Http\Controllers\AssignDashboardController;
 use App\Http\Controllers\AssignDetailController;
@@ -22,14 +23,26 @@ use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StaffStatusController;
 use Illuminate\Support\Facades\Route;
 
-// トップページ＝ECSのログイン画面（Laravelが組み立てるBlade画面）
-Route::get('/', function () {
-    return view('login');
-});
-// 新規登録画面（スタッフ・社員ともにここから登録）
+// ── ログイン（Laravel標準機能・照合先は people 名簿）──
+// トップページ＝ログイン画面。未ログインでの保護画面アクセスもここへ戻る（name='login'）。
+Route::get('/', [AuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+// 新規登録画面（現状は見た目のみ。自己登録の扱いは Step 4 で確定＝管理者発行方針）
 Route::get('/register', function () {
     return view('register');
 });
+
+// ── ログイン済みなら誰でも見られる区画（スタッフ本人＋社員）──
+Route::middleware('auth')->group(function () {
+    // スタッフ画面（サイドバー無しの独自レイアウト）。スタッフ本人が使う・社員も閲覧できる。
+    Route::get('/staff-portal', [StaffPortalController::class, 'index']);
+});
+
+// ══════════════════════════════════════════════════════════════════
+// ここから下は「社員以上」だけ（スタッフは入れない＝自分のスタッフ画面へ戻される）。
+// ══════════════════════════════════════════════════════════════════
+Route::middleware(['auth', 'tier:employee'])->group(function () {
 
 // 社員側の画面（Blade化済み）
 // ダッシュボードは DB（projects テーブル）から読む。KPI・危険日カレンダーが本物の案件で動く。
@@ -108,9 +121,7 @@ Route::post('/employees/experience', [PersonController::class, 'saveExperience']
 // 旧URL・旧リンク（アサインダッシュボード等）から来ても迷子にならないよう /staff へ転送する。
 Route::get('/staff-status', fn () => redirect('/staff'));
 
-// スタッフ側の画面（Blade化済み・サイドバー無しの独自レイアウト）。
-// 「確定アサイン」と希望カレンダーの確定表示は DB（公開ON=staff_published）から作る。
-Route::get('/staff-portal', [StaffPortalController::class, 'index']);
+// （/staff-portal は上の「ログイン済みなら誰でも」区画へ移動＝スタッフも社員も見られる）
 
 // その他の画面（Blade化済み）
 // マイページ（S-015）。社員が自分の担当アサイン案件を assignments から読む。
@@ -118,8 +129,9 @@ Route::get('/staff-portal', [StaffPortalController::class, 'index']);
 Route::get('/mypage', [MyPageController::class, 'index']);
 // 収支入力。案件一覧を DB から出す（D または営業担当の案件が対象）。保存はMTG後。
 Route::get('/mypage-finance', [MyPageFinanceController::class, 'index']);
-// 設定画面。マスタ件数を DB の実データから数えて表示（保存はまだモック）。
+// 設定画面。マスタ件数を DB の実データから表示し、アサインMTG日の予定表を DB(settings) に保存する。
 Route::get('/settings', [SettingsController::class, 'index']);
+Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);
 
 // マスタ管理（コンテンツ・拠点＝追加/編集/削除、ポジション＝表示のみ）。
 Route::get('/masters', [MasterController::class, 'index']);
@@ -127,8 +139,10 @@ Route::post('/masters/contents', [MasterController::class, 'contentStore']);    
 Route::post('/masters/contents/bulk', [MasterController::class, 'contentBulkStore']);    // まとめて保存
 Route::get('/masters/contents/{id}/requirements', [MasterController::class, 'contentReqs']);    // 必要人数（規模×役割）
 Route::post('/masters/contents/{id}/requirements', [MasterController::class, 'contentReqsSave']);
-Route::post('/masters/contents/{id}/delete', [MasterController::class, 'contentDestroy']);
+Route::post('/masters/contents/{id}/delete', [MasterController::class, 'contentDestroy'])->middleware('tier:admin'); // 削除はAdministratorのみ
 Route::post('/masters/offices', [MasterController::class, 'officeStore']);               // 新規追加
 Route::post('/masters/offices/bulk', [MasterController::class, 'officeBulkStore']);      // まとめて保存
 Route::post('/masters/offices/{id}/{dir}/move', [MasterController::class, 'officeMove'])->where('dir', 'up|down'); // 上下並び替え
-Route::post('/masters/offices/{id}/delete', [MasterController::class, 'officeDestroy']);
+Route::post('/masters/offices/{id}/delete', [MasterController::class, 'officeDestroy'])->middleware('tier:admin'); // 削除はAdministratorのみ
+
+}); // ← ログイン必須グループ ここまで

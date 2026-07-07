@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Models\Person;
 
 return [
 
@@ -62,9 +62,10 @@ return [
     */
 
     'providers' => [
+        // ログインの照合先は people 名簿（Person モデル）。標準の users 表ではない。
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', User::class),
+            'model' => env('AUTH_MODEL', Person::class),
         ],
 
         // 'users' => [

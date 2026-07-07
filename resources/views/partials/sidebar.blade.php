@@ -52,9 +52,20 @@
     </div>
   </nav>
   <div class="userbox">
-    <strong>baba さん</strong>
-    社員
-    <div style="margin-top:8px;"><a href="/" style="color:#a08a73;">ログアウト</a></div>
+    @auth
+      @php
+        $permLabels = ['admin' => 'Administrator', 'manager' => '管理者', 'employee' => '社員', 'staff' => 'スタッフ'];
+        $u = Auth::user();
+      @endphp
+      <strong>{{ $u->name }} さん</strong>
+      {{ $permLabels[$u->permission] ?? '社員' }}
+      <div style="margin-top:8px;">
+        <form method="POST" action="/logout" style="margin:0;">
+          @csrf
+          <button type="submit" style="background:none; border:none; padding:0; color:#a08a73; cursor:pointer; font:inherit; text-decoration:underline;">ログアウト</button>
+        </form>
+      </div>
+    @endauth
   </div>
 </aside>
 <script>

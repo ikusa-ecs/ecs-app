@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // 権限4段階チェックを 'tier' という名前で使えるようにする（例：middleware('tier:employee')）。
+        $middleware->alias([
+            'tier' => \App\Http\Middleware\EnsureTier::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

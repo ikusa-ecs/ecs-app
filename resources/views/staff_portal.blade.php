@@ -859,10 +859,17 @@
   </script>
   @endverbatim
   <script>
-    // ログアウト → ログイン画面へ戻る（Blade版：きれいなURL「/」）
+    // ログアウト → 本物のログアウト（POST /logout）。CSRFトークン付きでフォーム送信する。
     function doLogout() {
       if (confirm('ログアウトします。よろしいですか？')) {
-        location.href = '/';
+        var f = document.createElement('form');
+        f.method = 'POST';
+        f.action = '/logout';
+        var t = document.createElement('input');
+        t.type = 'hidden'; t.name = '_token'; t.value = '{{ csrf_token() }}';
+        f.appendChild(t);
+        document.body.appendChild(f);
+        f.submit();
       }
     }
 

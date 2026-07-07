@@ -34,6 +34,8 @@ class DemoMyPageSeeder extends Seeder
             'hire_date' => '2020-04-01',
             'active' => true,
             'is_admin' => true,
+            'permission' => 'admin',       // Administrator（全権）
+            'password' => 'password',      // 開発用の仮パスワード（本番前に入れ替え・castで自動暗号化）
         ]);
 
         // ── ② baba のアサイン（案件ID → 自分のポジション）──

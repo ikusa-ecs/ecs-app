@@ -36,6 +36,8 @@ class PersonSeeder extends Seeder
                 'email' => strtolower($e['id']) . '@example.com',
                 'active' => true,
                 'is_admin' => false,
+                'permission' => 'employee',   // 社員
+                'password' => 'password',      // 開発用の仮パスワード（本番前に入れ替え・castで自動暗号化）
             ]));
         }
 
@@ -64,6 +66,8 @@ class PersonSeeder extends Seeder
                 'email' => strtolower($s['id']) . '@example.com',
                 'hire_date' => $s['hire_date'],
                 'active' => true,
+                'permission' => 'staff',      // スタッフ
+                'password' => 'password',      // 開発用の仮パスワード（本番前に入れ替え・castで自動暗号化）
                 'is_exclusive' => $s['is_exclusive'],
                 'monthly_cap' => 20,                       // 月上限は全員一律20（過重労働防止）
                 'experience_count' => $s['experience_count'],

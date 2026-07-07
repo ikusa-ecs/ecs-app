@@ -2,15 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * 利用者（社員・スタッフ共通）。テーブルは people。
  * role='employee'（社員）/ 'staff'（スタッフ）で区別する。
+ *
+ * ログインもこの people 名簿で行う（アカウントは users 表ではなくここに持たせる）。
+ * Authenticatable を実装＝この行のまま「ログインできる人」として扱える。
  */
-class Person extends Model
+class Person extends Model implements AuthenticatableContract
 {
+    use Authenticatable;
+
     protected $table = 'people';
 
     // ID は E-001 / S-001 のような文字列なので、自動採番しない。
@@ -19,9 +26,16 @@ class Person extends Model
 
     protected $guarded = [];
 
+    // 画面やJSONに出さない（パスワード等の秘密情報）
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
     protected function casts(): array
     {
         return [
+            'password' => 'hashed',   // 代入時に自動で暗号化（平文を保存しない）
             'hire_date' => 'date',
             'active' => 'boolean',
             'experienced_contents' => 'array',

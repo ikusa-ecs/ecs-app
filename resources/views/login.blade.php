@@ -25,19 +25,35 @@
   <div class="login-card">
     <div class="brand">ECS<small>スタッフアサイン管理</small></div>
     <h1>ログイン</h1>
-    <p class="lead">登録済みのメールアドレスにログイン用リンクをお送りします（パスワード不要）</p>
+    <p class="lead">登録済みのメールアドレスとパスワードでログインしてください。</p>
 
-    <div class="sent" id="sent">
-      ✉️ ログインリンクを送信しました（モックのため実際には送信されません）。<br>
-      下のボタンでアプリに入れます。
-    </div>
+    @if ($errors->any())
+      <div style="background:#fdecec; color:#b91c1c; border:1px solid #f3c0c0; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px;">
+        {{ $errors->first() }}
+      </div>
+    @endif
 
-    <div class="form-row">
-      <label>メールアドレス</label>
-      <input type="email" id="email" placeholder="you@example.com" value="baba@ikusa.co.jp">
-    </div>
+    <form method="POST" action="/login">
+      @csrf
 
-    <button class="btn primary" style="width:100%; justify-content:center;" onclick="sendLink()">ログインリンクを送る</button>
+      <div class="form-row">
+        <label>メールアドレス</label>
+        {{-- 開発中は既定値を入れておく（本番前に消す）。入力し直した値はエラー時も保持。 --}}
+        <input type="email" name="email" placeholder="you@example.com" value="{{ old('email', 'e-007@example.com') }}" required autofocus>
+      </div>
+
+      <div class="form-row">
+        <label>パスワード</label>
+        {{-- 開発中の仮パスワードを既定で入れておく（本番前に消す）。 --}}
+        <input type="password" name="password" placeholder="パスワード" value="password" required>
+      </div>
+
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin:2px 0 16px;">
+        <input type="checkbox" name="remember" value="1"> ログイン状態を保持する
+      </label>
+
+      <button class="btn primary" type="submit" style="width:100%; justify-content:center;">ログイン</button>
+    </form>
 
     <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line, #e6cdb8); text-align:center;">
       <p class="muted" style="font-size:12px; margin:0 0 8px;">まだ登録していない方（スタッフ・社員）は</p>
@@ -45,22 +61,26 @@
     </div>
 
     <div class="mock-entry">
-      <p class="mock-entry-label">モック用：ログイン後の画面を直接見る</p>
-      <a class="btn primary" href="/dashboard">🧑‍💼 社員として入る（ダッシュボード）</a>
-      <a class="btn ghost" href="/staff-portal">🙋 スタッフとして入る（スタッフ画面）</a>
+      <p class="mock-entry-label">開発用：ワンクリックで入る（自動ログイン・本番前に外します）</p>
+      {{-- 以前の「直接入れる」ボタンの復活版。今は全画面が保護されているので、
+           ただのリンクではなく裏で本物のログイン(POST /login)をしてから入る。 --}}
+      <form method="POST" action="/login" style="margin:0;">
+        @csrf
+        <input type="hidden" name="email" value="e-007@example.com">
+        <input type="hidden" name="password" value="password">
+        <button class="btn primary" type="submit" style="width:100%; justify-content:center;">🧑‍💼 社員として入る（baba）</button>
+      </form>
+      <form method="POST" action="/login" style="margin:0;">
+        @csrf
+        <input type="hidden" name="email" value="s-001@example.com">
+        <input type="hidden" name="password" value="password">
+        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る</button>
+      </form>
     </div>
 
-    <p class="muted" style="text-align:center; font-size:11.5px; margin-top:20px;">
-      スタッフ・社員ともにご自身で新規登録できます（種別を選んで登録）。<br>
-      これは見た目確認用のモックです。<br>
-      ※本番は、入力されたメールアドレスから社員かスタッフかを判定し、自動で行き先を分ける想定（方式は要検討）。
+    <p class="muted" style="text-align:center; font-size:11.5px; margin-top:16px;">
+      ※開発中：見本アカウントの仮パスワードは「password」です（本番前に必ず入れ替え、上の自動ログインも外します）。
     </p>
   </div>
-
-  <script>
-    function sendLink() {
-      document.getElementById('sent').style.display = 'block';
-    }
-  </script>
 </body>
 </html>
