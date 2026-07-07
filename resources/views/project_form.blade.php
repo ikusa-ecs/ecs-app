@@ -758,6 +758,8 @@
 <script>window.ECS_PARENTS = @json($parentProjects ?? []);</script>
 {{-- 営業担当プルダウンの選択肢＝社員（role=employee）の名前一覧。 --}}
 <script>window.ECS_SALES = @json($salesOwners ?? []);</script>
+{{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
+<script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
 <script src="/ecs/data/cases.js"></script>
 @verbatim
 <script>
@@ -818,20 +820,31 @@
   updateDuration(); // 初期表示
 
   // ===== 区分（通常／追加案件）：アサインMTG日を基準に自動判定＋手動修正 =====
-  const MTG_DATE = new Date('2026-06-02'); // 直近のアサインMTG日（モック。本来は設定で持つ値）
-  const MTG_LABEL = '6/2';
+  // アサインMTG日は共通設定（/settings）でDB保存された値を使う（window.ECS_ASSIGN_MTG_DATE）。
+  // 未設定（null）のときは自動判定せず、手動で選んでもらう。
+  const MTG_DATE = window.ECS_ASSIGN_MTG_DATE
+    ? new Date(window.ECS_ASSIGN_MTG_DATE + 'T00:00:00')
+    : null;
+  const MTG_LABEL = MTG_DATE ? ((MTG_DATE.getMonth() + 1) + '/' + MTG_DATE.getDate()) : '';
   let manualAddtl = false;
   function initAddtl() {
-    const today = new Date();
-    const isAddtl = today > MTG_DATE;
-    const target = document.querySelector('input[name="addtl"][value="' + (isAddtl ? '追加案件' : '通常案件') + '"]');
-    if (target) target.checked = true;
+    if (MTG_DATE) {
+      const today = new Date();
+      const isAddtl = today > MTG_DATE;
+      const target = document.querySelector('input[name="addtl"][value="' + (isAddtl ? '追加案件' : '通常案件') + '"]');
+      if (target) target.checked = true;
+    }
     updateAddtlNote();
   }
   function onAddtlChange() { manualAddtl = true; updateAddtlNote(); }
   function updateAddtlNote() {
-    const sel = document.querySelector('input[name="addtl"]:checked');
     const note = document.getElementById('addtlNote');
+    if (!note) return;
+    if (!MTG_DATE) {
+      note.innerHTML = 'アサインMTG日が<b>未設定</b>です（共通設定で登録できます）。区分は手動で選んでください。';
+      return;
+    }
+    const sel = document.querySelector('input[name="addtl"]:checked');
     if (!sel) return;
     const v = sel.value;
     if (manualAddtl) {

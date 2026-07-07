@@ -210,6 +210,9 @@ class ProjectController extends Controller
             'editProject'    => $editProject,
             'parentProjects' => $parentProjects,
             'salesOwners'    => $salesOwners,
+            // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
+            // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
+            'assignMtgDate'  => \App\Support\AssignMtg::current(),
         ]);
     }
 

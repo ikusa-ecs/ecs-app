@@ -52,38 +52,56 @@
     /* 保存ボタンと「保存しました」 */
     .save-bar { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
     .saved-msg { display: none; color: #2e7d32; font-weight: 700; font-size: 13px; }
+
+    /* ① アサインMTG日の予定表 */
+    .mtg-current { font-size: 13px; color: var(--ink); margin: 4px 0 12px; }
+    .mtg-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+    .mtg-empty { font-size: 12.5px; color: var(--muted); margin: 4px 0 12px; }
+    .mtg-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #f3ece0; border: 1px solid var(--line); border-radius: 999px;
+      padding: 6px 10px 6px 12px; font-size: 13px; font-weight: 600; color: var(--ink);
+    }
+    .mtg-chip.is-current { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .mtg-chip b.rm { cursor: pointer; font-weight: 700; opacity: .8; }
+    .mtg-chip b.rm:hover { opacity: 1; }
   </style>
 @endverbatim
 @endpush
 
 @section('content')
 @verbatim
-      <div class="mock-note">これは見た目確認用のモックです。ここはアサイン担当が触る「全員に効く設定」です。保存内容はこのブラウザにだけ記憶されます（本番ではサーバに保存します）。</div>
+      <div class="mock-note">ここはアサイン担当が触る「全員に効く設定」です。この画面の設定・マスタ件数はサーバ（DB）に保存され、全員・全画面に反映されます。</div>
 
-      <!-- ① 直近のアサインMTG日 -->
+      <!-- ① アサインMTG日の予定表 -->
       <div class="panel settings-wrap">
-        <div class="panel-head"><h2>直近のアサインMTG日</h2></div>
+        <div class="panel-head"><h2>アサインMTG日の予定表</h2></div>
         <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
-          ここで設定した日<strong>より後</strong>に登録された案件は、自動で「追加案件」として扱われます。
-          毎月のアサインMTGが終わったら、その日付に更新してください。
+          毎月のアサインMTGの日を、先の月ぶんもまとめて登録できます。システムは自動で
+          <strong>「今日までで一番新しいMTG日」</strong>を基準に使い、その日より後に登録された案件を「追加案件」として扱います（毎月手で直す必要はありません）。
         </p>
 
-        <div class="set-row">
+        <div class="mtg-current">現在の基準日：<b id="mtgCurrent">—</b></div>
+
+        <div id="mtgList" class="mtg-empty"><!-- JSで日付チップを描画 --></div>
+
+        <div class="set-row" style="border-bottom:none;">
           <div>
-            <span class="set-label">直近のアサインMTG開催日</span>
-            <span class="set-note">例：今月のMTGが 6/2 だった → 6/2 を設定</span>
+            <span class="set-label">MTG日を追加</span>
+            <span class="set-note">日付を選んで「追加」。来月・再来月ぶんも入れておけます。</span>
           </div>
-          <div class="set-control">
-            <input type="date" id="mtgDate" class="date-input">
+          <div class="set-control" style="display:flex; gap:8px;">
+            <input type="date" id="mtgAddDate" class="date-input">
+            <button class="line-btn" onclick="addMtgDate()">追加</button>
           </div>
         </div>
 
         <div class="save-bar">
-          <button class="btn primary" onclick="saveMtgDate()">この日付で保存する</button>
+          <button class="btn primary" onclick="saveMtgDates()">この予定表を保存する</button>
           <span class="saved-msg" id="mtgSaved">✓ 保存しました</span>
         </div>
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
-          ※ 現在のモックでは案件登録画面のMTG日は仮固定です。本番ではこの設定が案件登録の「追加案件」判定に使われます。
+          ※ 案件登録画面の「追加案件」自動判定に使われます。登録が無い／まだ最初のMTGが来ていないときは自動判定せず、登録時に手動で選びます。「追加」を押しただけでは保存されません。最後に「この予定表を保存する」を押してください。
         </p>
       </div>
 
@@ -131,12 +149,15 @@
 <script>
   // マスタ件数（SettingsController が DB から数えた実データ）。
   window.ECS_SETTINGS_COUNTS = @json($masterCounts ?? null);
+  // アサインMTG日の予定表（DB保存の一覧・昇順）。案件登録の「追加案件」自動判定に使う。
+  window.ECS_MTG_DATES = @json($assignMtgDates ?? []);
+  // 今日までで一番新しいMTG日＝現在の基準日（無ければ null）。
+  window.ECS_MTG_CURRENT = @json($assignMtgCurrent ?? null);
+  // 保存POST用のCSRFトークン。
+  window.ECS_CSRF = @json(csrf_token());
 </script>
 @verbatim
 <script>
-  // ===== 保存先のキー（このブラウザに記憶） =====
-  const MTG_KEY    = 'ecs_emp_mtgdate';
-
   // --- 「保存しました」を一定時間だけ表示 ---
   function flashSaved(id) {
     const el = document.getElementById(id);
@@ -144,16 +165,71 @@
     setTimeout(() => { el.style.display = 'none'; }, 2500);
   }
 
-  // --- ② 直近MTG日 ---
-  function loadMtgDate() {
-    const v = localStorage.getItem(MTG_KEY);
-    if (v) document.getElementById('mtgDate').value = v;
+  // --- ① アサインMTG日の予定表（DBに保存＝全員・全画面に効く）---
+  // 画面上の作業コピー。DB由来の一覧をコピーして持ち、追加/削除→最後にまとめて保存する。
+  let MTG_DATES = Array.isArray(window.ECS_MTG_DATES) ? window.ECS_MTG_DATES.slice() : [];
+
+  function todayStr() {                          // 端末の今日を 'YYYY-MM-DD' で
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   }
-  function saveMtgDate() {
-    const v = document.getElementById('mtgDate').value;
+  function mdLabel(iso) {                         // 'YYYY-MM-DD' → 'M/D'
+    const a = String(iso).split('-');
+    return a.length === 3 ? (Number(a[1]) + '/' + Number(a[2])) : iso;
+  }
+  function currentBase() {                        // 今日までで一番新しいMTG日（過ぎた中で最新）
+    const t = todayStr();
+    const past = MTG_DATES.filter(d => d <= t);
+    return past.length ? past[past.length - 1] : null;
+  }
+  function renderMtg() {
+    MTG_DATES.sort();
+    const cur = currentBase();
+    const curEl = document.getElementById('mtgCurrent');
+    if (curEl) curEl.textContent = cur
+      ? (mdLabel(cur) + '（この日より後の登録が追加案件）')
+      : '未設定（自動判定なし）';
+
+    const list = document.getElementById('mtgList');
+    if (!list) return;
+    if (!MTG_DATES.length) {
+      list.className = 'mtg-empty';
+      list.textContent = 'まだ登録がありません。下の欄から追加してください。';
+      return;
+    }
+    list.className = 'mtg-list';
+    list.innerHTML = MTG_DATES.map(function (d, i) {
+      const isCur = (d === cur);
+      return '<span class="mtg-chip' + (isCur ? ' is-current' : '') + '">' +
+             mdLabel(d) + (isCur ? '（基準）' : '') +
+             ' <b class="rm" onclick="removeMtgDate(' + i + ')">×</b></span>';
+    }).join('');
+  }
+  function addMtgDate() {
+    const el = document.getElementById('mtgAddDate');
+    const v = el.value;
     if (!v) { alert('日付を選んでください。'); return; }
-    try { localStorage.setItem(MTG_KEY, v); } catch (e) {}
-    flashSaved('mtgSaved');
+    if (MTG_DATES.indexOf(v) === -1) MTG_DATES.push(v);
+    el.value = '';
+    renderMtg();
+  }
+  function removeMtgDate(i) {
+    MTG_DATES.splice(i, 1);
+    renderMtg();
+  }
+  function saveMtgDates() {
+    fetch('/settings/mtg-dates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': window.ECS_CSRF,
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ dates: MTG_DATES }),
+    })
+      .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+      .then(res => { if (Array.isArray(res.dates)) MTG_DATES = res.dates; renderMtg(); flashSaved('mtgSaved'); })
+      .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
   }
 
   // --- マスタ件数を DB の実データで表示（嘘の固定件数を置き換え）---
@@ -167,7 +243,7 @@
   }
 
   // 初期表示
-  loadMtgDate();
+  renderMtg();
   fillMasterCounts();
 </script>
 @endverbatim
