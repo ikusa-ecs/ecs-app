@@ -120,6 +120,26 @@ a:hover { text-decoration: underline; }
 }
 .topbar h1 { font-size: 18px; margin: 0; }
 .topbar .spacer { flex: 1; }
+/* ☰ 左メニューの開閉ボタン */
+.nav-toggle {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: #6e5b49;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-toggle:hover { background: #efe7d7; color: #4f4338; }
+
+/* 「たたむ」＝左メニューを丸ごと隠して本文をフル幅に。もう一度☰で戻る。 */
+html.nav-collapsed .sidebar { display: none; }
 .topbar .role-pill {
   background: var(--brand-soft);
   color: var(--brand-dark);
