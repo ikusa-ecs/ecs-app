@@ -7,6 +7,7 @@
 ## 作業を始める前に、必ず下記を読むこと（設計の「正」はすべて共有Googleドライブ `ECS再開発2026_Claude開発` にある。コピーは作らない＝唯一の正。※2026-06-30にOneDriveからここへ移行）
 > 共有ドライブの実体パス＝`G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発`
 - `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\エンジニア引き継ぎ資料.md`   ← 全体の入口
+- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_開発の背景と注意点（引き継ぎメモ）.md`  ← **決定の背景・理由・事故りやすい罠（AIの記憶を人が読める形に写したもの）。担当が抜けても誰でも動けるように。まずこれを読む**
 - `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\作業リスト_共有.md`          ← 現在地・次にやること・設計の宿題
 - `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_設計書_v1.1.md`        ← 要件・データ設計の本体（正）
 - `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_図解_v1.1.md`          ← 図解（Mermaid）

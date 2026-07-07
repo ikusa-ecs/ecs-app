@@ -131,7 +131,30 @@
       "Bash(echo \"status: $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/project-import\\)\")",
       "Bash(kill %1)",
       "Bash(start \"\" \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\46ee2fc0-68fc-4f7e-9c4b-1280cc00c32d\\\\scratchpad\\\\badge_preview.html\")",
-      "Bash(echo \"status: $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/employees\\)\")"
+      "Bash(echo \"status: $\\(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/employees\\)\")",
+      "PowerShell(git ls-remote *)",
+      "PowerShell(git *)",
+      "Bash(git check-ignore *)",
+      "PowerShell(php -l app\\\\Http\\\\Controllers\\\\AssignmentController.php; php artisan view:clear)",
+      "PowerShell(php artisan tinker --execute=\"echo 'reqs='.\\\\App\\\\Models\\\\ContentRoleRequirement::count\\(\\).PHP_EOL; \\\\$p=\\\\App\\\\Models\\\\Project::whereNotNull\\('scale'\\)->first\\(\\); if\\(\\\\$p\\){ echo 'proj='.\\\\$p->id.' scale='.\\\\$p->scale.' contents='.json_encode\\(\\\\$p->content_ids\\).PHP_EOL; } else { echo 'no project with scale'.PHP_EOL; }\")",
+      "PowerShell($r = try { Invoke-WebRequest -Uri \"http://127.0.0.1:8000\" -TimeoutSec 3 -UseBasicParsing } catch { $null }; if \\($r\\) { \"already running \\(status $\\($r.StatusCode\\)\\)\" } else { \"not running - will start\" })",
+      "PowerShell(php artisan db:seed --class=ContentRoleRequirementSeeder --force)",
+      "Bash(composer --version)",
+      "Bash(npm -v)",
+      "Bash(git -C \"C:/Users/onuma/ecs_dev/ecs_laravel\" status --short)",
+      "Bash(git -C \"C:/Users/onuma/ecs_dev/ecs_laravel\" log --oneline -5)",
+      "Read(//g/.shortcut-targets-by-id/1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H/ECS再開発2026_Claude開発/**)",
+      "Read(//c/Users/onuma/**)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(xargs -n1 basename)",
+      "Bash(awk -F',' 'NR<=70{printf \"%d: %s | %s | %s | %s | %s\\\\n\", NR, $1,$2,$3,$4,$5}' \"【雛形】東京アサイン表 - 202605.csv\")",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq php*\")",
+      "Bash(pkill -f \"artisan serve --port=8009\")",
+      "Bash(netstat -ano)",
+      "PowerShell(php artisan tinker --execute=\"require 'C:/Users/onuma/AppData/Local/Temp/claude/C--Users-onuma-ecs-dev-ecs-laravel/95440498-af43-4810-84fe-d984297ecdf0/scratchpad/ecs_check.php';\")",
+      "PowerShell(php artisan tinker --execute=\"require 'C:/Users/onuma/AppData/Local/Temp/claude/C--Users-onuma-ecs-dev-ecs-laravel/95440498-af43-4810-84fe-d984297ecdf0/scratchpad/ecs_check.php';\" 2>&1 | Select-Object -First 8)",
+      "Bash(grep -nE \"^#{1,3} \" 作業リスト_共有.md)",
+      "Bash(git push *)"
     ]
   }
 }
