@@ -61,25 +61,25 @@
     </div>
 
     <div class="mock-entry">
-      <p class="mock-entry-label">開発用：ワンクリックで入る（自動ログイン・本番前に外します）</p>
-      {{-- 以前の「直接入れる」ボタンの復活版。今は全画面が保護されているので、
-           ただのリンクではなく裏で本物のログイン(POST /login)をしてから入る。 --}}
+      <p class="mock-entry-label">テスト用：ワンクリックで入る（DB不要・本番前に外します）</p>
+      {{-- DBを使わないテスト用アカウントで入る（App\Support\TestAccounts）。
+           DBが無い／未接続のテスト環境でも入れる。裏で本物のログイン(POST /login)をしてから入る。 --}}
       <form method="POST" action="/login" style="margin:0;">
         @csrf
-        <input type="hidden" name="email" value="e-007@example.com">
-        <input type="hidden" name="password" value="password">
-        <button class="btn primary" type="submit" style="width:100%; justify-content:center;">🧑‍💼 社員として入る（baba）</button>
+        <input type="hidden" name="email" value="test@ecs.local">
+        <input type="hidden" name="password" value="test">
+        <button class="btn primary" type="submit" style="width:100%; justify-content:center;">🧑‍💼 社員として入る（テスト・DB不要）</button>
       </form>
       <form method="POST" action="/login" style="margin:0;">
         @csrf
-        <input type="hidden" name="email" value="s-001@example.com">
-        <input type="hidden" name="password" value="password">
-        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る</button>
+        <input type="hidden" name="email" value="test-staff@ecs.local">
+        <input type="hidden" name="password" value="test">
+        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る（テスト・DB不要）</button>
       </form>
     </div>
 
     <p class="muted" style="text-align:center; font-size:11.5px; margin-top:16px;">
-      ※開発中：見本アカウントの仮パスワードは「password」です（本番前に必ず入れ替え、上の自動ログインも外します）。
+      ※テスト用：上のボタンはDBを使わず入れます（メール test@ecs.local ／ パスワード test）。本番前に無効化します（.env の ECS_TEST_LOGIN=false）。
     </p>
   </div>
 </body>

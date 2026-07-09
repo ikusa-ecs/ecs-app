@@ -63,8 +63,10 @@ return [
 
     'providers' => [
         // ログインの照合先は people 名簿（Person モデル）。標準の users 表ではない。
+        // driver='person'＝App\Auth\PersonUserProvider（Eloquent拡張）。
+        // 実在アカウントはDBで照合し、テスト用アカウントのときだけDBを見ずにログインできる。
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'person',
             'model' => env('AUTH_MODEL', Person::class),
         ],
 
