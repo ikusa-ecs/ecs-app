@@ -48,6 +48,9 @@
       <div class="group-items">
         <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">☷</span> スタッフ（名簿・稼働状況）</a>
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+        @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
+        <a class="{{ ($active ?? '') === 'person_import' ? 'active' : '' }}" href="/person-import"><span class="nav-icon">⬆</span> 名簿CSV取込</a>
+        @endif
         <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">⚙️</span> 共通設定</a>
       </div>
     </div>

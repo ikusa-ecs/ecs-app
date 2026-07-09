@@ -17,6 +17,7 @@ use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\MyPageFinanceController;
 use App\Http\Controllers\PaperStockController;
 use App\Http\Controllers\PersonController;
+use App\Http\Controllers\PersonImportController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\SettingsController;
@@ -61,6 +62,9 @@ Route::get('/project-import', function () {
 });
 // CSV一括取込の保存先（記入済みCSVを読んで projects に複数登録）。
 Route::post('/project-import', [ProjectController::class, 'import']);
+// 名簿（people）のCSV一括取込。アカウント作成に準じるため「管理者以上」に限定。
+Route::get('/person-import', [PersonImportController::class, 'show'])->middleware('tier:manager');
+Route::post('/person-import', [PersonImportController::class, 'import'])->middleware('tier:manager');
 // 別ウィンドウで開くポップアップ画面（Blade化済み）
 // 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。
 Route::get('/projects-agg', [ProjectsAggController::class, 'index']);
