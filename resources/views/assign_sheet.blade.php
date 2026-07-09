@@ -35,19 +35,31 @@
   .t-tokyo  { background: #d9822b; }
   .t-other  { background: #8a7a66; }
 
-  /* カードを横に並べる帯（横スクロール） */
-  .sheet-scroll { overflow-x: auto; padding-bottom: 12px; }
-  .sheet-row { display: flex; gap: 8px; align-items: flex-start; min-width: min-content; }
+  /* カードを横に並べる帯。高さに上限を付けて“この枠の中で”縦横スクロールさせる。
+     こうすると各カードの頭（下の .acard-sticky）を枠の上端に貼り付けられる＝
+     下のスタッフ名を見ようと下へスクロールしても、案件名が消えない。 */
+  .sheet-scroll { overflow: auto; max-height: calc(100vh - 172px); padding-bottom: 8px; }
+  /* align-items:stretch＝全カードの高さを一番背の高いカードにそろえる。
+     こうすると背の低いカードも下端まで伸び、下へスクロールしても頭（案件名）が最後まで上に残る。 */
+  .sheet-row { display: flex; gap: 8px; align-items: stretch; min-width: min-content; }
 
-  /* 1案件＝縦カード（できるだけ詰める） */
+  /* 1案件＝縦カード（できるだけ詰める）。
+     ※ sticky を効かせるため overflow:hidden は使わない（角丸は頭側で付ける）。 */
   .acard {
     flex: 0 0 auto; width: 202px;
     border: 1px solid var(--line); border-radius: 10px; background: #fff;
-    overflow: hidden; box-shadow: 0 1px 2px rgba(60,45,30,.06);
+    box-shadow: 0 1px 2px rgba(60,45,30,.06);
+  }
+
+  /* 頭（日付）＋案件名を1つにまとめ、スクロール枠の上端に貼り付ける（sticky）。 */
+  .acard-sticky {
+    position: sticky; top: 0; z-index: 3; background: #fff;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 3px 4px -2px rgba(60,45,30,.12);
   }
 
   /* カード頭：日付（種別で色が変わる）・NO・種別・充足 */
-  .acard-head { padding: 6px 9px; color: #fff; }
+  .acard-head { padding: 6px 9px; color: #fff; border-radius: 10px 10px 0 0; }
   .acard-head .top { display: flex; align-items: baseline; gap: 6px; }
   .acard-head .no { font-size: 10px; opacity: .8; }
   .acard-head .date { font-size: 16px; font-weight: 800; line-height: 1.15; }
@@ -167,6 +179,8 @@
            data-search="{{ mb_strtolower($c['content'] . ' ' . $c['client'] . ' ' . $c['agency']) }}"
            data-short="{{ $short ? '1' : '0' }}">
 
+        {{-- 頭＋案件名は sticky でスクロール枠の上端に残す（下のメンバーを見ても案件名が消えない）。 --}}
+        <div class="acard-sticky">
         {{-- 頭：日付（種別で色が変わる）・NO・種別・充足 --}}
         <div class="acard-head t-{{ $c['typeKey'] }}">
           <div class="top">
@@ -188,6 +202,7 @@
 
         {{-- コンテンツ（見出し・常に出す） --}}
         <div class="arow hl first"><span class="lbl">案件</span><span class="val">{{ $c['content'] }}</span></div>
+        </div>{{-- /acard-sticky（ここまでが上に貼り付く部分） --}}
 
         {{-- 値のある項目だけ --}}
         @foreach ($rows as $r)
