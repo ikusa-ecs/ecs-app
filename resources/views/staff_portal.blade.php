@@ -293,7 +293,7 @@
     <!-- ヘッダー -->
     <div class="s-header">
       <div class="app-name">ECS スタッフ画面</div>
-      <div class="who">佐藤 健太 さん <span class="role">スタッフ</span></div>
+      <div class="who">{{ Auth::user()->name ?? 'スタッフ' }} さん <span class="role">スタッフ</span></div>
     </div>
 
     <!-- タブ -->
@@ -449,9 +449,10 @@
             <p class="sub">ログイン情報の確認・変更ができます。</p>
             <div class="acct-row">
               <span class="acct-label">ログイン中のメール</span>
-              <span class="acct-value">sato.kenta@example.com</span>
+              <span class="acct-value">{{ Auth::user()->email ?? '—' }}</span>
             </div>
-            <button class="line-btn" onclick="alert('パスワード変更の画面を開きます（モックのためダミーです）。')">パスワードを変更する</button>
+            <button class="line-btn" onclick="location.href='/profile'">マイプロフィールを編集する</button>
+            <button class="line-btn" onclick="location.href='/password'">パスワードを変更する</button>
             <button class="line-btn danger" onclick="doLogout()">ログアウト</button>
           </div>
 
