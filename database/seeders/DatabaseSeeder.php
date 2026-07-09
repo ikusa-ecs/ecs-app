@@ -22,7 +22,21 @@ class DatabaseSeeder extends Seeder
             PersonSeeder::class,                  // 人名簿（社員・スタッフ）
             StaffProfileSeeder::class,            // スタッフのポジション可否・NGペア（people を参照）
             ProjectSeeder::class,                 // 案件（ディレクター等で people を参照するため最後）
-            TestLoginSeeder::class,               // DB接続版のテスト用ログイン（ECS_TEST_LOGIN 有効時のみ）
+        ]);
+
+        // テスト/デモ環境のときだけ、アサイン・応募・希望などの動作確認用データも入れる
+        // （ECS_TEST_LOGIN 有効時のみ）。これで migrate:fresh --seed 一発でアサイン表・
+        // マイページ等が“埋まった状態”になる。本番（flag=false）では入らない。
+        if (config('ecs.test_login', false)) {
+            $this->call([
+                DemoActivitySeeder::class,        // アサイン・応募・希望（/staff-status・/assign-sheet 等が埋まる）
+                DemoMyPageSeeder::class,          // baba(E-007) のアサイン・営業担当案件（/mypage が埋まる）
+            ]);
+        }
+
+        // DB接続版のテスト用ログイン（シーダー内で ECS_TEST_LOGIN を判定）。
+        $this->call([
+            TestLoginSeeder::class,
         ]);
     }
 }
