@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             PersonSeeder::class,                  // 人名簿（社員・スタッフ）
             StaffProfileSeeder::class,            // スタッフのポジション可否・NGペア（people を参照）
             ProjectSeeder::class,                 // 案件（ディレクター等で people を参照するため最後）
+            TestLoginSeeder::class,               // DB接続版のテスト用ログイン（ECS_TEST_LOGIN 有効時のみ）
         ]);
     }
 }

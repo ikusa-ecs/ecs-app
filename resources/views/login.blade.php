@@ -76,6 +76,22 @@
         <input type="hidden" name="password" value="test">
         <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る（テスト・DB不要）</button>
       </form>
+
+      {{-- DB接続版：people テーブルに実在するテストアカウント（TestLoginSeeder で投入）。
+           DBがつながっている環境で、名簿・アサイン等の関連データも含めて確認したいとき用。 --}}
+      <p class="mock-entry-label" style="margin-top:6px;">DB接続版（DBがつながっている環境用）</p>
+      <form method="POST" action="/login" style="margin:0;">
+        @csrf
+        <input type="hidden" name="email" value="test-db@example.com">
+        <input type="hidden" name="password" value="test">
+        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🧑‍💼 社員として入る（テスト・DB接続）</button>
+      </form>
+      <form method="POST" action="/login" style="margin:0;">
+        @csrf
+        <input type="hidden" name="email" value="test-db-staff@example.com">
+        <input type="hidden" name="password" value="test">
+        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る（テスト・DB接続）</button>
+      </form>
     </div>
 
     <p class="muted" style="text-align:center; font-size:11.5px; margin-top:16px;">
