@@ -51,7 +51,9 @@ class StaffStatusController extends Controller
             ->map(fn (Project $p) => optional($p->start_date)->format('Y-m-d'))
             ->filter()->unique()->count();
 
-        $assignsByStaff = Assignment::all()->groupBy('staff_id');
+        // キャンセルされたアサインは数えない（/assign・マイページ・スタッフ画面と同じ扱いにそろえる）。
+        // ここだけ全件を数えていると、同じ人の稼働数・連勤・選ばれた率が他画面とズレるため。
+        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
         $prefByStaff = ShiftPreference::where('period', '2026-07')->available()->get()->groupBy('staff_id');
         $appsByStaff = Application::all()->groupBy('staff_id');
 

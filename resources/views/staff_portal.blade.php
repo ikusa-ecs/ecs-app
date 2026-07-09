@@ -677,7 +677,7 @@
       if (!wrap) return;
       const pub = (window.ECS_PUBLISHED || []).slice().sort((a, b) => a.off - b.off);
       if (!pub.length){
-        wrap.innerHTML = '<p class="empty-note" style="margin:6px 0 0;">まだ公開された確定アサインはありません。（担当が「スタッフに公開」するとここに出ます）</p>';
+        wrap.innerHTML = '<p class="empty-note" style="margin:6px 0 0;">あなたが確定アサインされた公開案件はまだありません。（担当があなたをアサインして「スタッフに公開」すると、ここにあなたの担当が出ます）</p>';
         return;
       }
       wrap.innerHTML = pub.map(j => {
@@ -685,7 +685,7 @@
         return `<div class="assign-item" onclick="openAssign('${escAttr(j.content + ' ' + j.client)}')">
           <div class="assign-date"><div class="d">${(d.getMonth()+1)}/${d.getDate()}</div><div class="dow">${DOW_CIRCLE[d.getDay()]}</div></div>
           <div class="assign-info">
-            <div class="t">${j.content} ${j.client} <span style="font-size:11px;color:#15803d;font-weight:700;">★公開されました</span></div>
+            <div class="t">${j.content} ${j.client} <span style="font-size:11px;color:#15803d;font-weight:700;">★公開されました</span>${j.myRole ? ' ／ <span style="color:#b45309;font-weight:700;">あなたの担当：'+escAttr(j.myRole)+'</span>' : ''}</div>
             <div class="meta">集合 ${j.meet}〜${j.leave}　／　${j.meetPlace}　／　${j.place}</div>
           </div>
           <div class="assign-arrow">›</div>

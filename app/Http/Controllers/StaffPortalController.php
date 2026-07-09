@@ -6,7 +6,9 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
 use App\Models\Setting;
+use App\Support\AssignmentRole;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * スタッフ側ポータル（/staff-portal）。
@@ -26,11 +28,26 @@ class StaffPortalController extends Controller
     {
         $today = Carbon::today();
 
+        // ログイン本人（people名簿の1行）。本人の確定アサインだけを見せるために使う。
+        $me = Auth::user();
+
+        // 本人のアサイン（キャンセル除外＝他画面と同じ絞り）を「案件ID → 行」で引く。
+        // 同一案件に複数役割の行があれば keyBy で後勝ち（1つに代表させる）。
+        $mine = $me
+            ? Assignment::where('staff_id', $me->id)
+                ->where('status', '!=', 'キャンセル')
+                ->get()
+                ->keyBy('project_id')
+            : collect();
+
         // 公開ON の案件だけを開催日の近い順に取り出す。
+        // このあと「本人がアサインされた案件だけ」に絞る＝スタッフ画面はあくまで
+        // 「あなたの確定アサイン」なので、公開中でも本人が入っていない案件は見せない
+        // （誰でも全案件が見えてしまうのを防ぎ、本人の担当だけを表示するため）。
         $published = Project::where('staff_published', true)
             ->orderBy('start_date')
             ->get()
-            ->map(function (Project $p) use ($today) {
+            ->map(function (Project $p) use ($today, $mine) {
                 // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付計算に使う。
                 $off = $p->start_date
                     ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400)
@@ -46,8 +63,15 @@ class StaffPortalController extends Controller
                     'meet'      => $p->staff_meet_time ?? $p->start_time ?? '—',
                     'leave'     => $p->staff_leave_time ?? $p->end_time ?? '—',
                     'off'       => $off,
+                    // 本人がこの案件にアサインされているか／本人の担当ポジション（表示名）。
+                    // 役割コード→表示名は必ず AssignmentRole::label() を使う（日本語直書き禁止＝表記ゆれ防止）。
+                    'mine'      => $mine->has($p->id),
+                    'myRole'    => $mine->has($p->id) ? AssignmentRole::label(optional($mine->get($p->id))->role) : '',
                 ];
             })
+            // 本人がアサインされた案件だけに絞る＝「公開ON かつ 自分がアサイン済み」だけが
+            // 本当の『あなたの確定アサイン』。
+            ->filter(fn ($c) => $c['mine'])
             ->values();
 
         return view('staff_portal', [
