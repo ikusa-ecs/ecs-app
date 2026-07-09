@@ -40,6 +40,32 @@ class TestLoginSeeder extends Seeder
             'is_admin'   => true,
         ]);
 
+        // テスト社員（一般）＝業務画面は見えるが削除・マスタ等は不可。
+        Person::updateOrCreate(['id' => 'E-903'], [
+            'role'       => 'employee',
+            'name'       => 'テスト社員（DB・一般）',
+            'email'      => 'test-db-emp@example.com',
+            'password'   => 'test',
+            'permission' => 'employee',
+            'department' => 'セールス',
+            'office'     => '東京',
+            'hire_date'  => '2022-04-01',
+            'active'     => true,
+        ]);
+
+        // テスト管理者（アサイン担当）＝社員に加えアカウント発行・名簿取込などが可。
+        Person::updateOrCreate(['id' => 'E-902'], [
+            'role'       => 'employee',
+            'name'       => 'テスト管理者（DB・アサイン担当）',
+            'email'      => 'test-db-mgr@example.com',
+            'password'   => 'test',
+            'permission' => 'manager',
+            'department' => 'イベプラ',
+            'office'     => '東京',
+            'hire_date'  => '2021-04-01',
+            'active'     => true,
+        ]);
+
         // テストスタッフ＝スタッフ画面（/staff-portal）の確認用。
         Person::updateOrCreate(['id' => 'S-900'], [
             'role'             => 'staff',

@@ -16,8 +16,10 @@ use App\Http\Controllers\EmployeeAvailabilityController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\MyPageFinanceController;
 use App\Http\Controllers\PaperStockController;
+use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonImportController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\SettingsController;
@@ -39,6 +41,14 @@ Route::get('/register', function () {
 Route::middleware('auth')->group(function () {
     // スタッフ画面（サイドバー無しの独自レイアウト）。スタッフ本人が使う・社員も閲覧できる。
     Route::get('/staff-portal', [StaffPortalController::class, 'index']);
+
+    // 本人のパスワード変更（初回ログイン後などに自分で変える）。
+    Route::get('/password', [PasswordController::class, 'edit']);
+    Route::post('/password', [PasswordController::class, 'update']);
+
+    // 本人のプロフィール入力・編集（旧・新規登録の項目を本人が埋める）。
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
 // ══════════════════════════════════════════════════════════════════

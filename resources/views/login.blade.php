@@ -55,47 +55,60 @@
       <button class="btn primary" type="submit" style="width:100%; justify-content:center;">ログイン</button>
     </form>
 
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line, #e6cdb8); text-align:center;">
-      <p class="muted" style="font-size:12px; margin:0 0 8px;">まだ登録していない方（スタッフ・社員）は</p>
-      <a class="btn ghost" style="width:100%; justify-content:center;" href="/register">＋ 新規登録</a>
-    </div>
+    {{-- 自己登録は廃止（アカウントは管理者が発行する方針）＝「新規登録」導線は置かない。 --}}
 
     <div class="mock-entry">
-      <p class="mock-entry-label">テスト用：ワンクリックで入る（DB不要・本番前に外します）</p>
-      {{-- DBを使わないテスト用アカウントで入る（App\Support\TestAccounts）。
-           DBが無い／未接続のテスト環境でも入れる。裏で本物のログイン(POST /login)をしてから入る。 --}}
-      <form method="POST" action="/login" style="margin:0;">
-        @csrf
-        <input type="hidden" name="email" value="test@ecs.local">
-        <input type="hidden" name="password" value="test">
-        <button class="btn primary" type="submit" style="width:100%; justify-content:center;">🧑‍💼 社員として入る（テスト・DB不要）</button>
-      </form>
-      <form method="POST" action="/login" style="margin:0;">
-        @csrf
-        <input type="hidden" name="email" value="test-staff@ecs.local">
-        <input type="hidden" name="password" value="test">
-        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る（テスト・DB不要）</button>
-      </form>
+      <p class="mock-entry-label">テスト用ログイン（役割ごと・本番前に外します）</p>
+      <p style="text-align:center; font-size:11px; color:var(--muted); margin:-2px 0 10px;">役割によって見える画面が変わります。試したい役割を選んでください。</p>
 
-      {{-- DB接続版：people テーブルに実在するテストアカウント（TestLoginSeeder で投入）。
-           DBがつながっている環境で、名簿・アサイン等の関連データも含めて確認したいとき用。 --}}
-      <p class="mock-entry-label" style="margin-top:6px;">DB接続版（DBがつながっている環境用）</p>
-      <form method="POST" action="/login" style="margin:0;">
-        @csrf
-        <input type="hidden" name="email" value="test-db@example.com">
-        <input type="hidden" name="password" value="test">
-        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🧑‍💼 社員として入る（テスト・DB接続）</button>
-      </form>
-      <form method="POST" action="/login" style="margin:0;">
-        @csrf
-        <input type="hidden" name="email" value="test-db-staff@example.com">
-        <input type="hidden" name="password" value="test">
-        <button class="btn ghost" type="submit" style="width:100%; justify-content:center;">🙋 スタッフとして入る（テスト・DB接続）</button>
-      </form>
+      {{-- 役割ごとのワンクリック（DB接続版＝people に実在。データが入った状態で確認できる）。 --}}
+      @php
+        $ecsTestRoles = [
+          ['スタッフ', 'test-db-staff@example.com', '自分の確定アサインだけ'],
+          ['社員', 'test-db-emp@example.com', '業務画面（削除・マスタは不可）'],
+          ['管理者', 'test-db-mgr@example.com', '社員＋アカウント発行・名簿取込'],
+          ['Administrator', 'test-db@example.com', '全操作（削除・権限・マスタ）'],
+        ];
+      @endphp
+      @foreach ($ecsTestRoles as $r)
+        <form method="POST" action="/login" style="margin:0 0 6px;">
+          @csrf
+          <input type="hidden" name="email" value="{{ $r[1] }}">
+          <input type="hidden" name="password" value="test">
+          <button class="btn ghost" type="submit" style="width:100%; justify-content:space-between; text-align:left; gap:8px;">
+            <span><b>{{ $r[0] }}</b> で入る</span>
+            <span style="font-size:10.5px; color:var(--muted); font-weight:400;">{{ $r[2] }}</span>
+          </button>
+        </form>
+      @endforeach
+
+      {{-- DBが無い環境用の予備（折りたたみ）。画面の見た目だけ確認したいとき。 --}}
+      <details style="margin-top:8px;">
+        <summary style="font-size:11.5px; color:var(--muted); cursor:pointer;">DBが無い環境で見た目だけ確認する場合</summary>
+        <div style="margin-top:6px;">
+          @php
+            $ecsTestRolesNoDb = [
+              ['スタッフ', 'test-staff@ecs.local'],
+              ['社員', 'test-emp@ecs.local'],
+              ['管理者', 'test-mgr@ecs.local'],
+              ['Administrator', 'test@ecs.local'],
+            ];
+          @endphp
+          @foreach ($ecsTestRolesNoDb as $r)
+            <form method="POST" action="/login" style="margin:0 0 5px;">
+              @csrf
+              <input type="hidden" name="email" value="{{ $r[1] }}">
+              <input type="hidden" name="password" value="test">
+              <button class="btn ghost" type="submit" style="width:100%; justify-content:center; font-size:12px;">{{ $r[0] }}（DB不要）</button>
+            </form>
+          @endforeach
+          <p style="font-size:10.5px; color:var(--muted); margin:4px 0 0;">※DB不要版は画面が空で表示されます（中身のデータはDB接続版で見えます）。</p>
+        </div>
+      </details>
     </div>
 
-    <p class="muted" style="text-align:center; font-size:11.5px; margin-top:16px;">
-      ※テスト用：上のボタンはDBを使わず入れます（メール test@ecs.local ／ パスワード test）。本番前に無効化します（.env の ECS_TEST_LOGIN=false）。
+    <p class="muted" style="text-align:center; font-size:11px; margin-top:14px;">
+      ※テスト用ログインです（パスワードはすべて test）。本番公開前に無効化します（.env の ECS_TEST_LOGIN=false）。
     </p>
   </div>
 </body>

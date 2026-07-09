@@ -21,21 +21,38 @@ class TestAccounts
     private static function accounts(): array
     {
         return [
-            [
-                'id'         => 'TEST-ADMIN',
-                'name'       => 'テスト社員（管理者）',
-                'email'      => 'test@ecs.local',
-                'password'   => 'test',
-                'role'       => 'employee',   // 社員 → ログイン後は /dashboard
-                'permission' => 'admin',      // 全操作OK（画面確認しやすいように）
-            ],
+            // ── 4段階の権限それぞれのテスト用（画面の違いを確認できるように）──
             [
                 'id'         => 'TEST-STAFF',
                 'name'       => 'テストスタッフ',
                 'email'      => 'test-staff@ecs.local',
                 'password'   => 'test',
-                'role'       => 'staff',       // スタッフ → ログイン後は /staff-portal
+                'role'       => 'staff',       // スタッフ → ログイン後は /staff-portal（自分の画面のみ）
                 'permission' => 'staff',
+            ],
+            [
+                'id'         => 'TEST-EMP',
+                'name'       => 'テスト社員（一般）',
+                'email'      => 'test-emp@ecs.local',
+                'password'   => 'test',
+                'role'       => 'employee',    // 社員 → 業務画面が見える（削除・マスタ等は不可）
+                'permission' => 'employee',
+            ],
+            [
+                'id'         => 'TEST-MGR',
+                'name'       => 'テスト管理者（アサイン担当）',
+                'email'      => 'test-mgr@ecs.local',
+                'password'   => 'test',
+                'role'       => 'employee',    // 管理者 → 社員に加えアカウント発行・名簿取込などが可
+                'permission' => 'manager',
+            ],
+            [
+                'id'         => 'TEST-ADMIN',
+                'name'       => 'テストAdministrator',
+                'email'      => 'test@ecs.local',
+                'password'   => 'test',
+                'role'       => 'employee',    // Administrator → 全操作OK（削除/権限付与/マスタも）
+                'permission' => 'admin',
             ],
         ];
     }
