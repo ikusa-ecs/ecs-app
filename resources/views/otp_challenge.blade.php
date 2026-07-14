@@ -15,16 +15,24 @@
     .login-card .brand small { display:block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
     .login-card h1 { font-size: 17px; text-align: center; margin: 22px 0 6px; }
     .login-card p.lead { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }
-    .alt { margin-top: 16px; text-align:center; }
-    .alt a { color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline; }
-    .recovery { display: none; }
+    .code-input { text-align:center; letter-spacing: 8px; font-size: 22px; font-family: monospace; }
+    .alt { margin-top: 14px; text-align:center; }
   </style>
 </head>
 <body>
   <div class="login-card">
     <div class="brand">ECS<small>スタッフアサイン管理</small></div>
     <h1>2段階認証</h1>
-    <p class="lead">スマホの認証アプリに表示されている6桁のコードを入力してください。</p>
+    <p class="lead">
+      登録メールアドレス宛に確認コードを送りました。<br>
+      メールに届いた6桁のコードを入力してください。
+    </p>
+
+    @if (session('status') === 'confirmation-code-sent')
+      <div style="background:var(--ok-soft, #e7f6ec); color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px;">
+        新しい確認コードをメールで送りました。
+      </div>
+    @endif
 
     @if ($errors->any())
       <div style="background:#fdecec; color:#b91c1c; border:1px solid #f3c0c0; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px;">
@@ -32,30 +40,20 @@
       </div>
     @endif
 
-    {{-- 通常＝認証アプリの6桁コード。スマホが無いときは下の「リカバリコード」に切り替える。 --}}
-    <form method="POST" action="/two-factor-challenge">
+    <form method="POST" action="/otp">
       @csrf
-
-      <div id="codeBlock">
-        <div class="form-row">
-          <label>認証アプリの6桁コード</label>
-          <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" autofocus>
-        </div>
+      <div class="form-row">
+        <label>確認コード（6桁）</label>
+        <input class="code-input" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="______" required autofocus>
       </div>
-
-      <div id="recoveryBlock" class="recovery">
-        <div class="form-row">
-          <label>リカバリコード</label>
-          <input type="text" name="recovery_code" placeholder="xxxxxxxx-xxxxxxxx">
-        </div>
-      </div>
-
       <button class="btn primary" type="submit" style="width:100%; justify-content:center; margin-top:6px;">ログイン</button>
     </form>
 
     <div class="alt">
-      <a id="toRecovery" onclick="ECSshowRecovery(true)">スマホが使えない（リカバリコードを使う）</a>
-      <a id="toCode" onclick="ECSshowRecovery(false)" style="display:none;">認証アプリのコードに戻す</a>
+      <form method="POST" action="/otp/resend" style="margin:0;">
+        @csrf
+        <button type="submit" style="background:none; border:none; padding:0; color:var(--muted); font-size:12px; cursor:pointer; text-decoration:underline;">コードが届かない場合は再送する</button>
+      </form>
     </div>
 
     <div class="alt" style="margin-top:10px;">
@@ -64,16 +62,10 @@
         <button type="submit" style="background:none; border:none; padding:0; color:var(--muted); font-size:12px; cursor:pointer; text-decoration:underline;">ログインし直す</button>
       </form>
     </div>
-  </div>
 
-  <script>
-    // 「認証アプリのコード」と「リカバリコード」の入力欄を切り替える。
-    function ECSshowRecovery(useRecovery){
-      document.getElementById('codeBlock').style.display     = useRecovery ? 'none' : '';
-      document.getElementById('recoveryBlock').style.display = useRecovery ? 'block' : 'none';
-      document.getElementById('toRecovery').style.display    = useRecovery ? 'none' : '';
-      document.getElementById('toCode').style.display        = useRecovery ? '' : 'none';
-    }
-  </script>
+    <p class="muted" style="text-align:center; font-size:11px; margin-top:16px; color:var(--muted);">
+      送信先：{{ $email }}
+    </p>
+  </div>
 </body>
 </html>

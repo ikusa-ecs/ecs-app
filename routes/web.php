@@ -28,7 +28,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StaffStatusController;
 use App\Http\Controllers\OnboardingController;
-use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\OtpController;
 use Illuminate\Support\Facades\Route;
 
 // ── ログイン（Laravel Fortify を利用・照合先は people 名簿）──
@@ -36,25 +36,29 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 // ※ POST /login（ログイン実行）・POST /logout は Fortify が登録する。
 //   照合の中身（people 照合・active チェック・テストログイン）は FortifyServiceProvider を参照。
-// 2段階認証の入力ページ：ログイン時、2段階認証がONの人にコードを聞く画面。
-//   Fortify は views=false なので、このGETページだけ自前で用意する（POSTは Fortify が処理）。
-Route::get('/two-factor-challenge', fn () => view('auth.two-factor-challenge'))
-    ->middleware('guest')
-    ->name('two-factor.login');
 // 新規登録画面（現状は見た目のみ。自己登録の扱いは Step 4 で確定＝管理者発行方針）
 Route::get('/register', function () {
     return view('register');
 });
 
-// ── 初回ログインの初期設定（パスワード設定＋プロフィール入力）──
-//   auth は必要だが onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。
+// ── 2段階認証（メールでコード）の入力ページ ──
+//   auth は必要だが twofa/onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。
 Route::middleware('auth')->group(function () {
+    Route::get('/otp', [OtpController::class, 'show'])->name('otp.challenge');
+    Route::post('/otp', [OtpController::class, 'verify']);
+    Route::post('/otp/resend', [OtpController::class, 'resend']);
+});
+
+// ── 初回ログインの初期設定（パスワード設定＋プロフィール入力）──
+//   auth と twofa は必要だが onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。
+//   2段階認証（メールコード）は初期設定より先に通す。
+Route::middleware(['auth', 'twofa'])->group(function () {
     Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
     Route::post('/onboarding', [OnboardingController::class, 'complete']);
 });
 
 // ── ログイン済みなら誰でも見られる区画（スタッフ本人＋社員）──
-Route::middleware(['auth', 'onboarded'])->group(function () {
+Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // スタッフ画面（サイドバー無しの独自レイアウト）。スタッフ本人が使う・社員も閲覧できる。
     Route::get('/staff-portal', [StaffPortalController::class, 'index']);
 
@@ -65,16 +69,12 @@ Route::middleware(['auth', 'onboarded'])->group(function () {
     // 本人のプロフィール入力・編集（旧・新規登録の項目を本人が埋める）。
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
-
-    // 2段階認証の設定ページ（本人が自分でON/OFF・QRコード表示・リカバリコード確認）。
-    //   有効化/確認/無効化などの実処理(POST/DELETE)は Fortify の /user/two-factor-* が担当。
-    Route::get('/two-factor', [TwoFactorController::class, 'show'])->name('two-factor.show');
 });
 
 // ══════════════════════════════════════════════════════════════════
 // ここから下は「社員以上」だけ（スタッフは入れない＝自分のスタッフ画面へ戻される）。
 // ══════════════════════════════════════════════════════════════════
-Route::middleware(['auth', 'onboarded', 'tier:employee'])->group(function () {
+Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(function () {
 
 // 社員側の画面（Blade化済み）
 // ダッシュボードは DB（projects テーブル）から読む。KPI・危険日カレンダーが本物の案件で動く。

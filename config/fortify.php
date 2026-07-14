@@ -149,16 +149,14 @@ return [
     |
     */
 
-    // 今回は「2段階認証」だけ有効にする。
+    // Fortify にはログイン／ログアウトだけ担当させる（features は空）。
+    // ・2段階認証＝チーム決定によりメールでコード送信（全員必須）。認証アプリ(TOTP)は使わず、
+    //   独自実装（App\Http\Middleware\EnsureTwoFactor＋App\Http\Controllers\OtpController）で行う。
     // ・自己登録(registration)＝廃止方針（アカウントは管理者が発行）。
-    // ・パスワード再発行(resetPasswords)＝メール送信の設定が未整備のため保留（別日）。
+    // ・パスワード再発行(resetPasswords)＝メール送信(SES)の設定後に有効化予定。
     // ・プロフィール更新／パスワード変更＝既存の /profile・/password 画面を使う。
     'features' => [
-        Features::twoFactorAuthentication([
-            'confirm' => true,          // 有効化後、コード確認できて初めてONになる（安全）
-            'confirmPassword' => false, // パスワード再確認ページ(views=false)は用意しないため false
-            // 'window' => 0,
-        ]),
+        //
     ],
 
 ];

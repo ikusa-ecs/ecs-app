@@ -56,17 +56,4 @@ class AuthLoginTest extends TestCase
     {
         $this->get('/')->assertOk()->assertSee('ログイン');
     }
-
-    public function test_two_factor_challenge_page_renders(): void
-    {
-        $this->get('/two-factor-challenge')->assertOk()->assertSee('2段階認証');
-    }
-
-    public function test_two_factor_settings_page_renders(): void
-    {
-        $this->post('/login', ['email' => 'test@ecs.local', 'password' => 'test']);
-        $this->assertAuthenticated();
-
-        $this->get('/two-factor')->assertOk()->assertSee('2段階認証');
-    }
 }

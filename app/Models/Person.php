@@ -6,7 +6,6 @@ use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
  * 利用者（社員・スタッフ共通）。テーブルは people。
@@ -18,7 +17,6 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class Person extends Model implements AuthenticatableContract
 {
     use Authenticatable;
-    use TwoFactorAuthenticatable;   // 2段階認証（Fortify）用のメソッド・カラムを扱えるようにする
 
     protected $table = 'people';
 
