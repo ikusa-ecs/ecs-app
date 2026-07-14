@@ -148,10 +148,13 @@ class MasterController extends Controller
     /** 次のコンテンツID（CT-001 形式）。 */
     private function nextContentId(): string
     {
-        $last = Content::where('id', 'like', 'CT-%')
-            ->orderByRaw('CAST(SUBSTR(id, 4) AS INTEGER) DESC')
-            ->value('id');
-        $n = $last ? ((int) substr($last, 3)) + 1 : 1;
+        // 生SQL（CAST ... AS INTEGER）は SQLite専用で MySQL では構文エラーになるため、
+        // DBに依存しないよう ID一覧をPHP側で数値化して最大＋1を求める。
+        $max = Content::where('id', 'like', 'CT-%')
+            ->pluck('id')
+            ->map(fn ($id) => (int) substr($id, 3))
+            ->max();
+        $n = ($max ?? 0) + 1;
 
         return 'CT-' . str_pad((string) $n, 3, '0', STR_PAD_LEFT);
     }
