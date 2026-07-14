@@ -31,7 +31,7 @@ return new class extends Migration
             $table->boolean('is_admin')->default(false);     // 全権管理者か
 
             // ── スタッフ（staff）固有 ──
-            $table->string('employment_type')->nullable();   // 雇用区分（社員/アルバイト等）
+            $table->string('employment_type')->nullable();   // 雇用区分（社員/現場運営スタッフ 等）
             $table->boolean('is_exclusive')->nullable();     // 自社専属か
             $table->integer('monthly_cap')->nullable();      // 月間アサイン上限（専属は20）
             $table->integer('experience_count')->nullable(); // 通算参加回数（参考値・本番複数日は日数分）

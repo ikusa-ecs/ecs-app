@@ -78,6 +78,11 @@
     <a href="/settings">← 設定に戻る</a>
   </div>
 
+  {{-- 削除権限の注釈（1か所にまとめて記載）。Administrator以外には削除ボタンを出さない。 --}}
+  @if (optional(Auth::user())->permission !== 'admin')
+    <p class="m-note" style="margin:0 0 14px;">※ コンテンツ・拠点の<b>削除</b>は Administrator のみ行えます（追加・編集はどなたでも可能です）。</p>
+  @endif
+
   {{-- ── コンテンツ ── --}}
   <div class="panel m-wrap" id="contents">
     <div class="panel-head"><h2>コンテンツ</h2></div>
@@ -99,12 +104,10 @@
           <label class="m-chk"><input type="checkbox" name="rows[{{ $c->id }}][active]" value="1" @checked($c->active)></label>
           <div class="m-acts">
             <a class="m-btn" href="/masters/contents/{{ $c->id }}/requirements" title="規模ごとの必要人数を設定">必要人数</a>
-            {{-- 削除は Administrator のみ（サーバー側も tier:admin で保護）。他の役割にはボタンを出さない。 --}}
+            {{-- 削除は Administrator のみ（サーバー側も tier:admin で保護）。他の役割にはボタンを出さない（注釈は画面上部にまとめて記載）。 --}}
             @if (optional(Auth::user())->permission === 'admin')
             <button type="submit" class="m-btn danger" formaction="/masters/contents/{{ $c->id }}/delete"
                     formnovalidate onclick="return confirm('「{{ $c->content_name }}」を削除しますか？')">削除</button>
-            @else
-            <span class="m-note" style="margin:0; font-size:11px;">削除はAdministratorのみ</span>
             @endif
           </div>
         </div>
@@ -147,12 +150,10 @@
           </div>
           <label class="m-chk"><input type="checkbox" name="rows[{{ $o->id }}][active]" value="1" @checked($o->active)></label>
           <div class="m-acts">
-            {{-- 削除は Administrator のみ（サーバー側も tier:admin で保護）。他の役割にはボタンを出さない。 --}}
+            {{-- 削除は Administrator のみ（サーバー側も tier:admin で保護）。他の役割にはボタンを出さない（注釈は画面上部にまとめて記載）。 --}}
             @if (optional(Auth::user())->permission === 'admin')
             <button type="submit" class="m-btn danger" formaction="/masters/offices/{{ $o->id }}/delete"
                     formnovalidate onclick="return confirm('拠点「{{ $o->name }}」を削除しますか？')">削除</button>
-            @else
-            <span class="m-note" style="margin:0; font-size:11px;">削除はAdministratorのみ</span>
             @endif
           </div>
         </div>

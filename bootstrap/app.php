@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tier' => \App\Http\Middleware\EnsureTier::class,
             'onboarded' => \App\Http\Middleware\EnsureOnboarded::class,
+            // 'twofa' ＝ ログイン後、メールで届く確認コードを入れるまで業務画面へ進ませない。
+            'twofa' => \App\Http\Middleware\EnsureTwoFactor::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

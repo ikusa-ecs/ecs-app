@@ -199,7 +199,9 @@ class AssignmentController extends Controller
 
         // 「いま選ばれている人」で、その案件×その日 を上書き保存する（外した人は削除）。
         DB::transaction(function () use ($project, $date, $staffIds, $roles, $data, $now) {
-            Assignment::where('project_id', $project->id)->where('date', $date)->delete();
+            // date は 'date' キャストで時刻付き保存になり得るため、日付部分だけで照合する
+            // （quickToggle と同じ考え方。where('date',$date) だと空振りして再登録が unique 制約で 500 になる）。
+            Assignment::where('project_id', $project->id)->whereDate('date', $date)->delete();
 
             foreach ($staffIds as $sid) {
                 Assignment::create([

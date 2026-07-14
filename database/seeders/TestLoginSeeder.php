@@ -74,7 +74,7 @@ class TestLoginSeeder extends Seeder
             'password'         => 'test',        // cast で自動ハッシュ
             'permission'       => 'staff',
             'office'           => '東京',
-            'employment_type'  => 'アルバイト',
+            'employment_type'  => '現場運営スタッフ',
             'experience_count' => 0,
             'hire_date'        => '2025-04-01',
             'active'           => true,
