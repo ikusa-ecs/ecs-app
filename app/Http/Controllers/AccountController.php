@@ -1,0 +1,124 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Person;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * アカウント発行（1人ずつ）。
+ *
+ * 運用：最初の名簿投入は CSV 一括（/person-import）で行い、以降 増える人は
+ * この画面で1人ずつ「ログインできるアカウント」を発行する（管理者以上）。
+ *
+ * 発行時に仮パスワードを設定し、must_onboard=true を立てる。
+ * 本人はその仮パスワードで初回ログインし、/onboarding でパスワード変更＋プロフィール入力を行う。
+ *
+ * 権限付与のルール（設計・権限4段階）：
+ *   Administrator（admin）権限を付けられるのは Administrator のみ。
+ *   管理者（manager）は staff / employee / manager まで発行できる。
+ */
+class AccountController extends Controller
+{
+    /** 発行フォームを表示。 */
+    public function create()
+    {
+        return view('account_new', [
+            'canGrantAdmin' => optional(Auth::user())->permission === 'admin',
+        ]);
+    }
+
+    /** 入力を検証してアカウントを発行する。 */
+    public function store(Request $request)
+    {
+        $isAdmin = optional(Auth::user())->permission === 'admin';
+
+        // 付与できる権限（Administrator は admin まで／管理者は manager まで）
+        $allowedPerms = $isAdmin
+            ? ['staff', 'employee', 'manager', 'admin']
+            : ['staff', 'employee', 'manager'];
+
+        $validated = $request->validate([
+            'role'          => ['required', Rule::in(['employee', 'staff'])],
+            'name'          => ['required', 'string', 'max:255'],
+            'email'         => ['required', 'email', Rule::unique('people', 'email')],
+            'permission'    => ['required', Rule::in($allowedPerms)],
+            'office'        => ['nullable', 'string'],
+            'hire_date'     => ['nullable', 'date'],
+            'temp_password' => ['nullable', 'string', 'min:6'],
+        ], [
+            'permission.in' => 'その権限を付与する権限がありません（Administrator権限を付けられるのはAdministratorだけです）。',
+            'email.unique'  => 'このメールアドレスは既に使われています。',
+        ], [
+            'role'          => '種別',
+            'name'          => '氏名',
+            'email'         => 'メールアドレス',
+            'permission'    => '権限',
+            'office'        => '事務所',
+            'hire_date'     => '入社日',
+            'temp_password' => '仮パスワード',
+        ]);
+
+        // 種別と権限の整合（スタッフは権限=staff 固定・社員に staff 権限は付けない）
+        if ($validated['role'] === 'staff' && $validated['permission'] !== 'staff') {
+            throw ValidationException::withMessages(['permission' => 'スタッフの権限は「スタッフ」になります。']);
+        }
+        if ($validated['role'] === 'employee' && $validated['permission'] === 'staff') {
+            throw ValidationException::withMessages(['permission' => '社員には社員以上の権限を選んでください。']);
+        }
+
+        // 仮パスワード（未入力なら自動生成）※任意項目は $validated にキーが無いことがある
+        $tempPassword = ($validated['temp_password'] ?? null) ?: $this->generateTempPassword();
+
+        // 社員番号（E-###）／スタッフ番号（S-###）を自動採番
+        $prefix = $validated['role'] === 'employee' ? 'E-' : 'S-';
+        $next = $this->maxIdNum($prefix) + 1;
+        $id = $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+
+        Person::create([
+            'id'           => $id,
+            'role'         => $validated['role'],
+            'name'         => $validated['name'],
+            'email'        => $validated['email'],
+            'permission'   => $validated['permission'],
+            'office'       => ($validated['office'] ?? null) ?: null,
+            'hire_date'    => ($validated['hire_date'] ?? null) ?: null,
+            'password'     => $tempPassword,   // モデルのキャストで自動ハッシュ化
+            'must_onboard' => true,            // 初回ログインで初期設定へ誘導
+            'active'       => true,
+        ]);
+
+        // 発行結果（メール＋仮パスワード）を本人に伝えられるよう画面に表示する。
+        return redirect('/account-new')->with('issued', [
+            'id'       => $id,
+            'name'     => $validated['name'],
+            'email'    => $validated['email'],
+            'password' => $tempPassword,
+        ]);
+    }
+
+    /** 指定プレフィックス（E-/S-）の既存IDの最大番号。無ければ0。 */
+    private function maxIdNum(string $prefix): int
+    {
+        return (int) (Person::where('id', 'like', $prefix . '%')->get()
+            ->map(fn ($p) => (int) preg_replace('/\D/', '', $p->id))
+            ->max() ?? 0);
+    }
+
+    /** 読み間違えにくい仮パスワードを作る（紛らわしい 0/O/1/l/I を除外）。 */
+    private function generateTempPassword(int $length = 8): string
+    {
+        $chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $max = strlen($chars) - 1;
+        $out = '';
+        for ($i = 0; $i < $length; $i++) {
+            // random_int は暗号的に安全（Math.random 相当のブレは不要）
+            $out .= $chars[random_int(0, $max)];
+        }
+
+        return $out;
+    }
+}

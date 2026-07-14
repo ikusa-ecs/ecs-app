@@ -49,6 +49,7 @@
         <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">☷</span> スタッフ（名簿・稼働状況）</a>
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
+        <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>
         <a class="{{ ($active ?? '') === 'person_import' ? 'active' : '' }}" href="/person-import"><span class="nav-icon">⬆</span> 名簿CSV取込</a>
         @endif
         {{-- 共通設定＝マスタ管理・システム設定。権限4段階の方針で Administrator（admin）のみ表示。 --}}

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AssignBoardController;
 use App\Http\Controllers\AssignDashboardController;
@@ -83,6 +84,9 @@ Route::post('/project-import', [ProjectController::class, 'import']);
 // 名簿（people）のCSV一括取込。アカウント作成に準じるため「管理者以上」に限定。
 Route::get('/person-import', [PersonImportController::class, 'show'])->middleware('tier:manager');
 Route::post('/person-import', [PersonImportController::class, 'import'])->middleware('tier:manager');
+// アカウント発行（1人ずつ）。最初はCSV一括、以降はここで発行。作成＝管理者以上。
+Route::get('/account-new', [AccountController::class, 'create'])->middleware('tier:manager');
+Route::post('/account-new', [AccountController::class, 'store'])->middleware('tier:manager');
 // 別ウィンドウで開くポップアップ画面（Blade化済み）
 // 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。
 Route::get('/projects-agg', [ProjectsAggController::class, 'index']);
