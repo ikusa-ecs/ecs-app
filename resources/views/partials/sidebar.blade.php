@@ -52,9 +52,11 @@
         <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>
         <a class="{{ ($active ?? '') === 'person_import' ? 'active' : '' }}" href="/person-import"><span class="nav-icon">⬆</span> 名簿CSV取込</a>
         @endif
-        {{-- 共通設定＝マスタ管理・システム設定。権限4段階の方針で Administrator（admin）のみ表示。 --}}
-        @if (optional(Auth::user())->permission === 'admin')
+        {{-- 共通設定＝マスタ管理・システム設定。MTG日などは社員も変更できるので社員以上に表示（マスタ削除だけAdministrator限定）。 --}}
         <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">⚙️</span> 共通設定</a>
+        {{-- Administrator（全権）専用コンソール。権限変更など「Administratorだけの作業」をここに集約。 --}}
+        @if (optional(Auth::user())->permission === 'admin')
+        <a class="{{ ($active ?? '') === 'admin_console' ? 'active' : '' }}" href="/admin-console"><span class="nav-icon">🛡</span> Administrator（管理）</a>
         @endif
       </div>
     </div>

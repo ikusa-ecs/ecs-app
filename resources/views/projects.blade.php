@@ -131,6 +131,8 @@
 
     /* 操作リンク */
     td.ops a { font-size: 12.5px; margin-right: 10px; white-space: nowrap; }
+    /* 削除は目立たせすぎない補助的な赤リンク（キャンセル案件を消す用・元に戻せない） */
+    td.ops a.del-link { color: var(--danger); }
 
     /* ===== 詳細（折りたたみ）行 ===== */
     tr.detail-row > td { background: #faf6ee; padding: 10px 16px 11px; border-bottom: 1px solid var(--line); }
@@ -670,6 +672,7 @@
           <a href="/project-assign?project=${encodeURIComponent(p.id)}">アサイン</a>
           <a href="/project-form?project=${encodeURIComponent(p.id)}">編集</a>
           <a href="#" id="arc-${p._i}" onclick="event.preventDefault(); toggleArchive(${p._i});">${p.archived ? '↩ 戻す' : '🗄 アーカイブ'}</a>
+          <a href="#" class="del-link" onclick="event.preventDefault(); deleteProject('${p.id}');">削除</a>
         </td>`;
       tbody.appendChild(tr);
 
@@ -792,6 +795,23 @@
     const a = document.getElementById('arc-' + idx);
     if (a) a.textContent = p.archived ? '↩ 戻す' : '🗄 アーカイブ';
     applyFilter();   // 表示中タブから消える／現タブに現れるのを反映
+  }
+
+  // ===== 案件の削除（キャンセルになった案件を消す） =====
+  // 確認ダイアログでOKのときだけ POST /projects/{id}/delete を送る（元に戻せないため一度確認する）。
+  // CSRFトークンは画面上部で用意した window.ECS_CSRF を使う。
+  function deleteProject(id) {
+    if (!confirm('この案件を削除します。よろしいですか？（元に戻せません）')) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/projects/' + encodeURIComponent(id) + '/delete';
+    const token = document.createElement('input');
+    token.type = 'hidden';
+    token.name = '_token';
+    token.value = window.ECS_CSRF;
+    form.appendChild(token);
+    document.body.appendChild(form);
+    form.submit();
   }
 
   // ===== 月見出しの開閉（アコーディオン） =====

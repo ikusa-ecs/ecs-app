@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * 案件一覧（/projects）。
@@ -383,6 +385,40 @@ class ProjectController extends Controller
         $project->save();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 案件の削除（POST /projects/{id}/delete）。
+     * キャンセルになったイベントの案件を一覧から消すための機能。ログイン済みの社員以上が実行できる
+     * （誰が実行できるかはルート側で制御済み。ここでは触らない）。
+     * 案件だけ消すと、その案件に紐づくアサイン（assignments.project_id）や、複数日案件の予備日・リハ日
+     * （parent_project_id でこの案件を親に指す子案件）が宙に浮いて残ってしまう。
+     * そこでトランザクションでまとめて「子案件も含めたアサイン → 案件本体（子案件も）」の順に削除する。
+     */
+    public function destroy($id)
+    {
+        // 案件IDは文字列（例 P-2026-0001）。無ければ落とさず一覧へ戻して知らせる。
+        $project = Project::find($id);
+        if (! $project) {
+            return redirect('/projects')
+                ->with('status', '指定の案件が見つかりませんでした（すでに削除された可能性があります）。');
+        }
+
+        // メッセージ用の表示名。未設定でも壊れないように代替名を用意する。
+        $name = $project->project_name ?: '（名称未定）';
+
+        // この案件を親に持つ子案件（予備日・リハ日）のIDも集めて、一緒に消す対象にする。
+        $childIds = Project::where('parent_project_id', $id)->pluck('id')->all();
+        $targetIds = array_merge([$id], $childIds);
+
+        DB::transaction(function () use ($targetIds) {
+            // 先にアサインを消す（割り当てが宙に浮いて残らないように）。
+            Assignment::whereIn('project_id', $targetIds)->delete();
+            // そのあとで案件本体（子案件も含む）を消す。
+            Project::whereIn('id', $targetIds)->delete();
+        });
+
+        return redirect('/projects')->with('status', "案件「{$name}」を削除しました。");
     }
 
     /**

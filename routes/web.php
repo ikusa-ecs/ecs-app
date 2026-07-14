@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminConsoleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AssignBoardController;
 use App\Http\Controllers\AssignDashboardController;
@@ -76,6 +77,8 @@ Route::get('/project-form', [ProjectController::class, 'form']);
 Route::post('/project-form', [ProjectController::class, 'store']);
 // 案件一覧の詳細から、ケータリングの種類・メモだけを保存する（公開ボードの時間保存と同じ方式）。
 Route::post('/projects/catering', [ProjectController::class, 'saveCatering']);
+// 案件の削除（キャンセルになった案件を消す）。案件の削除＝社員以上でOK（baba 2026-07-14）。関連アサインも一緒に消す。
+Route::post('/projects/{id}/delete', [ProjectController::class, 'destroy']);
 Route::get('/project-import', function () {
     return view('project_import');
 });
@@ -87,6 +90,9 @@ Route::post('/person-import', [PersonImportController::class, 'import'])->middle
 // アカウント発行（1人ずつ）。最初はCSV一括、以降はここで発行。作成＝管理者以上。
 Route::get('/account-new', [AccountController::class, 'create'])->middleware('tier:manager');
 Route::post('/account-new', [AccountController::class, 'store'])->middleware('tier:manager');
+// Administrator専用コンソール（権限変更などを集約）。全権のみ＝tier:admin。
+Route::get('/admin-console', [AdminConsoleController::class, 'index'])->middleware('tier:admin');
+Route::post('/admin-console/permission', [AdminConsoleController::class, 'updatePermission'])->middleware('tier:admin');
 // 別ウィンドウで開くポップアップ画面（Blade化済み）
 // 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。
 Route::get('/projects-agg', [ProjectsAggController::class, 'index']);
