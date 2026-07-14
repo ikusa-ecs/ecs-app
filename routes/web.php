@@ -25,6 +25,7 @@ use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StaffStatusController;
+use App\Http\Controllers\OnboardingController;
 use Illuminate\Support\Facades\Route;
 
 // ── ログイン（Laravel標準機能・照合先は people 名簿）──
@@ -37,8 +38,15 @@ Route::get('/register', function () {
     return view('register');
 });
 
-// ── ログイン済みなら誰でも見られる区画（スタッフ本人＋社員）──
+// ── 初回ログインの初期設定（パスワード設定＋プロフィール入力）──
+//   auth は必要だが onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。
 Route::middleware('auth')->group(function () {
+    Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
+    Route::post('/onboarding', [OnboardingController::class, 'complete']);
+});
+
+// ── ログイン済みなら誰でも見られる区画（スタッフ本人＋社員）──
+Route::middleware(['auth', 'onboarded'])->group(function () {
     // スタッフ画面（サイドバー無しの独自レイアウト）。スタッフ本人が使う・社員も閲覧できる。
     Route::get('/staff-portal', [StaffPortalController::class, 'index']);
 
@@ -54,7 +62,7 @@ Route::middleware('auth')->group(function () {
 // ══════════════════════════════════════════════════════════════════
 // ここから下は「社員以上」だけ（スタッフは入れない＝自分のスタッフ画面へ戻される）。
 // ══════════════════════════════════════════════════════════════════
-Route::middleware(['auth', 'tier:employee'])->group(function () {
+Route::middleware(['auth', 'onboarded', 'tier:employee'])->group(function () {
 
 // 社員側の画面（Blade化済み）
 // ダッシュボードは DB（projects テーブル）から読む。KPI・危険日カレンダーが本物の案件で動く。

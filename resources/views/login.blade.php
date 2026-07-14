@@ -83,6 +83,18 @@
         </form>
       @endforeach
 
+      {{-- 初回ログイン体験（管理者に発行された直後の新人スタッフ）。
+           押すと初期設定ページ＝パスワード設定＋プロフィール入力へ誘導される。 --}}
+      <form method="POST" action="/login" style="margin:10px 0 0;">
+        @csrf
+        <input type="hidden" name="email" value="test-onboard@ecs.local">
+        <input type="hidden" name="password" value="test">
+        <button class="btn" type="submit" style="width:100%; justify-content:space-between; text-align:left; gap:8px; background:var(--brand-soft, #f6e9dd); border:1px solid #ecd6c2; color:var(--brand-dark, #8a5a33);">
+          <span>🆕 <b>初回ログイン</b>を体験</span>
+          <span style="font-size:10.5px; font-weight:400;">パスワード設定＋プロフィール入力</span>
+        </button>
+      </form>
+
       {{-- DBに実在するアカウント（折りたたみ）。自分のマイページ等も本物のデータで見たいとき。
            ※こちらは見本データの投入(seed)が済んでいる環境でのみ入れる。 --}}
       <details style="margin-top:8px;">

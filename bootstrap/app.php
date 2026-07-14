@@ -13,8 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // 権限4段階チェックを 'tier' という名前で使えるようにする（例：middleware('tier:employee')）。
+        // 'onboarded' ＝ 初回ログインの初期設定がまだの人を初期設定ページへ誘導する。
         $middleware->alias([
             'tier' => \App\Http\Middleware\EnsureTier::class,
+            'onboarded' => \App\Http\Middleware\EnsureOnboarded::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

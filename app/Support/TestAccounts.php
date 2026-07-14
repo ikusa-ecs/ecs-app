@@ -54,6 +54,17 @@ class TestAccounts
                 'role'       => 'employee',    // Administrator → 全操作OK（削除/権限付与/マスタも）
                 'permission' => 'admin',
             ],
+            // ── 初回ログイン体験用（管理者に発行された直後の新人スタッフ）──
+            //   ログインすると初期設定ページ（パスワード変更＋プロフィール入力）へ強制的に誘導される。
+            [
+                'id'           => 'TEST-ONBOARD',
+                'name'         => '新人スタッフ（初回ログイン）',
+                'email'        => 'test-onboard@ecs.local',
+                'password'     => 'test',
+                'role'         => 'staff',
+                'permission'   => 'staff',
+                'must_onboard' => true,        // ← 初期設定がまだ＝初回セットアップへ誘導
+            ],
         ];
     }
 
@@ -102,12 +113,13 @@ class TestAccounts
         $person = new Person();
         // fill ではなく setRawAttributes で直接入れる（キャストは読み取り時に効く）。
         $person->setRawAttributes([
-            'id'         => $a['id'],
-            'name'       => $a['name'],
-            'email'      => $a['email'],
-            'role'       => $a['role'],
-            'permission' => $a['permission'],
-            'active'     => true,
+            'id'           => $a['id'],
+            'name'         => $a['name'],
+            'email'        => $a['email'],
+            'role'         => $a['role'],
+            'permission'   => $a['permission'],
+            'active'       => true,
+            'must_onboard' => $a['must_onboard'] ?? false,   // 初回設定が必要か（既定＝不要）
         ], true);
         // 「新規保存が要る行」と誤解されないよう既存扱いにする（が、save は呼ばない）。
         $person->exists = true;

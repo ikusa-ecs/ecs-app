@@ -49,13 +49,17 @@ class ProfileController extends Controller
         $user->name   = $request->input('name');
         $user->email  = $request->input('email');
         $user->office = $request->input('office');
+        // 身長・靴/服（衣装）サイズ・都道府県・最寄り駅（旧・新規登録の基本情報。当日準備の参考）
+        $user->height          = $request->input('height');
+        $user->shoe_size       = $request->input('shoe_size');
+        $user->shirt_size      = $request->input('shirt_size');
+        $user->prefecture      = $request->input('prefecture');
+        $user->nearest_station = $request->input('nearest_station');
 
         // 5. role ごとに対象カラムだけ保存（people に実在する列のみ）
         if ($user->role === 'employee') {
             // 社員だけの項目
             $user->department = $request->input('department');
-            $user->shirt_size = $request->input('shirt_size');
-            $user->shoe_size  = $request->input('shoe_size');
         } elseif ($user->role === 'staff') {
             // スタッフだけの項目
             $user->appeal            = $request->input('appeal');

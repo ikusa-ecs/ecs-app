@@ -41,6 +41,7 @@ class Person extends Model implements AuthenticatableContract
             'experienced_contents' => 'array',
             'director_contents' => 'array',
             'is_admin' => 'boolean',
+            'must_onboard' => 'boolean',   // 初回ログインの初期設定が必要か
             'is_exclusive' => 'boolean',
             'mc_audition_passed' => 'boolean',
             'can_kigurumi' => 'boolean',

@@ -51,7 +51,10 @@
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
         <a class="{{ ($active ?? '') === 'person_import' ? 'active' : '' }}" href="/person-import"><span class="nav-icon">⬆</span> 名簿CSV取込</a>
         @endif
+        {{-- 共通設定＝マスタ管理・システム設定。権限4段階の方針で Administrator（admin）のみ表示。 --}}
+        @if (optional(Auth::user())->permission === 'admin')
         <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">⚙️</span> 共通設定</a>
+        @endif
       </div>
     </div>
   </nav>

@@ -50,9 +50,42 @@
             <span class="hint">所属している地域の事務所を選んでください。</span>
           </div>
 
+          {{-- 身長・靴・服（衣装）サイズ・都道府県・最寄り駅：当日のユニフォーム／衣装の準備の参考。
+               もともと新規登録で聞いていた項目を、本人がここ（＝初回ログインの初期設定）で入れる。社員・スタッフ共通。 --}}
+          <div class="form-row">
+            <label>身長</label>
+            <input type="text" name="height" value="{{ $me->height }}" placeholder="例）170（cm）">
+          </div>
+
+          <div class="form-row">
+            <label>靴のサイズ</label>
+            <input type="text" name="shoe_size" value="{{ $me->shoe_size }}" placeholder="例）26.5cm">
+          </div>
+
+          <div class="form-row">
+            <label>服（衣装）のサイズ</label>
+            <select name="shirt_size">
+              <option value="">選択してください</option>
+              @foreach (['SS','S','M','L','LL','3L'] as $opt)
+                <option value="{{ $opt }}" @selected($me->shirt_size === $opt)>{{ $opt }}</option>
+              @endforeach
+            </select>
+            <span class="hint">当日の衣装・ユニフォームの準備に使います。</span>
+          </div>
+
+          <div class="form-row">
+            <label>都道府県</label>
+            <input type="text" name="prefecture" value="{{ $me->prefecture }}" placeholder="例）千葉県">
+          </div>
+
+          <div class="form-row">
+            <label>最寄り駅</label>
+            <input type="text" name="nearest_station" value="{{ $me->nearest_station }}" placeholder="例）JR千葉駅">
+          </div>
+
           {{-- ② 社員（employee）だけの項目 --}}
           @if ($me->role === 'employee')
-            <h2 style="margin-top:24px;">所属・サイズ（社員）</h2>
+            <h2 style="margin-top:24px;">所属（社員）</h2>
 
             <div class="form-row">
               <label>所属</label>
@@ -63,21 +96,6 @@
                 @endforeach
               </select>
               <span class="hint">あなたの主な担当を選んでください。</span>
-            </div>
-
-            <div class="form-row">
-              <label>服のサイズ</label>
-              <select name="shirt_size">
-                <option value="">選択してください</option>
-                @foreach (['SS','S','M','L','LL','3L'] as $opt)
-                  <option value="{{ $opt }}" @selected($me->shirt_size === $opt)>{{ $opt }}</option>
-                @endforeach
-              </select>
-            </div>
-
-            <div class="form-row">
-              <label>靴のサイズ</label>
-              <input type="text" name="shoe_size" value="{{ $me->shoe_size }}" placeholder="例）26.5cm">
             </div>
           @endif
 

@@ -26,7 +26,13 @@
       <button type="button" class="nav-toggle" onclick="ECStoggleNav()" aria-label="メニューを開く／閉じる" title="メニューを開く／閉じる">☰</button>
       <h1>@yield('h1')</h1>
       <div class="spacer"></div>
-      <span class="role-pill">社員</span>
+      {{-- ログイン中の本人の権限を表示（Administrator／管理者／社員／スタッフ）。以前は「社員」固定だった。 --}}
+      @auth
+        @php
+          $__permLabels = ['admin' => 'Administrator', 'manager' => '管理者', 'employee' => '社員', 'staff' => 'スタッフ'];
+        @endphp
+        <span class="role-pill">{{ $__permLabels[Auth::user()->permission] ?? '社員' }}</span>
+      @endauth
     </div>
     <div class="content">
       @yield('content')
