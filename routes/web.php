@@ -28,13 +28,19 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StaffStatusController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
-// ── ログイン（Laravel標準機能・照合先は people 名簿）──
+// ── ログイン（Laravel Fortify を利用・照合先は people 名簿）──
 // トップページ＝ログイン画面。未ログインでの保護画面アクセスもここへ戻る（name='login'）。
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+// ※ POST /login（ログイン実行）・POST /logout は Fortify が登録する。
+//   照合の中身（people 照合・active チェック・テストログイン）は FortifyServiceProvider を参照。
+// 2段階認証の入力ページ：ログイン時、2段階認証がONの人にコードを聞く画面。
+//   Fortify は views=false なので、このGETページだけ自前で用意する（POSTは Fortify が処理）。
+Route::get('/two-factor-challenge', fn () => view('auth.two-factor-challenge'))
+    ->middleware('guest')
+    ->name('two-factor.login');
 // 新規登録画面（現状は見た目のみ。自己登録の扱いは Step 4 で確定＝管理者発行方針）
 Route::get('/register', function () {
     return view('register');
@@ -59,6 +65,10 @@ Route::middleware(['auth', 'onboarded'])->group(function () {
     // 本人のプロフィール入力・編集（旧・新規登録の項目を本人が埋める）。
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    // 2段階認証の設定ページ（本人が自分でON/OFF・QRコード表示・リカバリコード確認）。
+    //   有効化/確認/無効化などの実処理(POST/DELETE)は Fortify の /user/two-factor-* が担当。
+    Route::get('/two-factor', [TwoFactorController::class, 'show'])->name('two-factor.show');
 });
 
 // ══════════════════════════════════════════════════════════════════
