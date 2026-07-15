@@ -14,6 +14,7 @@ use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\CountDeadlineReminderController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MasterController;
+use App\Http\Controllers\MasterImportController;
 use App\Http\Controllers\EmployeeAvailabilityController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\MyPageFinanceController;
@@ -97,6 +98,11 @@ Route::post('/project-import', [ProjectController::class, 'import']);
 // 名簿（people）のCSV一括取込。アカウント作成に準じるため「管理者以上」に限定。
 Route::get('/person-import', [PersonImportController::class, 'show'])->middleware('tier:manager');
 Route::post('/person-import', [PersonImportController::class, 'import'])->middleware('tier:manager');
+
+// CSV一括取込。サイドバーは「CSV一括取込」1項目→ハブ(/imports)から各取込へ。名簿取込と同じく管理者以上のみ。
+Route::get('/imports', [MasterImportController::class, 'hub'])->middleware('tier:manager');
+Route::get('/content-import', [MasterImportController::class, 'showContent'])->middleware('tier:manager');
+Route::post('/content-import', [MasterImportController::class, 'importContent'])->middleware('tier:manager');
 // アカウント発行（1人ずつ）。最初はCSV一括、以降はここで発行。作成＝管理者以上。
 Route::get('/account-new', [AccountController::class, 'create'])->middleware('tier:manager');
 Route::post('/account-new', [AccountController::class, 'store'])->middleware('tier:manager');

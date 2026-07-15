@@ -50,7 +50,8 @@
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
         <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>
-        <a class="{{ ($active ?? '') === 'person_import' ? 'active' : '' }}" href="/person-import"><span class="nav-icon">⬆</span> 名簿CSV取込</a>
+        {{-- CSV取込は増やさず1項目に集約。ハブ画面から名簿・コンテンツ・案件の各取込へ。 --}}
+        <a class="{{ in_array(($active ?? ''), ['imports', 'person_import', 'content_import', 'project_import'], true) ? 'active' : '' }}" href="/imports"><span class="nav-icon">⬆</span> CSV一括取込</a>
         @endif
         {{-- 共通設定＝マスタ管理・システム設定。MTG日などは社員も変更できるので社員以上に表示（マスタ削除だけAdministrator限定）。 --}}
         <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">⚙️</span> 共通設定</a>
