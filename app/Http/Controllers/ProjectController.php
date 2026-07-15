@@ -104,7 +104,21 @@ class ProjectController extends Controller
             ];
         })->values();
 
-        return view('projects', ['cases' => $cases]);
+        // リピート（常連）クライアント＝同じクライアント名で案件が2件以上あるお客様。
+        // クライアント名（前後空白は落とす）→ true の連想にして渡す（一覧でバッジ＋履歴リンクに使う）。
+        $repeatClients = $projects
+            ->map(fn (Project $p) => trim((string) $p->client))
+            ->filter(fn ($c) => $c !== '')
+            ->countBy()
+            ->filter(fn ($n) => $n >= 2)
+            ->keys()
+            ->mapWithKeys(fn ($c) => [$c => true])
+            ->all();
+
+        return view('projects', [
+            'cases'         => $cases,
+            'repeatClients' => $repeatClients,
+        ]);
     }
 
     /**

@@ -9,6 +9,7 @@
 <script>
   window.ECS_CASES = @json($cases);
   window.ECS_CSRF = '{{ csrf_token() }}';   // ケータリング等の保存に使う合言葉
+  window.ECS_REPEAT_CLIENTS = @json($repeatClients ?? []);   // リピート（常連）クライアント名の集合（名前→true）
 </script>
 @verbatim
 <style>
@@ -83,6 +84,7 @@
     .tag-mini.reha  { background: #ece3d4;            color: #7a6a58; }
     .tag-mini.stay  { background: #e8833a;            color: #fff; }
     .tag-mini.draft { background: #6b5544;            color: #fff; }
+    .tag-mini.repeat{ background: var(--brand);       color: #fff; }  /* リピート（常連）クライアント */
 
     /* 下書きの行（準備中とわかるよう薄い色＋左に印） */
     tr.main-row.draft { background: #f3eee4; }
@@ -654,13 +656,22 @@
       tr.dataset.archived = p.archived ? '1' : '0';
       tr.setAttribute('onclick', `toggleDetail(${p._i})`);
 
+      // リピート（常連）クライアントなら、クライアント名を履歴（/assign-history）へのリンクにし「リピート」バッジを付ける。
+      const clientTrim = (p.client || '').trim();
+      const isRepeatClient = !!(window.ECS_REPEAT_CLIENTS && clientTrim && window.ECS_REPEAT_CLIENTS[clientTrim]);
+      const clientNameHtml = isRepeatClient
+        ? `<a href="/assign-history?client=${encodeURIComponent(clientTrim)}" onclick="event.stopPropagation()">${p.client}</a>`
+        : (p.client || '');
+      const repeatBadge = isRepeatClient ? '<span class="tag-mini repeat">リピート</span>' : '';
+      const clientLine = (p.agency ? `${clientNameHtml}（${p.agency}）` : clientNameHtml) + repeatBadge;
+
       tr.innerHTML = `
         <td class="caret-cell"><span class="caret" id="caret-${p._i}">▸</span></td>
         <td class="date-cell">${fmtMD(p.date)}<span class="dow ${dowCls}">(${dow})</span>${ymHtml}<span class="big-mark" id="big-${p._i}"${p.scale === '大型' ? '' : ' style="display:none;"'}>大型</span>${dateTagsHtml}</td>
         <td class="proj-cell">
           <strong>${p.content}</strong>${tags}${noteFlag}
           <div class="sub-info"><span class="fbadge ${formatClass(p.format)}">${p.format}</span></div>
-          <div class="sub-info">${p.agency ? `${p.client}（${p.agency}）` : p.client}</div>
+          <div class="sub-info">${clientLine}</div>
         </td>
         <td class="person">
           <div>${p.sales}</div>

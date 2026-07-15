@@ -389,6 +389,8 @@
             <label>クライアント（正式名称）<span class="req-mark yellow">必須</span></label>
             <input type="text" id="client" name="client" data-need="later" placeholder="例）〇〇株式会社">
             <div class="hint">正式名称で記載ください。</div>
+            <!-- リピート（常連）のお客様なら、ここに過去案件の履歴を控えめに出す（入力/フォーカスアウトで自動照会）。 -->
+            <div class="hint repeat-note" id="clientRepeatNote" style="display:none;"></div>
           </div>
           <div class="form-row">
             <label>代理店名（任意）</label>
@@ -1256,7 +1258,55 @@
     onSalesChange();                         // 手入力欄の表示・name付け替えを反映
   })();
 
+  // ===== リピート（常連）クライアントの照会 =====
+  // クライアント欄の入力／フォーカスアウトで /clients/lookup を呼び、常連なら過去案件を控えめに出す。
+  // 既存に同名クライアントがあれば「常連」（新規登録中の案件はまだ保存されていない前提）。GETなのでCSRF不要。
+  (function setupClientRepeat() {
+    const input = document.getElementById('client');
+    const note  = document.getElementById('clientRepeatNote');
+    if (!input || !note) return;
+
+    let lastQueried = null;
+
+    const esc = function (s) {
+      return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+        return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+      });
+    };
+
+    function render(data) {
+      if (!data || !data.isRepeat) { note.style.display = 'none'; note.innerHTML = ''; return; }
+      let html = '<div style="color:var(--brand-dark,#8a5a2b);font-weight:700;">🔁 リピートのお客様です（過去' + data.count + '件）</div>';
+      if (Array.isArray(data.entries) && data.entries.length) {
+        html += '<ul style="margin:4px 0 0;padding-left:18px;line-height:1.6;">';
+        data.entries.forEach(function (e) {
+          html += '<li>' + (esc(e.date) || '日付未定') + '　担当D：' + esc(e.director) + '</li>';
+        });
+        html += '</ul>';
+      }
+      note.innerHTML = html;
+      note.style.display = '';
+    }
+
+    function query() {
+      const c = input.value.trim();
+      if (c === '') { render(null); lastQueried = ''; return; }
+      if (c === lastQueried) return;   // 同じ値の二重問い合わせを避ける
+      lastQueried = c;
+      fetch('/clients/lookup?client=' + encodeURIComponent(c), { headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) { if (input.value.trim() === c) render(data); })
+        .catch(function () { /* 照会失敗時は注釈を出さないだけ（入力の邪魔はしない） */ });
+    }
+
+    let t = null;
+    input.addEventListener('input', function () { clearTimeout(t); t = setTimeout(query, 400); });
+    input.addEventListener('blur', query);
+    window._checkClientRepeat = query;   // 編集モードの初期表示用に外へ出す
+  })();
+
   applyEdit(); // 編集モードなら値を流し込む（新規は素通り）
+  if (window._checkClientRepeat) window._checkClientRepeat(); // 編集で既存クライアントが入っていれば履歴を表示
 
   // CSV取込のエラー行から来たときの案内を表示（applyEdit で値を入れたあと）。
   if (window.ECS_FROM_CSV) {

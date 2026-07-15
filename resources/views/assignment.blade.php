@@ -137,6 +137,7 @@
 
       <div class="asg-bar">
         <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ $project->required_count ?? '—' }}名</span></span>
+        <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="onlyAvail" checked onchange="filterStaff()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> この日 希望・稼働可 の人だけ</label>
         <div class="spacer"></div>
         <input type="text" id="staffSearch" placeholder="名前でしぼり込み" oninput="filterStaff()">
       </div>
@@ -178,7 +179,6 @@
               <th>区分</th>
               <th>できる役割</th>
               <th class="num">経験</th>
-              <th>この日の希望</th>
               <th>この案件での役割</th>
               <th>NG</th>
             </tr>
@@ -186,13 +186,16 @@
           <tbody>
             @forelse ($staff as $s)
               @php($ex = $existing[$s['id']] ?? null)
-              <tr class="staff-row" data-name="{{ $s['name'] }}" data-ng="{{ implode('|', $s['ng']) }}">
+              @php($w = $s['wish'] ?? null)
+              @php($isAvail = in_array($w, ['希望', '稼働可'], true))
+              <tr class="staff-row" data-name="{{ $s['name'] }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
                 <td class="chk">
                   <input type="checkbox" name="staff_ids[]" value="{{ $s['id'] }}" {{ $ex ? 'checked' : '' }} onchange="updateCount()">
                 </td>
                 <td>
                   <strong>{{ $s['name'] }}</strong>
                   <span class="muted" style="font-size:11.5px;">{{ $s['id'] }}</span>
+                  @if ($w === '希望')<span class="wish 希望">希望</span>@elseif ($w === '稼働可')<span class="wish 稼働可">稼働可</span>@elseif ($w === 'NG')<span class="wish NG">NG</span>@endif
                   @if ($s['exclusive'])<span class="badge ok" style="font-size:10px;">専属</span>@endif
                   @if ($ex && $ex['status'] === '確定')<span class="badge ok" style="font-size:10px;">確定済</span>@endif
                   @if (isset($sameDay[$s['id']]))
@@ -217,16 +220,6 @@
                 </td>
                 <td class="num">{{ $s['exp'] }}</td>
                 <td>
-                  @php($w = $s['wish'] ?? null)
-                  @if ($w === '希望')
-                    <span class="wish 希望">希望あり</span>
-                  @elseif ($w)
-                    <span class="wish {{ $w }}">{{ $w }}</span>
-                  @else
-                    <span class="muted" style="font-size:11.5px;">—</span>
-                  @endif
-                </td>
-                <td>
                   <select name="role[{{ $s['id'] }}]" class="role-sel" title="この案件で担当する役割（任意）">
                     <option value="">—</option>
                     @foreach ($roleLabels as $k => $label)
@@ -239,12 +232,14 @@
                 </td>
               </tr>
             @empty
-              <tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
+              <tr><td colspan="7" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
             @endforelse
           </tbody>
         </table>
         </div>
       </div>
+
+      <p id="noAvail" class="muted" style="display:none; font-size:12.5px; margin-top:8px;">この日に「希望・稼働可」の人がまだいません。上の「この日 希望・稼働可 の人だけ」のチェックを外すと、名簿の全員から選べます。</p>
 
       <div class="save-bar">
         <span class="hint">「いま選んでいる人」で上書き保存します（チェックを外した人はアサインから消えます）。複数日の案件は本番・予備日・リハごとに別の案件として保存します。</span>
@@ -328,9 +323,19 @@
   });
   function filterStaff() {
     const q = document.getElementById('staffSearch').value.trim();
+    const availToggle = document.getElementById('onlyAvail');
+    const availOnly = availToggle ? availToggle.checked : false;
+    let visible = 0;
     document.querySelectorAll('.staff-row').forEach(tr => {
-      tr.style.display = (!q || (tr.dataset.name || '').includes(q)) ? '' : 'none';
+      const nameOk = !q || (tr.dataset.name || '').includes(q);
+      // 「希望者だけ」表示でも、すでにアサイン済みの人は隠さない（外す判断ができるように）
+      const availOk = !availOnly || tr.dataset.avail === '1' || tr.dataset.assigned === '1';
+      const show = nameOk && availOk;
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
     });
+    const note = document.getElementById('noAvail');
+    if (note) note.style.display = (visible === 0 && availOnly) ? '' : 'none';
   }
   // 保存時：必要人数の不一致・NGペア同席があれば確認（警告であって保存は止めない）
   if (asgForm) {
@@ -349,6 +354,7 @@
     });
   }
   updateCount();
+  filterStaff();
 </script>
 @endverbatim
 @endpush

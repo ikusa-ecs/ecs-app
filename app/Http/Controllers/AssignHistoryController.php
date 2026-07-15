@@ -170,6 +170,53 @@ class AssignHistoryController extends Controller
         ]);
     }
 
+    /**
+     * クライアント履歴の照会（AJAX用・GET /clients/lookup?client=名前）。
+     *
+     * 案件登録フォームなどから呼び、そのお客様が「リピート（常連）」かどうかと、
+     * 過去案件（start_date の新しい順・最大5件）の日付・担当ディレクターを JSON で返す。
+     * 判定は projects.client の完全一致（前後の空白は落とす）。1件でもあれば常連。
+     * 新規登録中の案件はまだ保存されていない前提なので、既存に同名クライアントがあれば常連とみなす。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     *   {"isRepeat": bool, "count": 過去案件数, "entries":[{"date","director","project_name"}]}
+     */
+    public function lookup(Request $request)
+    {
+        $client = trim((string) $request->query('client', ''));
+
+        if ($client === '') {
+            return response()->json(['isRepeat' => false, 'count' => 0, 'entries' => []]);
+        }
+
+        // このお客様の案件を、担当ディレクター（people）付きで新しい順に一括取得（N+1回避）。
+        $projects = Project::with('director:id,name')
+            ->whereNotNull('client')
+            ->where('client', $client)
+            ->orderByDesc('start_date')
+            ->get();
+
+        $count = $projects->count();
+
+        // 表示用に最大5件だけ、日付・担当D・案件名を取り出す。
+        $entries = $projects->take(5)
+            ->map(fn (Project $p) => [
+                'date'         => $p->start_date
+                    ? $p->start_date->format('Y') . '/' . (int) $p->start_date->format('n') . '/' . (int) $p->start_date->format('j')
+                    : '',
+                'director'     => $p->director->name ?? '未定',
+                'project_name' => $p->project_name ?? '',
+            ])
+            ->values()
+            ->all();
+
+        return response()->json([
+            'isRepeat' => $count > 0,
+            'count'    => $count,
+            'entries'  => $entries,
+        ]);
+    }
+
     /** 開催日を「2026/7/10（金）」の形にする。null は空。 */
     private function fmtDate(?Carbon $d): string
     {
