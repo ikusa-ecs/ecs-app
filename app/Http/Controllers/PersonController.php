@@ -123,6 +123,25 @@ class PersonController extends Controller
                         'starter' => (bool) $p->self_starter,
                         'atmos'   => (bool) $p->improves_atmosphere,
                     ],
+                    // 本人プロフィール（公開ボードの設定／初回設定で本人が入力・people の実列）。
+                    // これまで名簿詳細は擬似ランダムの見本を出していたが、実データ表示に切り替える。
+                    'profile'   => [
+                        'appeal'   => $p->appeal ?? '',
+                        'likeC'    => $p->liked_contents ?? '',
+                        'dislikeC' => $p->disliked_contents ?? '',
+                        'strong'   => $p->strong_positions ?? '',
+                        'weak'     => $p->weak_positions ?? '',
+                        'height'   => $p->height ?? '',
+                        'shoe'     => $p->shoe_size ?? '',
+                        'shirt'    => $p->shirt_size ?? '',
+                        'pref'     => $p->prefecture ?? '',
+                        'station'  => $p->nearest_station ?? '',
+                        'mcPass'   => (bool) $p->mc_audition_passed,
+                        'kigurumi' => (bool) $p->can_kigurumi,
+                        'stay'     => (bool) $p->can_stay_over,
+                        'drive'    => $p->driving_level ?? '',
+                        'english'  => $p->english_level ?? '',
+                    ],
                 ];
             })
             ->values();
