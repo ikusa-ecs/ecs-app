@@ -158,6 +158,8 @@ class AssignmentController extends Controller
         // マスタ（content_role_requirements）に人数が登録されていれば、D×1・MC×2… の「枠」を出す。
         // 未登録なら空配列＝画面は従来どおり（全スタッフ一覧＋役割セレクト）で使える。
         $roleReq = $this->positionTemplate($project);
+        // 備考（担当）・巡回つきの内訳（必要アサイン人数リスト由来）。枠の下に見せる。
+        $roleDetail = $this->positionDetail($project);
 
         // すでに役割つきで入っている人数を役割ごとに数える（枠の初期「現在◯」＝サーバ側の目安）。
         // 画面側でチェック／役割を動かすとJSで即時に上書きされる。
@@ -177,6 +179,7 @@ class AssignmentController extends Controller
             'existing' => $existing,
             'roleLabels' => AssignmentRole::positionLabels(),
             'roleReq' => $roleReq,
+            'roleDetail' => $roleDetail,
             'roleAssigned' => $roleAssigned,
             'sameDay' => $sameDay,
             'monthCount' => $monthCount,
@@ -221,6 +224,58 @@ class AssignmentController extends Controller
         }
 
         return $ordered;
+    }
+
+    /**
+     * 必要ポジションの「担当内訳」＝[役割コード => ['label'=>, 'items'=>[['note'=>,'patrol'=>,'count'=>], ...]]]。
+     * content_role_requirements の note（備考）・patrol（巡回）を、役割×備考でまとめる。
+     * 備考のあるものだけ返す（D/MC/OP のような指定なしの枠は「ポジション枠」の数字で足りるため）。
+     */
+    private function positionDetail(Project $project): array
+    {
+        $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
+        $scale = $project->scale;
+        if (empty($contentIds) || ! $scale) {
+            return [];
+        }
+
+        $rows = ContentRoleRequirement::whereIn('content_id', $contentIds)
+            ->where('scale', $scale)
+            ->where('count', '>', 0)
+            ->orderBy('sort_order')
+            ->get(['position', 'count', 'note', 'patrol']);
+
+        // 役割 → 「備考|巡回」キー → 件数 を集計。
+        $agg = [];
+        foreach ($rows as $r) {
+            if (! AssignmentRole::isValid($r->position)) {
+                continue;
+            }
+            $note = trim((string) ($r->note ?? ''));
+            $patrol = $r->patrol;
+            if ($note === '' && $patrol === null) {
+                continue;   // 指定なしの枠は内訳に出さない（枠の数字で十分）
+            }
+            $key = $note . '|' . ($patrol ?? '');
+            if (! isset($agg[$r->position][$key])) {
+                $agg[$r->position][$key] = ['note' => $note, 'patrol' => $patrol, 'count' => 0];
+            }
+            $agg[$r->position][$key]['count'] += (int) $r->count;
+        }
+
+        // 表示順は AssignmentRole の定義順。
+        $out = [];
+        foreach (array_keys(AssignmentRole::LABELS) as $code) {
+            if (empty($agg[$code])) {
+                continue;
+            }
+            $out[] = [
+                'label' => AssignmentRole::label($code),
+                'items' => array_values($agg[$code]),
+            ];
+        }
+
+        return $out;
     }
 
     /** アサインを保存（いま選ばれている人で、その案件×その日を上書き）。 */

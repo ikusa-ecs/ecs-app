@@ -100,6 +100,14 @@
     .pos-slot.over  { border-color: #e8b877; background: #fdecd2; }
     .pos-slot.over  .cnt b { color: #b45309; }
     .pos-tpl .note { color: var(--muted); font-size: 12px; }
+    /* 担当の内訳（備考・巡回） */
+    .role-detail { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+    .role-detail .rd-ttl { font-size: 12.5px; font-weight: 700; margin-bottom: 6px; }
+    .role-detail .rd-ttl .sub { color: var(--muted); font-weight: 400; font-size: 11px; margin-left: 6px; }
+    .role-detail .rd-row { font-size: 12.5px; line-height: 1.9; }
+    .role-detail .rd-row b { color: var(--ink); }
+    .role-detail .rd-item { display: inline-block; background: #f4f1ec; border: 1px solid var(--line);
+      border-radius: 6px; padding: 1px 8px; margin: 2px 4px 2px 0; font-size: 11.5px; white-space: nowrap; }
 
     /* 下部の保存バー（画面下に貼り付く） */
     .save-bar {
@@ -171,6 +179,16 @@
               </span>
             @endforeach
           </div>
+          @if (count($roleDetail))
+            <div class="role-detail">
+              <div class="rd-ttl">担当の内訳<span class="sub">（必要アサイン人数リストより・備考／巡回）</span></div>
+              @foreach ($roleDetail as $d)
+                <div class="rd-row"><b>{{ $d['label'] }}</b>：
+                  @foreach ($d['items'] as $it)<span class="rd-item">{{ $it['note'] !== '' ? $it['note'] : '指定なし' }}@if ($it['patrol'] !== null)（巡回{{ $it['patrol'] }}）@endif ×{{ $it['count'] }}</span>@endforeach
+                </div>
+              @endforeach
+            </div>
+          @endif
         </div>
       @else
         <div class="panel pos-tpl">

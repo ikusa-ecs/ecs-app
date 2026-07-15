@@ -17,6 +17,8 @@ class ContentRoleRequirement extends Model
     {
         return [
             'count' => 'integer',
+            'patrol' => 'integer',
+            'sort_order' => 'integer',
         ];
     }
 }
