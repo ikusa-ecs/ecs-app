@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Content;
 use App\Models\Person;
+use App\Models\StaffRelation;
+use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * 人名簿（people テーブル）の画面。社員・スタッフは同じ1テーブル（role で区別）。
@@ -128,5 +131,82 @@ class PersonController extends Controller
         $status = app(StaffStatusController::class)->buildStatus();
 
         return view('staff', ['people' => $people, 'status' => $status]);
+    }
+
+    /**
+     * スタッフの「できるポジション・NGペア・専属・人柄・メモ」を編集する画面（GET /staff/{id}/edit）。
+     * これまで /staff の詳細パネルは見本（保存されない）だったのを、本物のDB保存に置き換える。
+     */
+    public function staffEdit(string $id)
+    {
+        $person = Person::staff()->with(['roleEligibilities', 'ngRelations'])->find($id);
+        if (! $person) {
+            return redirect('/staff')->with('status', 'スタッフが見つかりませんでした。一覧から選び直してください。');
+        }
+
+        return view('staff_edit', [
+            'person'         => $person,
+            'positionLabels' => AssignmentRole::positionLabels(),                 // [コード => 表示名]
+            'canPositions'   => $person->roleEligibilities->pluck('position')->all(),
+            'ngNames'        => $person->ngRelations->pluck('partner_name')->all(),
+        ]);
+    }
+
+    /**
+     * 上の編集画面の保存先（POST /staff/{id}/edit）。
+     * ポジション可否・NGペアは「この人の分を作り直す（全消し→入れ直し）」。専属・人柄・メモは people を更新。
+     */
+    public function staffUpdate(Request $request, string $id)
+    {
+        $person = Person::staff()->find($id);
+        if (! $person) {
+            return redirect('/staff')->with('status', 'スタッフが見つかりませんでした。一覧から選び直してください。');
+        }
+
+        $data = $request->validate([
+            'positions'   => ['sometimes', 'array'],
+            'positions.*' => ['string'],
+            'ng'          => ['nullable', 'string', 'max:2000'],
+            'impression'  => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($person, $request, $data) {
+            // 1) できるポジション：正規の役割コードだけ受け付け、この人の分を入れ直す。
+            $positions = array_values(array_unique(array_filter(
+                $data['positions'] ?? [],
+                fn ($p) => AssignmentRole::isValid($p)
+            )));
+            StaffRoleEligibility::where('staff_id', $person->id)->delete();
+            foreach ($positions as $pos) {
+                StaffRoleEligibility::create(['staff_id' => $person->id, 'position' => $pos]);
+            }
+
+            // 2) NGペア：改行区切りの氏名。登録済みスタッフなら people.id もひも付ける。この人の分を入れ直す。
+            $names = collect(preg_split('/\r\n|\r|\n/', (string) ($data['ng'] ?? '')))
+                ->map(fn ($s) => trim($s))
+                ->filter()
+                ->unique()
+                ->values();
+            StaffRelation::where('staff_id', $person->id)->delete();
+            foreach ($names as $name) {
+                StaffRelation::create([
+                    'staff_id'      => $person->id,
+                    'partner_name'  => $name,
+                    'partner_id'    => Person::where('name', $name)->value('id'),
+                    'relation_type' => 'NG',
+                ]);
+            }
+
+            // 3) 専属・人柄・メモ（people の実在カラム）。
+            $person->is_exclusive        = $request->boolean('exclusive');
+            $person->can_follow_newbie   = $request->boolean('follow');
+            $person->self_starter        = $request->boolean('starter');
+            $person->improves_atmosphere = $request->boolean('atmos');
+            $person->planner_impression  = $data['impression'] ?? null;
+            $person->save();
+        });
+
+        return redirect('/staff/' . urlencode($person->id) . '/edit')
+            ->with('status', $person->name . ' さんの情報を保存しました。');
     }
 }

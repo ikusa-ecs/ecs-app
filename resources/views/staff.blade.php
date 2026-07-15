@@ -112,7 +112,7 @@
 
       <!-- ===================== 名簿タブ ===================== -->
       <div class="pane show" id="pane-roster">
-      <div class="mock-note">氏名・事務所・専属・通算・できるポジション・相性（NG）は、登録済みのスタッフデータ（DB）を表示しています。<br>※「詳細」を開いた中の編集（ポジション可否・人柄メモ・保存ボタンなど）と、本人プロフィール／イベプラの雰囲気メモは、現在まだ保存に対応していません（見本表示です）。</div>
+      <div class="mock-note">氏名・事務所・専属・通算・できるポジション・相性（NG）は、登録済みのスタッフデータ（DB）を表示しています。<br>※「詳細」を開くと、可否・NGペア・専属・人柄メモを<b>本物編集ページ</b>で保存できます（本人プロフィール／イベプラの雰囲気メモは今後対応）。</div>
 
       <div class="panel">
         <div class="filterbar">
@@ -362,7 +362,7 @@
 
   function detailHtml(p, idx){
     const posChecks = POS.map(x =>
-      `<label><input type="checkbox" ${p.pos[x.k]?'checked':''} onchange="alert('モックのため保存はしません。')"> ${posFull[x.k]}</label>`
+      `<label><input type="checkbox" ${p.pos[x.k]?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> ${posFull[x.k]}</label>`
     ).join('');
     const ngStr = p.ng.join('、');
     const prof = profileFor(p);
@@ -389,9 +389,9 @@
 
             <h4 style="margin-top:16px;">人柄・育成メモ</h4>
             <div class="trait">
-              <label><input type="checkbox" ${p.traits.follow?'checked':''} onchange="alert('モックのため保存はしません。')"> 新人フォローができる</label>
-              <label><input type="checkbox" ${p.traits.starter?'checked':''} onchange="alert('モックのため保存はしません。')"> 自分で考えて動ける</label>
-              <label><input type="checkbox" ${p.traits.atmos?'checked':''} onchange="alert('モックのため保存はしません。')"> 現場の空気を良くする</label>
+              <label><input type="checkbox" ${p.traits.follow?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> 新人フォローができる</label>
+              <label><input type="checkbox" ${p.traits.starter?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> 自分で考えて動ける</label>
+              <label><input type="checkbox" ${p.traits.atmos?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> 現場の空気を良くする</label>
             </div>
           </div>
           <div>
@@ -399,15 +399,15 @@
             <textarea>${p.dnote}</textarea>
 
             <h4 style="margin-top:16px;">イベプラからの雰囲気</h4>
-            <textarea placeholder="イベプラが現場で感じた雰囲気・印象を記入" onchange="alert('モックのため保存はしません。')">${atmos}</textarea>
+            <textarea placeholder="イベプラが現場で感じた雰囲気・印象を記入" onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')">${atmos}</textarea>
 
             <h4 style="margin-top:16px;">NGペア（同席を避ける組合せ）</h4>
             <div class="pair-line"><b>NGペア：</b>${ngStr || '（なし）'}</div>
-            <div class="muted" style="font-size:12px; margin-top:4px;">※NGペアの編集はモックでは省略しています。</div>
+            <div class="muted" style="font-size:12px; margin-top:4px;">※NGペア・可否・専属の編集は下の「本物編集ページで保存する」から行えます。</div>
           </div>
         </div>
         <div class="save-row">
-          <button class="btn primary sm" onclick="alert('モックのため保存はしません。')">保存</button>
+          <a class="btn primary sm" href="/staff/${encodeURIComponent(p.id)}/edit">この内容を本物編集ページで保存する</a>
           <button class="btn sm" onclick="rosterToggle(${idx})">閉じる</button>
           <span class="muted" style="font-size:12px;">※載せるのは最低限の情報のみ。社員は全員この内容を閲覧できます。</span>
         </div>
