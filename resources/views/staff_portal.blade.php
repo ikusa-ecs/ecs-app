@@ -366,10 +366,10 @@
           <div class="m-card">
             <div class="field">
               <label>コメント（任意）</label>
-              <textarea rows="2" placeholder="例）後半は予定が入りやすいです／土日を希望します"></textarea>
+              <textarea id="prefMemo" rows="2" placeholder="例）後半は予定が入りやすいです／土日を希望します"></textarea>
             </div>
-            <button class="submit-btn" onclick="document.getElementById('savedMsg').style.display='block'">この内容で希望を提出する</button>
-            <div class="saved-msg" id="savedMsg">✓ 希望を保存しました（モックのため実際には送信されません）</div>
+            <button class="submit-btn" onclick="submitPref()">この内容で希望を提出する</button>
+            <div class="saved-msg" id="savedMsg">✓ 希望を保存しました</div>
           </div>
         </div>
       </div>
@@ -472,6 +472,9 @@
   <script>
     window.ECS_MY_PROFILE = @json($myProfile ?? null);
     window.ECS_CSRF = '{{ csrf_token() }}';
+    window.ECS_MY_PREFS = @json($myPrefs ?? []);
+    window.ECS_PREF_PERIOD = @json($prefPeriod ?? '');
+    window.ECS_MY_PREF_MEMO = @json($myPrefMemo ?? '');
   </script>
   @verbatim
   <script>
@@ -711,8 +714,12 @@
     // 確定（イベント）＝DBの公開済み案件。エントリー中＝募集タブ（cases.js）の応募中案件。
     (window.ECS_PUBLISHED || []).forEach(j => { const d = addDays(today, j.off); eventDays[d.getDate()] = j.content + ' ' + j.client; });
     jobs.filter(j => j.state === 'applied').forEach(j => { const d = ECS_caseDate(j.offset); if (!eventDays[d.getDate()]) entryDays[d.getDate()] = j.content + ' ' + j.client; });
-    const presetOk = [6, 13, 19, 27];    // 稼働可
-    const presetNg = [4, 11, 18, 25];    // NG
+    // 対象月（DB保存・読込に使う）。画面は 2026年7月 固定。
+    const _pp = (window.ECS_PREF_PERIOD || '2026-07').split('-');
+    const PREF_Y = parseInt(_pp[0], 10);
+    const PREF_M = parseInt(_pp[1], 10);
+    // 本人がDBに保存済みの希望（date "Y-M-D" => ok/ng/maybe）。無ければ空＝全部「未定」で開く。
+    const savedPrefs = window.ECS_MY_PREFS || {};
     for (let d = 1; d <= 31; d++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
@@ -728,8 +735,9 @@
         cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>';
       } else {
         let s = 0; // 0=未定,1=稼働可,2=NG
-        if (presetOk.includes(d)) s = 1;
-        else if (presetNg.includes(d)) s = 2;
+        const pv = savedPrefs[PREF_Y + '-' + PREF_M + '-' + d];
+        if (pv === 'ok') s = 1;
+        else if (pv === 'ng') s = 2;
         cell.dataset.state = s;
         cell.innerHTML = '<div>' + d + '</div><div class="st"></div>';
         applyCellState(cell);
@@ -740,6 +748,9 @@
       }
       grid.appendChild(cell);
     }
+    // 保存済みのコメントを反映
+    const _memoEl = document.getElementById('prefMemo');
+    if (_memoEl && window.ECS_MY_PREF_MEMO) _memoEl.value = window.ECS_MY_PREF_MEMO;
     function applyCellState(cell) {
       const s = parseInt(cell.dataset.state);
       cell.classList.remove('s-ok','s-ng');
@@ -752,6 +763,37 @@
     // 確定アサインの案件をタップ → 案件の詳細ページへ（※遷移先は未定。決まったらここでURLを設定）
     function openAssign(name) {
       alert(name + '\nの詳細ページへ移動します（モックのためダミーです）。\n※遷移先（案件詳細／LINEグループ など）は決まったら設定します。');
+    }
+
+    // 「この内容で希望を提出する」→ その月の希望をDB(shift_preferences)へ保存。
+    // タップで変えられるセル（dataset.state を持つ日）だけを集める。イベント/エントリー日は対象外。
+    function submitPref() {
+      const state = {};
+      document.querySelectorAll('#calGrid .cell').forEach(cell => {
+        if (cell.dataset.state === undefined) return;
+        const day = parseInt((cell.querySelector('div') || {}).textContent, 10);
+        if (!day) return;
+        const s = parseInt(cell.dataset.state, 10);
+        state[PREF_Y + '-' + PREF_M + '-' + day] = (s === 1 ? 'ok' : (s === 2 ? 'ng' : 'maybe'));
+      });
+      const body = new URLSearchParams();
+      body.append('period', window.ECS_PREF_PERIOD || '');
+      Object.keys(state).forEach(k => body.append('state[' + k + ']', state[k]));
+      const memoEl = document.getElementById('prefMemo');
+      if (memoEl) body.append('memo', memoEl.value);
+      const msg = document.getElementById('savedMsg');
+      fetch('/staff-portal/availability', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!msg) return;
+        msg.textContent = (res && res.ok) ? '✓ 希望を保存しました' : ('⚠ ' + ((res && res.message) || '保存できませんでした'));
+        msg.style.display = 'block';
+      })
+      .catch(err => { if (msg) { msg.textContent = '保存に失敗しました（' + err + '）'; msg.style.display = 'block'; } });
     }
 
     // ===== タブ切り替え =====

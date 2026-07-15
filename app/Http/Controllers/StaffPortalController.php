@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
 use App\Models\Setting;
+use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\TestAccounts;
@@ -83,8 +84,18 @@ class StaffPortalController extends Controller
             'recruitJobs' => $this->recruitJobs($today),
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
             'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
+            'prefPeriod' => self::PREF_PERIOD,              // 稼働希望カレンダーの対象月（画面は7月固定）
+            'myPrefs' => $this->myPrefs($me),               // 本人の希望（カレンダー初期表示）
+            'myPrefMemo' => $this->myPrefMemo($me),         // 希望のコメント（初期表示）
         ]);
     }
+
+    // 稼働希望カレンダーの対象月。画面（cal-grid）が 2026年7月 固定で組まれているのに合わせる。
+    // ※月の切り替えは既存カレンダーの作り込み範囲外。ここでは「その月の保存・読込」を本物にする。
+    private const PREF_PERIOD = '2026-07';
+
+    /** DBの availability → カレンダーの状態語（ok/ng/maybe）。「希望」も画面では〇(ok)扱い。 */
+    private const PREF_TO_VIEW = ['稼働可' => 'ok', '希望' => 'ok', 'NG' => 'ng', '未定' => 'maybe'];
 
     /**
      * 設定タブ（プロフィール／できるポジション・スキル）の初期表示に使う、本人のDB値。
@@ -189,6 +200,106 @@ class StaffPortalController extends Controller
         });
 
         return response()->json(['ok' => true, 'message' => '保存しました。']);
+    }
+
+    /**
+     * 稼働希望カレンダーの初期表示に使う、本人の希望（date "Y-M-D" => ok/ng/maybe）。
+     * 画面のキーは月/日ゼロ埋めなし（employee-availability と同じ形）。テスト/未ログインは空。
+     */
+    private function myPrefs($me): array
+    {
+        if (! $me || TestAccounts::isTest($me)) {
+            return [];
+        }
+        $map = [];
+        foreach (ShiftPreference::where('staff_id', $me->id)->get() as $sp) {
+            $d = $sp->date;
+            if (! $d) {
+                continue;
+            }
+            $view = self::PREF_TO_VIEW[$sp->availability] ?? null;
+            if ($view !== null) {
+                $map[$d->year.'-'.$d->month.'-'.$d->day] = $view;
+            }
+        }
+        return $map;
+    }
+
+    /** 希望のコメント（対象月の note を1つ拾う）。 */
+    private function myPrefMemo($me): string
+    {
+        if (! $me || TestAccounts::isTest($me)) {
+            return '';
+        }
+        $row = ShiftPreference::where('staff_id', $me->id)
+            ->where('period', self::PREF_PERIOD)
+            ->whereNotNull('note')
+            ->where('note', '!=', '')
+            ->first();
+
+        return $row->note ?? '';
+    }
+
+    /**
+     * 稼働希望カレンダーの提出（POST /staff-portal/availability・本人分のみ）。
+     * その月ぶんを「作り直す」＝本人×対象月の既存行を消してから、ok(稼働可)/ng(NG) だけ入れ直す。
+     * 未定は行を持たない（＝希望なし）。テスト用アカウントは保存しない。
+     */
+    public function saveAvailability(Request $request)
+    {
+        $user = Auth::user();
+        if (! $user || TestAccounts::isTest($user)) {
+            return response()->json(['ok' => false, 'message' => 'テスト用アカウントは保存できません（見本のため）。']);
+        }
+
+        $period = (string) $request->input('period', '');
+        $state = (array) $request->input('state', []);   // { "Y-M-D": "ok"|"ng"|"maybe" }
+        $memo = $request->input('memo');
+
+        // period（YYYY-MM）から対象の年・月を取り出す（その月を作り直す範囲）。
+        if (! preg_match('/^(\d{4})-(\d{1,2})$/', $period, $mm)) {
+            return response()->json(['ok' => false, 'message' => 'period（対象月）が不正です。'], 422);
+        }
+        $year = (int) $mm[1];
+        $month = (int) $mm[2];
+
+        $toDb = ['ok' => '稼働可', 'ng' => 'NG'];   // 未定は保存しない（行なし＝希望なし）
+
+        $saved = DB::transaction(function () use ($user, $year, $month, $period, $state, $memo, $toDb) {
+            // 本人×対象月の希望を一旦消す（未定に戻した日も確実に消えるように）。
+            ShiftPreference::where('staff_id', $user->id)
+                ->whereYear('date', $year)
+                ->whereMonth('date', $month)
+                ->delete();
+
+            $n = 0;
+            foreach ($state as $key => $value) {
+                $availability = $toDb[$value] ?? null;
+                if ($availability === null) {
+                    continue;   // maybe（未定）や不正値は入れない
+                }
+                $parts = explode('-', (string) $key);
+                if (count($parts) !== 3) {
+                    continue;
+                }
+                try {
+                    $date = Carbon::create((int) $parts[0], (int) $parts[1], (int) $parts[2])->format('Y-m-d');
+                } catch (\Throwable $e) {
+                    continue;
+                }
+                ShiftPreference::create([
+                    'staff_id' => $user->id,
+                    'period' => $period,
+                    'date' => $date,
+                    'availability' => $availability,
+                    'note' => $memo,
+                ]);
+                $n++;
+            }
+            return $n;
+        });
+
+        return response()->json(['ok' => true, 'saved' => $saved]);
     }
 
     /**
