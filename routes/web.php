@@ -66,6 +66,8 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // 設定タブの「自分の情報」をDB(people)へ本物保存（AJAX・本人分のみ）。
     Route::post('/staff-portal/profile', [StaffPortalController::class, 'saveProfile']);
     Route::post('/staff-portal/skills', [StaffPortalController::class, 'savePositions']);
+    // 稼働希望カレンダー（その月の希望）をDB(shift_preferences)へ本物保存。
+    Route::post('/staff-portal/availability', [StaffPortalController::class, 'saveAvailability']);
 
     // 本人のパスワード変更（初回ログイン後などに自分で変える）。
     Route::get('/password', [PasswordController::class, 'edit']);
