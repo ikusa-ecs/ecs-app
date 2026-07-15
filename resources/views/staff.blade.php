@@ -276,49 +276,15 @@
   ];
   const posFull = { OP:'OP（音響）', MC:'MC（司会進行）', SP:'軍師・サポーター' };
 
-  // ===== スタッフ設定（staff_portal.html）で本人が入力した内容を、ここに反映する =====
-  // このモックでのログイン中の本人＝佐藤 健太（S-032）。
-  // 本人だけは「スタッフ設定」で保存した実データ(localStorage)を読み込んで表示する。
-  // → スタッフ設定で書き換えてからこの画面を開くと、内容が反映される。本人以外はサンプル表示。
-  const ME_ID = 'S-032';
-  const PROFILE_STORE = 'ecs_staff_profile';   // staff_portal.html と同じキー
-
-  function readMyProfile(){
-    try { const raw = localStorage.getItem(PROFILE_STORE); if (raw) return JSON.parse(raw); } catch(e){}
-    return null;
-  }
-
-  // 本人以外（またはまだ未保存）のときに出す仮表示の素材
-  const APPEAL_POOL  = ['元気な進行が得意です！','どんな現場でも笑顔で対応します。','裏方の段取りが好きです。','子ども向けが得意です。','落ち着いて状況を見られます。'];
-  const LIKEC_POOL   = ['運動会・水合戦','謎解き・クイズ大会','縁日・お祭り','チームビルディング','オンライン配信'];
-  const DISLIKEC_POOL= ['オンライン配信','長時間の屋外','特になし','大規模アリーナ','早朝集合'];
-  const STRONGFREE_POOL = ['盛り上げ役が好きです。','全体を見て動くのが得意。','受付まわりは任せてください。','設営の段取りが速いです。',''];
-  const WEAKFREE_POOL   = ['細かい受付業務はやや苦手。','大人数の前の司会は緊張します。','機材操作は勉強中です。','特になし。',''];
-  const ATMOS_POOL   = ['明るくて現場が和む。挨拶がしっかりしている。','黙々と正確に動くタイプ。指示は具体的だと安心。','後輩の面倒見がよい。場を仕切れる。','まだ緊張気味だが素直。フォロー役とセットが◎。','ムードメーカー。お客様対応が丁寧。'];
-  function seedOf(id){ let s=0; for(const c of id) s=(s*31+c.charCodeAt(0))>>>0; return s; }
-  function pick(arr, seed){ return arr[seed % arr.length]; }
-
-  // その人の「本人プロフィール（設定画面の内容）」を返す
+  // その人の「本人プロフィール」＝ people の実データ（Controller が profile として渡す）。
+  // 以前は擬似ランダムの見本を出していたが、本人が公開ボードの設定／初回設定で入力した実データを表示する。
+  // live ＝ どれか1つでも入力済みか（未入力なら「本人未入力」と出す）。
   function profileFor(p){
-    if (p.id === ME_ID){
-      const d = readMyProfile();
-      if (d){
-        return {
-          live: true,
-          appeal: d.pfAppeal||'', likeC: d.pfLike||'', dislikeC: d.pfDislike||'',
-          strong: d.pfStrongPosFree||'', weak: d.pfWeakPosFree||''
-        };
-      }
-    }
-    const s = seedOf(p.id);
-    return {
-      live: false,
-      appeal: pick(APPEAL_POOL, s), likeC: pick(LIKEC_POOL, s), dislikeC: pick(DISLIKEC_POOL, s+1),
-      strong: pick(STRONGFREE_POOL, s), weak: pick(WEAKFREE_POOL, s+2)
-    };
+    const d = p.profile || {};
+    const filled = ['appeal','likeC','dislikeC','strong','weak','height','shoe','shirt','pref','station','drive','english']
+      .some(k => d[k]) || d.mcPass || d.kigurumi || d.stay;
+    return { live: !!filled, ...d };
   }
-  // 「イベプラからの雰囲気」（社員＝イベプラが書くメモ）の仮表示
-  function atmosFor(p){ return pick(ATMOS_POOL, seedOf(p.id)); }
 
   const tbody = document.getElementById('tbody');
 
@@ -366,18 +332,34 @@
     ).join('');
     const prof = profileFor(p);
     const profBadge = prof.live
-      ? ' <span class="badge green" style="font-size:11px;">本人入力を反映中</span>'
-      : ' <span class="muted" style="font-size:11px;">※サンプル表示</span>';
+      ? ' <span class="badge green" style="font-size:11px;">本人入力あり</span>'
+      : ' <span class="muted" style="font-size:11px;">※本人未入力</span>';
+    const skillBits = [];
+    if (prof.mcPass)   skillBits.push('MC合格');
+    if (prof.kigurumi) skillBits.push('着ぐるみOK');
+    if (prof.stay)     skillBits.push('前泊・後泊OK');
+    if (prof.drive)    skillBits.push('運転：' + prof.drive);
+    if (prof.english)  skillBits.push('英語：' + prof.english);
+    const physBits = [];
+    if (prof.height) physBits.push('身長 ' + prof.height);
+    if (prof.shoe)   physBits.push('靴 ' + prof.shoe);
+    if (prof.shirt)  physBits.push('衣装 ' + prof.shirt);
+    const areaBits = [];
+    if (prof.pref)    areaBits.push(prof.pref);
+    if (prof.station) areaBits.push(prof.station);
     return `
       <div class="detail-box">
         <div style="border:1px solid #e4ddd3;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#fbf8f3;">
-          <h4 style="margin:0 0 6px;">本人プロフィール（スタッフ設定の内容）${profBadge}</h4>
+          <h4 style="margin:0 0 6px;">本人プロフィール（本人入力）${profBadge}</h4>
           <div style="font-size:13px;line-height:1.9;">
             <div><b>一言アピール：</b>${prof.appeal||'（未入力）'}</div>
             <div><b>好きなコンテンツ：</b>${prof.likeC||'（未入力）'}</div>
             <div><b>苦手なコンテンツ：</b>${prof.dislikeC||'（未入力）'}</div>
             <div><b>得意なポジション：</b>${prof.strong||'（未入力）'}</div>
             <div><b>苦手なポジション：</b>${prof.weak||'（未入力）'}</div>
+            <div><b>スキル：</b>${skillBits.length ? skillBits.join('／') : '（未入力）'}</div>
+            <div><b>身体・サイズ：</b>${physBits.length ? physBits.join('／') : '（未入力）'}</div>
+            <div><b>エリア：</b>${areaBits.length ? areaBits.join('　') : '（未入力）'}</div>
           </div>
         </div>
         <div class="dgrid">

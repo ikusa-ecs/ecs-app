@@ -6,9 +6,13 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
 use App\Models\Setting;
+use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
+use App\Support\TestAccounts;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * スタッフ側ポータル（/staff-portal）。
@@ -78,7 +82,113 @@ class StaffPortalController extends Controller
             'published' => $published,
             'recruitJobs' => $this->recruitJobs($today),
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
+            'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
         ]);
+    }
+
+    /**
+     * 設定タブ（プロフィール／できるポジション・スキル）の初期表示に使う、本人のDB値。
+     * テスト用アカウント（DBに実体が無い）や未ログインのときは null＝画面は空欄で開く。
+     */
+    private function myProfile($me): ?array
+    {
+        if (! $me || TestAccounts::isTest($me)) {
+            return null;
+        }
+
+        $elig = $me->roleEligibilities->pluck('position')->all();
+
+        return [
+            'height'            => $me->height,
+            'shoe_size'         => $me->shoe_size,
+            'shirt_size'        => $me->shirt_size,
+            'prefecture'        => $me->prefecture,
+            'nearest_station'   => $me->nearest_station,
+            'appeal'            => $me->appeal,
+            'liked_contents'    => $me->liked_contents,
+            'disliked_contents' => $me->disliked_contents,
+            'strong_positions'  => $me->strong_positions,
+            'weak_positions'    => $me->weak_positions,
+            'mcPass'            => (bool) $me->mc_audition_passed,
+            'kigurumi'          => (bool) $me->can_kigurumi,
+            'stay'              => (bool) $me->can_stay_over,
+            'drive'             => $me->driving_level,
+            'english'           => $me->english_level,
+            // OP・軍師(SP) は「できる役割」= staff_role_eligibility。トグルの初期ON/OFFに使う。
+            'op'                => in_array(AssignmentRole::OP, $elig, true),
+            'gunshi'            => in_array(AssignmentRole::SP, $elig, true),
+        ];
+    }
+
+    /**
+     * 設定タブ「プロフィール（自分の情報）」をDB(people)へ保存（AJAX・本人分のみ）。
+     * これまで localStorage 保存だったものを本物化。テスト用アカウントは保存しない（/profile と同じ方針）。
+     */
+    public function saveProfile(Request $request)
+    {
+        $user = Auth::user();
+        if (! $user || TestAccounts::isTest($user)) {
+            return response()->json(['ok' => false, 'message' => 'テスト用アカウントは保存できません（見本のため）。']);
+        }
+
+        $data = $request->validate([
+            'height'            => ['nullable', 'string', 'max:20'],
+            'shoe_size'         => ['nullable', 'string', 'max:20'],
+            'shirt_size'        => ['nullable', 'string', 'max:20'],
+            'prefecture'        => ['nullable', 'string', 'max:20'],
+            'nearest_station'   => ['nullable', 'string', 'max:100'],
+            'appeal'            => ['nullable', 'string', 'max:1000'],
+            'liked_contents'    => ['nullable', 'string', 'max:1000'],
+            'disliked_contents' => ['nullable', 'string', 'max:1000'],
+            'strong_positions'  => ['nullable', 'string', 'max:1000'],
+            'weak_positions'    => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $user->fill($data);   // Person は guarded=[] なので列名一致でそのまま入る
+        $user->save();
+
+        return response()->json(['ok' => true, 'message' => 'プロフィールを保存しました。']);
+    }
+
+    /**
+     * 設定タブ「できるポジション・スキル」をDBへ保存（AJAX・本人分のみ）。
+     * MC合格・着ぐるみ・前泊・運転・英語は people 列へ。OP・軍師(SP) は staff_role_eligibility。
+     * OP/SP は「この2つの範囲だけ」入れ替える（範囲外＝管理者が名簿で付けた他の役割は温存）。
+     */
+    public function savePositions(Request $request)
+    {
+        $user = Auth::user();
+        if (! $user || TestAccounts::isTest($user)) {
+            return response()->json(['ok' => false, 'message' => 'テスト用アカウントは保存できません（見本のため）。']);
+        }
+
+        $user->mc_audition_passed = $request->boolean('mc');
+        $user->can_kigurumi       = $request->boolean('kigurumi');
+        $user->can_stay_over      = $request->boolean('stay');
+        $drive   = trim((string) $request->input('drive', ''));
+        $english = trim((string) $request->input('english', ''));
+        $user->driving_level = ($drive === '' || $drive === '（なし）') ? null : $drive;
+        $user->english_level = ($english === '' || $english === '（なし）') ? null : $english;
+        $user->save();
+
+        // OP・軍師(SP) の「できる役割」を、この2つの範囲だけ入れ替える（他の役割は消さない）。
+        $want = [];
+        if ($request->boolean('op')) {
+            $want[] = AssignmentRole::OP;
+        }
+        if ($request->boolean('gunshi')) {
+            $want[] = AssignmentRole::SP;
+        }
+        DB::transaction(function () use ($user, $want) {
+            StaffRoleEligibility::where('staff_id', $user->id)
+                ->whereIn('position', [AssignmentRole::OP, AssignmentRole::SP])
+                ->delete();
+            foreach ($want as $pos) {
+                StaffRoleEligibility::create(['staff_id' => $user->id, 'position' => $pos]);
+            }
+        });
+
+        return response()->json(['ok' => true, 'message' => '保存しました。']);
     }
 
     /**

@@ -63,6 +63,9 @@ Route::middleware(['auth', 'twofa'])->group(function () {
 Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // スタッフ画面（サイドバー無しの独自レイアウト）。スタッフ本人が使う・社員も閲覧できる。
     Route::get('/staff-portal', [StaffPortalController::class, 'index']);
+    // 設定タブの「自分の情報」をDB(people)へ本物保存（AJAX・本人分のみ）。
+    Route::post('/staff-portal/profile', [StaffPortalController::class, 'saveProfile']);
+    Route::post('/staff-portal/skills', [StaffPortalController::class, 'savePositions']);
 
     // 本人のパスワード変更（初回ログイン後などに自分で変える）。
     Route::get('/password', [PasswordController::class, 'edit']);

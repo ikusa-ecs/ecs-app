@@ -431,7 +431,7 @@
               💡 ここに入力した内容は、メンバーを決めるときの<b>参考</b>にさせてもらうものです。できるだけ希望や得意を活かしたいと思っていますが、現場の状況やチームのバランスもあるため、<b>必ずしも好きなコンテンツや得意なポジションばかりにアサインされるわけではありません</b>。あらかじめご了承ください。
             </div>
             <button class="submit-btn" onclick="saveProfile()">この内容で保存する</button>
-            <div class="saved-msg" id="pfSavedMsg">✓ 保存しました（モックのため実際には送信されません）</div>
+            <div class="saved-msg" id="pfSavedMsg">✓ 保存しました</div>
           </div>
 
           <!-- ② できるポジション・スキル -->
@@ -440,7 +440,7 @@
             <p class="sub">あなたが対応できる役割をONにしてください。ここで選んだ内容は、担当が案件のメンバーを決めるときの参考になります。</p>
             <div class="pos-list" id="posList"></div>
             <button class="submit-btn" style="margin-top:6px;" onclick="savePositions()">この内容で保存する</button>
-            <div class="saved-msg" id="posSavedMsg">✓ 保存しました（モックのため実際には送信されません）</div>
+            <div class="saved-msg" id="posSavedMsg">✓ 保存しました</div>
           </div>
 
           <!-- ③ アカウント（ログイン関連） -->
@@ -468,6 +468,11 @@
   <script>window.ECS_PUBLISHED = @json($published);</script>
   <!-- 募集中タブの案件リスト（DB）。空のときは見本cases.jsにフォールバック。 -->
   <script>window.ECS_RECRUIT_JOBS = @json($recruitJobs ?? []);</script>
+  <!-- 設定タブの初期値（本人のDB値）＋保存用のCSRFトークン。test/未ログインは null。 -->
+  <script>
+    window.ECS_MY_PROFILE = @json($myProfile ?? null);
+    window.ECS_CSRF = '{{ csrf_token() }}';
+  </script>
   @verbatim
   <script>
     // ===== 募集中の案件（共通リスト data/cases.js から作る） =====
@@ -757,32 +762,56 @@
       document.getElementById(btn.dataset.tab).classList.add('active');
     }
 
-    // ===== 設定タブ：プロフィール（自分の情報） =====
-    // 入力欄のID一覧（保存・読み込みで共通して使う）
-    const PROFILE_FIELDS = ['pfHeight','pfShoe','pfWear','pfPref','pfStation','pfAppeal','pfLike','pfDislike','pfStrongPosFree','pfWeakPosFree'];
-    const PROFILE_STORE = 'ecs_staff_profile';   // 同じブラウザに記憶するキー
-
-    // 記憶しているプロフィールを各欄に入れる
-    function loadProfile() {
-      let data = {};
-      try { const raw = localStorage.getItem(PROFILE_STORE); if (raw) data = JSON.parse(raw); } catch (e) {}
-      PROFILE_FIELDS.forEach(id => {
-        const el = document.getElementById(id);
-        if (el && data[id] != null) el.value = data[id];
+    // ===== 設定タブ：DB保存の共通処理 =====
+    // 入力内容を本物のDB（people）へ保存する。localStorage はやめてサーバに送る。
+    function postSettings(url, body, msgId) {
+      const msg = document.getElementById(msgId);
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-TOKEN': window.ECS_CSRF || '',
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!msg) return;
+        msg.textContent = (res && res.ok ? '✓ ' : '⚠ ') + ((res && res.message) || '保存しました');
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+      })
+      .catch(err => {
+        if (msg) { msg.textContent = '保存に失敗しました（' + err + '）'; msg.style.display = 'block'; }
       });
     }
 
-    // 「この内容で保存する」→ 同じブラウザに記憶
-    function saveProfile() {
-      const data = {};
-      PROFILE_FIELDS.forEach(id => {
+    // ===== 設定タブ：プロフィール（自分の情報） =====
+    // 入力欄のID ↔ people 列名の対応
+    const PF_MAP = {
+      pfHeight:'height', pfShoe:'shoe_size', pfWear:'shirt_size', pfPref:'prefecture', pfStation:'nearest_station',
+      pfAppeal:'appeal', pfLike:'liked_contents', pfDislike:'disliked_contents',
+      pfStrongPosFree:'strong_positions', pfWeakPosFree:'weak_positions'
+    };
+
+    // DBに保存済みの本人プロフィールを各欄に入れる
+    function loadProfile() {
+      const d = window.ECS_MY_PROFILE || {};
+      Object.keys(PF_MAP).forEach(id => {
         const el = document.getElementById(id);
-        if (el) data[id] = el.value;
+        if (el && d[PF_MAP[id]] != null) el.value = d[PF_MAP[id]];
       });
-      try { localStorage.setItem(PROFILE_STORE, JSON.stringify(data)); } catch (e) {}
-      const msg = document.getElementById('pfSavedMsg');
-      msg.style.display = 'block';
-      setTimeout(() => { msg.style.display = 'none'; }, 2500);
+    }
+
+    // 「この内容で保存する」→ DB（people）へ保存
+    function saveProfile() {
+      const body = new URLSearchParams();
+      Object.keys(PF_MAP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) body.append(PF_MAP[id], el.value);
+      });
+      postSettings('/staff-portal/profile', body, 'pfSavedMsg');
     }
 
     // ===== 設定タブ：できるポジション・スキル =====
@@ -802,15 +831,13 @@
       { key:'english', label:'英語力',     note:'英語での対応レベル',
         options:['（なし）', '片言レベル', '日常会話レベル', 'ビジネス会話可能レベル'] },
     ];
-    const POS_STORE = 'ecs_staff_positions';   // 同じブラウザに記憶するキー
-
-    // 記憶している選択内容を読む（無ければ既定）
+    // DBに保存済みの「できるポジション・スキル」を読む（無ければ既定OFF）
     function loadPositions() {
-      try {
-        const raw = localStorage.getItem(POS_STORE);
-        if (raw) return JSON.parse(raw);
-      } catch (e) {}
-      return { mc:false, op:false, gunshi:false, kigurumi:false, stay:false, drive:'（なし）', english:'（なし）' };
+      const d = window.ECS_MY_PROFILE || {};
+      return {
+        mc: !!d.mcPass, op: !!d.op, gunshi: !!d.gunshi, kigurumi: !!d.kigurumi, stay: !!d.stay,
+        drive: d.drive || '（なし）', english: d.english || '（なし）'
+      };
     }
 
     // ポジションのスイッチ一覧を描画
@@ -843,19 +870,16 @@
       });
     }
 
-    // 「この内容で保存する」→ 同じブラウザに記憶
+    // 「この内容で保存する」→ DBへ保存（ON項目だけ送る＝未チェックはOFF扱い）
     function savePositions() {
-      const sel = {};
+      const body = new URLSearchParams();
       document.querySelectorAll('#posList input[type="checkbox"]').forEach(cb => {
-        sel[cb.dataset.key] = cb.checked;
+        if (cb.checked) body.append(cb.dataset.key, '1');
       });
       document.querySelectorAll('#posList select[data-key]').forEach(s => {
-        sel[s.dataset.key] = s.value;
+        body.append(s.dataset.key, s.value);
       });
-      try { localStorage.setItem(POS_STORE, JSON.stringify(sel)); } catch (e) {}
-      const msg = document.getElementById('posSavedMsg');
-      msg.style.display = 'block';
-      setTimeout(() => { msg.style.display = 'none'; }, 2500);
+      postSettings('/staff-portal/skills', body, 'posSavedMsg');
     }
   </script>
   @endverbatim
