@@ -42,6 +42,13 @@
     table.tbl input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--brand); cursor: pointer; }
     .ng-note { color: var(--danger); font-size: 11.5px; }
 
+    /* この日の稼働希望バッジ（希望あり=強調・稼働可=緑・NG=赤・未定=グレー） */
+    .wish { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+    .wish.希望 { background: var(--brand-soft); color: var(--brand-dark); }
+    .wish.稼働可 { background: var(--ok-soft); color: #15803d; }
+    .wish.NG { background: var(--danger-soft); color: #b91c1c; }
+    .wish.未定 { background: #eef0f2; color: #8a8f98; }
+
     /* 警告バッジ（同日かぶり・月20件上限） */
     .dup-warn { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
                 background: var(--danger-soft); color: #b91c1c; white-space: nowrap; }
@@ -171,6 +178,7 @@
               <th>区分</th>
               <th>できる役割</th>
               <th class="num">経験</th>
+              <th>この日の希望</th>
               <th>この案件での役割</th>
               <th>NG</th>
             </tr>
@@ -209,6 +217,16 @@
                 </td>
                 <td class="num">{{ $s['exp'] }}</td>
                 <td>
+                  @php($w = $s['wish'] ?? null)
+                  @if ($w === '希望')
+                    <span class="wish 希望">希望あり</span>
+                  @elseif ($w)
+                    <span class="wish {{ $w }}">{{ $w }}</span>
+                  @else
+                    <span class="muted" style="font-size:11.5px;">—</span>
+                  @endif
+                </td>
+                <td>
                   <select name="role[{{ $s['id'] }}]" class="role-sel" title="この案件で担当する役割（任意）">
                     <option value="">—</option>
                     @foreach ($roleLabels as $k => $label)
@@ -221,7 +239,7 @@
                 </td>
               </tr>
             @empty
-              <tr><td colspan="7" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
+              <tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
             @endforelse
           </tbody>
         </table>

@@ -7,6 +7,7 @@ use App\Http\Controllers\AssignBoardController;
 use App\Http\Controllers\AssignDashboardController;
 use App\Http\Controllers\AssignDetailController;
 use App\Http\Controllers\AssignDirectorController;
+use App\Http\Controllers\AssignHistoryController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AssignPublishController;
 use App\Http\Controllers\AssignSheetController;
@@ -126,6 +127,8 @@ Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
 // アサイン関連の画面（Blade化済み）
 // アサイン表（東京アサイン表そっくりの縦カード）。案件情報＋割り当てメンバーを1画面で見る。月を選んで表示。
 Route::get('/assign-sheet', [AssignSheetController::class, 'index']);
+// クライアント別アサイン履歴。お客様ごとに「常連スタッフ」と過去案件の顔ぶれを見る（見るだけ）。
+Route::get('/assign-history', [AssignHistoryController::class, 'index']);
 // アサインダッシュボード＝担当者向けの状況まとめ。「アサインが必要な案件」だけ本物の案件から作る。
 Route::get('/assign-dashboard', [AssignDashboardController::class, 'index']);
 // 割当メンバーの仮データに使う名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。

@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -53,12 +54,23 @@ class AssignmentController extends Controller
             ->map(fn ($a) => ['role' => $a->role, 'status' => $a->status])
             ->all();
 
-        // スタッフ名簿（経験回数の多い順）。区分・できる役割・NG も一緒に。
+        // この案件の日について、各スタッフが出した稼働希望（希望/稼働可/NG/未定）。
+        // shift_preferences にまだ入力が無ければ空配列＝全員「—」表示（画面は従来どおり動く）。
+        $wish = [];
+        if ($date) {
+            $wish = ShiftPreference::whereDate('date', $date->format('Y-m-d'))
+                ->pluck('availability', 'staff_id')
+                ->all();
+        }
+
+        // スタッフ名簿。区分・できる役割・NG・この日の希望 も一緒に。
+        // 並びは「希望あり→稼働可→未定→NG」を上に、同じ希望の中では経験回数の多い順
+        // （元クエリを experience_count 降順で取り、PHP8の安定ソートで希望優先に並べ替える）。
         $staff = Person::staff()
             ->with(['roleEligibilities', 'ngRelations'])
             ->orderByDesc('experience_count')
             ->get()
-            ->map(function (Person $p) {
+            ->map(function (Person $p) use ($wish) {
                 $can = $p->roleEligibilities->pluck('position')->all();
                 $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $can);
 
@@ -70,7 +82,14 @@ class AssignmentController extends Controller
                     'exclusive' => (bool) $p->is_exclusive,
                     'posLabels' => $posLabels,
                     'ng' => $p->ngRelations->pluck('partner_name')->all(),
+                    'wish' => $wish[$p->id] ?? null,
                 ];
+            })
+            ->sortBy(fn ($s) => match ($s['wish']) {
+                '希望' => 0,
+                '稼働可' => 1,
+                'NG' => 3,
+                default => 2,   // 未定・未入力
             })
             ->values();
 

@@ -26,6 +26,7 @@
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> アサイン</div>
       <div class="group-items">
         <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
+        <a class="{{ ($active ?? '') === 'assign_history' ? 'active' : '' }}" href="/assign-history"><span class="nav-icon">🔁</span> クライアント別アサイン履歴</a>
         <a class="{{ ($active ?? '') === 'assign_dashboard' ? 'active' : '' }}" href="/assign-dashboard"><span class="nav-icon">▣</span> アサインダッシュボード</a>
         <a class="{{ ($active ?? '') === 'assign' ? 'active' : '' }}" href="/assign"><span class="nav-icon">▦</span> 日別ボード</a>
         <a class="{{ ($active ?? '') === 'assign_detail' ? 'active' : '' }}" href="/assign-detail"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
