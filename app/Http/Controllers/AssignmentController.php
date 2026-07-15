@@ -9,6 +9,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\AssignmentScorer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -63,41 +64,12 @@ class AssignmentController extends Controller
                 ->all();
         }
 
-        // スタッフ名簿。区分・できる役割・NG・この日の希望 も一緒に。
-        // 並びは「希望あり→稼働可→未定→NG」を上に、同じ希望の中では経験回数の多い順
-        // （元クエリを experience_count 降順で取り、PHP8の安定ソートで希望優先に並べ替える）。
-        $staff = Person::staff()
-            ->with(['roleEligibilities', 'ngRelations'])
-            ->orderByDesc('experience_count')
-            ->get()
-            ->map(function (Person $p) use ($wish) {
-                $can = $p->roleEligibilities->pluck('position')->all();
-                $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $can);
-
-                return [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'level' => $p->skill_level ?? '—',
-                    'exp' => $p->experience_count ?? 0,
-                    'exclusive' => (bool) $p->is_exclusive,
-                    'posLabels' => $posLabels,
-                    'ng' => $p->ngRelations->pluck('partner_name')->all(),
-                    'wish' => $wish[$p->id] ?? null,
-                ];
-            })
-            ->sortBy(fn ($s) => match ($s['wish']) {
-                '希望' => 0,
-                '稼働可' => 1,
-                'NG' => 3,
-                default => 2,   // 未定・未入力
-            })
-            ->values();
-
         // ── 警告用の集計（設計どおり「警告」であってハード制約にはしない）──
         // ① 同日・他案件にすでに割り当て済みの人（staff_id => [案件名,...]）＝ダブルブッキング検知
         $sameDay = [];
         // ② 今月のアサイン件数（staff_id => 件数）＝月20件上限の見える化
         $monthCount = [];
+        // ※下の「頭脳（AssignmentScorer）」にも渡すので、スタッフ名簿を作る前に用意しておく。
         if ($date) {
             $ymd = $date->format('Y-m-d');
 
@@ -121,6 +93,65 @@ class AssignmentController extends Controller
                 ->pluck('c', 'staff_id')
                 ->all();
         }
+
+        // ── 自動アサインの「頭脳」に渡す材料（C-5）──
+        // リピート継続：このクライアントの過去案件に出たスタッフ（is_repeat のとき加点）。
+        $repeatStaffIds = [];
+        if ($project->client) {
+            $priorPids = Project::where('client', $project->client)
+                ->where('id', '!=', $project->id)
+                ->pluck('id');
+            if ($priorPids->isNotEmpty()) {
+                $repeatStaffIds = Assignment::whereIn('project_id', $priorPids)
+                    ->where('status', '!=', 'キャンセル')
+                    ->pluck('staff_id')
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+        }
+        // コンテンツ経験の一致判定に使う「この案件のコンテンツ名」。
+        $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
+        $contentNames = $contentIds
+            ? Content::whereIn('id', $contentIds)->pluck('content_name')->all()
+            : [];
+        // NGペア同席の判定に使う「この案件にすでに入っている人の氏名」。
+        $memberNames = Person::whereIn('id', array_keys($existing))->pluck('name')->all();
+
+        $scorer = (new AssignmentScorer(
+            $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP
+        ))->setProjectMemberNames($memberNames);
+
+        // スタッフ名簿。区分・できる役割・NG・この日の希望＋「おすすめ度（点数・理由）」も一緒に。
+        // 並びは「おすすめ順（点数の高い順）」。NG該当（この日NG・NGペア同席）は末尾へ回す。
+        $staff = Person::staff()
+            ->with(['roleEligibilities', 'ngRelations'])
+            ->orderByDesc('experience_count')
+            ->get()
+            ->map(function (Person $p) use ($wish, $scorer) {
+                $can = $p->roleEligibilities->pluck('position')->all();
+                $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $can);
+                $eval = $scorer->evaluate($p);
+
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'level' => $p->skill_level ?? '—',
+                    'exp' => $p->experience_count ?? 0,
+                    'exclusive' => (bool) $p->is_exclusive,
+                    'posLabels' => $posLabels,
+                    'ng' => $p->ngRelations->pluck('partner_name')->all(),
+                    'wish' => $wish[$p->id] ?? null,
+                    'score' => $eval['score'],
+                    'reasons' => $eval['reasons'],
+                    'warnings' => $eval['warnings'],
+                    'blocked' => $eval['blocked'],
+                    'blockReason' => $eval['blockReason'],
+                ];
+            })
+            ->sortByDesc('score')
+            ->sortBy(fn ($s) => $s['blocked'] ? 1 : 0)   // NG該当は末尾（PHP8の安定ソートで点数順は保たれる）
+            ->values();
 
         // ── ポジション雛型（コンテンツ×規模 → 必要ポジション人数）──
         // マスタ（content_role_requirements）に人数が登録されていれば、D×1・MC×2… の「枠」を出す。
