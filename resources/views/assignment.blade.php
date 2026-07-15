@@ -154,6 +154,7 @@
         <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ $project->required_count ?? '—' }}名</span></span>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="onlyAvail" checked onchange="filterStaff()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> この日 希望・稼働可 の人だけ</label>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="sortByScore" checked onchange="sortRows()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> おすすめ順に並べる</label>
+        <button type="button" class="btn primary" id="autoPlaceBtn" onclick="autoPlace()" title="空いている必要人数ぶん、おすすめ上位を自動でチェックします（保存はしません）">✨ おすすめを自動で仮置き</button>
         <div class="spacer"></div>
         <input type="text" id="staffSearch" placeholder="名前でしぼり込み" oninput="filterStaff()">
       </div>
@@ -207,7 +208,7 @@
               @php($ex = $existing[$s['id']] ?? null)
               @php($w = $s['wish'] ?? null)
               @php($isAvail = in_array($w, ['希望', '稼働可'], true))
-              <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
+              <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-pos="{{ implode('|', $s['posCodes']) }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
                 <td class="chk">
                   <input type="checkbox" name="staff_ids[]" value="{{ $s['id'] }}" {{ $ex ? 'checked' : '' }} onchange="updateCount()">
                 </td>
@@ -265,6 +266,7 @@
       </div>
 
       <p id="noAvail" class="muted" style="display:none; font-size:12.5px; margin-top:8px;">この日に「希望・稼働可」の人がまだいません。上の「この日 希望・稼働可 の人だけ」のチェックを外すと、名簿の全員から選べます。</p>
+      <div id="autoNote" class="alert ok" style="display:none; margin-top:10px;"><span class="ico">✨</span><div></div></div>
 
       <div class="save-bar">
         <span class="hint">「いま選んでいる人」で上書き保存します（チェックを外した人はアサインから消えます）。複数日の案件は本番・予備日・リハごとに別の案件として保存します。</span>
@@ -380,6 +382,72 @@
     });
     rows.forEach(r => tbody.appendChild(r));
   }
+  // 「おすすめを自動で仮置き」：空いている必要人数ぶん、おすすめ上位を自動でチェックする。
+  // すでに手で選んだ人は消さず、足りないぶんだけ足す（除外＝NG該当は対象外）。保存はしない。
+  function autoPlace() {
+    // おすすめ順（点数の高い順）・除外を外した候補リスト
+    const rows = Array.from(document.querySelectorAll('tr.staff-row'))
+      .filter(tr => !tr.classList.contains('blocked'))
+      .sort((a, b) => parseFloat(b.dataset.score || '0') - parseFloat(a.dataset.score || '0'));
+    // すでにチェック済みの人は「使用済み」として扱う（上書きしない）
+    const used = new Set();
+    rows.forEach(tr => {
+      const cb = tr.querySelector('input[name="staff_ids[]"]');
+      if (cb && cb.checked) used.add(tr);
+    });
+
+    const slots = Array.from(document.querySelectorAll('.pos-slot'));
+    let placed = 0;
+
+    if (slots.length) {
+      // ポジション枠がある案件：役割ごとに、その役割ができるおすすめ上位で埋める
+      slots.forEach(slot => {
+        const role = slot.dataset.role;
+        const need = parseInt(slot.dataset.need || '0', 10);
+        let cur = 0;
+        used.forEach(tr => {
+          const sel = tr.querySelector('select.role-sel');
+          if (sel && sel.value === role) cur++;
+        });
+        for (const tr of rows) {
+          if (cur >= need) break;
+          if (used.has(tr)) continue;
+          const canDo = (tr.dataset.pos || '').split('|').filter(Boolean);
+          if (!canDo.includes(role)) continue;   // その役割ができない人は飛ばす
+          const cb = tr.querySelector('input[name="staff_ids[]"]');
+          const sel = tr.querySelector('select.role-sel');
+          if (cb) cb.checked = true;
+          if (sel) sel.value = role;
+          used.add(tr);
+          cur++;
+          placed++;
+        }
+      });
+    } else {
+      // 枠が無い案件：必要人数ぶん、おすすめ上位から埋める（役割は付けない）
+      const need = isNaN(NEED) ? 0 : NEED;
+      for (const tr of rows) {
+        if (used.size >= need) break;
+        if (used.has(tr)) continue;
+        const cb = tr.querySelector('input[name="staff_ids[]"]');
+        if (cb) { cb.checked = true; used.add(tr); placed++; }
+      }
+    }
+
+    updateCount();
+    const note = document.getElementById('autoNote');
+    if (note) {
+      note.style.display = '';
+      const msg = placed > 0
+        ? ('おすすめ上位を自動で仮置きしました（' + placed + '名を追加）。内容を確認して、下の「保存」で確定してください。')
+        : ((slots.length || !isNaN(NEED))
+            ? '追加できる空き枠がありませんでした（必要人数はすでに埋まっています）。'
+            : 'この案件は必要人数もポジション枠も未設定のため、自動で仮置きできませんでした。');
+      const body = note.querySelector('div');
+      if (body) body.textContent = msg;
+    }
+  }
+
   // 保存時：必要人数の不一致・NGペア同席があれば確認（警告であって保存は止めない）
   if (asgForm) {
     asgForm.addEventListener('submit', function (e) {

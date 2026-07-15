@@ -140,6 +140,7 @@ class AssignmentController extends Controller
                     'exp' => $p->experience_count ?? 0,
                     'exclusive' => (bool) $p->is_exclusive,
                     'posLabels' => $posLabels,
+                    'posCodes' => $can,   // 自動仮置きで「この役割ができる人か」を判定するため
                     'ng' => $p->ngRelations->pluck('partner_name')->all(),
                     'wish' => $wish[$p->id] ?? null,
                     'score' => $eval['score'],
