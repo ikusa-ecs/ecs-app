@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ContentSeeder::class,                 // コンテンツ・マスタ（先に投入）
             ContentRoleRequirementSeeder::class,  // コンテンツ別・規模別の必要人数（仮の見本／コンテンツの後）
+            RoleRequirementSeeder::class,         // 必要アサイン人数リスト（本物・CSV取込／見本の後で上書き＋商品追加）
             PersonSeeder::class,                  // 人名簿（社員・スタッフ）
             StaffProfileSeeder::class,            // スタッフのポジション可否・NGペア（people を参照）
             ProjectSeeder::class,                 // 案件（ディレクター等で people を参照するため最後）
