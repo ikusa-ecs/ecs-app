@@ -169,8 +169,7 @@ Route::get('/pickup', [AssignBoardController::class, 'pickup']);
 // スタッフ関連の画面（Blade化済み）
 // スタッフ名簿は DB（people＋ポジション可否＋NGペア）から読む。
 Route::get('/staff', [PersonController::class, 'staff']);
-// スタッフの「できるポジション・NGペア・専属・人柄・メモ」を本物編集（GET=画面／POST=保存）。
-Route::get('/staff/{id}/edit', [PersonController::class, 'staffEdit']);
+// スタッフの「できるポジション・NGペア・専属・人柄・メモ」を保存（/staff 詳細パネルからAJAX）。
 Route::post('/staff/{id}/edit', [PersonController::class, 'staffUpdate']);
 // 社員名簿は DB（people テーブルの社員）から読む。
 Route::get('/employees', [PersonController::class, 'employees']);

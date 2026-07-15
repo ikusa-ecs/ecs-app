@@ -134,50 +134,47 @@ class PersonController extends Controller
     }
 
     /**
-     * スタッフの「できるポジション・NGペア・専属・人柄・メモ」を編集する画面（GET /staff/{id}/edit）。
-     * これまで /staff の詳細パネルは見本（保存されない）だったのを、本物のDB保存に置き換える。
-     */
-    public function staffEdit(string $id)
-    {
-        $person = Person::staff()->with(['roleEligibilities', 'ngRelations'])->find($id);
-        if (! $person) {
-            return redirect('/staff')->with('status', 'スタッフが見つかりませんでした。一覧から選び直してください。');
-        }
-
-        return view('staff_edit', [
-            'person'         => $person,
-            'positionLabels' => AssignmentRole::positionLabels(),                 // [コード => 表示名]
-            'canPositions'   => $person->roleEligibilities->pluck('position')->all(),
-            'ngNames'        => $person->ngRelations->pluck('partner_name')->all(),
-        ]);
-    }
-
-    /**
-     * 上の編集画面の保存先（POST /staff/{id}/edit）。
+     * スタッフ編集の保存先（POST /staff/{id}/edit）。/staff の詳細パネルからAJAXで呼ばれる。
      * ポジション可否・NGペアは「この人の分を作り直す（全消し→入れ直し）」。専属・人柄・メモは people を更新。
      */
     public function staffUpdate(Request $request, string $id)
     {
         $person = Person::staff()->find($id);
         if (! $person) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => 'スタッフが見つかりませんでした。'], 404);
+            }
             return redirect('/staff')->with('status', 'スタッフが見つかりませんでした。一覧から選び直してください。');
         }
 
         $data = $request->validate([
-            'positions'   => ['sometimes', 'array'],
-            'positions.*' => ['string'],
-            'ng'          => ['nullable', 'string', 'max:2000'],
-            'impression'  => ['nullable', 'string', 'max:1000'],
+            'positions'           => ['sometimes', 'array'],
+            'positions.*'         => ['string'],
+            'managed_positions'   => ['sometimes', 'array'],   // このフォームが扱うポジションの範囲（未指定＝全件置換）
+            'managed_positions.*' => ['string'],
+            'ng'                  => ['nullable', 'string', 'max:2000'],
+            'impression'          => ['nullable', 'string', 'max:1000'],
         ]);
 
         DB::transaction(function () use ($person, $request, $data) {
-            // 1) できるポジション：正規の役割コードだけ受け付け、この人の分を入れ直す。
-            $positions = array_values(array_unique(array_filter(
+            // 1) できるポジション：正規コードだけ受け付ける。
+            //    managed_positions が来たら「その範囲だけ」入れ替える（範囲外の可否は温存）。来なければ全件置換。
+            $submitted = array_values(array_unique(array_filter(
                 $data['positions'] ?? [],
                 fn ($p) => AssignmentRole::isValid($p)
             )));
-            StaffRoleEligibility::where('staff_id', $person->id)->delete();
-            foreach ($positions as $pos) {
+            $managed = array_values(array_filter(
+                $data['managed_positions'] ?? [],
+                fn ($p) => AssignmentRole::isValid($p)
+            ));
+
+            $q = StaffRoleEligibility::where('staff_id', $person->id);
+            if (! empty($managed)) {
+                $q->whereIn('position', $managed);
+                $submitted = array_values(array_intersect($submitted, $managed));
+            }
+            $q->delete();
+            foreach ($submitted as $pos) {
                 StaffRoleEligibility::create(['staff_id' => $person->id, 'position' => $pos]);
             }
 
@@ -206,7 +203,11 @@ class PersonController extends Controller
             $person->save();
         });
 
-        return redirect('/staff/' . urlencode($person->id) . '/edit')
-            ->with('status', $person->name . ' さんの情報を保存しました。');
+        $message = $person->name . ' さんの情報を保存しました。';
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'message' => $message]);
+        }
+
+        return redirect('/staff')->with('status', $message);
     }
 }

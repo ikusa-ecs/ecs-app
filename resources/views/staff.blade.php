@@ -112,7 +112,7 @@
 
       <!-- ===================== 名簿タブ ===================== -->
       <div class="pane show" id="pane-roster">
-      <div class="mock-note">氏名・事務所・専属・通算・できるポジション・相性（NG）は、登録済みのスタッフデータ（DB）を表示しています。<br>※「詳細」を開くと、可否・NGペア・専属・人柄メモを<b>本物編集ページ</b>で保存できます（本人プロフィール／イベプラの雰囲気メモは今後対応）。</div>
+      <div class="mock-note">氏名・事務所・専属・通算・できるポジション・相性（NG）は、登録済みのスタッフデータ（DB）を表示しています。<br>※「詳細」を開くと、可否・NGペア・専属・人柄メモを<b>その場で編集・保存</b>できます（本人プロフィールは今後対応）。</div>
 
       <div class="panel">
         <div class="filterbar">
@@ -246,7 +246,7 @@
 
 @push('scripts')
 {{-- 稼働状況は DB（assignments＋shift_preferences＋applications＋people）から計算して渡す。 --}}
-<script>window.ECS_STATUS = @json($status);</script>
+<script>window.ECS_STATUS = @json($status); window.ECS_CSRF = '{{ csrf_token() }}';</script>
 @verbatim
 <script>
   // ===== タブ切替 =====
@@ -362,11 +362,9 @@
 
   function detailHtml(p, idx){
     const posChecks = POS.map(x =>
-      `<label><input type="checkbox" ${p.pos[x.k]?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> ${posFull[x.k]}</label>`
+      `<label><input type="checkbox" class="edit-pos" value="${x.k}" ${p.pos[x.k]?'checked':''}> ${posFull[x.k]}</label>`
     ).join('');
-    const ngStr = p.ng.join('、');
     const prof = profileFor(p);
-    const atmos = atmosFor(p);
     const profBadge = prof.live
       ? ' <span class="badge green" style="font-size:11px;">本人入力を反映中</span>'
       : ' <span class="muted" style="font-size:11px;">※サンプル表示</span>';
@@ -387,29 +385,31 @@
             <h4>ポジション可否（できる現場の役割）</h4>
             <div class="pos-check">${posChecks}</div>
 
+            <h4 style="margin-top:16px;">区分</h4>
+            <div class="trait">
+              <label><input type="checkbox" class="edit-exclusive" ${p.exclusive?'checked':''}> 専属スタッフ</label>
+            </div>
+
             <h4 style="margin-top:16px;">人柄・育成メモ</h4>
             <div class="trait">
-              <label><input type="checkbox" ${p.traits.follow?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> 新人フォローができる</label>
-              <label><input type="checkbox" ${p.traits.starter?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> 自分で考えて動ける</label>
-              <label><input type="checkbox" ${p.traits.atmos?'checked':''} onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')"> 現場の空気を良くする</label>
+              <label><input type="checkbox" class="edit-follow" ${p.traits.follow?'checked':''}> 新人フォローができる</label>
+              <label><input type="checkbox" class="edit-starter" ${p.traits.starter?'checked':''}> 自分で考えて動ける</label>
+              <label><input type="checkbox" class="edit-atmos" ${p.traits.atmos?'checked':''}> 現場の空気を良くする</label>
             </div>
           </div>
           <div>
-            <h4>初回アサイン時のDアンケート（要点）</h4>
-            <textarea>${p.dnote}</textarea>
+            <h4>NGペア（同席を避ける組合せ）</h4>
+            <textarea class="edit-ng" placeholder="NGにしたい相手の氏名を1行に1名ずつ">${p.ng.join('\n')}</textarea>
+            <div class="muted" style="font-size:12px; margin-top:4px;">1行に1名。登録済みスタッフ名と一致すれば自動でひも付きます。</div>
 
-            <h4 style="margin-top:16px;">イベプラからの雰囲気</h4>
-            <textarea placeholder="イベプラが現場で感じた雰囲気・印象を記入" onchange="alert('ここは表示だけです。変更は下の「本物編集ページで保存する」から行えます。')">${atmos}</textarea>
-
-            <h4 style="margin-top:16px;">NGペア（同席を避ける組合せ）</h4>
-            <div class="pair-line"><b>NGペア：</b>${ngStr || '（なし）'}</div>
-            <div class="muted" style="font-size:12px; margin-top:4px;">※NGペア・可否・専属の編集は下の「本物編集ページで保存する」から行えます。</div>
+            <h4 style="margin-top:16px;">メモ（イベプラ・Dからの印象／要点）</h4>
+            <textarea class="edit-impression" placeholder="このスタッフについてのメモ">${p.dnote}</textarea>
           </div>
         </div>
         <div class="save-row">
-          <a class="btn primary sm" href="/staff/${encodeURIComponent(p.id)}/edit">この内容を本物編集ページで保存する</a>
+          <button class="btn primary sm" onclick="rosterSave(${idx}, this)">保存する</button>
           <button class="btn sm" onclick="rosterToggle(${idx})">閉じる</button>
-          <span class="muted" style="font-size:12px;">※載せるのは最低限の情報のみ。社員は全員この内容を閲覧できます。</span>
+          <span class="save-status muted" style="font-size:12px;"></span>
         </div>
       </div>`;
   }
@@ -445,9 +445,62 @@
     document.getElementById('countTxt').textContent = shown;
   }
 
+  // 詳細パネルの「保存する」→ 可否(OP/MC/SP)・専属・人柄・NG・メモをDBへ保存（AJAX）。
+  function saveStaff(idx, btn){
+    const dr = tbody.querySelector(`tr.detail-row[data-for="${idx}"]`);
+    if (!dr) return;
+    const p = staff[idx];
+    const posSel = Array.from(dr.querySelectorAll('.edit-pos:checked')).map(c => c.value);
+    const exclusive = !!(dr.querySelector('.edit-exclusive') && dr.querySelector('.edit-exclusive').checked);
+    const follow    = !!(dr.querySelector('.edit-follow') && dr.querySelector('.edit-follow').checked);
+    const starter   = !!(dr.querySelector('.edit-starter') && dr.querySelector('.edit-starter').checked);
+    const atmosT    = !!(dr.querySelector('.edit-atmos') && dr.querySelector('.edit-atmos').checked);
+    const ngText    = (dr.querySelector('.edit-ng') || {}).value || '';
+    const memo      = (dr.querySelector('.edit-impression') || {}).value || '';
+    const statusEl  = dr.querySelector('.save-status');
+    const body = new URLSearchParams();
+    posSel.forEach(v => body.append('positions[]', v));
+    ['OP','MC','SP'].forEach(v => body.append('managed_positions[]', v));  // この画面が扱う可否はこの3つだけ
+    if (exclusive) body.append('exclusive', '1');
+    if (follow)    body.append('follow', '1');
+    if (starter)   body.append('starter', '1');
+    if (atmosT)    body.append('atmos', '1');
+    body.append('ng', ngText);
+    body.append('impression', memo);
+    if (btn) btn.disabled = true;
+    if (statusEl) { statusEl.textContent = '保存中…'; statusEl.style.color = 'var(--muted)'; }
+    fetch(`/staff/${encodeURIComponent(p.id)}/edit`, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(() => {
+      ['OP','MC','SP'].forEach(k => { p.pos[k] = posSel.includes(k); });
+      p.exclusive = exclusive;
+      p.traits = { follow: follow, starter: starter, atmos: atmosT };
+      p.ng = ngText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      p.dnote = memo;
+      const mr = tbody.querySelector(`tr.main-row[data-idx="${idx}"]`);
+      if (mr) {
+        const tds = mr.querySelectorAll('td');
+        if (tds[3]) tds[3].innerHTML = p.exclusive ? '<span class="badge green">専属</span>' : '<span class="muted" style="font-size:12px;">—</span>';
+        if (tds[5]) tds[5].innerHTML = posTagsHtml(p);
+        if (tds[6]) tds[6].innerHTML = relHtml(p);
+      }
+      if (statusEl) { statusEl.textContent = '✓ 保存しました'; statusEl.style.color = '#15803d'; }
+      if (btn) btn.disabled = false;
+    })
+    .catch(err => {
+      if (statusEl) { statusEl.textContent = '保存に失敗しました（' + err + '）'; statusEl.style.color = 'var(--danger)'; }
+      if (btn) btn.disabled = false;
+    });
+  }
+
   // 名簿タブの中で、HTML内のクリックから呼ぶ関数だけ外に出す（名前は roster〜 で固有化）
   window.rosterFilter = applyFilter;
   window.rosterToggle = toggleDetail;
+  window.rosterSave = saveStaff;
 
   render();
   })();
