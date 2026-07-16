@@ -91,7 +91,7 @@ class AssignSheetController extends Controller
             ? collect()
             : Assignment::whereIn('project_id', $projectIds)
                 ->where('status', '!=', 'キャンセル')
-                ->get(['project_id', 'staff_id', 'role', 'status']);
+                ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
 
         // 関係する人の名前・区分をまとめて引く（毎回引かない）。
         $people = Person::whereIn('id', $assignments->pluck('staff_id')->unique()->all())
@@ -127,6 +127,8 @@ class AssignSheetController extends Controller
                         'staffId' => $a->staff_id,
                         'roleCode' => $a->role ?: '',
                         'pos' => self::POS_LABELS[$a->role] ?? ($a->role ?: '—'),
+                        'note' => $a->note ?? '',   // 担当メモ（軍師/サポ 等）
+                        'patrol' => $a->patrol,     // 巡回数（数値/null）
                         'status' => $a->status,   // 仮/確定
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
                     ];
@@ -142,6 +144,8 @@ class AssignSheetController extends Controller
                     'staffId' => $p->director_id,
                     'roleCode' => 'D',
                     'pos' => 'D',
+                    'note' => '',
+                    'patrol' => null,
                     'status' => null,
                     'type' => 'emp',
                 ]);
@@ -208,10 +212,22 @@ class AssignSheetController extends Controller
             ];
         })->values();
 
+        // 役割プルダウンの選択肢（正本）と、担当メモ候補（この月のコンテンツで使われる備考）。編集UIで使う。
+        $noteOptions = $reqByContent
+            ->flatten(1)
+            ->pluck('note')
+            ->map(fn ($n) => trim((string) $n))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         return view('assign_sheet', [
             'cards'         => $cards,
             'months'        => $months,
             'selectedMonth' => $selectedMonth,
+            'roleOptions'   => AssignmentRole::positionLabels(),
+            'noteOptions'   => $noteOptions,
         ]);
     }
 

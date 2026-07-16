@@ -174,7 +174,14 @@
       "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\run_seeder.php\")",
       "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\check_assign.php\")",
       "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\formats.php\")",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(git branch *)",
+      "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\check_qt.php\")",
+      "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\count_staff.php\")",
+      "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\run_entry_seeder.php\")",
+      "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\4b6a7700-7452-46cf-a38e-9724a6308fb1\\\\scratchpad\\\\check_entries.php\")"
     ]
   }
 }

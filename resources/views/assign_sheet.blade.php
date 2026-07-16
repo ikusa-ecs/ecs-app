@@ -101,6 +101,23 @@
   .mrow .st { font-size: 9.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; }
   .mrow .st.kari { background: #fff3e0; color: #d9822b; }
   .mrow .mempty { color: #c9bdae; font-size: 11px; padding: 6px 9px; }
+  /* メンバー行の担当/巡回（読み取り表示） */
+  .mrow .m-tag { font-size: 9.5px; color: #8a7a66; margin-left: 4px; white-space: nowrap; }
+
+  /* ▼ 編集モード（カードに .editing が付くと入力欄を出す。日別ボードと同じ「選ぶと保存」） */
+  .mhead .m-edit-btn { margin-left: auto; font-size: 9.5px; font-weight: 700; color: #2f6fb3;
+    cursor: pointer; background: #eaf1f8; border-radius: 5px; padding: 0 6px; }
+  .acard.editing .mhead .m-edit-btn { background: #2f6fb3; color: #fff; }
+  .mrow .m-edit { display: none; }
+  .acard.editing .mrow .m-edit { display: inline-flex; }
+  .acard.editing .mrow .pos-badge,
+  .acard.editing .mrow .m-tag { display: none; }
+  .mrow .m-role { font-size: 10px; padding: 1px 2px; border: 1px solid var(--line); border-radius: 5px;
+    background: #fff; max-width: 46px; font-family: inherit; }
+  .mrow .m-note { width: 70px; font-size: 10px; padding: 1px 4px; border: 1px solid var(--line);
+    border-radius: 5px; font-family: inherit; margin-left: 4px; }
+  .mrow .m-patrol { width: 34px; font-size: 10px; padding: 1px 3px; border: 1px solid var(--line);
+    border-radius: 5px; font-family: inherit; margin-left: 3px; }
 
   .sheet-empty { padding: 40px; text-align: center; color: #a08a73; }
 </style>
@@ -230,11 +247,23 @@
 
         {{-- メンバー --}}
         <div class="acard-members">
-          <div class="mhead"><span class="p">P</span><span>名前（割り当てメンバー）</span></div>
+          <div class="mhead"><span class="p">P</span><span>名前（割り当てメンバー）</span>@if (count($c['members']))<span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span>@endif</div>
           @forelse ($c['members'] as $m)
-            <div class="mrow">
-              <span class="p"><span class="pos-badge {{ $m['roleCode'] === 'D' ? 'd' : ($m['pos'] === '—' ? 'none' : '') }}">{{ $m['pos'] }}</span></span>
-              <span class="nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif</span>
+            <div class="mrow" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
+              <span class="p">
+                <span class="pos-badge {{ $m['roleCode'] === 'D' ? 'd' : ($m['pos'] === '—' ? 'none' : '') }}">{{ $m['pos'] }}</span>
+                <select class="m-edit m-role" title="役割（選ぶと保存）" onchange="ecsSheetSave(this,'role',this.value)">
+                  <option value="">—</option>
+                  @foreach ($roleOptions as $code => $label)
+                    <option value="{{ $code }}" {{ $m['roleCode'] === $code ? 'selected' : '' }}>{{ $code }}</option>
+                  @endforeach
+                </select>
+              </span>
+              <span class="nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
+                @if ($m['note'] !== '' || $m['patrol'] !== null)<span class="m-tag">· {{ $m['note'] }}@if ($m['patrol'] !== null) 巡回{{ $m['patrol'] }}@endif</span>@endif
+                <input class="m-edit m-note" list="sheetNoteOpts" placeholder="担当" value="{{ $m['note'] }}" title="担当メモ（軍師/サポ等・入力で保存）" onchange="ecsSheetSave(this,'note',this.value)">
+                <input class="m-edit m-patrol" type="number" min="0" placeholder="巡" value="{{ $m['patrol'] ?? '' }}" title="巡回数（入力で保存）" onchange="ecsSheetSave(this,'patrol',this.value)">
+              </span>
               @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
             </div>
           @empty
@@ -248,11 +277,49 @@
 </div>
 @endif
 
+{{-- 担当メモ入力の候補（軍師/サポ 等）。編集モードの入力欄が参照する。 --}}
+<datalist id="sheetNoteOpts">
+  @foreach ($noteOptions as $opt)<option value="{{ $opt }}">@endforeach
+</datalist>
+
 @endsection
 
 @push('scripts')
+<script>
+  // 担当/巡回/役割の保存先（日別ボードと同じ quickToggle を再利用）とCSRFトークン。
+  window.ECS_QUICK_URL = '/entries/assign';
+  window.ECS_CSRF = @json(csrf_token());
+</script>
 @verbatim
 <script>
+  // 案件カードを「編集モード」に切り替える（役割/担当/巡回の入力欄を出す）。
+  function ecsSheetToggleEdit(btn) {
+    var card = btn.closest('.acard');
+    if (!card) return;
+    card.classList.toggle('editing');
+    btn.textContent = card.classList.contains('editing') ? '完了' : '✎編集';
+  }
+  // 変更したメンバーの役割/担当/巡回を assignments に保存する（送ったキーだけ更新）。
+  function ecsSheetSave(inp, field, value) {
+    var row = inp.closest('.mrow');
+    if (!row) return;
+    var body = {
+      project_id: row.getAttribute('data-project'),
+      staff_id: row.getAttribute('data-staff'),
+      action: 'assign',
+      status: row.getAttribute('data-status') || '仮'
+    };
+    body[field] = value;
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { if (!(res && res.ok)) alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); })
+      .catch(function () { alert('通信エラーで保存できませんでした。'); });
+  }
+
   // 検索ボックス（コンテンツ・顧客）と「人数が足りない案件だけ」で、カードを出し分ける。
   // サーバーで作ったカードを画面側で見せ隠しするだけ（開き直し不要で軽い）。
   function ecsSheetFilter() {
