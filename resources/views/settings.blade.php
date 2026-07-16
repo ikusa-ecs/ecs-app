@@ -65,6 +65,17 @@
     .mtg-chip.is-current { background: var(--brand); color: #fff; border-color: var(--brand); }
     .mtg-chip b.rm { cursor: pointer; font-weight: 700; opacity: .8; }
     .mtg-chip b.rm:hover { opacity: 1; }
+    /* 危険日（手動）：大型案件日の一覧 */
+    .danger-current { font-size: 13px; font-weight: 700; color: var(--ink); margin: 4px 0 6px; }
+    .big-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto;
+      border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fff; }
+    .big-list .empty { color: var(--muted); font-size: 12.5px; padding: 4px; }
+    .big-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    .big-row .bdate { font-weight: 700; min-width: 70px; }
+    .big-row .bname { flex: 1; color: var(--ink); word-break: break-word; }
+    .big-row .badd { font-size: 12px; padding: 3px 10px; white-space: nowrap; }
+    .big-row .badd.done { opacity: .6; }
+    .mtg-chip.danger { background: #fdecec; border-color: #f1b5b5; color: #b91c1c; }
   </style>
 @endverbatim
 @endpush
@@ -102,6 +113,39 @@
         </div>
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
           ※ 案件登録画面の「追加案件」自動判定に使われます。登録が無い／まだ最初のMTGが来ていないときは自動判定せず、登録時に手動で選びます。「追加」を押しただけでは保存されません。最後に「この予定表を保存する」を押してください。
+        </p>
+      </div>
+
+      <!-- ①-2 危険日（手動指定） -->
+      <div class="panel settings-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>危険日（手動指定）</h2></div>
+        <p class="muted" style="font-size:12.5px; margin:0 0 8px;">
+          ダッシュボードの危険日カレンダーは自動でも判定しますが、<strong>「大型が1件でも人手的に危険」「全拠点を合わせると危険」</strong>など自動で拾えない日は、ここで手動で足せます。足した日はカレンダーで赤くなります。
+        </p>
+
+        <div class="danger-current">大型案件の開催日（これから）— 押すと危険日に追加できます</div>
+        <div id="bigList" class="big-list"><!-- JSで大型案件日を描画 --></div>
+
+        <div style="font-size:12.5px; font-weight:700; color:var(--ink); margin:14px 0 4px;">いま設定されている危険日</div>
+        <div id="dangerList" class="mtg-empty"><!-- JSで危険日チップを描画 --></div>
+
+        <div class="set-row" style="border-bottom:none;">
+          <div>
+            <span class="set-label">危険日を手動で追加</span>
+            <span class="set-note">日付を選んで「追加」。上の大型案件日の「危険日にする」からも足せます。</span>
+          </div>
+          <div class="set-control" style="display:flex; gap:8px;">
+            <input type="date" id="dangerAddDate" class="date-input">
+            <button class="line-btn" onclick="addDangerDate()">追加</button>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <button class="btn primary" onclick="saveDangerDates()">危険日を保存する</button>
+          <span class="saved-msg" id="dangerSaved">✓ 保存しました</span>
+        </div>
+        <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
+          ※「追加」だけでは保存されません。最後に「危険日を保存する」を押してください。保存するとダッシュボードのカレンダーに反映されます。
         </p>
       </div>
 
@@ -153,6 +197,10 @@
   window.ECS_MTG_DATES = @json($assignMtgDates ?? []);
   // 今日までで一番新しいMTG日＝現在の基準日（無ければ null）。
   window.ECS_MTG_CURRENT = @json($assignMtgCurrent ?? null);
+  // 危険日（手動指定）の一覧（YYYY-MM-DD の配列）。ダッシュボードのカレンダーに反映される。
+  window.ECS_DANGER_DATES = @json($dangerDates ?? []);
+  // 大型案件の開催日一覧（これから）＝危険日にワンクリックで足す候補。
+  window.ECS_BIG_EVENTS = @json($bigEventDates ?? []);
   // 保存POST用のCSRFトークン。
   window.ECS_CSRF = @json(csrf_token());
 </script>
@@ -232,6 +280,75 @@
       .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
   }
 
+  // --- ①-2 危険日（手動指定）（DBに保存＝ダッシュボードのカレンダーに効く）---
+  let DANGER_DATES = Array.isArray(window.ECS_DANGER_DATES) ? window.ECS_DANGER_DATES.slice() : [];
+  const BIG_EVENTS = Array.isArray(window.ECS_BIG_EVENTS) ? window.ECS_BIG_EVENTS.slice() : [];
+
+  // 大型案件の開催日一覧を描く。すでに危険日にした日はボタンを「追加済み」にする。
+  function renderBigEvents() {
+    const box = document.getElementById('bigList');
+    if (!box) return;
+    if (!BIG_EVENTS.length) {
+      box.innerHTML = '<div class="empty">これから開催の大型案件はありません。</div>';
+      return;
+    }
+    box.innerHTML = BIG_EVENTS.map(function (e) {
+      const done = DANGER_DATES.indexOf(e.date) !== -1;
+      return '<div class="big-row">' +
+        '<span class="bdate">' + e.label + '</span>' +
+        '<span class="bname">' + e.name + '</span>' +
+        '<button class="line-btn badd' + (done ? ' done' : '') + '" onclick="addDangerFromBig(\'' + e.date + '\')">' +
+        (done ? '追加済み' : '危険日にする') + '</button>' +
+        '</div>';
+    }).join('');
+  }
+  function renderDanger() {
+    DANGER_DATES.sort();
+    const list = document.getElementById('dangerList');
+    if (!list) return;
+    if (!DANGER_DATES.length) {
+      list.className = 'mtg-empty';
+      list.textContent = 'まだ手動の危険日はありません。上の大型案件日か、下の欄から追加してください。';
+    } else {
+      list.className = 'mtg-list';
+      list.innerHTML = DANGER_DATES.map(function (d, i) {
+        return '<span class="mtg-chip danger">' + mdLabel(d) +
+               ' <b class="rm" onclick="removeDangerDate(' + i + ')">×</b></span>';
+      }).join('');
+    }
+    renderBigEvents();   // ボタンの「追加済み」表示を更新
+  }
+  function addDangerDate() {
+    const el = document.getElementById('dangerAddDate');
+    const v = el.value;
+    if (!v) { alert('日付を選んでください。'); return; }
+    if (DANGER_DATES.indexOf(v) === -1) DANGER_DATES.push(v);
+    el.value = '';
+    renderDanger();
+  }
+  function addDangerFromBig(date) {
+    if (DANGER_DATES.indexOf(date) === -1) DANGER_DATES.push(date);
+    renderDanger();
+  }
+  function removeDangerDate(i) {
+    DANGER_DATES.splice(i, 1);
+    renderDanger();
+  }
+  function saveDangerDates() {
+    fetch('/settings/danger-dates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': window.ECS_CSRF,
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ dates: DANGER_DATES }),
+    })
+      .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+      .then(res => { if (Array.isArray(res.dates)) DANGER_DATES = res.dates; renderDanger(); flashSaved('dangerSaved'); })
+      .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
+  }
+
   // --- マスタ件数を DB の実データで表示（嘘の固定件数を置き換え）---
   function fillMasterCounts() {
     const mc = window.ECS_SETTINGS_COUNTS;
@@ -244,6 +361,7 @@
 
   // 初期表示
   renderMtg();
+  renderDanger();
   fillMasterCounts();
 </script>
 @endverbatim

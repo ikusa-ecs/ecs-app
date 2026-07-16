@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Content;
 use App\Models\Person;
+use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
+use App\Support\DangerDays;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * 設定（S / /settings）。
@@ -49,6 +52,52 @@ class SettingsController extends Controller
             'assignMtgDates' => AssignMtg::dates(),
             // 今日までで一番新しいMTG日＝現在の基準日（無ければ null）。表示用。
             'assignMtgCurrent' => AssignMtg::current(),
+            // 危険日（手動指定）の一覧。ダッシュボードの危険日カレンダーに反映される。
+            'dangerDates' => DangerDays::dates(),
+            // 大型案件の開催日一覧（これから開催・完了/下書き以外）＝危険日にワンクリックで足す候補。
+            'bigEventDates' => $this->bigEventDates(),
+        ]);
+    }
+
+    /**
+     * これから開催される「大型」案件の一覧（危険日追加の候補）。
+     * [ '日付'=>Y-m-d, 'label'=>「7/25（金）」, 'name'=>案件名 ] の配列（開催日昇順）。
+     */
+    private function bigEventDates(): array
+    {
+        $today = Carbon::today();
+        $weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+
+        return Project::where('scale', '大型')
+            ->whereNotNull('start_date')
+            ->whereNotIn('status', ['完了', '下書き'])
+            ->orderBy('start_date')
+            ->get(['project_name', 'start_date'])
+            ->filter(fn (Project $p) => $p->start_date->gte($today))
+            ->map(fn (Project $p) => [
+                'date' => $p->start_date->format('Y-m-d'),
+                'label' => (int) $p->start_date->format('n') . '/' . (int) $p->start_date->format('j')
+                    . '（' . $weekdays[(int) $p->start_date->format('w')] . '）',
+                'name' => $p->project_name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * 危険日（手動指定）を保存する（POST /settings/danger-dates）。
+     * 全員に効く共通設定なので settings テーブル（key='manual_danger_dates'）にまとめて保存する。
+     */
+    public function saveDangerDates(Request $request)
+    {
+        $data = $request->validate([
+            'dates'   => ['present', 'array'],
+            'dates.*' => ['date'],
+        ]);
+
+        return response()->json([
+            'ok'    => true,
+            'dates' => DangerDays::save($data['dates']),
         ]);
     }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Content;
+use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
@@ -12,6 +13,7 @@ use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * アサイン系の画面（/assign・/entries・/pickup）。
@@ -49,6 +51,7 @@ class AssignBoardController extends Controller
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
             'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
             'roleOptions' => AssignmentRole::positionLabels(), // ポジション編集プルダウンの選択肢（正本）
+            'noteOptions' => $this->allNoteOptions(),          // 担当メモ入力の候補（軍師/サポ 等）
         ]);
     }
 
@@ -82,7 +85,69 @@ class AssignBoardController extends Controller
         return view('pickup', [
             'staffPool' => $this->staffPool(),
             'pickupCases' => $this->pickupCases(),
+            'roleOptions' => AssignmentRole::positionLabels(),   // 担当役割プルダウンの選択肢（正本）
+            'noteOptions' => $this->allNoteOptions(),            // 担当メモ入力の候補（軍師/サポ 等）
         ]);
+    }
+
+    /**
+     * ピックアップのメンバーを DB（assignments）へ保存する。
+     * 「いま画面にいるメンバー」で、その案件×開催日 を上書きする（外した人は削除）。
+     * project-assign の save() と同じ“上書き”の考え方。担当メモ・巡回数も一緒に保存する。
+     */
+    public function pickupSave(Request $request)
+    {
+        $data = $request->validate([
+            'project_id' => ['required', 'string'],
+            'members' => ['nullable', 'array'],
+            'members.*.staff_id' => ['required', 'string'],
+            'members.*.role' => ['nullable', 'string'],
+            'members.*.note' => ['nullable', 'string'],
+            'members.*.patrol' => ['nullable'],
+            'members.*.status' => ['nullable', 'in:仮,確定'],
+        ]);
+
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        if (! $project->start_date) {
+            return response()->json(['ok' => false, 'message' => 'この案件は開催日が未設定です。先に案件登録で日付を入れてください。'], 422);
+        }
+
+        $date = $project->start_date->format('Y-m-d');
+        $members = $data['members'] ?? [];
+        $now = Carbon::now();
+
+        DB::transaction(function () use ($project, $date, $members, $now) {
+            // 日付部分だけで照合して消す（date キャストの時刻付き保存対策。save()と同じ）。
+            Assignment::where('project_id', $project->id)->whereDate('date', $date)->delete();
+
+            $seen = [];
+            foreach ($members as $m) {
+                $sid = $m['staff_id'];
+                if (isset($seen[$sid])) {
+                    continue;   // 同じ人の重複は1回だけ
+                }
+                $seen[$sid] = true;
+
+                $note = trim((string) ($m['note'] ?? ''));
+                $patrolRaw = $m['patrol'] ?? null;
+                Assignment::create([
+                    'project_id' => $project->id,
+                    'staff_id' => $sid,
+                    'date' => $date,
+                    'role' => AssignmentRole::isValid($m['role'] ?? null) ? $m['role'] : '',
+                    'note' => $note === '' ? null : mb_substr($note, 0, 100),
+                    'patrol' => (is_numeric($patrolRaw) && (int) $patrolRaw >= 0) ? (int) $patrolRaw : null,
+                    'status' => ($m['status'] ?? '仮') === '確定' ? '確定' : '仮',
+                    'assigned_by' => null,
+                    'assigned_at' => $now,
+                ]);
+            }
+        });
+
+        return response()->json(['ok' => true, 'count' => count($members), 'date' => $date]);
     }
 
     /**
@@ -123,7 +188,7 @@ class AssignBoardController extends Controller
         // この案件群の割当（キャンセル以外）。
         $assignments = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'role', 'status']);
+            ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
 
         // この案件群への応募（applications）＝希望者カラムの元。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
@@ -157,6 +222,8 @@ class AssignBoardController extends Controller
                         'lv' => '-',   // 経験レベルは希望者カラム用。メンバー行では未表示。
                         'pos' => self::POS_LABELS[$a->role] ?? ($a->role ?: '—'),
                         'roleCode' => $a->role ?: '',  // 保存用の役割コード（プルダウンの初期選択）
+                        'note' => $a->note ?? '',      // 担当メモ（軍師/サポ 等）
+                        'patrol' => $a->patrol,        // 巡回数（数値／null）
                         'status' => $a->status,        // 仮/確定（保存時に維持する）
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
                     ];
@@ -198,6 +265,7 @@ class AssignBoardController extends Controller
                 'name' => $p->project_name,
                 'contentMissing' => $contentMissing,
                 'client' => $p->client ?? '',
+                'note' => $p->note ?? '',   // 案件の備考（見落とし防止でカードに出す）
                 'cat' => $p->site_category ?: '通常',
                 'need' => $p->required_count ?? 0,
                 'filled' => count($assigned),
@@ -398,7 +466,7 @@ class AssignBoardController extends Controller
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
         $assignedRows = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id']);
+            ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
 
         $staffIds = $apps->pluck('staff_id')->merge($assignedRows->pluck('staff_id'))->unique();
         $people = $this->peopleWithPos($staffIds->all());
@@ -414,12 +482,27 @@ class AssignBoardController extends Controller
         $appsByProject = $apps->groupBy('project_id')->map(fn ($r) => $r->pluck('staff_id')->all());
         $assignedByProject = $assignedRows->groupBy('project_id')
             ->map(fn ($r) => $r->pluck('staff_id')->unique()->all());
+        // 案件×人 → 割当の詳細（役割・担当メモ・巡回・状態）。メンバー行の初期値に使う。
+        $assignInfoByProject = $assignedRows->groupBy('project_id')->map(function ($rows) {
+            $map = [];
+            foreach ($rows as $r) {
+                $map[$r->staff_id] = [
+                    'roleCode' => $r->role ?: '',
+                    'note' => $r->note ?? '',
+                    'patrol' => $r->patrol,
+                    'status' => $r->status,
+                ];
+            }
+
+            return $map;
+        });
 
         $contentNames = Content::pluck('content_name', 'id');
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $availSet, $people, $contentNames) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $applicantIds = $appsByProject->get($p->id, []);
+            $assignInfo = $assignInfoByProject->get($p->id, []);
             $off = $this->offDays($p->start_date ?? $today, $today);
 
             // 候補者プール＝応募者 ∪ 現メンバー（重複は除く）。
@@ -430,15 +513,29 @@ class AssignBoardController extends Controller
                 $person = $people->get($sid);
 
                 return [
+                    'id' => $sid,                                  // 保存用（案件×人）
                     'name' => $person->name ?? $sid,
                     'pos' => $this->primaryPos($person),
+                    'roleCode' => $this->primaryPosCode($person),  // 担当役割の初期値
                     'cal' => $dateStr ? isset($availSet[$sid . '|' . $dateStr]) : false,
                 ];
             })->all();
 
-            // メンバー名（assignments）＝rosterの初期値。
-            $memberNames = collect($assignedIds)
-                ->map(fn ($sid) => optional($people->get($sid))->name ?? $sid)
+            // メンバー（assignments）＝rosterの初期値。名前だけでなく id・担当・巡回も持たせる（DB保存に使う）。
+            $members = collect($assignedIds)
+                ->map(function ($sid) use ($people, $assignInfo) {
+                    $info = $assignInfo[$sid] ?? [];
+
+                    return [
+                        'id' => $sid,
+                        'name' => optional($people->get($sid))->name ?? $sid,
+                        'roleCode' => $info['roleCode'] ?? '',
+                        'pos' => self::POS_LABELS[$info['roleCode'] ?? ''] ?? ($info['roleCode'] ?? ''),
+                        'note' => $info['note'] ?? '',
+                        'patrol' => $info['patrol'] ?? null,
+                        'status' => $info['status'] ?? '仮',
+                    ];
+                })
                 ->values()->all();
 
             $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
@@ -447,9 +544,11 @@ class AssignBoardController extends Controller
             return [
                 'id' => $p->id,
                 'off' => $off,
+                'date' => $dateStr,          // 保存に使う開催日（null＝日付未設定で保存不可）
                 'content' => $content,
                 'name' => $p->project_name,
                 'client' => $p->client ?? '',
+                'note' => $p->note ?? '',    // 案件の備考（見落とし防止でカードに出す）
                 'fmt' => $this->fmtCode($p->format),
                 'dayType' => $p->date_type ?? '本番',
                 'parentId' => $p->parent_project_id,
@@ -464,9 +563,28 @@ class AssignBoardController extends Controller
                 'archived' => $off < 0,   // 過去の案件はピックアップ対象から外す
                 'draft' => false,
                 'entrants' => $entrants,
-                'members' => $memberNames,
+                'members' => $members,
             ];
         })->values();
+    }
+
+    /**
+     * 担当メモ入力の候補（datalist用・全体）＝必要人数リストで使われている備考の一覧。
+     * 例：['軍師', 'サポ', '全体サポ']。ピックアップは案件をまたいで編集するため全体から候補を出す。
+     *
+     * @return list<string>
+     */
+    private function allNoteOptions(): array
+    {
+        return ContentRoleRequirement::whereNotNull('note')
+            ->where('note', '!=', '')
+            ->orderBy('sort_order')
+            ->pluck('note')
+            ->map(fn ($n) => trim((string) $n))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** 実施形態の文字列 → コード（real/long/online）。cases.js の fmt と同じ。 */

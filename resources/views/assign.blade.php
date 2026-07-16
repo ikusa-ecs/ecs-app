@@ -151,6 +151,19 @@
 
     .empty-note { text-align: center; color: var(--muted); font-size: 13px; padding: 26px 0; }
 
+    /* 案件の備考（見落とすと事故るので目立つ色で。長文は折り返す） */
+    .cc-note { font-size: 12px; font-weight: 600; color: #b45309; background: var(--warn-soft);
+      border-radius: 8px; padding: 5px 9px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+    /* メンバー行の担当メモ・巡回（小さく控えめに） */
+    .m-note  { font-size: 10.5px; font-weight: 700; color: #6d28d9; white-space: nowrap; }
+    .m-patrol{ font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+      background: #e3edf7; color: #2c6ca0; white-space: nowrap; }
+    /* 手動編集中の担当メモ入力・巡回数入力 */
+    .m-note-inp { flex: 0 0 auto; font-family: inherit; font-size: 10.5px; padding: 1px 4px;
+      border: 1px solid var(--brand); border-radius: 6px; width: 66px; }
+    .m-patrol-inp { flex: 0 0 auto; font-family: inherit; font-size: 10.5px; padding: 1px 4px;
+      border: 1px solid var(--brand); border-radius: 6px; width: 42px; }
+
     /* カード内：割当メンバー／希望者の折りたたみ（雛形の「名前／P」に対応） */
     .cc-members { margin-top: 2px; }
     .mem-toggle {
@@ -310,6 +323,8 @@
 <!-- ポジション編集：選択肢（役割コードの正本）＋保存先＋CSRF。メンバーのポジションをDB(assignments)に保存する。 -->
 <script>
   window.ECS_ROLE_OPTIONS = @json($roleOptions ?? []);
+  // 担当メモ（軍師・サポ等）の入力候補。datalist に流し込む。
+  window.ECS_NOTE_OPTIONS = @json($noteOptions ?? []);
   window.ECS_QUICK_URL = '/entries/assign';
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
@@ -330,9 +345,11 @@
       need:c.need, filled:c.filled, state:c.state, mine:c.mine,
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
+      note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
-      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, status:m.status }))
+      // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。
+      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, status:m.status, note:m.note, patrol:m.patrol }))
     }));
 
   // 各日の「稼働可スタッフ数」（仮）。off → その日に稼働可と出している人数。
@@ -587,6 +604,12 @@
     for (const [k, label] of order) { if (pos && pos[k]) return label; }
     return 'FC';
   }
+  // 上と同じ優先順で「役割コード（D/OP/…）」を返す。DB保存(assignments.role)にはラベルでなくコードが要るため。
+  function firstPosCodeOf(pos){
+    const order = ['D','OP','MC','FC','CK','SP','RP'];
+    for (const k of order) { if (pos && pos[k]) return k; }
+    return 'FC';
+  }
   // この案件カードの「名簿から追加」プルダウンの中身（すでに入っている人は除外＝重複防止）
   function rosterOptions(c){
     if (typeof ECS_PEOPLE === 'undefined') return '<option value="">名簿から追加…</option>';
@@ -616,8 +639,21 @@
       if (!confirm(pp.name + ' さんは今月のアサインがすでに上限の ' + MONTH_CAP + '件 に達しています（現在 ' + mc + '件）。\n過重労働防止のための上限を超えます。それでも追加しますか？')) return;
     }
     const isEmp = pp.role === 'employee';
-    const pos = isEmp ? ((pp.dexp && pp.dexp.length) ? 'D' : 'FC') : firstPosOf(pp.pos);
-    c.assigned.push({ name: pp.name, lv: (isEmp ? '-' : ECS_lvOf(pp)), pos: pos, type: (isEmp ? 'emp' : 'staff') });
+    // 役割は「コード」で持つ（保存に必要）。表示ラベルは ECS_ROLE_OPTIONS から引く。
+    const roleCode = isEmp ? ((pp.dexp && pp.dexp.length) ? 'D' : 'FC') : firstPosCodeOf(pp.pos);
+    const posLabel = (window.ECS_ROLE_OPTIONS || {})[roleCode] || roleCode;
+    // id・roleCode・status を持たせる＝追加直後から担当/巡回を編集・保存できる（id が無いと入力欄が出ない）。
+    const m = { id: pp.id, name: pp.name, lv: (isEmp ? '-' : ECS_lvOf(pp)), pos: posLabel, roleCode: roleCode, note: '', patrol: null, status: '仮', type: (isEmp ? 'emp' : 'staff') };
+    c.assigned.push(m);
+    // 追加した時点で assignments に「仮」で保存する（見本ではなく本物のアサインにする）。
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: pp.id, action: 'assign', role: roleCode, status: '仮' })
+    })
+      .then(r => r.json())
+      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); } })
+      .catch(() => { alert('通信エラーでメンバー追加を保存できませんでした。'); });
     render();
   }
 
@@ -628,6 +664,13 @@
     b.classList.add('lh-' + v);
     // 押したボタンを目立たせる
     document.querySelectorAll('.lh-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.h === v));
+  }
+
+  // 文字列をHTMLに安全に埋め込む（備考・担当メモにタグ文字が入っても崩れないように）
+  function escHtml(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   // 案件カードのタイトル部分のHTML。タイトルは1行省略（長い分は「…」・ホバーで全文）。
@@ -657,6 +700,23 @@
     return `<select class="m-pos-sel" title="ポジションを変更（選ぶと保存されます）" onchange="changeMemberPos('${c.id}','${m.id}', this.value)">${html}</select>`;
   }
 
+  // メンバーの担当メモ欄。手動編集中でスタッフIDがあれば入力（datalistで候補）、それ以外は表示のみ。
+  function noteCellHtml(c, m){
+    if (!editing.has(c.id) || !m.id) {
+      return (m.note && String(m.note).trim()) ? `<span class="m-note" title="担当メモ">· ${escHtml(m.note)}</span>` : '';
+    }
+    const v = m.note ? escHtml(m.note) : '';
+    return `<input class="m-note-inp" list="ecsNoteList" placeholder="担当" value="${v}" title="担当メモ（軍師・サポ等。入力すると保存されます）" onchange="changeMemberNote('${c.id}','${m.id}', this.value)">`;
+  }
+  // メンバーの巡回数欄。手動編集中でスタッフIDがあれば数値入力、それ以外は数値があれば表示。
+  function patrolCellHtml(c, m){
+    if (!editing.has(c.id) || !m.id) {
+      return (m.patrol != null && m.patrol !== '') ? `<span class="m-patrol" title="巡回数">巡回${m.patrol}</span>` : '';
+    }
+    const v = (m.patrol != null && m.patrol !== '') ? m.patrol : '';
+    return `<input class="m-patrol-inp" type="number" min="0" placeholder="巡回" value="${v}" title="巡回数（入力すると保存されます）" onchange="changeMemberPatrol('${c.id}','${m.id}', this.value)">`;
+  }
+
   // ポジション変更を assignments に保存（エントリー一覧と同じ quickToggle を再利用）。状態(仮/確定)は維持する。
   function changeMemberPos(caseId, staffId, roleCode){
     const c = cases.find(z => z.id === caseId);
@@ -677,6 +737,43 @@
         }
       })
       .catch(() => { alert('通信エラーでポジションを保存できませんでした。'); render(); });
+  }
+
+  // 担当メモ（軍師・サポ等）を assignments に保存。役割変更(changeMemberPos)と同じ quickToggle を使う。状態は維持。
+  function changeMemberNote(caseId, staffId, note){
+    const c = cases.find(z => z.id === caseId);
+    const m = c && c.assigned.find(x => x.id === staffId);
+    const status = (m && m.status) ? m.status : '確定';
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: staffId, action: 'assign', note: note, status: status })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok){ if (m) m.note = note; }
+        else { alert('担当メモの保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); render(); }
+      })
+      .catch(() => { alert('通信エラーで担当メモを保存できませんでした。'); render(); });
+  }
+
+  // 巡回数を assignments に保存。空欄なら null（未設定）として送る。状態は維持。
+  function changeMemberPatrol(caseId, staffId, patrol){
+    const c = cases.find(z => z.id === caseId);
+    const m = c && c.assigned.find(x => x.id === staffId);
+    const status = (m && m.status) ? m.status : '確定';
+    const val = (patrol === '' || patrol == null) ? null : Number(patrol);
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: staffId, action: 'assign', patrol: val, status: status })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok){ if (m) m.patrol = val; }
+        else { alert('巡回数の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); render(); }
+      })
+      .catch(() => { alert('通信エラーで巡回数を保存できませんでした。'); render(); });
   }
 
   // 希望者一覧を別ウィンドウで開く
@@ -808,6 +905,11 @@
       return `<span class="ctag ${cls}">${t}</span>`;
     }).join('');
 
+    // 案件の備考（あれば目立つ帯で表示。担当者の見落とし＝事故を防ぐ）
+    const noteHtml = (c.note && String(c.note).trim())
+      ? `<div class="cc-note">📌 備考：${escHtml(String(c.note).trim())}</div>`
+      : '';
+
     // 割当メンバー（スタッフ＋社員＋派遣）。同じ日にかぶる人は赤文字。
     // 各メンバーの右に「他にどの案件に出ているか」を小タグで表示（同日=赤／別日=緑＝連続起用OK）。
     const members = buildMembers(c);
@@ -831,7 +933,7 @@
         ? `<span class="renkin-badge ${dayN >= 4 ? 'hi' : ''}" title="連勤の内訳（この期間に ${dayN}日ぶん）：\n${renkinList}">連${dayN}日</span>`
         : '';
       const capb = m.type === 'staff' ? capBadge(m.name, amap) : '';
-      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${posCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
+      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${posCellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
     const memCol =
       `<div class="cc-col">
@@ -882,6 +984,7 @@
           <a class="open-btn" href="/assign-detail?case=${c.id}">詳細 →</a>
         </div>
       </div>
+      ${noteHtml}
       ${tagHtml ? `<div class="cc-tags">${tagHtml}</div>` : ''}
       <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${posHtml}</div>
       <div class="cc-fill">
@@ -913,6 +1016,19 @@
     el.style.boxShadow = '0 0 0 3px #e8833a, 0 8px 24px rgba(0,0,0,.14)';
     setTimeout(() => { el.style.boxShadow = ''; }, 4000);
   }
+
+  // 担当メモ入力の候補（datalist）を1度だけ用意する。各入力は list="ecsNoteList" で参照する。
+  (function initNoteDatalist(){
+    if (document.getElementById('ecsNoteList')) return;
+    const dl = document.createElement('datalist');
+    dl.id = 'ecsNoteList';
+    (window.ECS_NOTE_OPTIONS || []).forEach(v => {
+      const op = document.createElement('option');
+      op.value = v;
+      dl.appendChild(op);
+    });
+    document.body.appendChild(dl);
+  })();
 
   // 日付ピッカーに現在の基準日を表示（空なら今日）。
   (function initFromDate(){

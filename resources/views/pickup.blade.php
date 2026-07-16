@@ -124,6 +124,31 @@
     .pk-btn.remove:hover { background:#fbeeea; }
 
     .empty-note { color:#a08a73; padding:30px; text-align:center; font-size:13px; }
+
+    /* メンバー行を編集できるように（役割・担当メモ・巡回を横並び／折り返し可） */
+    .pk-mem.pk-mem-edit { flex-wrap:wrap; }
+    .pk-mem-role, .pk-mem-note, .pk-mem-patrol {
+      border:1px solid #d8c8b6; border-radius:6px; padding:2px 6px; font-size:12px; color:#3a2d20; background:#fff;
+    }
+    .pk-mem-role { min-width:74px; }
+    .pk-mem-note { width:100px; }
+    .pk-mem-patrol { width:54px; }
+
+    /* 案件の備考（見落とし防止で目立たせる・折り返しOK） */
+    .pk-case-note {
+      background:#fff6e6; border:1px solid #f0dcae; color:#8a6a20;
+      border-radius:8px; padding:6px 10px; margin:6px 0 2px; font-size:12.5px;
+      white-space:pre-wrap; word-break:break-word; line-height:1.5;
+    }
+
+    /* 保存ボタン行（この案件をDBへ保存） */
+    .pk-save-row {
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      margin-top:12px; padding-top:10px; border-top:1px dashed #ece1d2;
+    }
+    .pk-save-msg { font-size:12px; }
+    .pk-save-msg.ok  { color:#2f8a3d; }
+    .pk-save-msg.err { color:#c0392b; }
 </style>
 @endverbatim
 @endpush
@@ -178,7 +203,8 @@
       <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
         ※ メンバー・希望者は仮の見本です（本番はアサイン済みの人・「エントリーする」を押した人が並びます）。<br>
         ※ <span class="cstat cal1">終日〇</span>＝その日は終日 稼働可（どの案件にも入れる）／<span class="cstat only">この案件のみ</span>＝この案件にだけ希望。<br>
-        ※ <b>＋追加</b>でメンバーに入れる・<b>×外す</b>で外せます（モックなので保存はされません）。<br>
+        ※ <b>＋追加</b>でメンバーに入れる・<b>×外す</b>で外せます。役割・担当メモ・巡回数もその場で直せます。<br>
+        ※ 直したら各案件の <b>「この案件を保存」</b> を押すとDBに保存されます（いま画面にいるメンバーで上書き＝外した人は消えます）。<br>
         ※ <b style="background:#fbf1da; padding:1px 7px; border-radius:4px;">色つき</b>＝選んだ案件のうち<b>複数（複数日など）に入っている人</b>。同じ人を継続してアサインしたいときの目印です（白＝その案件だけの人）。
       </p>
 @endverbatim
@@ -191,6 +217,13 @@
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
 <!-- DBの案件＋候補者（応募＋当日稼働可）＋現メンバー。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_PICKUP_CASES = @json($pickupCases ?? []);</script>
+<!-- DB保存に必要な橋渡し（CSRF・保存先URL・役割/担当メモの選択肢）。@verbatimの外で渡す。 -->
+<script>
+  window.ECS_CSRF = '{{ csrf_token() }}';
+  window.ECS_PICKUP_SAVE = '/pickup/save';
+  window.ECS_ROLE_OPTIONS = @json($roleOptions ?? []);
+  window.ECS_NOTE_OPTIONS = @json($noteOptions ?? []);
+</script>
 @verbatim
 <script>
   // ===== 仮データ生成（entries.html / assign.html と同じ作り） =====
@@ -270,27 +303,82 @@
   // ピックアップ対象＝過去（アーカイブ）と下書きを除いた案件、開催日の早い順
   const CASES = ALL.filter(c => !c.archived && !c.draft).slice().sort((a,b) => a.off - b.off);
 
-  // ===== アサイン状態（モック編集用） =====
-  // rosters[caseId] = その案件のメンバー名のSet（初期＝先頭 filled 名）
+  // ===== アサイン状態（DB保存できる本物） =====
+  // rosters[caseId] = その案件のメンバー配列。1人＝{ id, name, roleCode, note, patrol, status }。
+  //   id＝staff_id なので、名前ではなく id を基準に追加/解除・保存する（同姓同名でも安全なため）。
   const rosters = {};
+
+  // 候補者(entrants)・メンバー(members)の識別子。DBはid、見本はidが無いので名前で代用。
+  function entId(x){ return String(x.id != null ? x.id : x.name); }
+
   function ensureRoster(c){
     if (!rosters[c.id]){
-      // DBの案件なら現メンバー（assignments由来 c.members）を初期値に。見本なら先頭 filled 名。
-      const names = Array.isArray(c.members)
-        ? c.members
-        : entrantsOf(c).slice(0, c.filled).map(e => e.name);
-      rosters[c.id] = new Set(names);
+      if (Array.isArray(c.members)){
+        // DBの案件＝現メンバー（役割・担当メモ・巡回・状態つき）をそのまま初期値に。
+        rosters[c.id] = c.members.map(m => ({
+          id: entId(m), name: m.name,
+          roleCode: m.roleCode || '', note: m.note || '',
+          patrol: (m.patrol != null ? m.patrol : null),
+          status: m.status || '仮',
+        }));
+      } else {
+        // 見本（c.membersが無い）＝先頭 filled 名を仮メンバー化（保存対象外の飾り）。
+        rosters[c.id] = entrantsOf(c).slice(0, c.filled).map(e => ({
+          id: entId(e), name: e.name,
+          roleCode: e.roleCode || e.pos || '', note: '',
+          patrol: null, status: '仮',
+        }));
+      }
     }
     return rosters[c.id];
   }
-  function memberCount(c){ return ensureRoster(c).size; }
-  function isMember(c, name){ return ensureRoster(c).has(name); }
-  function toggleMember(id, name){
-    const c = getCase(id); if (!c) return;
+  function memberCount(c){ return ensureRoster(c).length; }
+  function isMemberId(c, id){ return ensureRoster(c).some(m => m.id === String(id)); }
+  function findMem(caseId, id){
+    const c = getCase(caseId); if (!c) return null;
+    return ensureRoster(c).find(m => m.id === String(id)) || null;
+  }
+
+  // 候補⇄メンバーの切替（id基準）。追加時は候補の役割を初期値に、担当メモ空・巡回なし・仮。
+  function toggleMember(caseId, id){
+    const c = getCase(caseId); if (!c) return;
     const r = ensureRoster(c);
-    if (r.has(name)) r.delete(name); else r.add(name);
+    const key = String(id);
+    const i = r.findIndex(m => m.id === key);
+    if (i >= 0){
+      r.splice(i, 1);
+    } else {
+      const e = entrantsOf(c).find(x => entId(x) === key);
+      r.push({
+        id: key,
+        name: e ? e.name : key,
+        roleCode: e ? (e.roleCode || e.pos || '') : '',
+        note: '', patrol: null, status: '仮',
+      });
+    }
     renderList();
     renderPicked();
+  }
+
+  // メンバー行の編集をrosterに反映（再描画しない＝入力中のフォーカスを保つため）。
+  function setMemRole(caseId, id, val){ const m = findMem(caseId, id); if (m) m.roleCode = val; }
+  function setMemNote(caseId, id, val){ const m = findMem(caseId, id); if (m) m.note = val; }
+  function setMemPatrol(caseId, id, val){
+    const m = findMem(caseId, id); if (!m) return;
+    const n = parseInt(val, 10);
+    m.patrol = (Number.isInteger(n) && n >= 0) ? n : null;
+  }
+
+  // HTML/属性エスケープ（担当メモ等に記号が入っても崩れないように）
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
+
+  // 役割セレクト（window.ECS_ROLE_OPTIONS からoption生成・初期選択=roleCode）
+  function roleSelectHtml(caseId, m){
+    const opts = Object.entries(window.ECS_ROLE_OPTIONS || {}).map(([code, label]) =>
+      `<option value="${escAttr(code)}" ${code === m.roleCode ? 'selected' : ''}>${esc(label)}</option>`).join('');
+    return `<select class="pk-mem-role" onchange="setMemRole('${escAttr(caseId)}','${escAttr(m.id)}',this.value)">`
+      + `<option value="">役割</option>${opts}</select>`;
   }
 
   // 選択状態
@@ -405,7 +493,7 @@
   function repeatMap(){
     const map = {};
     selectedCases().forEach(c => {
-      ensureRoster(c).forEach(name => { (map[name] = map[name] || []).push(c); });
+      ensureRoster(c).forEach(m => { (map[m.name] = map[m.name] || []).push(c); });
     });
     const rep = {};
     Object.keys(map).forEach(n => { if (map[n].length >= 2) rep[n] = map[n]; });
@@ -445,27 +533,38 @@
 
     dupBox.innerHTML = '';
 
+    // 担当メモ入力の候補（datalist）。全カード共通で1つあれば足りる。
+    const noteDatalist = `<datalist id="pk-note-list">`
+      + (window.ECS_NOTE_OPTIONS || []).map(o => `<option value="${escAttr(o)}">`).join('')
+      + `</datalist>`;
+
     // 案件カード
-    box.innerHTML = sel.map(c => {
+    box.innerHTML = noteDatalist + sel.map(c => {
       const ents   = entrantsOf(c);
-      // メンバー（アサイン済み）を上に、希望者（未割当）を下に
-      const members = ents.filter(e => isMember(c, e.name));
-      const wishers = ents.filter(e => !isMember(c, e.name));
+      const roster = ensureRoster(c);
+      // メンバー＝rosterそのもの（役割/担当メモ/巡回を保持）。希望者＝rosterに居ない候補。
+      const memberIds = new Set(roster.map(m => m.id));
+      const wishers = ents.filter(e => !memberIds.has(entId(e)));
       const dt = c.dayType && c.dayType !== '本番'
         ? `<span class="e-badge dt-badge ${dtClass(c.dayType)}">${c.dayType}</span>` : '';
       const parent = parentInfo(c);
-      const short  = members.length < c.need;
+      const short  = roster.length < c.need;
 
-      const memRow = (e) => {
-        const isMulti = !!rep[e.name];   // 複数の案件に入っている人＝色つき
-        const posClass = KEY_POS.includes(e.pos) ? 'e-pos key' : 'e-pos';
+      // メンバー行＝名前＋役割セレクト＋担当メモ（datalist）＋巡回数。変更でrosterに反映。
+      const memRow = (m) => {
+        const isMulti = !!rep[m.name];   // 複数の案件に入っている人＝色つき
         return `
-          <div class="pk-mem ${isMulti ? 'multi' : ''}">
-            <span class="m-name">${e.name}${isMulti ? '<span class="multi-flag">複数日</span>' : ''}</span>
-            <span class="${posClass}">${e.pos}</span>
+          <div class="pk-mem pk-mem-edit ${isMulti ? 'multi' : ''}">
+            <span class="m-name">${esc(m.name)}${isMulti ? '<span class="multi-flag">複数日</span>' : ''}</span>
+            ${roleSelectHtml(c.id, m)}
+            <input type="text" class="pk-mem-note" list="pk-note-list" placeholder="担当メモ"
+                   value="${escAttr(m.note)}"
+                   onchange="setMemNote('${escAttr(c.id)}','${escAttr(m.id)}',this.value)">
+            <input type="number" class="pk-mem-patrol" min="0" placeholder="巡回"
+                   value="${m.patrol != null ? m.patrol : ''}"
+                   onchange="setMemPatrol('${escAttr(c.id)}','${escAttr(m.id)}',this.value)">
             <span class="m-spacer"></span>
-            <span class="cstat done">✓ アサイン済み</span>
-            <button class="pk-btn remove" onclick="toggleMember('${c.id}','${e.name}')">× 外す</button>
+            <button class="pk-btn remove" onclick="toggleMember('${escAttr(c.id)}','${escAttr(m.id)}')">× 外す</button>
           </div>`;
       };
 
@@ -476,16 +575,16 @@
           : '<span class="cstat only">この案件のみ</span>';
         return `
           <div class="pk-mem">
-            <span class="m-name">${e.name}</span>
-            <span class="${posClass}">${e.pos}</span>
+            <span class="m-name">${esc(e.name)}</span>
+            <span class="${posClass}">${esc(e.pos)}</span>
             <span class="m-spacer"></span>
             ${avail}
-            <button class="pk-btn add" onclick="toggleMember('${c.id}','${e.name}')">＋ 追加</button>
+            <button class="pk-btn add" onclick="toggleMember('${escAttr(c.id)}','${escAttr(entId(e))}')">＋ 追加</button>
           </div>`;
       };
 
-      const memHtml = members.length
-        ? members.map(memRow).join('')
+      const memHtml = roster.length
+        ? roster.map(memRow).join('')
         : '<div class="muted" style="font-size:12px; padding:4px 8px;">（まだメンバーがいません）</div>';
       const wishHtml = wishers.length
         ? wishers.map(wishRow).join('')
@@ -493,6 +592,11 @@
 
       const guests = (c.guests && c.guests !== '—') ? `<span>参加者 <b>${c.guests}</b>名</span>` : '';
       const teams  = (c.teams  && c.teams  !== '—') ? `<span>チーム <b>${c.teams}</b></span>` : '';
+      // 案件の備考＝空でなければ目立つ帯で出す（見落とし防止）。
+      const noteHtml = (c.note && String(c.note).trim() !== '')
+        ? `<div class="pk-case-note">📌 備考：${esc(c.note)}</div>` : '';
+      // 開催日が無い案件は保存できない（バックエンドが422で弾く）ので、その場で理由を出す。
+      const saveHint = c.date ? '' : ' disabled title="開催日が未設定のため保存できません"';
 
       return `
         <div class="pk-case">
@@ -503,18 +607,62 @@
             ${dt}${seriesBadge(c)}
           </div>
           ${parent ? `<div class="pk-case-parent">${parent}</div>` : ''}
+          ${noteHtml}
           <div class="pk-case-meta">
             <span>集合 <b>${c.meet || '—'}</b> / 解散 <b>${c.leave || '—'}</b></span>
             <span>会場 <b>${c.place || '—'}</b></span>
             <span>D <b>${c.dir || '—'}</b></span>
             ${guests}${teams}
           </div>
-          <div class="pk-block-h">メンバー（アサイン済み） <span class="cnt ${short ? 'short' : ''}">${members.length} / 必要 ${c.need}名</span></div>
+          <div class="pk-block-h">メンバー（アサイン済み） <span class="cnt ${short ? 'short' : ''}">${roster.length} / 必要 ${c.need}名</span></div>
           ${memHtml}
           <div class="pk-block-h">希望者（未割当・エントリー中） <span class="cnt">${wishers.length}名</span></div>
           ${wishHtml}
+          <div class="pk-save-row">
+            <button class="btn primary sm" onclick="savePickup('${escAttr(c.id)}', this)"${saveHint}>この案件を保存</button>
+            <span class="pk-save-msg"></span>
+          </div>
         </div>`;
     }).join('');
+  }
+
+  // ===== ③ DB保存 =====
+  // 「いま画面にいるメンバー」でその案件×開催日を上書き保存する（外した人は消える）。
+  function savePickup(caseId, btn){
+    const c = getCase(caseId); if (!c) return;
+    const msg = btn.parentElement.querySelector('.pk-save-msg');
+    const setMsg = (text, cls) => { if (msg){ msg.textContent = text; msg.className = 'pk-save-msg ' + cls; } };
+
+    if (!c.date){
+      setMsg('開催日が未設定のため保存できません。', 'err');
+      return;
+    }
+
+    const roster = ensureRoster(c);
+    const payload = {
+      project_id: c.id,
+      members: roster.map(m => ({
+        staff_id: m.id, role: m.roleCode, note: m.note, patrol: m.patrol, status: m.status,
+      })),
+    };
+
+    btn.disabled = true;
+    setMsg('保存中…', '');
+    fetch(window.ECS_PICKUP_SAVE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify(payload),
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ j }) => {
+        if (j && j.ok){
+          setMsg(`保存しました（${j.count}名）`, 'ok');
+        } else {
+          setMsg((j && j.message) ? j.message : '保存に失敗しました。', 'err');
+        }
+      })
+      .catch(() => setMsg('通信エラーで保存できませんでした。もう一度お試しください。', 'err'))
+      .finally(() => { btn.disabled = false; });
   }
 
   // 初期描画

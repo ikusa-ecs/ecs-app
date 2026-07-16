@@ -10,6 +10,8 @@
 <script src="/ecs/data/cases.js"></script>
 <script>
   window.ECS_CASES = @json($cases);
+  // 危険日（手動指定）＝設定画面で足した日（YYYY-MM-DD の配列）。自動判定に加えてカレンダーで赤くする。
+  window.ECS_MANUAL_DANGER = @json($manualDanger ?? []);
 </script>
 @verbatim
 <style>
@@ -60,7 +62,7 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">これは見た目確認用のモックです。数値・データはすべて仮の見本です。</div>
+      <div class="mock-note">ここに出ている数値は<b>登録された本物の案件データ</b>から自動計算しています（KPI・危険日カレンダー・件数集計とも）。※ 危険日判定で使う「稼働スタッフ40名」は今は暫定の目安です。</div>
 
       <!-- 数値サマリ（全社員向け・案件データから自動計算） -->
       <div class="grid cols-4">
@@ -98,7 +100,7 @@
           </div>
         </div>
         <p class="muted" style="font-size:12px; margin:0 0 4px;">
-          同じ日に案件が集中して、人手が足りなくなりそうな日（危険日）を赤く表示します。判定は「大型2件以上／リアル系5件以上／必要スタッフ合計が稼働40名の7割（28名）以上」のいずれか。数値はすべて仮の見本です。
+          同じ日に案件が集中して、人手が足りなくなりそうな日（危険日）を赤く表示します。判定は「大型2件以上／リアル系5件以上／必要スタッフ合計が稼働40名の7割（28名）以上」のいずれか。案件データは本物ですが、判定に使う「稼働40名」は今は暫定の目安です。
         </p>
         <div class="cal-grid" id="calDow"></div>
         <div class="cal-grid" id="calGrid"></div>
@@ -217,6 +219,9 @@
     var y = cursor.getFullYear(), m = cursor.getMonth();
     document.getElementById('calLabel').textContent = y + '年' + (m+1) + '月';
 
+    // 手動指定の危険日（設定画面で足した日）。自動判定に加えて赤くする。
+    var MANUAL_DANGER = new Set(window.ECS_MANUAL_DANGER || []);
+
     var map = casesByDay(y, m);
     var firstDow = new Date(y, m, 1).getDay();           // 0=日
     var lead = (firstDow + 6) % 7;                         // 月曜始まりの先頭空白
@@ -246,9 +251,16 @@
       num.textContent = day;
       cell.appendChild(num);
 
+      // その日が手動危険日か（案件が無くても手動で危険日にできる）。
+      var ymd = y + '-' + ('0'+(m+1)).slice(-2) + '-' + ('0'+day).slice(-2);
+      var isManual = MANUAL_DANGER.has(ymd);
+      // 自動判定（案件があるときだけ）＋手動指定を合わせた「理由」リスト。
+      var chk = items.length ? window.ECS_dangerCheck(items) : { danger:false, reasons:[] };
+      var reasons = (chk.reasons || []).slice();
+      if (isManual) reasons.push('手動で危険日に設定');
+
       if (items.length){
         cell.className += ' has';
-        var chk = window.ECS_dangerCheck(items);
         var hasBig = items.some(function(it){ return it.scale === '大型'; });
 
         var cnt = document.createElement('span');
@@ -273,16 +285,17 @@
           cell.appendChild(document.createElement('br'));
           cell.appendChild(bm);
         }
+      }
 
-        if (chk.danger){
-          cell.className += ' danger';
-          cell.title += '\n\n⚠ 危険日\n・' + chk.reasons.join('\n・');
-          var w = document.createElement('span');
-          w.className = 'warn-ico';
-          w.textContent = '⚠';
-          cell.appendChild(w);
-          dangerDays.push({ day:day, chk:chk, items:items });
-        }
+      // 自動 or 手動で危険日なら赤くする（手動は案件0件の日でも対象）。
+      if (chk.danger || isManual){
+        cell.className += ' danger';
+        cell.title = (cell.title || ((m+1) + '/' + day)) + '\n\n⚠ 危険日\n・' + reasons.join('\n・');
+        var w = document.createElement('span');
+        w.className = 'warn-ico';
+        w.textContent = '⚠';
+        cell.appendChild(w);
+        dangerDays.push({ day:day, reasons:reasons, items:items });
       }
       grid.appendChild(cell);
     }
@@ -303,9 +316,9 @@
       dangerDays.forEach(function(dd){
         var row = document.createElement('div');
         row.className = 'dgr-item';
-        var nm = dd.items.map(function(it){ return it.name; }).join('／');
+        var nm = dd.items.length ? dd.items.map(function(it){ return it.name; }).join('／') : '案件なし（手動指定）';
         row.innerHTML = '<span class="ddate">' + (m+1) + '/' + dd.day + '</span>' +
-          '<span class="drsn">' + dd.chk.reasons.join('。') + '。' +
+          '<span class="drsn">' + dd.reasons.join('。') + '。' +
           '<span class="nm">（' + nm + '）</span></span>';
         list.appendChild(row);
       });

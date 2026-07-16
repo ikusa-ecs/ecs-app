@@ -48,11 +48,16 @@ class AssignmentController extends Controller
         // この案件の日付（複数日案件は本番/予備日/リハで別レコード＝1案件1日）。
         $date = $project->start_date; // Carbon|null
 
-        // すでに保存済みのアサイン（staff_id => ['role'=>, 'status'=>]）。再表示で選択済みにする。
+        // すでに保存済みのアサイン（staff_id => ['role'=>, 'status'=>, 'note'=>, 'patrol'=>]）。再表示で選択済みにする。
         $existing = Assignment::where('project_id', $project->id)
             ->get()
             ->keyBy('staff_id')
-            ->map(fn ($a) => ['role' => $a->role, 'status' => $a->status])
+            ->map(fn ($a) => [
+                'role' => $a->role,
+                'status' => $a->status,
+                'note' => $a->note ?? '',
+                'patrol' => $a->patrol,
+            ])
             ->all();
 
         // この案件の日について、各スタッフが出した稼働希望（希望/稼働可/NG/未定）。
@@ -160,6 +165,8 @@ class AssignmentController extends Controller
         $roleReq = $this->positionTemplate($project);
         // 備考（担当）・巡回つきの内訳（必要アサイン人数リスト由来）。枠の下に見せる。
         $roleDetail = $this->positionDetail($project);
+        // 担当メモ入力の候補（datalist用）＝このコンテンツ×規模で使われる備考の一覧（軍師／サポ 等）。
+        $noteOptions = $this->noteOptions($project);
 
         // すでに役割つきで入っている人数を役割ごとに数える（枠の初期「現在◯」＝サーバ側の目安）。
         // 画面側でチェック／役割を動かすとJSで即時に上書きされる。
@@ -180,6 +187,7 @@ class AssignmentController extends Controller
             'roleLabels' => AssignmentRole::positionLabels(),
             'roleReq' => $roleReq,
             'roleDetail' => $roleDetail,
+            'noteOptions' => $noteOptions,
             'roleAssigned' => $roleAssigned,
             'sameDay' => $sameDay,
             'monthCount' => $monthCount,
@@ -278,6 +286,32 @@ class AssignmentController extends Controller
         return $out;
     }
 
+    /**
+     * 担当メモ入力の候補（datalist用）＝このコンテンツ×規模で使われている備考の一覧。
+     * 例：['軍師', 'サポ', '全体サポ']。自由入力もできるが、よく使う語をワンタップで選べるようにする。
+     *
+     * @return list<string>
+     */
+    private function noteOptions(Project $project): array
+    {
+        $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
+        if (empty($contentIds) || ! $project->scale) {
+            return [];
+        }
+
+        return ContentRoleRequirement::whereIn('content_id', $contentIds)
+            ->where('scale', $project->scale)
+            ->whereNotNull('note')
+            ->where('note', '!=', '')
+            ->orderBy('sort_order')
+            ->pluck('note')
+            ->map(fn ($n) => trim((string) $n))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     /** アサインを保存（いま選ばれている人で、その案件×その日を上書き）。 */
     public function save(Request $request)
     {
@@ -287,6 +321,8 @@ class AssignmentController extends Controller
             'staff_ids' => ['nullable', 'array'],
             'staff_ids.*' => ['string'],
             'role' => ['nullable', 'array'],
+            'note' => ['nullable', 'array'],          // 担当メモ（staff_id => 軍師/サポ 等）
+            'patrol' => ['nullable', 'array'],         // 巡回数（staff_id => 数値）
         ]);
 
         $project = Project::find($data['project_id']);
@@ -301,10 +337,12 @@ class AssignmentController extends Controller
         $date = $project->start_date->format('Y-m-d');
         $staffIds = $data['staff_ids'] ?? [];
         $roles = $data['role'] ?? [];
+        $notes = $data['note'] ?? [];
+        $patrols = $data['patrol'] ?? [];
         $now = Carbon::now();
 
         // 「いま選ばれている人」で、その案件×その日 を上書き保存する（外した人は削除）。
-        DB::transaction(function () use ($project, $date, $staffIds, $roles, $data, $now) {
+        DB::transaction(function () use ($project, $date, $staffIds, $roles, $notes, $patrols, $data, $now) {
             // date は 'date' キャストで時刻付き保存になり得るため、日付部分だけで照合する
             // （quickToggle と同じ考え方。where('date',$date) だと空振りして再登録が unique 制約で 500 になる）。
             Assignment::where('project_id', $project->id)->whereDate('date', $date)->delete();
@@ -316,6 +354,8 @@ class AssignmentController extends Controller
                     'date' => $date,
                     // 正規の役割コード以外（空・別表記）は「役割なし（''）」に倒す＝表記ゆれを入れない
                     'role' => AssignmentRole::isValid($roles[$sid] ?? null) ? $roles[$sid] : '',
+                    'note' => $this->cleanNote($notes[$sid] ?? null),      // 担当メモ（軍師/サポ 等）
+                    'patrol' => $this->cleanPatrol($patrols[$sid] ?? null), // 巡回数（数値・空はnull）
                     'status' => $data['status'],
                     'assigned_by' => null,        // 認証導入後に操作者を入れる
                     'assigned_at' => $now,
@@ -327,6 +367,25 @@ class AssignmentController extends Controller
 
         return redirect('/project-assign?project=' . urlencode($project->id))
             ->with('status', "「{$project->project_name}」に {$n}名を「{$data['status']}」で保存しました（{$date}）。");
+    }
+
+    /** 担当メモを整える（前後空白を除去。空文字は null）。 */
+    private function cleanNote($v): ?string
+    {
+        $s = trim((string) ($v ?? ''));
+
+        return $s === '' ? null : mb_substr($s, 0, 100);   // 念のため長さ上限
+    }
+
+    /** 巡回数を整える（数値だけ。空・非数値・0未満は null）。 */
+    private function cleanPatrol($v): ?int
+    {
+        if ($v === null || $v === '' || ! is_numeric($v)) {
+            return null;
+        }
+        $n = (int) $v;
+
+        return $n < 0 ? null : $n;
     }
 
     /**
@@ -343,6 +402,8 @@ class AssignmentController extends Controller
             'action' => ['required', 'in:assign,unassign'],
             'role' => ['nullable', 'string'],
             'status' => ['nullable', 'in:仮,確定'],
+            'note' => ['nullable', 'string'],       // 担当メモ（軍師/サポ 等）。送られたときだけ更新。
+            'patrol' => ['nullable'],               // 巡回数（数値／空）。送られたときだけ更新。
         ]);
 
         $project = Project::find($data['project_id']);
@@ -366,24 +427,40 @@ class AssignmentController extends Controller
         if ($data['action'] === 'assign') {
             $role = AssignmentRole::isValid($data['role'] ?? null) ? $data['role'] : '';
             $status = $data['status'] ?? '確定';
+            // note/patrol は「送られてきたキーだけ」更新する（役割だけ変える操作で担当を消さないため）。
+            $note = $this->cleanNote($data['note'] ?? null);
+            $patrol = $this->cleanPatrol($data['patrol'] ?? null);
             if ($existing) {
-                $existing->update([
+                $update = [
                     'status' => $status,
                     'role' => $role !== '' ? $role : $existing->role,
-                ]);
+                ];
+                if ($request->has('note')) {
+                    $update['note'] = $note;
+                }
+                if ($request->has('patrol')) {
+                    $update['patrol'] = $patrol;
+                }
+                $existing->update($update);
             } else {
                 Assignment::create([
                     'project_id' => $project->id,
                     'staff_id' => $sid,
                     'date' => $date,
                     'role' => $role,
+                    'note' => $note,
+                    'patrol' => $patrol,
                     'status' => $status,
                     'assigned_by' => null,          // 認証導入後に操作者を入れる
                     'assigned_at' => Carbon::now(),
                 ]);
             }
 
-            return response()->json(['ok' => true, 'assigned' => true, 'status' => $status]);
+            return response()->json([
+                'ok' => true, 'assigned' => true, 'status' => $status,
+                'note' => $existing ? $existing->fresh()->note : $note,
+                'patrol' => $existing ? $existing->fresh()->patrol : $patrol,
+            ]);
         }
 
         // unassign：その行を消す（応募＝applications はそのまま＝また〇に戻る）。

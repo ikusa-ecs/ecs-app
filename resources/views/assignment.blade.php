@@ -12,6 +12,12 @@
     .asg-head .pname { font-size: 18px; font-weight: 700; }
     .asg-head .meta { display: flex; gap: 20px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-top: 6px; }
     .asg-head .meta b { color: var(--ink); font-weight: 600; }
+    /* 案件の備考（見落とすと事故るので薄い黄色の帯で目立たせる） */
+    .asg-note-band { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px;
+      background: #fdf6d8; border: 1px solid #e8dca0; border-radius: 8px; padding: 8px 12px;
+      font-size: 13px; color: var(--ink); line-height: 1.6; }
+    .asg-note-band .lbl { font-weight: 700; white-space: nowrap; color: #8a6d1a; }
+    .asg-note-band .bd { word-break: break-word; }
 
     /* 操作バー（選択数・検索） */
     .asg-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; }
@@ -38,6 +44,14 @@
       min-width: 130px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
       padding: 5px 7px; font-family: inherit; font-size: 12.5px; color: var(--ink); cursor: pointer;
     }
+    /* 担当メモ・巡回数の入力（.role-sel と同じ雰囲気で・縦に並べる） */
+    .rp-cell { display: flex; flex-direction: column; gap: 4px; }
+    .note-in, .patrol-in {
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      padding: 5px 7px; font-family: inherit; font-size: 12.5px; color: var(--ink);
+    }
+    .note-in { width: 140px; }
+    .patrol-in { width: 70px; }
     table.tbl td.chk { width: 36px; text-align: center; }
     table.tbl input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--brand); cursor: pointer; }
     .ng-note { color: var(--danger); font-size: 11.5px; }
@@ -143,6 +157,13 @@
           <span>D：<b>{{ $project->director->name ?? '未定' }}</b></span>
           <span>状況：<b>{{ $project->status ?? '未着手' }}</b></span>
         </div>
+        {{-- 案件の備考：担当が見落とすと事故るので、メタ情報の下に帯で目立たせる --}}
+        @if (trim((string) $project->note) !== '')
+          <div class="asg-note-band">
+            <span class="lbl">📌 案件の備考</span>
+            <span class="bd">{!! nl2br(e($project->note)) !!}</span>
+          </div>
+        @endif
       </div>
     </div>
   </div>
@@ -218,6 +239,7 @@
               <th>できる役割</th>
               <th class="num">経験</th>
               <th>この案件での役割</th>
+              <th>担当・巡回</th>
               <th>NG</th>
             </tr>
           </thead>
@@ -272,16 +294,28 @@
                   </select>
                 </td>
                 <td>
+                  {{-- 担当メモ（軍師/サポ等）と巡回数：フォーム内なので input を置くだけで save() が保存する --}}
+                  <div class="rp-cell">
+                    <input type="text" name="note[{{ $s['id'] }}]" list="asgNoteOpts" class="note-in" placeholder="担当（軍師/サポ等）" value="{{ $existing[$s['id']]['note'] ?? '' }}">
+                    <input type="number" name="patrol[{{ $s['id'] }}]" min="0" class="patrol-in" placeholder="巡回" value="{{ $existing[$s['id']]['patrol'] ?? '' }}">
+                  </div>
+                </td>
+                <td>
                   @if (count($s['ng']))<span class="ng-note">NG: {{ implode('、', $s['ng']) }}</span>@endif
                 </td>
               </tr>
             @empty
-              <tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
+              <tr><td colspan="9" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
             @endforelse
           </tbody>
         </table>
         </div>
       </div>
+
+      {{-- 担当メモの候補（軍師/サポ等）。表内で一度だけ置けば各行の note 入力から使える --}}
+      <datalist id="asgNoteOpts">
+        @foreach ($noteOptions as $opt)<option value="{{ $opt }}">@endforeach
+      </datalist>
 
       <p id="noAvail" class="muted" style="display:none; font-size:12.5px; margin-top:8px;">この日に「希望・稼働可」の人がまだいません。上の「この日 希望・稼働可 の人だけ」のチェックを外すと、名簿の全員から選べます。</p>
       <div id="autoNote" class="alert ok" style="display:none; margin-top:10px;"><span class="ico">✨</span><div></div></div>

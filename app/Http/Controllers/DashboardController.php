@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Support\DangerDays;
 use Illuminate\Support\Carbon;
 
 /**
@@ -16,9 +17,9 @@ use Illuminate\Support\Carbon;
  * 共通関数をそのまま使うので、見た目・計算式は変えずにデータの出どころ
  * だけ DB に切り替えられる。
  *
- * ※「今月の件数集計」表（拠点別・種別内訳）は、DB 側に拠点・実施形態の
- *   細分類がまだ揃っていないため、画面側のベタ書き（仮）のまま据え置く。
- *   ここで渡すのは KPI とカレンダーが使う案件リストだけ。
+ * ※ KPI・危険日カレンダー・件数集計とも、この $cases（DBのprojects由来）で描く＝本物のデータ。
+ *   件数集計は実施形態(format)の生テキストを画面側で「拠点(種別)」に解釈して月別集計する。
+ *   唯一、危険日判定で使う「稼働スタッフ40名」だけは暫定の目安（画面側 cases.js の定数）。
  */
 class DashboardController extends Controller
 {
@@ -64,7 +65,11 @@ class DashboardController extends Controller
             })
             ->values();
 
-        return view('dashboard', ['cases' => $cases]);
+        return view('dashboard', [
+            'cases' => $cases,
+            // 危険日（手動指定）＝設定画面で足した日。カレンダーが自動判定に加えて赤くする。
+            'manualDanger' => DangerDays::dates(),
+        ]);
     }
 
     /**

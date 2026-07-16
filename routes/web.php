@@ -170,6 +170,8 @@ Route::get('/entries', [AssignBoardController::class, 'entries']);
 // エントリー一覧「月ごと」の表からの1人ぶんアサイン切替（A案）。assignments に追加/削除する。
 Route::post('/entries/assign', [AssignmentController::class, 'quickToggle']);
 Route::get('/pickup', [AssignBoardController::class, 'pickup']);
+// ピックアップのメンバーを assignments にDB保存（担当メモ・巡回数も一緒に上書き）。
+Route::post('/pickup/save', [AssignBoardController::class, 'pickupSave']);
 
 // スタッフ関連の画面（Blade化済み）
 // スタッフ名簿は DB（people＋ポジション可否＋NGペア）から読む。
@@ -195,6 +197,8 @@ Route::get('/mypage-finance', [MyPageFinanceController::class, 'index']);
 // 設定画面。マスタ件数を DB の実データから表示し、アサインMTG日の予定表を DB(settings) に保存する。
 Route::get('/settings', [SettingsController::class, 'index']);
 Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);
+// 危険日（手動指定）を settings に保存。ダッシュボードの危険日カレンダーに反映される。
+Route::post('/settings/danger-dates', [SettingsController::class, 'saveDangerDates']);
 
 // マスタ管理（コンテンツ・拠点＝追加/編集/削除、ポジション＝表示のみ）。
 Route::get('/masters', [MasterController::class, 'index']);

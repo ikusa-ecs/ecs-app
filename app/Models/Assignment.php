@@ -22,6 +22,7 @@ class Assignment extends Model
         return [
             'date' => 'date',
             'score' => 'decimal:2',
+            'patrol' => 'integer',
             'assigned_at' => 'datetime',
         ];
     }

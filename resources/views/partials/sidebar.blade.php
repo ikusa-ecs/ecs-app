@@ -15,6 +15,8 @@
         <a class="{{ ($active ?? '') === 'projects' ? 'active' : '' }}" href="/projects"><span class="nav-icon">▤</span> 案件一覧</a>
         {{-- 年月フォルダ（案件一覧の画面だけJSで中身が入る。他画面では空のまま） --}}
         <div class="ym-tree" id="ymTree"></div>
+        {{-- アサイン表は「案件の分類」なので案件グループに置く（baba 2026-07-16）。 --}}
+        <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
         <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>
         <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
         <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">⏰</span> 人数確定リマインド</a>
@@ -25,13 +27,12 @@
     <div class="nav-group" data-group="アサイン">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> アサイン</div>
       <div class="group-items">
-        <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
         <a class="{{ ($active ?? '') === 'assign_dashboard' ? 'active' : '' }}" href="/assign-dashboard"><span class="nav-icon">▣</span> アサインダッシュボード</a>
         <a class="{{ ($active ?? '') === 'assign' ? 'active' : '' }}" href="/assign"><span class="nav-icon">▦</span> 日別ボード</a>
         <a class="{{ ($active ?? '') === 'assign_detail' ? 'active' : '' }}" href="/assign-detail"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
-        <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>
         <a class="{{ ($active ?? '') === 'pickup' ? 'active' : '' }}" href="/pickup"><span class="nav-icon">📌</span> ピックアップ</a>
         <a class="{{ ($active ?? '') === 'assign_director' ? 'active' : '' }}" href="/assign-director"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
+        <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>
         <a href="#" onclick="window.open('/assign-wishlist','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">📊</span> スタッフ集計</a>
       </div>
     </div>

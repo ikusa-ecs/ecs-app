@@ -33,6 +33,8 @@
   .t-online { background: #1f9d74; }
   .t-basho  { background: #7a52c9; }
   .t-tokyo  { background: #d9822b; }
+  .t-help   { background: #0891b2; }
+  .t-taiken { background: #be185d; }
   .t-other  { background: #8a7a66; }
 
   /* カードを横に並べる帯。高さに上限を付けて“この枠の中で”縦横スクロールさせる。
@@ -138,6 +140,8 @@
   <span class="lg"><span class="sw t-online"></span>オンライン</span>
   <span class="lg"><span class="sw t-basho"></span>場所貸し</span>
   <span class="lg"><span class="sw t-tokyo"></span>他拠点⇒東</span>
+  <span class="lg"><span class="sw t-help"></span>ヘルプのみ</span>
+  <span class="lg"><span class="sw t-taiken"></span>体験会</span>
   <span class="lg"><span class="sw t-other"></span>その他</span>
 </div>
 
@@ -159,7 +163,8 @@
         if ($c['meet'] !== '' || $c['leave'] !== '') $rows[] = ['集合/解散', ($c['meet'] !== '' ? $c['meet'] : '—') . ' 〜 ' . ($c['leave'] !== '' ? $c['leave'] : '—')];
         if ($c['enter'] !== '' || $c['evStart'] !== '' || $c['evEnd'] !== '') $rows[] = ['入/開/終', ($c['enter'] !== '' ? $c['enter'] : '—') . '/' . ($c['evStart'] !== '' ? $c['evStart'] : '—') . '/' . ($c['evEnd'] !== '' ? $c['evEnd'] : '—')];
         if ($c['guests'] !== '' || $c['teams'] !== '') $rows[] = ['客数/組', ($c['guests'] !== '' ? $c['guests'] . '名' : '') . ($c['teams'] !== '' ? ' ' . $c['teams'] . '組' : '')];
-        if ($c['need'] !== '' || $c['format'] !== '') $rows[] = ['運営/形式', ($c['need'] !== '' ? $c['need'] . '名 ' : '') . $c['format']];
+        // 形式（イベント東(リアル)等）はヘッダーの色つきバッジに一本化＝行では運営人数だけ出す（baba 2026-07-16）。
+        if ($c['need'] !== '') $rows[] = ['運営', $c['need'] . '名'];
         if ($c['staffRole'] !== '') $rows[] = ['運営方式', $c['staffRole']];
         if ($c['audio'] !== '') $rows[] = ['音響', $c['audio']];
         if ($c['location'] !== '') $rows[] = ['会場住所', $c['location']];
@@ -173,6 +178,7 @@
         if ($c['video'] !== '') $jisseki[] = '動画:' . $c['video'];
         if ($jisseki) $rows[] = ['実績公開', implode(' ', $jisseki)];
         if ($c['note'] !== '') $rows[] = ['備考', $c['note']];
+        if ($c['roleDetail'] !== '') $rows[] = ['担当内訳', $c['roleDetail']];
         $anyPrep = $c['lineSent'] || $c['handover'] || $c['script'];
       @endphp
       <div class="acard"
@@ -186,9 +192,10 @@
           <div class="top">
             <span class="date">{{ $c['date'] !== '' ? $c['date'] : '日付未定' }}</span>
             <span class="no">No.{{ $c['no'] }}</span>
-            @if ($c['typeLabel'] !== '')<span class="tlabel">{{ $c['typeLabel'] }}</span>@endif
           </div>
           <div class="head-tags">
+            {{-- 形式は入力したまま（イベント東(リアル)等）をバッジ表示。色は種別で自動（baba 2026-07-16）。 --}}
+            @if ($c['format'] !== '')<span class="htag fmt">{{ $c['format'] }}</span>@endif
             @if ($c['dayType'] !== '本番')<span class="htag dtype">{{ $c['dayType'] }}</span>@endif
             @if ($c['category'] === '追加案件')<span class="htag extra">追加</span>@endif
             @if ($c['lodging'] !== '')<span class="htag">{{ $c['lodging'] }}</span>@endif

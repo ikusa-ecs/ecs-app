@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Content;
+use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -41,6 +43,8 @@ class AssignSheetController extends Controller
         'online' => 'オンライン',
         'basho'  => '場所貸し',
         'tokyo'  => '他拠点⇒東',
+        'help'   => 'ヘルプのみ',
+        'taiken' => '体験会',
         'other'  => '',
     ];
 
@@ -99,7 +103,20 @@ class AssignSheetController extends Controller
         // コンテンツID → 名前（見出し用）。
         $contentNames = Content::pluck('content_name', 'id');
 
-        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $people, $contentNames) {
+        // ポジション別の「担当内訳」（備考／巡回）の元データをまとめて引く（必要アサイン人数リスト由来）。
+        // 案件ごとに content_ids × 規模 で絞れるよう、月内の全コンテンツ分を一括で取っておく（毎回引かない）。
+        $allContentIds = $monthProjects
+            ->flatMap(fn (Project $p) => is_array($p->content_ids) ? $p->content_ids : [])
+            ->filter()->unique()->values();
+        $reqByContent = $allContentIds->isEmpty()
+            ? collect()
+            : ContentRoleRequirement::whereIn('content_id', $allContentIds->all())
+                ->where('count', '>', 0)
+                ->orderBy('sort_order')
+                ->get(['content_id', 'scale', 'position', 'count', 'note', 'patrol'])
+                ->groupBy('content_id');
+
+        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $people, $contentNames, $reqByContent) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。
             $members = ($membersByProject->get($p->id) ?? collect())
                 ->map(function ($a) use ($people) {
@@ -184,6 +201,7 @@ class AssignSheetController extends Controller
                 'catering'    => $this->clean($p->catering),
                 'transport'   => $this->clean($p->transport),
                 'note'        => $this->clean($p->note),
+                'roleDetail'  => $this->roleDetailText($p, $reqByContent),
                 'need_i'      => (int) ($p->required_count ?? 0),
                 'filled'      => $members->count(),
                 'members'     => $members->all(),
@@ -195,6 +213,61 @@ class AssignSheetController extends Controller
             'months'        => $months,
             'selectedMonth' => $selectedMonth,
         ]);
+    }
+
+    /**
+     * 案件の「担当内訳」を短い1行テキストにする（例：「OP 巡回×2　SP 軍師×1」）。
+     *
+     * 元データは content_role_requirements の note（備考）・patrol（巡回）。役割×備考でまとめる。
+     * 備考も巡回も無い枠（Dなど指定なし）は出さない＝ポジション枠の数字で足りるため。
+     * 考え方はアサイン画面（/project-assign）の「担当の内訳」と同じ。カードが狭いので短くまとめる。
+     */
+    private function roleDetailText(Project $p, Collection $reqByContent): string
+    {
+        $contentIds = is_array($p->content_ids) ? array_filter($p->content_ids) : [];
+        $scale = $p->scale;
+        if (empty($contentIds) || ! $scale) {
+            return '';
+        }
+
+        // 役割 → 「備考|巡回」キー → 件数 を集計（同じ備考は合算）。
+        $agg = [];
+        foreach ($contentIds as $cid) {
+            foreach ($reqByContent->get($cid, collect()) as $r) {
+                if ((string) $r->scale !== (string) $scale || ! AssignmentRole::isValid($r->position)) {
+                    continue;
+                }
+                $note = trim((string) ($r->note ?? ''));
+                $patrol = $r->patrol;
+                if ($note === '' && $patrol === null) {
+                    continue;   // 指定なしの枠は内訳に出さない（枠の数字で十分）
+                }
+                $key = $note . '|' . ($patrol ?? '');
+                if (! isset($agg[$r->position][$key])) {
+                    $agg[$r->position][$key] = ['note' => $note, 'patrol' => $patrol, 'count' => 0];
+                }
+                $agg[$r->position][$key]['count'] += (int) $r->count;
+            }
+        }
+
+        // 役割コードの並び順（LABELS の定義順＝D→SD→OP→…）にそろえて短い文にする。
+        $parts = [];
+        foreach (array_keys(AssignmentRole::LABELS) as $code) {
+            if (empty($agg[$code])) {
+                continue;
+            }
+            $items = [];
+            foreach ($agg[$code] as $it) {
+                $label = $it['note'] !== '' ? $it['note'] : '指定なし';
+                if ($it['patrol'] !== null) {
+                    $label .= '（巡回' . $it['patrol'] . '）';
+                }
+                $items[] = $label . '×' . $it['count'];
+            }
+            $parts[] = $code . ' ' . implode('・', $items);
+        }
+
+        return implode('　', $parts);
     }
 
     /** 開催日を「7/10（金）」の形にする。null は空。 */
@@ -227,6 +300,8 @@ class AssignSheetController extends Controller
         return match (true) {
             str_contains($f, '場所貸し') || str_contains($f, 'ARENA') => 'basho',
             str_contains($f, '他拠点→東') || str_contains($f, '他拠点⇒東') => 'tokyo',
+            str_contains($f, 'ヘルプ') => 'help',
+            str_contains($f, '体験') => 'taiken',
             str_contains($f, 'ロング') => 'long',
             str_contains($f, 'オンライン') => 'online',
             str_contains($f, 'リアル') => 'real',
