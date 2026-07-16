@@ -981,7 +981,7 @@
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
           ${filled < c.need ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
           ${stateBtn}
-          <a class="open-btn" href="/assign-detail?case=${c.id}">詳細 →</a>
+          <a class="open-btn" href="/project-assign?project=${c.id}">アサイン画面 →</a>
         </div>
       </div>
       ${noteHtml}

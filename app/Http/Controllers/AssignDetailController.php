@@ -9,21 +9,72 @@ use App\Models\Person;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * アサイン画面（案件詳細）/assign-detail。
  *
- * ?case=<案件ID> で開き、案件ヘッダー・提案チーム（＝実際のアサイン）・代替候補（＝応募者）を
- * 本物のデータ（DB）から作って画面に渡す。Blade は window.ECS_DETAIL があればそれを使い、
- * 無ければ従来の見本（cases.js の水合戦サンプル）で動く（フォールバック）。
- *
- * ※自動提案スコアはまだ本実装しない＝暫定（通算回数ベースの並び）。稼働率は稼働状況と同じ
- *   単一ソース（StaffStatusController::buildStatus）から取る。ポジション編集・確定/公開は
- *   この画面では従来どおり見本（保存は別画面：手動アサイン・D決め・公開ボード）。
+ * 【2026-07-17 入口を本物へ寄せた（baba 承認）】
+ * 保存できる本物のアサインは /project-assign（手動アサイン）に一本化した。この画面は
+ * その「入口」として振る舞う：
+ *   ・?case=<案件ID> 付き（日別ボード・公開ボードの「詳細→」等）→ /project-assign へ自動転送。
+ *   ・?case なし（サイドバーから）→ 「アサインする案件を選ぶ」一覧を表示（各行から本物画面へ）。
+ * これで見本（保存されない編集）と本物が混在して迷う状態を解消する。
+ * ※従来の見本ロジック（提案チーム・代替候補・暫定スコア）は撤去した。
  */
 class AssignDetailController extends Controller
 {
-    /** 役割コード → この画面の表示ラベル（POSITIONS と対応）。 */
+    public function show(Request $request)
+    {
+        $id = (string) $request->query('case', '');
+
+        // ① 案件が指定されていて実在するなら、本物のアサイン画面へそのまま転送。
+        if ($id !== '' && Project::whereKey($id)->exists()) {
+            return redirect('/project-assign?project=' . urlencode($id));
+        }
+
+        // ② 案件指定なし（または見つからない）＝「アサインする案件を選ぶ」一覧を表示。
+        $today = Carbon::today();
+        $projects = Project::with('director:id,name')
+            ->whereNotNull('start_date')
+            ->whereNotIn('status', ['完了', '下書き'])
+            ->orderBy('start_date')
+            ->get()
+            ->filter(fn (Project $p) => $p->start_date && $p->start_date->gte($today))
+            ->values();
+
+        // アサイン済み人数（キャンセル以外）を案件ごとに集計＝一覧で進捗が見えるように。
+        $assignedCount = Assignment::whereIn('project_id', $projects->pluck('id'))
+            ->where('status', '!=', 'キャンセル')
+            ->select('project_id', DB::raw('count(distinct staff_id) as c'))
+            ->groupBy('project_id')
+            ->pluck('c', 'project_id');
+
+        $cases = $projects->map(function (Project $p) use ($today, $assignedCount) {
+            $off = intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400);
+
+            return [
+                'id' => $p->id,
+                'name' => $p->project_name ?: '（名称未定）',
+                'client' => $p->client ?? '',
+                'date' => $p->start_date->format('Y-m-d'),
+                'dow' => ['日', '月', '火', '水', '木', '金', '土'][(int) $p->start_date->dayOfWeek],
+                'off' => $off,
+                'cat' => $p->site_category ?: '通常',
+                'need' => (int) ($p->required_count ?? 0),
+                'done' => (int) ($assignedCount[$p->id] ?? 0),
+                'dir' => optional($p->director)->name ?? '未定',
+                'place' => $p->location ?? '',
+            ];
+        })->all();
+
+        return view('assign_pick', ['cases' => $cases]);
+    }
+
+    /**
+     * ▼▼▼ 以下は旧・見本ロジック（現在は未使用）。参考のため残置。 ▼▼▼
+     * 役割コード → この画面の表示ラベル。
+     */
     private const CODE_TO_LABEL = [
         'D' => 'D（ディレクター）', 'SD' => 'D（ディレクター）', 'MC' => 'MC（司会進行）',
         'OP' => 'OP（音響）', 'FC' => 'FC（巡回ファシリ）', 'CK' => 'CK（チェッカー）',
@@ -37,7 +88,8 @@ class AssignDetailController extends Controller
         'GUN' => '軍師', 'SP' => '軍師', 'UKE' => '受付', 'RP' => '受付',
     ];
 
-    public function show(Request $request)
+    /** @deprecated 旧・見本の案件詳細表示（現在はルートから呼ばれない）。 */
+    private function legacyShow(Request $request)
     {
         $id = (string) $request->query('case', '');
         $project = Project::with('director:id,name')->find($id);

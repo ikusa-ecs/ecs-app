@@ -29,7 +29,7 @@
       <div class="group-items">
         <a class="{{ ($active ?? '') === 'assign_dashboard' ? 'active' : '' }}" href="/assign-dashboard"><span class="nav-icon">▣</span> アサインダッシュボード</a>
         <a class="{{ ($active ?? '') === 'assign' ? 'active' : '' }}" href="/assign"><span class="nav-icon">▦</span> 日別ボード</a>
-        <a class="{{ ($active ?? '') === 'assign_detail' ? 'active' : '' }}" href="/assign-detail"><span class="nav-icon">◎</span> アサイン画面（案件詳細）</a>
+        <a class="{{ ($active ?? '') === 'assign_detail' ? 'active' : '' }}" href="/assign-detail"><span class="nav-icon">◎</span> 案件別アサイン（案件を選ぶ）</a>
         <a class="{{ ($active ?? '') === 'pickup' ? 'active' : '' }}" href="/pickup"><span class="nav-icon">📌</span> ピックアップ</a>
         <a class="{{ ($active ?? '') === 'assign_director' ? 'active' : '' }}" href="/assign-director"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
         <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>

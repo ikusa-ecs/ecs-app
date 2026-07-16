@@ -500,7 +500,7 @@
           ? `<button class="pub-toggle undo" onclick="toggle('${c.id}')">公開取消</button>`
           : `<button class="pub-toggle go" onclick="toggle('${c.id}')">公開する</button>`}
         <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します">${extra ? '追加解除' : '＋追加'}</button>
-        <a class="detail-link" href="/assign-detail?case=${c.id}">詳細 →</a>
+        <a class="detail-link" href="/project-assign?project=${c.id}">アサイン画面 →</a>
         <button class="note-btn" onclick="toggleNote('${c.id}')">💬 備考</button>
       </td>`;
     tbody.appendChild(tr);
