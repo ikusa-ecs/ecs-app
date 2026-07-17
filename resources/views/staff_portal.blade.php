@@ -453,6 +453,7 @@
             </div>
             <button class="line-btn" onclick="location.href='/profile'">マイプロフィールを編集する</button>
             <button class="line-btn" onclick="location.href='/password'">パスワードを変更する</button>
+            <button class="line-btn" onclick="window.open('/guide-staff','_blank','noopener')">📋 使い方ガイドを見る</button>
             <button class="line-btn danger" onclick="doLogout()">ログアウト</button>
           </div>
 

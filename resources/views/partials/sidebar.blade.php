@@ -8,6 +8,8 @@
     <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">🙍</span> マイページ</a>
     <a class="{{ ($active ?? '') === 'employee_availability' ? 'active' : '' }}" href="/employee-availability"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
     <a class="{{ ($active ?? '') === 'mypage_finance' ? 'active' : '' }}" href="/mypage-finance"><span class="nav-icon">💰</span> 収支入力</a>
+    {{-- 使い方ガイド（社内向け）。別タブで開く＝作業を邪魔しない。機能が増えたら guide.blade.php を更新。 --}}
+    <a href="/guide" target="_blank" rel="noopener"><span class="nav-icon">📋</span> 使い方ガイド</a>
 
     <div class="nav-group" data-group="案件">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> 案件</div>

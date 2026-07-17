@@ -1,0 +1,278 @@
+{{-- ECS 使い方ガイド（アプリ内ページ）。中身は docs/ECS_ガイド_社内向け.html と同じ。 --}}
+{{-- 機能が増えたらこのファイルを更新する＝アプリ内のガイドが最新になる（生きた説明書）。 --}}
+{{-- CSSのメディアクエリ等をBladeに解釈させないため、全体をverbatimブロックで囲んでいる。 --}}
+@verbatim
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECS 仕様＆使い方ガイド（社内向け）</title>
+<style>
+  :root{
+    --brand:#a15c2e; --brand-soft:#f6ede4; --ink:#2f2a24; --muted:#7a6f63;
+    --line:#e6d8c8; --ok:#166534; --ok-soft:#e7f6ec; --warn:#8a5a10; --warn-soft:#fdf3e2;
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; color:var(--ink); background:#fbf8f4;
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    line-height:1.75; font-size:15px;
+  }
+  .wrap{ max-width:820px; margin:0 auto; padding:32px 22px 60px; }
+  header.doc{
+    background:linear-gradient(120deg,#a15c2e,#c07a44); color:#fff;
+    border-radius:14px; padding:26px 28px; margin-bottom:8px;
+  }
+  header.doc h1{ margin:0 0 6px; font-size:24px; letter-spacing:1px; }
+  header.doc p{ margin:0; opacity:.92; font-size:13.5px; }
+  .meta{ font-size:12px; color:var(--muted); margin:10px 2px 24px; }
+
+  nav.toc{
+    background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:14px 18px; margin-bottom:28px;
+  }
+  nav.toc b{ font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
+  nav.toc a{ color:var(--brand); text-decoration:none; font-size:14px; }
+  nav.toc ol{ margin:0; padding-left:20px; }
+  nav.toc li{ margin:3px 0; }
+
+  section{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 24px; margin-bottom:20px; }
+  h2{ font-size:18px; margin:0 0 12px; padding-bottom:8px; border-bottom:2px solid var(--brand-soft); color:var(--brand); }
+  h3{ font-size:15px; margin:18px 0 6px; }
+  p{ margin:8px 0; }
+  ul,ol{ margin:8px 0; padding-left:22px; }
+  li{ margin:4px 0; }
+  .why{ color:var(--muted); font-size:13px; }
+  .lead{ font-size:15.5px; }
+
+  table{ border-collapse:collapse; width:100%; margin:10px 0; font-size:13.5px; }
+  th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th{ background:var(--brand-soft); color:var(--brand); font-weight:700; }
+
+  .steps{ counter-reset:s; list-style:none; padding-left:0; }
+  .steps>li{ counter-increment:s; position:relative; padding:8px 0 8px 42px; border-bottom:1px dashed var(--line); }
+  .steps>li:last-child{ border-bottom:none; }
+  .steps>li::before{
+    content:counter(s); position:absolute; left:0; top:8px;
+    width:28px; height:28px; border-radius:50%; background:var(--brand); color:#fff;
+    text-align:center; line-height:28px; font-weight:700; font-size:14px;
+  }
+  .steps b{ color:var(--brand); }
+
+  .note{ background:var(--warn-soft); border:1px solid #ecd9b6; border-radius:10px; padding:12px 14px; font-size:13.5px; }
+  .tip{ background:var(--ok-soft); border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13.5px; }
+  .pill{ display:inline-block; background:var(--brand-soft); color:var(--brand); border-radius:20px; padding:1px 10px; font-size:12px; font-weight:700; }
+
+  .fb-btn{
+    display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
+    padding:10px 22px; border-radius:24px; font-weight:700; font-size:14.5px;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .fb-btn:hover{ background:#8a4d24; }
+  .fb-url{ margin:10px 0 0; font-size:11.5px; color:var(--muted); word-break:break-all; }
+  .qr{ width:150px; height:150px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  footer{ color:var(--muted); font-size:12px; text-align:center; margin-top:8px; }
+
+  @media print{
+    body{ background:#fff; font-size:11.5pt; }
+    .wrap{ max-width:none; padding:0; }
+    header.doc{ background:#a15c2e !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    section, nav.toc{ border:1px solid #ccc; box-shadow:none; break-inside:avoid; }
+    th{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    nav.toc{ display:none; }
+    a{ color:var(--ink); text-decoration:none; }
+    h2{ break-after:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <h1>ECS 仕様＆使い方ガイド</h1>
+    <p>スタッフアサイン管理システム ／ 社内確認用</p>
+  </header>
+  <div class="meta">2026年7月17日版 ・ 開発中のプロトタイプについての説明です（内容は今後変わることがあります）</div>
+
+  <div class="tip" style="text-align:center; padding:16px 14px; margin-bottom:24px;">
+    <p style="margin:0 0 10px; font-size:15px;"><b>ECS はこちらから開けます（テスト環境）</b></p>
+    <a class="fb-btn" href="http://ecs-test.ikusa.co.jp/" target="_blank" rel="noopener">🔗 ECS を開く</a>
+    <p class="fb-url">http://ecs-test.ikusa.co.jp/</p>
+    <div style="margin-top:14px;">
+      <img class="qr" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjIyMCIgaGVpZ2h0PSIyMjAiIHZpZXdCb3g9IjAgMCAyMjAgMjIwIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjIwIiBoZWlnaHQ9IjIyMCIgZmlsbD0iI2ZmZmZmZiIvPjxnIHRyYW5zZm9ybT0ic2NhbGUoNy41ODYpIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyLDIpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04IDBMOCAxTDEwIDFMMTAgMFpNMTMgMEwxMyAyTDExIDJMMTEgNEwxMCA0TDEwIDNMOSAzTDkgMkw4IDJMOCA1TDkgNUw5IDZMOCA2TDggN0w5IDdMOSA4TDggOEw4IDlMNyA5TDcgOEw2IDhMNiA5TDcgOUw3IDEwTDYgMTBMNiAxMUw1IDExTDUgOUw0IDlMNCA4TDAgOEwwIDEzTDEgMTNMMSAxNUwwIDE1TDAgMTZMMSAxNkwxIDE1TDMgMTVMMyAxNEw0IDE0TDQgMTVMNyAxNUw3IDE2TDUgMTZMNSAxN0w4IDE3TDggMThMOSAxOEw5IDIwTDEwIDIwTDEwIDIxTDExIDIxTDExIDIyTDkgMjJMOSAyMUw4IDIxTDggMjVMOSAyNUw5IDI0TDEwIDI0TDEwIDIzTDExIDIzTDExIDI1TDE1IDI1TDE1IDIzTDE2IDIzTDE2IDIyTDEzIDIyTDEzIDIxTDEyIDIxTDEyIDIwTDEzIDIwTDEzIDE5TDE0IDE5TDE0IDIxTDE1IDIxTDE1IDIwTDE2IDIwTDE2IDIxTDE3IDIxTDE3IDIyTDE4IDIyTDE4IDIzTDE3IDIzTDE3IDI0TDE4IDI0TDE4IDI1TDI1IDI1TDI1IDI0TDIzIDI0TDIzIDIzTDI0IDIzTDI0IDIyTDI1IDIyTDI1IDIwTDI0IDIwTDI0IDE5TDI1IDE5TDI1IDE1TDI0IDE1TDI0IDE0TDI1IDE0TDI1IDEyTDIzIDEyTDIzIDExTDIxIDExTDIxIDEyTDIwIDEyTDIwIDlMMjMgOUwyMyAxMEwyNCAxMEwyNCA5TDI1IDlMMjUgOEwyNCA4TDI0IDlMMjMgOUwyMyA4TDIwIDhMMjAgOUwxOSA5TDE5IDExTDE4IDExTDE4IDhMMTcgOEwxNyA0TDE1IDRMMTUgMUwxNCAxTDE0IDBaTTE2IDBMMTYgM0wxNyAzTDE3IDBaTTEyIDRMMTIgNUwxMCA1TDEwIDZMOSA2TDkgN0wxMCA3TDEwIDhMOSA4TDkgOUwxMCA5TDEwIDEwTDcgMTBMNyAxMUw2IDExTDYgMTJMNCAxMkw0IDlMMyA5TDMgMTNMMiAxM0wyIDEyTDEgMTJMMSAxM0wyIDEzTDIgMTRMMyAxNEwzIDEzTDQgMTNMNCAxNEw1IDE0TDUgMTNMNiAxM0w2IDE0TDcgMTRMNyAxNUw5IDE1TDkgMTZMOCAxNkw4IDE3TDkgMTdMOSAxOEwxMCAxOEwxMCAxN0w5IDE3TDkgMTZMMTEgMTZMMTEgMTdMMTMgMTdMMTMgMThMMTUgMThMMTUgMTlMMTYgMTlMMTYgMThMMTUgMThMMTUgMTdMMTYgMTdMMTYgMTZMMTcgMTZMMTcgMTRMMTQgMTRMMTQgMTNMMTMgMTNMMTMgMTBMMTQgMTBMMTQgOEwxNSA4TDE1IDdMMTYgN0wxNiA1TDE1IDVMMTUgNFpNMTIgNUwxMiA4TDExIDhMMTEgMTFMMTIgMTFMMTIgMTBMMTMgMTBMMTMgOUwxMiA5TDEyIDhMMTMgOEwxMyA2TDE0IDZMMTQgN0wxNSA3TDE1IDVaTTEwIDZMMTAgN0wxMSA3TDExIDZaTTE1IDlMMTUgMTJMMTcgMTJMMTcgMTNMMTggMTNMMTggMTJMMTcgMTJMMTcgOVpNMSAxMEwxIDExTDIgMTFMMiAxMFpNNiAxMkw2IDEzTDcgMTNMNyAxNEw5IDE0TDkgMTVMMTAgMTVMMTAgMTRMMTEgMTRMMTEgMTNMMTAgMTNMMTAgMTJMOCAxMkw4IDEzTDcgMTNMNyAxMlpNMTkgMTJMMTkgMTNMMjAgMTNMMjAgMTJaTTIxIDEyTDIxIDE0TDE5IDE0TDE5IDE1TDIwIDE1TDIwIDE2TDIxIDE2TDIxIDE1TDIyIDE1TDIyIDE2TDI0IDE2TDI0IDE1TDIyIDE1TDIyIDE0TDI0IDE0TDI0IDEzTDIyIDEzTDIyIDEyWk0xMiAxM0wxMiAxNEwxMyAxNEwxMyAxNUwxMSAxNUwxMSAxNkwxMyAxNkwxMyAxN0wxNSAxN0wxNSAxNUwxNCAxNUwxNCAxNEwxMyAxNEwxMyAxM1pNMTMgMTVMMTMgMTZMMTQgMTZMMTQgMTVaTTMgMTZMMyAxN0w0IDE3TDQgMTZaTTE3IDE3TDE3IDIwTDIwIDIwTDIwIDE3Wk0yMSAxN0wyMSAxOEwyNCAxOEwyNCAxN1pNMTEgMThMMTEgMjBMMTIgMjBMMTIgMThaTTE4IDE4TDE4IDE5TDE5IDE5TDE5IDE4Wk0yMSAxOUwyMSAyMkwyMiAyMkwyMiAyMUwyMyAyMUwyMyAxOVpNMTkgMjFMMTkgMjJMMjAgMjJMMjAgMjFaTTE4IDIzTDE4IDI0TDIwIDI0TDIwIDIzWk0yMSAyM0wyMSAyNEwyMiAyNEwyMiAyM1pNMCAwTDAgN0w3IDdMNyAwWk0xIDFMMSA2TDYgNkw2IDFaTTIgMkwyIDVMNSA1TDUgMlpNMjUgMEwxOCAwTDE4IDdMMjUgN1pNMjQgMUwxOSAxTDE5IDZMMjQgNlpNMjMgMkwyMCAyTDIwIDVMMjMgNVpNMCAyNUw3IDI1TDcgMThMMCAxOFpNMSAyNEw2IDI0TDYgMTlMMSAxOVpNMiAyM0w1IDIzTDUgMjBMMiAyMFoiIGZpbGw9IiMwMDAwMDAiLz48L2c+PC9nPjwvc3ZnPgo=" alt="ECSのQRコード">
+      <p style="margin:4px 0 0; font-size:12px; color:var(--muted);">📱 スマホはこのQRコードから（読み取ってアクセス）</p>
+    </div>
+    <p style="margin:10px 0 0; font-size:12px; color:var(--muted);">※ 現在は動作確認用のテスト環境です。ログインには管理者が発行したアカウントが必要です。</p>
+  </div>
+
+  <nav class="toc">
+    <b>目次</b>
+    <ol>
+      <li><a href="#about">ECSとは</a></li>
+      <li><a href="#roles">誰が使う・何ができる（4つの権限）</a></li>
+      <li><a href="#features">主な機能（できること）</a></li>
+      <li><a href="#flow">基本の流れ</a></li>
+      <li><a href="#login">ログインの仕方（2段階認証）</a></li>
+      <li><a href="#try">テスト環境の試し方（4つの権限を体験）</a></li>
+      <li><a href="#faq">よくある操作</a></li>
+      <li><a href="#status">フィードバック・いまの状況</a></li>
+    </ol>
+  </nav>
+
+  <section id="about">
+    <h2>1. ECSとは</h2>
+    <p class="lead">ECS は、イベントの<b>案件</b>と、そこに入る<b>社員・スタッフのアサイン（誰がどの現場に入るか）</b>を、ひとつの場所で管理するための社内システムです。</p>
+    <p>これまで、案件情報・募集・連絡・アサイン表などが複数の場所（スプレッドシート／LINE／プロキャス等）に分かれていて、情報のズレが起きやすい状態でした。ECS は「<b>情報を1か所に集めて、見える・記録する</b>」ことを目的にしています。</p>
+    <p class="why">※ 当日の連絡や確定の合図（LINEグループ招待など）は、これまでどおり LINE・チャットワークで行います。ECS は「見せる・記録する」役割です。</p>
+  </section>
+
+  <section id="roles">
+    <h2>2. 誰が使う・何ができる（4つの権限）</h2>
+    <p>ログインする人は、役割によって<b>見える画面・できる操作</b>が変わります。</p>
+    <table>
+      <tr><th>権限</th><th>主な人</th><th>できること</th></tr>
+      <tr><td><b>スタッフ</b></td><td>現場運営スタッフ</td><td>自分の確定アサインの確認、参加希望の入力、自分のプロフィール編集</td></tr>
+      <tr><td><b>社員</b></td><td>営業・運営など</td><td>案件の登録・編集・閲覧、アサイン、案件の削除まで</td></tr>
+      <tr><td><b>管理者</b></td><td>アサイン担当</td><td>社員のことに加えて、アカウントの発行・名簿の一括取込</td></tr>
+      <tr><td><b>Administrator</b></td><td>全体管理</td><td>すべての操作（マスタ・アカウントの削除、権限の付与、システム設定）</td></tr>
+    </table>
+    <p class="why">※ 権限は上にいくほどできることが増えます。スタッフは自分に関係することだけ、という考え方です。</p>
+  </section>
+
+  <section id="features">
+    <h2>3. 主な機能（できること）</h2>
+
+    <h3>案件まわり</h3>
+    <ul>
+      <li><b>案件一覧・登録</b>：イベント案件を登録し、一覧で確認・編集。CSVでまとめて取り込みも可能。一覧の詳細で担当（D／SD／物品／移動／音響）や手動アーカイブも保存されます。</li>
+      <li><b>ダッシュボード</b>：件数の集計や、日程が近い・重なっている「危険日」をカレンダーで確認（危険日は手動でも追加できます）。</li>
+      <li><b>収支入力</b>：案件ごとに売上・経費（明細）・メモを入力して利益を計算・保存。</li>
+    </ul>
+
+    <h3>アサイン（誰をどの現場に）</h3>
+    <ul>
+      <li><b>アサイン表</b>：案件と割り当てメンバーを1画面でまとめて確認。担当・巡回・役割・備考をその場で編集・保存。</li>
+      <li><b>D決め・手動アサイン</b>：ディレクターを決め、案件ごとに人を割り当てて保存。同じ日のダブルブッキングや、必要人数の過不足を色で確認。役割を選ぶとその人が自動でアサインされ、1人が2役こなす「兼任」や、人ごとの「備考」も残せます（基本Dは1名）。</li>
+      <li><b>日別ボード・ピックアップ・エントリー一覧</b>：日ごと／案件ごとに、希望者を見ながらその場でアサイン。エントリー一覧では応募者の一言メモも確認できます。</li>
+      <li><b>自動アサイン（補助）</b>：希望者から候補をまとめて仮置き。人は確認して微調整するだけ（「誰を入れるか」の本格提案は今後強化）。</li>
+      <li><b>スタッフ公開ボード</b>：確定したアサインを「公開」すると、担当スタッフの画面に表示される。案件ごとの備考も全員に共有されます。</li>
+    </ul>
+
+    <h3>名簿・希望</h3>
+    <ul>
+      <li><b>スタッフ／社員名簿</b>：登録された人の情報・稼働状況を確認。CSVで一括登録（「できるポジション」列も取込可）、CSV書き出しも可能。社員のサイズなども編集できます。</li>
+      <li><b>できる役割</b>：D・MC・OP・軍師を管理。OP（音響）は「オンライン可／リアル可」で区別できます。</li>
+      <li><b>参加希望・出勤可能日</b>：スタッフ・社員が入れる日を入力・集約。</li>
+    </ul>
+
+    <h3>スタッフ側の画面（スマホ想定）</h3>
+    <ul>
+      <li><b>スタッフ用ポータル</b>：自分の確定アサイン・お知らせ・締切を、スマホで見やすく表示。募集中の案件へエントリー（応募＋一言メモ）でき、稼働希望カレンダーにも反映されます。</li>
+      <li><b>マイページ</b>：自分の担当した案件をカレンダーで確認。通知のオン／オフも設定できます。</li>
+    </ul>
+
+    <h3>そのほかの便利機能</h3>
+    <ul>
+      <li><b>人数確定リマインド</b>：開催が近い案件を、担当へチャットワークで自動お知らせ。</li>
+      <li><b>謎解きの紙 在庫</b>：必要枚数・消費・在庫を自動で集計。</li>
+      <li><b>共通設定</b>：コンテンツ・拠点などのマスタ管理、アサインMTGの予定管理。</li>
+    </ul>
+  </section>
+
+  <section id="flow">
+    <h2>4. 基本の流れ</h2>
+    <p>ふだんの使い方は、おおまかにこの順番です。</p>
+    <ol class="steps">
+      <li><b>案件を登録する</b>（営業・運営）— イベントの案件を ECS に入れる。</li>
+      <li><b>希望を集める</b> — スタッフ・社員が「入れる日」を入力する。</li>
+      <li><b>アサインを決める</b>（アサイン担当）— ディレクターを決め、案件ごとに人を割り当てる。</li>
+      <li><b>確定して公開する</b> — 内容が固まったら「公開」にして、スタッフに見えるようにする。</li>
+      <li><b>スタッフが自分の担当を確認</b> — スタッフはスマホで自分の確定アサインを見る。</li>
+    </ol>
+  </section>
+
+  <section id="login">
+    <h2>5. ログインの仕方（2段階認証）</h2>
+    <p>ECS には <b>顧客の社名などの情報</b>が入るため、ログインは<b>2段階認証</b>で守ります（パスワードに加えて、メールに届く確認コードが必要）。</p>
+    <ol class="steps">
+      <li><b>アカウントは管理者が発行</b> — 自分で新規登録はできません。管理者が発行し、仮パスワードを受け取ります。</li>
+      <li><b>メールアドレスとパスワードでログイン</b> — ログイン画面で入力します。</li>
+      <li><b>メールに届く6桁コードを入力</b> — 登録メール宛にコードが届くので、画面に入力します。<span class="pill">10分間有効</span></li>
+      <li><b>初回は初期設定</b> — 初めてのログイン時は、パスワードの変更と、身長・靴のサイズなどのプロフィール入力をお願いします。</li>
+    </ol>
+    <div class="note" style="margin-top:12px;">
+      <b>コードが届かないときは</b>：入力画面の「コードを再送する」を押すと、新しいコードが届きます。パスワードを忘れたときの再発行も、今後メールで対応予定です。
+    </div>
+  </section>
+
+  <section id="try">
+    <h2>6. テスト環境の試し方（4つの権限を体験）</h2>
+    <p>テスト環境では、<b>アカウント発行や2段階認証なしで</b>、4つの権限をワンクリックで体験できます。役割によって見える画面がどう変わるかを確認できます。</p>
+    <ol class="steps">
+      <li>上の「<b>ECS を開く</b>」からログイン画面を開く。</li>
+      <li>画面の「<b>テスト用ログイン</b>」から、試したい役割のボタンを押す（<b>パスワード入力は不要</b>・押すだけ）。</li>
+      <li>ログイン後、左メニューや各画面を触ってみる。役割によって<b>見えるメニューが変わります</b>。</li>
+      <li>別の役割を試すときは、左メニュー下の「<b>ログアウト</b>」を押してから、別のボタンを選ぶ。</li>
+    </ol>
+
+    <table>
+      <tr><th>押すボタン</th><th>権限</th><th>ログイン後に見えるもの</th></tr>
+      <tr><td>スタッフ</td><td>スタッフ</td><td>自分の確定アサインだけ（スマホ想定のスタッフ画面）</td></tr>
+      <tr><td>社員</td><td>社員</td><td>業務画面（案件・アサインなど。削除やマスタ操作は不可）</td></tr>
+      <tr><td>管理者</td><td>管理者</td><td>社員に加えて、アカウント発行・名簿CSV取込</td></tr>
+      <tr><td>Administrator</td><td>Administrator</td><td>すべての操作（削除・権限付与・設定）</td></tr>
+    </table>
+
+    <p><b>初回ログインも体験できます</b>：「🆕 初回ログインを体験」ボタンを押すと、管理者に発行された直後のスタッフとして、<b>パスワード設定＋プロフィール入力</b>の流れを体験できます。</p>
+
+    <div class="note">※「テスト用ログイン」ボタンは体験用です（本番公開前に外します）。本物のログイン（メールアドレス＋パスワード＋メールに届くコード）は「5. ログインの仕方」をご覧ください。</div>
+
+    <h3>役割ごとに見てほしいこと（フィードバックの観点）</h3>
+    <ul>
+      <li><b>スタッフ</b>：自分の確定アサインや希望の出し方が、スマホで分かりやすいか。</li>
+      <li><b>社員</b>：案件の登録・一覧・編集がスムーズか。</li>
+      <li><b>管理者（アサイン担当）</b>：アサインの流れ（D決め → 手動アサイン → 公開）が回せそうか。</li>
+      <li><b>Administrator</b>：アカウント発行・共通設定・名簿まわりが分かりやすいか。</li>
+    </ul>
+  </section>
+
+  <section id="faq">
+    <h2>7. よくある操作</h2>
+    <table>
+      <tr><th>やりたいこと</th><th>どこで</th></tr>
+      <tr><td>自分の担当（確定アサイン）を見たい</td><td>スタッフ用ポータル ／ マイページ</td></tr>
+      <tr><td>入れる日（参加希望）を出したい</td><td>スタッフ用ポータル（スタッフ）／ 出勤可能日（社員）</td></tr>
+      <tr><td>案件を登録・編集したい</td><td>案件登録／案件一覧（社員以上）</td></tr>
+      <tr><td>人を割り当てたい</td><td>D決め → 手動アサイン → スタッフ公開ボード（アサイン担当）</td></tr>
+      <tr><td>アカウントを発行したい</td><td>アカウント発行（管理者以上）</td></tr>
+      <tr><td>自分のプロフィール・パスワードを変えたい</td><td>左メニュー下の「マイプロフィール」「パスワード変更」</td></tr>
+    </table>
+  </section>
+
+  <section id="status">
+    <h2>8. フィードバック・いまの状況</h2>
+
+    <div class="tip" style="text-align:center; padding:18px 14px;">
+      <p style="margin:0 0 10px; font-size:15px;"><b>お気づきの点は、フィードバックシートへお願いします。</b></p>
+      <p style="margin:0 0 12px; font-size:13px; color:var(--muted);">使ってみて「分かりにくい」「こうしてほしい」があれば、下のフォームから送ってください。いただいた声を改善に反映します。</p>
+      <a class="fb-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSchd5XQ_fOrkLWd5DhcLHsgd-Xoc1H-u7xTPLldKgsgkH7FRw/viewform" target="_blank" rel="noopener">📝 フィードバックを送る（フォーム）</a>
+      <p class="fb-url">https://docs.google.com/forms/d/e/1FAIpQLSchd5XQ_fOrkLWd5DhcLHsgd-Xoc1H-u7xTPLldKgsgkH7FRw/viewform</p>
+      <p style="margin:14px 0 6px; font-size:13px; color:var(--muted);">これまでにいただいた声は、こちらのシートにまとまっています。</p>
+      <a class="fb-btn" href="https://docs.google.com/spreadsheets/d/1rSUOKRigGY1R7sACzGUZqJ-qRUp6XvranrqEAX2DV7Q/edit?gid=330669090#gid=330669090" target="_blank" rel="noopener">📊 フィードバックシートを開く</a>
+      <p class="fb-url">https://docs.google.com/spreadsheets/d/1rSUOKRigGY1R7sACzGUZqJ-qRUp6XvranrqEAX2DV7Q/edit</p>
+    </div>
+
+    <h3>いまの状況</h3>
+    <p>ECS は現在<b>開発中（プロトタイプ）</b>です。主要な機能は動いており、以前は見本だった多くの操作（<b>エントリー（応募）・収支入力・通知設定・案件詳細の編集・手動アーカイブ・公開ボードの備考</b>など）も、いまは<b>ちゃんと保存される</b>ようになりました。名簿・アサイン・希望などのデータも本物です。</p>
+    <p>これから進める主なもの：<b>ログインの本接続</b>（今は「自分＝固定表示」の画面があります）、<b>自動アサインの「誰を入れるか」提案の強化</b>、本番用データベース・メール送信（確認コード）・本番公開の準備です。</p>
+  </section>
+
+  <footer>ECS スタッフアサイン管理システム ／ 社内確認用ガイド ・ 2026年7月</footer>
+
+</div>
+</body>
+</html>
+@endverbatim

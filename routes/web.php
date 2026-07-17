@@ -70,6 +70,10 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     Route::post('/staff-portal/availability', [StaffPortalController::class, 'saveAvailability']);
     // 案件へのエントリー（応募＋一言コメント）をDB(applications)へ本物保存。
     Route::post('/staff-portal/entry', [StaffPortalController::class, 'saveEntry']);
+    // 使い方ガイド（社内向け・全役割）。サイドバー（社員以上）から開く。
+    Route::view('/guide', 'guide')->name('guide');
+    // 使い方ガイド（スタッフ向け）。スタッフ画面から開く＝スタッフがやることだけに絞った内容。
+    Route::view('/guide-staff', 'guide_staff')->name('guide.staff');
 
     // 本人のパスワード変更（初回ログイン後などに自分で変える）。
     Route::get('/password', [PasswordController::class, 'edit']);
