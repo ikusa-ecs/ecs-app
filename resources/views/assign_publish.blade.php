@@ -251,7 +251,7 @@
         ※「集合〜解散（スタッフ）」は、スタッフに見せる集合・解散時間です。社員と違うときは入力して直せます（直すと「別」マークが付き、スタッフ画面にも反映されます）。<br>
         ※「詳細 →」で案件詳細（アサイン画面）に飛びます。時間・場所など細かい変更はそちらでもできます。<br>
         ※ 公開状態はDB（projects の staff_published）に保存され、案件詳細（アサイン画面）とも同じ列で連動します。<br>
-        ※ 備考は担当用メモです（このブラウザに保存され、次に開いても残ります）。
+        ※ 備考は担当用メモです（<b>DB保存され、全員に共有されます</b>。入力欄から離れると自動で保存されます。スタッフ画面には出ません）。
       </p>
 @endverbatim
 @endsection
@@ -273,7 +273,7 @@
     return {
       id: c.id, name: c.name, client: c.client, cat: c.cat, category: c.category, need: c.need, off: c.off,
       added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published,
-      staffMeet: c.staffMeet, staffLeave: c.staffLeave
+      staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo
     };
   });
 
@@ -302,12 +302,24 @@
     });
   }
 
-  // ===== 備考（担当メモ・localStorage）=====
-  function noteKey(id){ return 'ecs_pubnote_' + id; }
-  function getNote(id){ try { return localStorage.getItem(noteKey(id)) || ''; } catch(e){ return ''; } }
+  // ===== 備考（担当メモ・DB保存＝全員で共有）=====
+  // サーバから渡された memo を初期表示に使い、変更はサーバ（DB）の projects.publish_memo へ保存する。
+  function getNote(id){ const c = CASES.find(x => x.id === id); return c ? (c.memo || '') : ''; }
+  // 入力欄からフォーカスが外れたら（onblur）保存する。連打を避けるためボタン連打ではなく1回で送る。
   function saveNote(id, el){
-    try { localStorage.setItem(noteKey(id), el.value); } catch(e){}
-    flash('nsaved-' + id);
+    const c = CASES.find(x => x.id === id);
+    if (!c) return;
+    const val = el.value;
+    if (val === (c.memo || '')) return;   // 変更が無ければ送らない
+    const prev = c.memo;
+    c.memo = val;
+    fetch('/assign-publish/memo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ id: id, memo: val })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('nsaved-' + id); })
+    .catch(() => { c.memo = prev; alert('備考の保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
 
   // ===== スタッフ集合・解散時間（DB保存）。既定は社員の時間と同じ =====
@@ -512,8 +524,8 @@
     nr.style.display = 'none';
     nr.innerHTML = `
       <td colspan="8">
-        <label>備考（担当メモ・スタッフ画面には出ません）<span class="saved" id="nsaved-${c.id}">✓ 保存しました</span></label>
-        <textarea placeholder="例）前泊あり。〇〇さんに声かけ済み。集合場所は南口。" oninput="saveNote('${c.id}', this)">${escapeHtml(getNote(c.id))}</textarea>
+        <label>備考（担当メモ・スタッフ画面には出ません／DB保存され、全員に共有されます）<span class="saved" id="nsaved-${c.id}">✓ 保存しました</span></label>
+        <textarea placeholder="例）前泊あり。〇〇さんに声かけ済み。集合場所は南口。（入力欄から離れると自動で保存されます）" onblur="saveNote('${c.id}', this)">${escapeHtml(getNote(c.id))}</textarea>
       </td>`;
     tbody.appendChild(nr);
   }

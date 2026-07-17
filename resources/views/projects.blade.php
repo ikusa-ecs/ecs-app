@@ -10,6 +10,7 @@
   window.ECS_CASES = @json($cases);
   window.ECS_CSRF = '{{ csrf_token() }}';   // ケータリング等の保存に使う合言葉
   window.ECS_REPEAT_CLIENTS = @json($repeatClients ?? []);   // リピート（常連）クライアント名の集合（名前→true）
+  window.ECS_EMPLOYEES = @json($employees ?? []);   // D／SD／物品担当プルダウン用の社員一覧（id,name）
 </script>
 @verbatim
 <style>
@@ -295,7 +296,7 @@
 <div class="mock-note" style="background:#e7f0e9; border-color:#cdeccf; color:#15803d;">✓ {{ session('status') }}</div>
 @endif
 @verbatim
-      <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<b>リピート（常連）のクライアントは、クライアント名を押すと過去のアサインをさかのぼれます。</b><br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（物品担当・移動・音響・準備チェック）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>いまはまだ保存されません</b>（次の工程で対応予定。読み込み直すと元に戻ります）。</div>
+      <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<b>リピート（常連）のクライアントは、クライアント名を押すと過去のアサインをさかのぼれます。</b><br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（ディレクター・SD・物品担当・移動・音響）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>その場で保存されます</b>（読み込み直しても残ります）。準備チェックだけは次の工程で対応予定です。</div>
 
       <!-- 絞り込みバー -->
       <div class="panel">
@@ -431,12 +432,11 @@
 @verbatim
 <script>
   // ===== 選択肢（プルダウン） =====
-  const DIRECTORS = ['未定', '田中', '鈴木', '佐藤', '高橋', '山本'];        // ディレクター（仮の見本）
-  const IVENTPLANNERS = ['未定', '田中', '鈴木', '佐藤', '高橋', '山本'];     // 物品担当＝イベプラ（仮の見本）
-  const TRANSPORTS = ['ー', 'IKUSAカー', 'IKUSAカー2台', 'IKUSAカー3台', '電車', 'レンタカー',
+  // ディレクター／SD／物品担当は「本物の社員一覧」（window.ECS_EMPLOYEES＝id,name）から作る。
+  const EMPLOYEES = Array.isArray(window.ECS_EMPLOYEES) ? window.ECS_EMPLOYEES : [];
+  const TRANSPORTS = ['IKUSAカー', 'IKUSAカー2台', 'IKUSAカー3台', '電車', 'レンタカー',
                       'IKUSAカー+レンタカー', '電車+IKUSAカー', '電車+レンタカー', '飛行機', '飛行機+レンタカー'];
   const SOUND = ['会場音響', 'クラシックプロ大', 'クラシックプロ中', 'クラシックプロ小', 'CUBE', 'SANWA', 'TOA', '不要'];
-  const SDLIST = ['未設定', 'なし', '田中', '鈴木', '佐藤', '高橋', '山本'];   // サブディレクター（仮の見本）。未設定＝未記録／なし＝あえて付けない
   // ケータリングの選択肢（案件登録フォームと同じ並び）。詳細で選べる。
   const CATERING_OPTS = ['無', 'ケータリング', 'オードブル', 'お弁当', 'キッチンカー', 'BBQ', 'LH発注あり（格付け）', 'LH発注あり（ゴチ）', 'その他'];
   // ケータリングが「あり」（＝無・空・なし系ではない）か
@@ -457,7 +457,9 @@
       area:c.area, catering:c.catering, agency:c.agency,
       logo:c.logo, camera:c.camera, article:c.article, video:c.video,
       note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, scale:c.scale, sd:c.sd, id:c.id,
-      toc:!!c.toc, cateringNote:c.cateringNote
+      toc:!!c.toc, cateringNote:c.cateringNote,
+      // 詳細プルダウンの現在値（社員ID）。担当なしは null。音響(sound)は上で設定済み。
+      directorId:c.director_id, sdId:c.sd_id, goodsId:c.goods_owner_id
     };
   });
   projects.forEach((p, i) => { p._i = i; });   // 編集・展開用に番号を保持
@@ -493,8 +495,8 @@
     p.gy = p.date.getFullYear();
     p.gm = p.date.getMonth() + 1;
     p.group = p.gy + '-' + p.gm;
-    // 開催日が過ぎた案件は自動でアーカイブ（＝「アーカイブ」タブへ。下書きは対象外）
-    if (!p.draft && p.date < today) p.archived = true;
+    // アーカイブ状態はサーバ（実効アーカイブ判定）から受け取った c.archived をそのまま使う。
+    // ＝ is_archived が未設定なら「開催日<今日」で自動、手動で隠す/戻すをしていればそれを優先。
   });
 
   // 案件のある年月を、日付の早い順に並べてグループ一覧をつくる
@@ -529,21 +531,68 @@
     return 'fmt-etc';
   }
 
-  // プルダウンHTML（現在値を選択状態に）
-  function selectHtml(options, value, field, idx) {
-    const opts = options.map(o => `<option${o === value ? ' selected' : ''}>${o}</option>`).join('');
-    return `<select class="cell-edit" onchange="onCellEdit(${idx}, '${field}', this.value)">${opts}</select>`;
+  // 社員ID → 名前（EMPLOYEES から引く）。無ければ空文字。
+  function empName(id) {
+    const e = EMPLOYEES.find(x => x.id === id);
+    return e ? e.name : '';
   }
-  // セル編集（モック：データだけ更新。保存はしない）
-  // ディレクターは一覧行にも表示しているので、変更を行の表示にも反映する
-  function onCellEdit(idx, field, value) {
-    projects[idx][field] = value;
-    if (field === 'director') {
+
+  // 担当（D／SD／物品）プルダウンHTML。先頭に「担当なし」（空）、続けて社員一覧。現在値を選択状態に。
+  function employeeSelectHtml(idx, id, field, currentId, emptyLabel) {
+    let opts = `<option value=""${!currentId ? ' selected' : ''}>${emptyLabel}</option>`;
+    EMPLOYEES.forEach(e => {
+      opts += `<option value="${e.id}"${e.id === currentId ? ' selected' : ''}>${e.name}</option>`;
+    });
+    return `<select class="cell-edit" onchange="onCellSaveEmployee(${idx}, '${id}', '${field}', this)">${opts}</select>`;
+  }
+
+  // 移動・音響プルダウンHTML（自由記述の候補一覧）。現在値が一覧に無ければ先頭に足して選択。空＝未設定。
+  function textSelectHtml(idx, id, field, options, currentVal, noneLabel) {
+    const cur = (currentVal && currentVal !== 'ー') ? String(currentVal) : '';
+    let list = options.slice();
+    if (cur && list.indexOf(cur) === -1) list = [cur].concat(list);
+    let opts = `<option value=""${cur === '' ? ' selected' : ''}>${noneLabel}</option>`;
+    opts += list.map(o => `<option${o === cur ? ' selected' : ''}>${o}</option>`).join('');
+    return `<select class="cell-edit" onchange="onCellSaveText(${idx}, '${id}', '${field}', this)">${opts}</select>`;
+  }
+
+  // 詳細セルをDBに保存（POST /projects/cells）。変えたキーだけ送る（他項目は消さない）。
+  function saveCell(id, field, value) {
+    const payload = { id: id };
+    payload[field] = value;
+    fetch('/projects/cells', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify(payload)
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); })
+    .catch(() => alert('保存に失敗しました。もう一度お試しください。'));
+  }
+
+  // 担当（D／SD／物品）を選んだとき：DB保存＋画面表示・集計を更新。
+  function onCellSaveEmployee(idx, id, field, sel) {
+    const val = sel.value;                       // 社員ID or ''（担当なし）
+    saveCell(id, field, val);
+    const name = val ? (empName(val) || '未定') : (field === 'sd_id' ? '未設定' : '未定');
+    if (field === 'director_id') {
+      projects[idx].director = name;
       const el = document.getElementById('dir-' + idx);
-      if (el) el.textContent = value;
+      if (el) el.textContent = name;             // 一覧行のD表示も更新
+      pushAgg();
+    } else if (field === 'sd_id') {
+      projects[idx].sd = name;
+      pushAgg();
+    } else if (field === 'goods_owner_id') {
+      projects[idx].goods = name;
     }
-    // ディレクター・SDを変えたら、別ウィンドウの集計を更新する（規模は案件登録で確定なのでここでは変えない）
-    if (field === 'director' || field === 'sd') pushAgg();
+  }
+
+  // 移動・音響を選んだとき：DB保存＋手元データを更新。
+  function onCellSaveText(idx, id, field, sel) {
+    const val = sel.value;
+    saveCell(id, field, val);
+    if (field === 'transport')       projects[idx].transport = val || 'ー';
+    if (field === 'audio_equipment') projects[idx].sound = val;
   }
 
   // ===== ケータリング（選択＋メモ）をDBに保存 =====
@@ -716,16 +765,16 @@
           <div class="detail-panel">
             <div class="d-item">
               <span class="d-label">ディレクター</span>
-              <span style="font-weight:600;">${p.director}</span>
+              ${employeeSelectHtml(p._i, p.id, 'director_id', p.directorId, '未定')}
             </div>
             <div class="d-item">
               <span class="d-label">規模・SD担当</span>
               <div class="mini-field"><span class="mini-label">規模</span><span style="font-weight:600;">${p.scale}</span><span style="color:var(--muted);font-size:11px;margin-left:6px;">（案件登録で設定）</span></div>
-              <div class="mini-field"><span class="mini-label">SD</span><span style="font-weight:600;">${p.sd}</span></div>
+              <div class="mini-field"><span class="mini-label">SD</span>${employeeSelectHtml(p._i, p.id, 'sd_id', p.sdId, '未設定')}</div>
             </div>
             <div class="d-item">
               <span class="d-label">物品担当</span>
-              <span style="font-weight:600;">${p.goods}</span>
+              ${employeeSelectHtml(p._i, p.id, 'goods_owner_id', p.goodsId, '未定')}
             </div>
             <div class="d-item">
               <span class="d-label">運営場所</span>
@@ -737,8 +786,8 @@
             </div>
             <div class="d-item">
               <span class="d-label">移動・音響</span>
-              <div class="mini-field"><span class="mini-label">移動</span><span style="font-weight:600;">${p.transport && p.transport !== 'ー' ? p.transport : '（未設定）'}</span></div>
-              <div class="mini-field"><span class="mini-label">音響</span><span style="font-weight:600;">${p.sound || '（未設定）'}</span></div>
+              <div class="mini-field"><span class="mini-label">移動</span>${textSelectHtml(p._i, p.id, 'transport', TRANSPORTS, p.transport, 'ー（未設定）')}</div>
+              <div class="mini-field"><span class="mini-label">音響</span>${textSelectHtml(p._i, p.id, 'audio_equipment', SOUND, p.sound, '（未設定）')}</div>
             </div>
             <div class="d-item" style="flex-basis:100%;">
               <span class="d-label">準備チェック・制作記録</span>
@@ -762,7 +811,7 @@
                 : `<a class="sheet-link" href="/project-form?project=${encodeURIComponent(p.id)}" onclick="event.stopPropagation()" style="color:var(--muted);">＋ 編集画面でURLを登録</a>`}
             </div>
             <div class="d-item" style="flex-basis:100%;">
-              <span style="font-size:11.5px;color:var(--muted);">※ この詳細は表示が中心です。<b>ケータリングだけ</b>はここで変更・メモを保存できます（自動保存）。担当・移動・音響・準備チェックの変更保存は次の工程で対応します。案件の内容を直すときは上の「編集」からどうぞ。</span>
+              <span style="font-size:11.5px;color:var(--muted);">※ <b>ディレクター・SD・物品担当・移動・音響・ケータリング</b>は、この詳細で選ぶ／入力するとその場で保存されます（自動保存）。準備チェックの保存は次の工程で対応します。案件の他の内容を直すときは上の「編集」からどうぞ。</span>
             </div>
           </div>
         </td>`;
@@ -797,15 +846,26 @@
   }
 
   // ===== アーカイブ（手動の隠す／戻す） =====
-  // モック：データだけ更新（保存はされない）。ボタン表記とタブ表示を切り替える。
+  // DB（POST /projects/archive）に保存してから、ボタン表記とタブ表示を切り替える。
+  // 保存できたときだけ画面を反映する（失敗時は元のまま知らせる）。
   function toggleArchive(idx) {
     const p = projects[idx];
-    p.archived = !p.archived;
-    const tr = document.querySelector('tr.main-row[data-idx="' + idx + '"]');
-    if (tr) tr.dataset.archived = p.archived ? '1' : '0';
-    const a = document.getElementById('arc-' + idx);
-    if (a) a.textContent = p.archived ? '↩ 戻す' : '🗄 アーカイブ';
-    applyFilter();   // 表示中タブから消える／現タブに現れるのを反映
+    const next = !p.archived;
+    fetch('/projects/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ id: p.id, archived: next })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+    .then(() => {
+      p.archived = next;
+      const tr = document.querySelector('tr.main-row[data-idx="' + idx + '"]');
+      if (tr) tr.dataset.archived = p.archived ? '1' : '0';
+      const a = document.getElementById('arc-' + idx);
+      if (a) a.textContent = p.archived ? '↩ 戻す' : '🗄 アーカイブ';
+      applyFilter();   // 表示中タブから消える／現タブに現れるのを反映
+    })
+    .catch(() => alert('アーカイブの保存に失敗しました。もう一度お試しください。'));
   }
 
   // ===== 案件の削除（キャンセルになった案件を消す） =====

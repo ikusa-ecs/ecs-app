@@ -96,6 +96,10 @@ Route::get('/project-form', [ProjectController::class, 'form']);
 Route::post('/project-form', [ProjectController::class, 'store']);
 // 案件一覧の詳細から、ケータリングの種類・メモだけを保存する（公開ボードの時間保存と同じ方式）。
 Route::post('/projects/catering', [ProjectController::class, 'saveCatering']);
+// 案件一覧の詳細セル（D/SD/物品/移動/音響）を保存する。
+Route::post('/projects/cells', [ProjectController::class, 'saveCells']);
+// 手動アーカイブ（隠す／戻す）を保存する。
+Route::post('/projects/archive', [ProjectController::class, 'setArchive']);
 // 案件の削除（キャンセルになった案件を消す）。案件の削除＝社員以上でOK（baba 2026-07-14）。関連アサインも一緒に消す。
 Route::post('/projects/{id}/delete', [ProjectController::class, 'destroy']);
 Route::get('/project-import', function () {
@@ -163,6 +167,8 @@ Route::post('/assign-publish/set', [AssignPublishController::class, 'setPublish'
 // スタッフ向けの集合・解散時間／スタッフ画面のお知らせ文も DB に保存する。
 Route::post('/assign-publish/time', [AssignPublishController::class, 'setTime']);
 Route::post('/assign-publish/notice', [AssignPublishController::class, 'setNotice']);
+// 公開ボードの案件ごとの「💬備考」（担当メモ）を projects.publish_memo へ保存。
+Route::post('/assign-publish/memo', [AssignPublishController::class, 'setMemo']);
 // 追加案件バッジの手動オン/オフ・通常案件の一斉締切日も DB に保存する。
 Route::post('/assign-publish/category', [AssignPublishController::class, 'setCategory']);
 Route::post('/assign-publish/category-bulk', [AssignPublishController::class, 'setCategoryBulk']);

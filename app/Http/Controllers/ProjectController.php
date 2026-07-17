@@ -28,8 +28,8 @@ class ProjectController extends Controller
         // コンテンツID → 名前（見出し用）。1回だけ引いて連想配列にしておく。
         $contentNames = Content::pluck('content_name', 'id');
 
-        // ディレクター・物品担当の名前は people を一緒に読む（毎回引かないようにする）。
-        $projects = Project::with(['director:id,name', 'goodsOwner:id,name'])
+        // ディレクター・SD・物品担当の名前は people を一緒に読む（毎回引かないようにする）。
+        $projects = Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name'])
             ->orderBy('start_date')
             ->get();
 
@@ -48,6 +48,15 @@ class ProjectController extends Controller
             $content = $firstContentId
                 ? ($contentNames[$firstContentId] ?? $p->project_name)
                 : $p->project_name;
+
+            // 実効アーカイブ状態＝アーカイブタブの振り分けに使う「本物の隠す/表示」判定。
+            // is_archived が null なら「開催日<今日」で自動アーカイブ。true/false なら手動を優先。
+            $autoArchived = $p->start_date
+                ? $p->start_date->copy()->startOfDay()->lt($today)
+                : false;
+            $effectiveArchived = is_null($p->is_archived)
+                ? $autoArchived
+                : (bool) $p->is_archived;
 
             return [
                 'id'         => $p->id,
@@ -68,7 +77,13 @@ class ProjectController extends Controller
                 'sales'      => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
                 'dir'        => $p->director->name ?? '未定',
                 'goods'      => $p->goodsOwner->name ?? '未定',
-                'sd'         => '未設定',                   // SD担当は未保存（後の工程で対応）。固定「なし」は嘘なので「未設定」に
+                'sd'         => $p->subDirector->name ?? '未設定',   // SD担当（DB保存）。未登録なら「未設定」
+                'sdName'     => $p->subDirector->name ?? '',        // SDの名前（空＝未設定）
+                // 詳細のプルダウンの現在値に使う社員ID（担当なしは null）。
+                'director_id'    => $p->director_id,
+                'sd_id'          => $p->sd_id,
+                'goods_owner_id' => $p->goods_owner_id,
+                'audio_equipment' => $p->audio_equipment ?? '',    // 音響（プルダウン初期値用）
                 'meet'       => $p->start_time ?? '—',
                 'leave'      => $p->end_time ?? '—',
                 'enter'      => $p->event_enter_time ?? '—',
@@ -97,9 +112,11 @@ class ProjectController extends Controller
                 'camera'     => $p->pub_camera ?? '',
                 'article'    => $p->pub_article ?? '',
                 'video'      => $p->pub_video ?? '',
-                // cases.js では下書き・アーカイブは別フラグ。DB では status にまとめているので戻す。
+                // cases.js では下書き・アーカイブは別フラグ。下書きは status から、
+                // アーカイブは上で出した実効アーカイブ状態（自動＝開催日／手動＝is_archived）を渡す。
                 'draft'      => $p->status === '下書き',
-                'archived'   => $p->status === '完了',
+                'archived'   => $effectiveArchived,
+                'is_archived' => $p->is_archived,   // 生の手動状態（null=自動／true/false=手動）。参考用
                 'off'        => $off,
             ];
         })->values();
@@ -115,9 +132,18 @@ class ProjectController extends Controller
             ->mapWithKeys(fn ($c) => [$c => true])
             ->all();
 
+        // 詳細のプルダウン（D／SD／物品担当）に出す「本物の社員一覧」（名前順）。
+        // これまでの見本配列（DIRECTORS/SDLIST 等）の代わりに、この一覧で選ばせる。
+        $employees = Person::employees()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Person $e) => ['id' => $e->id, 'name' => $e->name])
+            ->values();
+
         return view('projects', [
             'cases'         => $cases,
             'repeatClients' => $repeatClients,
+            'employees'     => $employees,
         ]);
     }
 
@@ -396,6 +422,68 @@ class ProjectController extends Controller
         if ($request->has('catering_note')) {
             $project->catering_note = trim((string) $request->input('catering_note')) ?: null;
         }
+        $project->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 案件一覧の詳細セル（D／SD／物品担当／移動／音響）を保存する（POST /projects/cells）。
+     * ケータリングと同じ「1項目だけ更新」の考え方。1セルずつ変える運用なので、
+     * 送られてきたキーだけ書き換える（送っていない項目は消さない）。空文字は null（担当なし）に倒す。
+     * 担当（director_id/sd_id/goods_owner_id）は社員（people の employee）に実在するIDだけ受け付け、
+     * それ以外（空・不正なID）はすべて null＝担当なしにする。
+     */
+    public function saveCells(Request $request)
+    {
+        $request->validate([
+            'id'             => ['required', 'string', 'exists:projects,id'],
+            'director_id'    => ['nullable', 'string'],
+            'sd_id'          => ['nullable', 'string'],
+            'goods_owner_id' => ['nullable', 'string'],
+            'transport'      => ['nullable', 'string', 'max:100'],
+            'audio_equipment' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $project = Project::findOrFail($request->input('id'));
+
+        // 担当3項目：送られたキーだけ更新。実在の社員IDのみ採用し、空・不正は null。
+        foreach (['director_id', 'sd_id', 'goods_owner_id'] as $key) {
+            if ($request->has($key)) {
+                $val = trim((string) $request->input($key));
+                $project->{$key} = ($val !== '' && Person::employees()->whereKey($val)->exists())
+                    ? $val
+                    : null;
+            }
+        }
+
+        // 移動・音響：送られたキーだけ更新。空文字は null（未設定）に。
+        foreach (['transport', 'audio_equipment'] as $key) {
+            if ($request->has($key)) {
+                $val = trim((string) $request->input($key));
+                $project->{$key} = $val !== '' ? $val : null;
+            }
+        }
+
+        $project->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 手動アーカイブ（隠す／戻す）を保存する（POST /projects/archive）。
+     * is_archived＝true でアーカイブ（隠す）、false で戻す（表示に復帰）。
+     * これを保存すると、開催日による自動判定より手動が優先される（index の実効アーカイブ判定を参照）。
+     */
+    public function setArchive(Request $request)
+    {
+        $request->validate([
+            'id'       => ['required', 'string', 'exists:projects,id'],
+            'archived' => ['required', 'boolean'],
+        ]);
+
+        $project = Project::findOrFail($request->input('id'));
+        $project->is_archived = $request->boolean('archived');
         $project->save();
 
         return response()->json(['ok' => true]);
