@@ -143,7 +143,7 @@
         <div class="panel-head">
           <h2>直近の確定アサイン</h2>
           <div class="spacer"></div>
-          <a class="btn sm" href="#" title="この機能はまだ仮です" onclick="alert('CSV出力はまだ仮の機能です（本番で実装予定）');return false;">⬇ CSV出力（仮）</a>
+          <a class="btn sm" href="/assign-dashboard/export.csv" title="「アサインが必要な案件」の一覧をCSVでダウンロードします">⬇ CSV出力</a>
         </div>
         @if (count($recentConfirmed))
         <table class="tbl">

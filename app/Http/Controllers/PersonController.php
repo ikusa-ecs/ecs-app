@@ -45,6 +45,10 @@ class PersonController extends Controller
                     'dexp'         => $p->director_contents ?? [],
                     'wear'         => $p->shirt_size ?? '',
                     'shoe'         => $p->shoe_size ?? '',
+                    // サイズ編集パネルの初期値（今の登録値をそのまま表示・空欄なら空文字）。
+                    'height'       => $p->height ?? '',
+                    'shoeSize'     => $p->shoe_size ?? '',
+                    'shirtSize'    => $p->shirt_size ?? '',
                 ];
             })
             ->values();
@@ -88,6 +92,99 @@ class PersonController extends Controller
         $person->save();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 社員のサイズ（身長・靴・服）を保存する（POST /employees/{id}/profile）。
+     * 社員名簿の詳細パネルからAJAXで呼ばれる。来た項目だけを people に上書きする。
+     * ※ 社員の新規作成はここでは行わない（アカウント発行は /account-new に集約）。
+     */
+    public function saveEmployeeProfile(Request $request, string $id)
+    {
+        // 対象は「社員」に限定（people の中で role=employee の行だけ）。
+        $person = Person::employees()->find($id);
+        if (! $person) {
+            return response()->json(['ok' => false, 'message' => '社員が見つかりませんでした。'], 404);
+        }
+
+        $data = $request->validate([
+            'height'     => ['nullable', 'string', 'max:20'],  // 身長（cm）
+            'shoe_size'  => ['nullable', 'string', 'max:20'],  // 靴のサイズ
+            'shirt_size' => ['nullable', 'string', 'max:20'],  // 服のサイズ
+        ]);
+
+        // 送られてきた項目だけ更新（空文字は「クリア」として保存する）。
+        if ($request->has('height')) {
+            $person->height = $data['height'] ?? null;
+        }
+        if ($request->has('shoe_size')) {
+            $person->shoe_size = $data['shoe_size'] ?? null;
+        }
+        if ($request->has('shirt_size')) {
+            $person->shirt_size = $data['shirt_size'] ?? null;
+        }
+        $person->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * スタッフ名簿の CSV 出力（GET /staff/export.csv）。
+     * Excel でそのまま開けるよう UTF-8 BOM 付き。カンマ等は fputcsv が正しくエスケープする。
+     */
+    public function exportStaffCsv()
+    {
+        // できる役割の判定に staff_role_eligibility を一緒に読む（毎回引かないように）。
+        $people = Person::staff()
+            ->with('roleEligibilities')
+            ->orderByDesc('experience_count')
+            ->get();
+
+        $rows = $people->map(function (Person $p) {
+            $can = $p->roleEligibilities->pluck('position')->all();
+
+            // 「できる役割」は D / MC / OP / 軍師 の4つだけを対象に表示する。
+            $roleParts = [];
+            if (in_array(AssignmentRole::D, $can, true))  { $roleParts[] = 'D'; }
+            if (in_array(AssignmentRole::MC, $can, true)) { $roleParts[] = 'MC'; }
+            if (in_array(AssignmentRole::OP, $can, true)) {
+                // OP はオンライン/リアルの別があれば付記する。
+                $flavor = '';
+                if ($p->op_online && $p->op_real) { $flavor = '（オンライン/リアル）'; }
+                elseif ($p->op_online)            { $flavor = '（オンライン）'; }
+                elseif ($p->op_real)              { $flavor = '（リアル）'; }
+                $roleParts[] = 'OP' . $flavor;
+            }
+            if (in_array(AssignmentRole::SP, $can, true)) { $roleParts[] = '軍師'; }
+
+            return [
+                $p->id,
+                $p->name,
+                $p->office ?? '',
+                $p->skill_level ?? '',   // 区分（新人/中堅/ベテラン）。hire_date から都度計算。
+                implode('・', $roleParts),
+                (int) ($p->experience_count ?? 0),
+                $p->is_exclusive ? '専属' : '',
+            ];
+        });
+
+        // BOM＋ヘッダ行＋データ行を組み立てる。
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, "\xEF\xBB\xBF"); // UTF-8 BOM
+        fputcsv($handle, ['ID', '氏名', '事務所', '区分', 'できる役割', '通算回数', '専属']);
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        $filename = 'staff_' . now()->format('Y-m-d') . '.csv';
+
+        return response($csv, 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 
     /** スタッフ名簿（/staff）。 */

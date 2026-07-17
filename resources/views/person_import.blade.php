@@ -53,7 +53,10 @@
     <div class="pi-cols">
       <b>列：</b>
       種別（社員／スタッフ）※必須 ／ 氏名 ※必須 ／ メール（重複不可） ／ 事務所（東京/大阪/名古屋/福岡/東北/北海道） ／
-      所属（社員のみ：イベプラ/セールス/クリエイティブ） ／ 入社日（例 2025-04-01） ／ 通算経験回数（スタッフのみ・数字）<br>
+      所属（社員のみ：イベプラ/セールス/クリエイティブ） ／ 入社日（例 2025-04-01） ／ 通算経験回数（スタッフのみ・数字） ／
+      できるポジション（任意・スタッフのみ）<br>
+      <b>できるポジションの書き方：</b> できる役割を「OP,MC,軍師」のように区切って書きます（区切りはカンマ／スラッシュ／読点のどれでもOK）。
+      使える言葉＝D／OP（音響）／MC（司会進行）／FC（巡回ファシリ）／CK（チェッカー）／軍師（＝サポーター）／受付。コードでも日本語でも書けます。空欄なら何も登録しません。<br>
       <b>自動で入る：</b> 社員番号（E-/S-を自動採番）・権限（社員/スタッフを種別から）・在籍（有効）。パスワードは入れません（アカウント発行は別作業）。
     </div>
   </div>
@@ -83,7 +86,7 @@
           <thead>
             <tr>
               <th>行</th><th>判定</th><th>種別</th><th>氏名</th><th>メール</th>
-              <th>事務所</th><th>所属</th><th>入社日</th><th>通算</th><th>理由</th>
+              <th>事務所</th><th>所属</th><th>入社日</th><th>通算</th><th>できるポジション</th><th>理由</th>
             </tr>
           </thead>
           <tbody id="piBody"></tbody>
@@ -103,13 +106,13 @@
 @verbatim
 <script>
   // ===== 名簿CSV取込：テンプレDL・プレビュー・検証（サーバーの基準と同じ）=====
-  var PI_HEADERS = ['種別', '氏名', 'メール', '事務所', '所属', '入社日', '通算経験回数'];
+  var PI_HEADERS = ['種別', '氏名', 'メール', '事務所', '所属', '入社日', '通算経験回数', 'できるポジション'];
 
   function piDownloadTemplate() {
     var rows = [
       PI_HEADERS,
-      ['スタッフ', '山田花子', 'hanako@example.com', '東京', '', '2025-04-01', '12'],
-      ['社員', '鈴木一郎', 'ichiro@example.com', '大阪', 'イベプラ', '2020-04-01', ''],
+      ['スタッフ', '山田花子', 'hanako@example.com', '東京', '', '2025-04-01', '12', 'OP,MC,軍師'],
+      ['社員', '鈴木一郎', 'ichiro@example.com', '大阪', 'イベプラ', '2020-04-01', '', ''],
     ];
     var csv = rows.map(function (r) {
       return r.map(function (v) {
@@ -160,7 +163,8 @@
       };
       return {
         type: get('種別'), name: get('氏名'), email: get('メール'),
-        office: get('事務所'), dept: get('所属'), hire: get('入社日'), expc: get('通算経験回数')
+        office: get('事務所'), dept: get('所属'), hire: get('入社日'), expc: get('通算経験回数'),
+        pos: get('できるポジション') || get('できる役割') || get('ポジション')
       };
     });
     return { header: header, rows: rows };
@@ -201,7 +205,7 @@
       tr.className = good ? 'row-ok' : 'row-ng';
       function td(t, cls) { return '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + (t == null ? '' : String(t).replace(/</g, '&lt;')) + '</td>'; }
       tr.innerHTML = td(i + 2) + td(good ? '✓ OK' : '✗ NG') + td(r.type) + td(r.name) + td(r.email)
-        + td(r.office) + td(r.dept) + td(r.hire) + td(r.expc) + td(errs.join('／'), 'pi-reason');
+        + td(r.office) + td(r.dept) + td(r.hire) + td(r.expc) + td(r.pos) + td(errs.join('／'), 'pi-reason');
       body.appendChild(tr);
     });
     document.getElementById('piTotal').textContent = parsed.rows.length;

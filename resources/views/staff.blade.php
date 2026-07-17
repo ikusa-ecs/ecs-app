@@ -212,7 +212,7 @@
             <option value="reg">並び：登録した順（番号順）</option>
           </select>
           <div class="spacer"></div>
-          <button class="btn" onclick="alert('モックのため、CSV出力は行いません。')">CSV出力</button>
+          <button class="btn" onclick="location.href='/staff/export.csv'">CSV出力</button>
         </div>
 
         <div class="count-line"><span id="wCount">0</span> 名を表示中</div>

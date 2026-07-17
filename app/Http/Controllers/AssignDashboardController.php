@@ -199,4 +199,61 @@ class AssignDashboardController extends Controller
             'careGobusata'     => $careGobusata,
         ]);
     }
+
+    /**
+     * 「アサインが必要な案件」の一覧をCSVでダウンロードさせる（/assign-dashboard/export.csv）。
+     *
+     * 対象・並びは index() と同じ（未着手・調整中／これから先の開催／開催日順）。
+     * 列＝開催日／案件名／クライアント／必要人数／確定数／不足数（必要−確定）。
+     * Excelでの文字化けを防ぐため UTF-8 BOM を先頭に付ける。
+     */
+    public function exportCsv()
+    {
+        $today = Carbon::today();
+
+        // index() と同じ「決まっている人数」（キャンセル以外の実人数）を案件IDごとに集計。
+        $filledByProject = Assignment::where('status', '!=', 'キャンセル')
+            ->select('project_id', DB::raw('COUNT(DISTINCT staff_id) AS cnt'))
+            ->groupBy('project_id')
+            ->pluck('cnt', 'project_id');
+
+        // index() と同じ対象・並び（未着手・調整中／これから先／開催日順）。
+        $needProjects = Project::whereIn('status', ['未着手', '調整中'])
+            ->whereNotNull('start_date')
+            ->whereDate('start_date', '>=', $today)
+            ->orderBy('start_date')
+            ->get();
+
+        $rows = $needProjects->map(function (Project $p) use ($filledByProject) {
+            $need = (int) $p->required_count;
+            $filled = (int) ($filledByProject[$p->id] ?? 0);
+
+            return [
+                $p->start_date ? $p->start_date->format('Y/n/j') : '',
+                $p->project_name ?: '（名称未定）',
+                $p->client ?: '',
+                $need,
+                $filled,
+                $need - $filled,   // 不足数（必要−確定。マイナスは充足済み）
+            ];
+        });
+
+        // BOM＋ヘッダ行＋データ行を組み立て。fputcsv がカンマ・"・改行を正しくエスケープする。
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, "\xEF\xBB\xBF"); // UTF-8 BOM
+        fputcsv($handle, ['開催日', '案件名', 'クライアント', '必要人数', '確定数', '不足数']);
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        $filename = 'assign-needs_' . now()->format('Y-m') . '.csv';
+
+        return response($csv, 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
 }

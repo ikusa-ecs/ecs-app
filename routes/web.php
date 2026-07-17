@@ -144,6 +144,8 @@ Route::get('/assign-history', [AssignHistoryController::class, 'index']);
 Route::get('/clients/lookup', [AssignHistoryController::class, 'lookup']);
 // アサインダッシュボード＝担当者向けの状況まとめ。「アサインが必要な案件」だけ本物の案件から作る。
 Route::get('/assign-dashboard', [AssignDashboardController::class, 'index']);
+// アサインダッシュボードのCSV出力（アサインが必要な案件の表）。
+Route::get('/assign-dashboard/export.csv', [AssignDashboardController::class, 'exportCsv']);
 // 割当メンバーの仮データに使う名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
 Route::get('/assign', [AssignBoardController::class, 'assign']);
 // D決め（S-017）。本物の案件＋社員（people）をカレンダーに表示し、D/SDを保存する。
@@ -184,10 +186,14 @@ Route::post('/pickup/save', [AssignBoardController::class, 'pickupSave']);
 // スタッフ関連の画面（Blade化済み）
 // スタッフ名簿は DB（people＋ポジション可否＋NGペア）から読む。
 Route::get('/staff', [PersonController::class, 'staff']);
+// スタッフ名簿のCSV出力（氏名・事務所・区分・できる役割・通算など）。
+Route::get('/staff/export.csv', [PersonController::class, 'exportStaffCsv']);
 // スタッフの「できるポジション・NGペア・専属・人柄・メモ」を保存（/staff 詳細パネルからAJAX）。
 Route::post('/staff/{id}/edit', [PersonController::class, 'staffUpdate']);
 // 社員名簿は DB（people テーブルの社員）から読む。
 Route::get('/employees', [PersonController::class, 'employees']);
+// 社員のサイズ（身長・靴・服）を保存（/employees 詳細パネルからAJAX）。
+Route::post('/employees/{id}/profile', [PersonController::class, 'saveEmployeeProfile']);
 // 社員名簿の詳細から「経験コンテンツ／Dの経験コンテンツ」だけを保存する。
 Route::post('/employees/experience', [PersonController::class, 'saveExperience']);
 // 稼働状況は「スタッフ」画面（/staff）の中のタブに統合済み。

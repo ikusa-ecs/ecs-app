@@ -52,9 +52,10 @@
     .detail-box .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     @media (max-width: 900px){ .detail-box .dgrid { grid-template-columns: 1fr; } }
     .detail-box h4 { margin: 0 0 8px; font-size: 13px; }
-    .size-row { display: flex; gap: 18px; flex-wrap: wrap; }
-    .size-row .size-item { font-size: 13px; }
+    .size-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+    .size-row .size-item { font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
     .size-row .size-item .v { font-weight: 600; }
+    .size-input { padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; width: 90px; }
     .detail-box .save-row { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .exp-block { margin-top: 14px; }
     .exp-block:first-child { margin-top: 0; }
@@ -66,7 +67,7 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">社員の情報は<b>登録された本物のデータ</b>を表示しています。氏名の横で新人（入社半年以内）が分かり、行の「詳細」で内容を確認できます。<br>※ 詳細の<b>「経験コンテンツ」「Dの経験コンテンツ」はここで追加・削除して保存できます</b>。社員の追加やサイズ等の編集の保存は次の工程で対応します。</div>
+      <div class="mock-note">社員の情報は<b>登録された本物のデータ</b>を表示しています。氏名の横で新人（入社半年以内）が分かり、行の「詳細」で内容を確認できます。<br>※ 詳細の<b>「経験コンテンツ」「Dの経験コンテンツ」「サイズ（身長・靴・服）」はここで編集して保存できます</b>。新しい社員の追加は「＋社員を追加」からアカウント発行画面で行います。</div>
 
       <div class="panel">
         <div class="filterbar">
@@ -82,7 +83,7 @@
             <option value="fresh">新人（入社半年以内）のみ</option>
           </select>
           <div class="spacer"></div>
-          <a class="btn primary" href="/register">＋ 社員を追加</a>
+          <a class="btn primary" href="/account-new" title="アカウント発行画面が開きます。社員のログインアカウントはそこで発行します。">＋ 社員を追加</a>
         </div>
 
         <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>
@@ -170,10 +171,15 @@
             </div>
           </div>
           <div>
-            <h4>サイズ</h4>
+            <h4>サイズ（当日の衣装・ユニフォーム準備の参考）</h4>
             <div class="size-row">
-              <div class="size-item">服：<span class="v">${p.wear || '—'}</span></div>
-              <div class="size-item">靴：<span class="v">${p.shoe || '—'}</span></div>
+              <label class="size-item">身長(cm)：<input type="text" class="size-input" id="height-${idx}" value="${p.height || ''}" placeholder="例：170"></label>
+              <label class="size-item">靴：<input type="text" class="size-input" id="shoe-${idx}" value="${p.shoeSize || ''}" placeholder="例：26.5"></label>
+              <label class="size-item">服：<input type="text" class="size-input" id="shirt-${idx}" value="${p.shirtSize || ''}" placeholder="例：M / L"></label>
+            </div>
+            <div class="save-row" style="margin-top:10px;">
+              <button class="btn primary sm" onclick="saveSize(${idx}, this)">サイズを保存</button>
+              <span class="save-ok" id="sizeSaved-${idx}" style="display:none;">✓ 保存しました</span>
             </div>
 
             ${fresh ? `<div class="muted" style="font-size:12px; margin-top:12px;">🌱 入社半年以内の新人です。経験コンテンツとDの経験コンテンツを重点的に確認してください。</div>` : ''}
@@ -183,7 +189,7 @@
           <button class="btn primary sm" onclick="saveExperience(${idx})">経験コンテンツを保存</button>
           <span class="save-ok" id="expSaved-${idx}" style="display:none;">✓ 保存しました</span>
           <button class="btn sm" onclick="toggleDetail(${idx})">閉じる</button>
-          <span class="muted" style="font-size:12px;">※「経験コンテンツ」「Dの経験コンテンツ」の変更は保存されます。社員はエントリーしません（この名簿はアサインとは別管理）。</span>
+          <span class="muted" style="font-size:12px;">※「経験コンテンツ」「Dの経験コンテンツ」「サイズ」の変更は保存されます。社員はエントリーしません（この名簿はアサインとは別管理）。</span>
         </div>
       </div>`;
   }
@@ -249,6 +255,42 @@
       if (m) { m.style.display = ''; setTimeout(() => { m.style.display = 'none'; }, 1800); }
     })
     .catch(() => alert('保存に失敗しました。もう一度お試しください。'));
+  }
+
+  // サイズ（身長・靴・服）を DB に保存する。
+  function saveSize(idx, btn){
+    const p = employees[idx];
+    const height = (document.getElementById(`height-${idx}`) || {}).value || '';
+    const shoe   = (document.getElementById(`shoe-${idx}`)   || {}).value || '';
+    const shirt  = (document.getElementById(`shirt-${idx}`)  || {}).value || '';
+    const body = new URLSearchParams();
+    body.append('height', height.trim());
+    body.append('shoe_size', shoe.trim());
+    body.append('shirt_size', shirt.trim());
+    if (btn) btn.disabled = true;
+    fetch(`/employees/${encodeURIComponent(p.id)}/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: body.toString()
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+    .then(() => {
+      // 画面の手元データも更新（一覧の「服 / 靴」列と詳細の初期値をそろえる）。
+      p.height = height.trim();
+      p.shoeSize = shoe.trim();
+      p.shirtSize = shirt.trim();
+      p.shoe = shoe.trim();   // 一覧列（服 / 靴）用
+      p.wear = shirt.trim();  // 一覧列（服 / 靴）用
+      const mr = tbody.querySelector(`tr.main-row[data-idx="${idx}"]`);
+      if (mr) {
+        const tds = mr.querySelectorAll('td');
+        if (tds[3]) tds[3].innerHTML = `<span class="muted" style="font-size:12.5px;">${p.wear || '—'} / ${p.shoe || '—'}</span>`;
+      }
+      const m = document.getElementById(`sizeSaved-${idx}`);
+      if (m) { m.style.display = ''; setTimeout(() => { m.style.display = 'none'; }, 1800); }
+      if (btn) btn.disabled = false;
+    })
+    .catch(() => { alert('保存に失敗しました。もう一度お試しください。'); if (btn) btn.disabled = false; });
   }
 
   // 絞り込み

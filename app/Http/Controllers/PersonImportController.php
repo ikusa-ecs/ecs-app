@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Models\StaffRoleEligibility;
+use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
 
 /**
@@ -12,9 +14,10 @@ use Illuminate\Http\Request;
  * BOM除去 → 改行で分割 → str_getcsv（第4引数=エスケープ無効・PHP8.4対応）→
  * 見出しを「列名→位置」表にして値を引く → 行ごとに必須チェック → OK行だけ登録。
  *
- * v1の列：種別／氏名／メール／事務所／所属／入社日／通算経験回数。
+ * 列：種別／氏名／メール／事務所／所属／入社日／通算経験回数／できるポジション（任意）。
  * 自動：社員番号（E-###/S-###）・権限（種別から）・在籍（active=true）。
- * ※パスワードは入れない（アカウント発行は別作業）。「できるポジション」は次段で追加予定。
+ * ※パスワードは入れない（アカウント発行は別作業）。
+ * ※「できるポジション」はスタッフのみ対象。役割の正本は App\Support\AssignmentRole。
  */
 class PersonImportController extends Controller
 {
@@ -48,6 +51,15 @@ class PersonImportController extends Controller
             $i = $col[$name] ?? null;
             return ($i !== null && isset($row[$i])) ? trim((string) $row[$i]) : '';
         };
+
+        // 「できるポジション」列（任意）。別名の見出しも許容する。無ければ null＝この列はスキップ。
+        $posColName = null;
+        foreach (['できるポジション', 'できる役割', 'ポジション', '可能ポジション'] as $cand) {
+            if (isset($col[$cand])) {
+                $posColName = $cand;
+                break;
+            }
+        }
 
         // メール重複チェックの元（既存＋このファイル内で出たもの）。
         $existingEmails = Person::whereNotNull('email')
@@ -132,7 +144,31 @@ class PersonImportController extends Controller
                 $attrs['experience_count'] = $expc !== '' ? (int) $expc : null;
             }
 
-            Person::create($attrs);
+            $person = Person::create($attrs);
+
+            // できるポジション（任意・スタッフのみ）：セルの各トークンを正規コードに直して入れ直す。
+            if ($role === 'staff' && $posColName !== null) {
+                $posCell = $get($row, $posColName);
+                if ($posCell !== '') {
+                    $codes = [];
+                    // カンマ／スラッシュ／読点（全角・半角どちらも）で区切る。中黒（・）は区切りにしない
+                    //（「軍師・サポーター」を1語として扱うため）。
+                    foreach (preg_split('/[,\/、，／]+/u', $posCell) as $token) {
+                        $code = $this->resolvePosition((string) $token);
+                        if ($code !== null) {
+                            $codes[] = $code;
+                        }
+                    }
+                    $codes = array_values(array_unique($codes));
+
+                    // その人ぶんを一旦消して入れ直す（重複行を作らない）。
+                    StaffRoleEligibility::where('staff_id', $person->id)->delete();
+                    foreach ($codes as $code) {
+                        StaffRoleEligibility::create(['staff_id' => $person->id, 'position' => $code]);
+                    }
+                }
+            }
+
             if ($email !== '') {
                 $seenEmails[] = mb_strtolower($email);
             }
@@ -153,6 +189,40 @@ class PersonImportController extends Controller
         return (int) (Person::where('id', 'like', $prefix . '%')->get()
             ->map(fn ($p) => (int) preg_replace('/\D/', '', $p->id))
             ->max() ?? 0);
+    }
+
+    /**
+     * 「できるポジション」の1トークンを正規コード（D/OP/MC/FC/CK/SP/RP）に直す。
+     * コードそのもの（OP等）・日本語ラベル（音響・軍師・受付等）・旧コード（GUN/UKE）を受ける。
+     * 解決できなければ null（＝その語は無視）。SD は対象外（スタッフの可否では使わない）。
+     */
+    private function resolvePosition(string $token): ?string
+    {
+        // 前後の空白と、途中の全角・半角スペースを除去（照合をぶれさせないため）。
+        $t = preg_replace('/[\s\x{3000}]+/u', '', trim($token));
+        if ($t === '') {
+            return null;
+        }
+
+        // まずコードとして直接照合（英字は大文字化）。旧コードは読み替える。
+        $upper = mb_strtoupper($t);
+        $upper = ['GUN' => 'SP', 'UKE' => 'RP'][$upper] ?? $upper;
+        if (in_array($upper, AssignmentRole::POSITIONS, true)) {
+            return $upper;
+        }
+
+        // 日本語ラベル・別名から照合。
+        $aliases = [
+            'ディレクター' => 'D', 'D（ディレクター）' => 'D',
+            '音響' => 'OP', 'オペレーター' => 'OP', 'OP（音響）' => 'OP',
+            '司会' => 'MC', '司会進行' => 'MC', 'MC（司会進行）' => 'MC',
+            '巡回' => 'FC', 'ファシリ' => 'FC', '巡回ファシリ' => 'FC', 'FC（巡回ファシリ）' => 'FC',
+            'チェッカー' => 'CK', 'CK（チェッカー）' => 'CK',
+            '軍師' => 'SP', 'サポーター' => 'SP', '軍師・サポーター' => 'SP',
+            '受付' => 'RP',
+        ];
+
+        return $aliases[$t] ?? null;
     }
 
     /** YYYY-MM-DD が実在する日付か。 */
