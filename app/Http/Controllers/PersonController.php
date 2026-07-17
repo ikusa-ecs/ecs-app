@@ -116,6 +116,9 @@ class PersonController extends Controller
                     'exclusive' => (bool) $p->is_exclusive,
                     'total'     => $p->experience_count ?? 0,
                     'pos'       => $pos,
+                    // OPの区別（B案）：オンライン可／リアル可。null=未設定は false 扱いで渡す。
+                    'opOnline'  => (bool) $p->op_online,
+                    'opReal'    => (bool) $p->op_real,
                     'ng'        => $p->ngRelations->pluck('partner_name')->all(),
                     'dnote'     => $p->planner_impression ?? '',
                     'traits'    => [
@@ -171,6 +174,8 @@ class PersonController extends Controller
             'positions.*'         => ['string'],
             'managed_positions'   => ['sometimes', 'array'],   // このフォームが扱うポジションの範囲（未指定＝全件置換）
             'managed_positions.*' => ['string'],
+            'op_online'           => ['sometimes', 'boolean'],  // OPオンライン可（B案）
+            'op_real'             => ['sometimes', 'boolean'],  // OPリアル(現地)可（B案）
             'ng'                  => ['nullable', 'string', 'max:2000'],
             'impression'          => ['nullable', 'string', 'max:1000'],
         ]);
@@ -219,6 +224,13 @@ class PersonController extends Controller
             $person->self_starter        = $request->boolean('starter');
             $person->improves_atmosphere = $request->boolean('atmos');
             $person->planner_impression  = $data['impression'] ?? null;
+            // OPのオンライン/リアル可（B案）：送られてきたときだけ更新する。
+            if ($request->has('op_online')) {
+                $person->op_online = $request->boolean('op_online');
+            }
+            if ($request->has('op_real')) {
+                $person->op_real = $request->boolean('op_real');
+            }
             $person->save();
         });
 

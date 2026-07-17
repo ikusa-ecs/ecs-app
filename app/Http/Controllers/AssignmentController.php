@@ -142,7 +142,14 @@ class AssignmentController extends Controller
                 $can = $p->roleEligibilities->pluck('position')->all();
                 // 「できる役割」バッジは D・MC・OP・軍師 だけ表示（FC・CK等は全員できるので出さない／baba 2026-07-17）。
                 $canShown = array_values(array_filter($can, fn ($k) => in_array($k, self::CAN_SHOWN, true)));
-                $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $canShown);
+                // OPはオンライン/リアルの区別（B案）を付ける。未設定は「OP（音響）」のまま。
+                $posLabels = array_map(function ($k) use ($p) {
+                    if ($k === 'OP') {
+                        $fl = $this->opFlavor($p);
+                        return $fl !== '' ? ('OP' . $fl) : AssignmentRole::label('OP');
+                    }
+                    return AssignmentRole::label($k);
+                }, $canShown);
                 $eval = $scorer->evaluate($p);
 
                 return [
@@ -399,6 +406,22 @@ class AssignmentController extends Controller
         $n = (int) $v;
 
         return $n < 0 ? null : $n;
+    }
+
+    /** OPのオンライン/リアル可を短い接尾辞にする（B案）。未設定は空文字。 */
+    private function opFlavor(Person $p): string
+    {
+        if ($p->op_online && $p->op_real) {
+            return '（オ/リ）';
+        }
+        if ($p->op_online) {
+            return '（オンライン）';
+        }
+        if ($p->op_real) {
+            return '（リアル）';
+        }
+
+        return '';
     }
 
     /** 備考（一言）を整える（前後空白を除去。空文字は null。長すぎは切り詰め）。 */

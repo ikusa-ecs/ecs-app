@@ -288,9 +288,16 @@
 
   const tbody = document.getElementById('tbody');
 
+  // OPの種類サフィックス（B案）：オンライン/リアルの可否を短く表す。未設定は空。
+  function opFlavor(p){
+    if (p.opOnline && p.opReal) return '（オ/リ）';
+    if (p.opOnline) return '（オンライン）';
+    if (p.opReal)   return '（リアル）';
+    return '';
+  }
   function posTagsHtml(p){
     const tags = POS.filter(x => p.pos[x.k]).map(x =>
-      `<span class="ptag ${x.key?'key':''}">${x.label}</span>`);
+      `<span class="ptag ${x.key?'key':''}">${x.label}${x.k==='OP'?opFlavor(p):''}</span>`);
     return `<div class="postags">${tags.join('')}</div>`;
   }
   function relHtml(p){
@@ -366,6 +373,11 @@
           <div>
             <h4>ポジション可否（できる現場の役割）</h4>
             <div class="pos-check">${posChecks}</div>
+            <div class="op-flavor" style="margin-top:6px; font-size:12.5px; color:var(--muted);">
+              <span style="margin-right:8px;">OPの種類：</span>
+              <label style="margin-right:10px;"><input type="checkbox" class="edit-op-online" ${p.opOnline?'checked':''}> オンライン可</label>
+              <label><input type="checkbox" class="edit-op-real" ${p.opReal?'checked':''}> リアル(現地)可</label>
+            </div>
 
             <h4 style="margin-top:16px;">区分</h4>
             <div class="trait">
@@ -433,6 +445,8 @@
     if (!dr) return;
     const p = staff[idx];
     const posSel = Array.from(dr.querySelectorAll('.edit-pos:checked')).map(c => c.value);
+    const opOnline = !!(dr.querySelector('.edit-op-online') && dr.querySelector('.edit-op-online').checked);
+    const opReal   = !!(dr.querySelector('.edit-op-real') && dr.querySelector('.edit-op-real').checked);
     const exclusive = !!(dr.querySelector('.edit-exclusive') && dr.querySelector('.edit-exclusive').checked);
     const follow    = !!(dr.querySelector('.edit-follow') && dr.querySelector('.edit-follow').checked);
     const starter   = !!(dr.querySelector('.edit-starter') && dr.querySelector('.edit-starter').checked);
@@ -443,6 +457,8 @@
     const body = new URLSearchParams();
     posSel.forEach(v => body.append('positions[]', v));
     ['OP','MC','SP'].forEach(v => body.append('managed_positions[]', v));  // この画面が扱う可否はこの3つだけ
+    body.append('op_online', opOnline ? '1' : '0');   // OPオンライン可（B案）
+    body.append('op_real',   opReal ? '1' : '0');     // OPリアル(現地)可（B案）
     if (exclusive) body.append('exclusive', '1');
     if (follow)    body.append('follow', '1');
     if (starter)   body.append('starter', '1');
@@ -459,6 +475,7 @@
     .then(r => r.ok ? r.json() : Promise.reject(r.status))
     .then(() => {
       ['OP','MC','SP'].forEach(k => { p.pos[k] = posSel.includes(k); });
+      p.opOnline = opOnline; p.opReal = opReal;
       p.exclusive = exclusive;
       p.traits = { follow: follow, starter: starter, atmos: atmosT };
       p.ng = ngText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);

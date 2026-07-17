@@ -45,6 +45,8 @@ class Person extends Model implements AuthenticatableContract
             'is_admin' => 'boolean',
             'must_onboard' => 'boolean',   // 初回ログインの初期設定が必要か
             'is_exclusive' => 'boolean',
+            'op_online' => 'boolean',   // OPオンライン可（B案）
+            'op_real' => 'boolean',     // OPリアル(現地)可（B案）
             'mc_audition_passed' => 'boolean',
             'can_kigurumi' => 'boolean',
             'can_stay_over' => 'boolean',
