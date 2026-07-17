@@ -38,6 +38,7 @@ class Project extends Model
             'prep_handover' => 'boolean',
             'prep_script' => 'boolean',
             'staff_published' => 'boolean',
+            'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）
         ];
     }
 
@@ -45,6 +46,12 @@ class Project extends Model
     public function director(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'director_id');
+    }
+
+    /** SD（サブディレクター・社員）。people を参照。 */
+    public function subDirector(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'sd_id');
     }
 
     /** 物品担当（社員）。people を参照。 */

@@ -495,8 +495,9 @@
 
     // ===== 募集案件（共通リスト data/cases.js から作る）=====
     // スタッフ画面には「募集する・過去でない・下書きでない」案件だけ出す。
-    // 締切は開催日の4日前（モックの簡易ルール）。状態は 満員→締切 / 調整中→エントリー中 / それ以外→募集中。
+    // 締切は開催日の4日前（見本フォールバック時の簡易ルール）。状態は 応募済み→エントリー中 / 満員→締切 / それ以外→募集中。
     // DBの募集案件（ECS_RECRUIT_JOBS）があればそれを使い、空なら見本cases.jsにフォールバック。
+    // ※応募（エントリー）は本物保存です（DB=applicationsへ）。「エントリーする／取り消す」を押すと保存されます。
     const _jobSrc = (window.ECS_RECRUIT_JOBS && window.ECS_RECRUIT_JOBS.length)
       ? window.ECS_RECRUIT_JOBS : ECS_CASES;
     const jobs = _jobSrc.filter(c => c.recruit && !c.archived && !c.draft).map(c => {
@@ -509,7 +510,10 @@
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
         need:c.need, filled:c.filled, meet:c.meet, leave:c.leave,
         enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, offset:c.off,
-        state:(c.filled >= c.need ? 'closed' : (c.state === 'adj' ? 'applied' : 'open')),
+        // 自分が応募済みなら「エントリー中」を最優先で表示（そうすれば取り消しもできる）。
+        // 未応募なら満員→締切／調整中→エントリー中／それ以外→募集中。
+        state:(c.applied ? 'applied' : (c.filled >= c.need ? 'closed' : (c.state === 'adj' ? 'applied' : 'open'))),
+        applied:!!c.applied, myNote:(c.myNote || ''), myIntent:(c.myIntent || '希望'),
         extra:(c.category === '追加案件')
       };
     });
@@ -640,6 +644,8 @@
 
     // コメントの保存（案件IDごとに本文と開閉状態を覚えておく＝再描画で消えない）
     const commentState = {};
+    // 応募済み案件は、DBに保存済みの一言コメント（myNote）を初期表示に復元する。
+    jobs.forEach(j => { if (j.myNote) commentState[j.id] = { text: j.myNote, open: false }; });
     function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
     function saveComment(id, val) {
       commentState[id] = commentState[id] || { text: '', open: true };
@@ -657,10 +663,34 @@
       if (open) wrap.querySelector('.jr-comment').focus();
     }
 
-    // エントリーする／取り消す（モック：状態を切り替えるだけ）
+    // エントリーする／取り消す → DB(applications)へ本物保存する。
+    //  applied 以外 → apply（応募・コメントも note として送る）／ applied → cancel（取り消し）。
+    // 画面は先に切り替えて体感を軽くし、保存に失敗したら元に戻して知らせる。
     function toggleApply(i) {
-      jobs[i].state = (jobs[i].state === 'applied') ? 'open' : 'applied';
+      const j = jobs[i];
+      const willApply = (j.state !== 'applied');
+      const before = j.state;
+      const note = (commentState[j.id] && commentState[j.id].text) || '';
+
+      const body = new URLSearchParams();
+      body.append('project_id', j.id);
+      body.append('action', willApply ? 'apply' : 'cancel');
+      if (willApply) { body.append('intent', '希望'); body.append('note', note); }
+
+      // 先に画面を反映
+      j.state = willApply ? 'applied' : 'open';
       renderJobs();
+
+      fetch('/staff-portal/entry', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!res || !res.ok) { j.state = before; renderJobs(); alert('保存できませんでした。もう一度お試しください。'); }
+      })
+      .catch(err => { j.state = before; renderJobs(); alert('保存に失敗しました（' + err + '）。'); });
     }
 
     // タブの「募集中」の数字バッジ（まだエントリーしていない＝募集中の件数）

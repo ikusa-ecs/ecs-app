@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
@@ -79,20 +80,34 @@ class StaffPortalController extends Controller
             ->filter(fn ($c) => $c['mine'])
             ->values();
 
+        // 稼働希望カレンダーの対象月。既定＝今日基準の当月（?period= があればそれを優先）。
+        $prefPeriod = $this->prefPeriod();
+
         return view('staff_portal', [
             'published' => $published,
-            'recruitJobs' => $this->recruitJobs($today),
+            'recruitJobs' => $this->recruitJobs($today, $me),
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
             'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
-            'prefPeriod' => self::PREF_PERIOD,              // 稼働希望カレンダーの対象月（画面は7月固定）
+            'prefPeriod' => $prefPeriod,                     // 稼働希望カレンダーの対象月（当月）
             'myPrefs' => $this->myPrefs($me),               // 本人の希望（カレンダー初期表示）
-            'myPrefMemo' => $this->myPrefMemo($me),         // 希望のコメント（初期表示）
+            'myPrefMemo' => $this->myPrefMemo($me, $prefPeriod), // 希望のコメント（初期表示）
         ]);
     }
 
-    // 稼働希望カレンダーの対象月。画面（cal-grid）が 2026年7月 固定で組まれているのに合わせる。
-    // ※月の切り替えは既存カレンダーの作り込み範囲外。ここでは「その月の保存・読込」を本物にする。
-    private const PREF_PERIOD = '2026-07';
+    /**
+     * 稼働希望カレンダーの対象月（YYYY-MM）。
+     * 既定＝今日基準の当月（now()）。URL に ?period=YYYY-MM が付いていればそれを優先。
+     * ※以前は '2026-07' 直書きだったが、月が変わっても正しい当月を見せるため今日基準にした。
+     */
+    private function prefPeriod(): string
+    {
+        $param = (string) request('period', '');
+        if (preg_match('/^\d{4}-\d{1,2}$/', $param)) {
+            return $param;
+        }
+
+        return now()->format('Y-m');
+    }
 
     /** DBの availability → カレンダーの状態語（ok/ng/maybe）。「希望」も画面では〇(ok)扱い。 */
     private const PREF_TO_VIEW = ['稼働可' => 'ok', '希望' => 'ok', 'NG' => 'ng', '未定' => 'maybe'];
@@ -226,13 +241,13 @@ class StaffPortalController extends Controller
     }
 
     /** 希望のコメント（対象月の note を1つ拾う）。 */
-    private function myPrefMemo($me): string
+    private function myPrefMemo($me, string $period): string
     {
         if (! $me || TestAccounts::isTest($me)) {
             return '';
         }
         $row = ShiftPreference::where('staff_id', $me->id)
-            ->where('period', self::PREF_PERIOD)
+            ->where('period', $period)
             ->whereNotNull('note')
             ->where('note', '!=', '')
             ->first();
@@ -303,12 +318,64 @@ class StaffPortalController extends Controller
     }
 
     /**
+     * 案件へのエントリー（応募＋一言コメント）を DB(applications) へ本物保存（AJAX・本人分のみ）。
+     * これまで画面はモックで状態を切り替えるだけだったものを本物化。
+     *  - action=apply（既定）… 応募（同じ人×同じ案件は上書き＝updateOrCreate）。
+     *  - action=cancel        … 応募の取り消し（その行を削除）。
+     * テスト用アカウント・未ログインは保存しない（見本のため）＝ saveProfile/saveAvailability と同じ方針。
+     */
+    public function saveEntry(Request $request)
+    {
+        $data = $request->validate([
+            'project_id' => ['required', 'string', 'exists:projects,id'],
+            'intent'     => ['nullable', 'in:希望,可'],
+            'note'       => ['nullable', 'string', 'max:1000'],
+            'action'     => ['nullable', 'in:apply,cancel'],
+        ]);
+
+        $action = $data['action'] ?? 'apply';
+        $applied = ($action !== 'cancel');   // apply→応募済み・cancel→未応募
+
+        $user = Auth::user();
+
+        // テスト用アカウント・未ログインは実DBに本人が居ないので保存しない（見本）。
+        // 画面は成功として扱えるよう ok:true を返しつつ saved:false で「保存はしていない」と伝える。
+        if (! $user || TestAccounts::isTest($user)) {
+            return response()->json([
+                'ok'      => true,
+                'saved'   => false,
+                'applied' => $applied,
+                'message' => 'テスト用アカウントのため保存されません（見本）。',
+            ]);
+        }
+
+        if ($action === 'cancel') {
+            Application::where('staff_id', $user->id)
+                ->where('project_id', $data['project_id'])
+                ->delete();
+
+            return response()->json(['ok' => true, 'saved' => true, 'applied' => false]);
+        }
+
+        // 応募（同じ人×同じ案件は1行だけ＝上書き）。
+        Application::updateOrCreate(
+            ['staff_id' => $user->id, 'project_id' => $data['project_id']],
+            [
+                'intent'     => $data['intent'] ?? '希望',
+                'note'       => $data['note'] ?? null,
+                'applied_at' => now(),
+            ]
+        );
+
+        return response()->json(['ok' => true, 'saved' => true, 'applied' => true]);
+    }
+
+    /**
      * 募集中タブに出す案件リスト（projects から）。
      * 「募集する・完了/下書きでない」案件を、画面の jobs 変換がそのまま読める項目名で返す。
-     * ※「あなたがエントリー中か」は本人特定（ログイン）が要るため、画面側の従来モックのまま
-     *   （ここでは案件リストだけを本物にする。状態は満員→締切／それ以外→募集中）。
+     * 本人がログイン中なら「自分が応募済みか（applied）＋intent/コメント」も案件ごとに載せる。
      */
-    private function recruitJobs(Carbon $today)
+    private function recruitJobs(Carbon $today, $me)
     {
         $projects = Project::where('is_recruiting', true)
             ->whereNotIn('status', ['完了', '下書き'])
@@ -318,6 +385,11 @@ class StaffPortalController extends Controller
         if ($projects->isEmpty()) {
             return collect();
         }
+
+        // 本人の応募（案件ID → 行）。テスト/未ログインは空＝応募状態なし。
+        $myApps = ($me && ! TestAccounts::isTest($me))
+            ? Application::where('staff_id', $me->id)->get()->keyBy('project_id')
+            : collect();
 
         // 充足数＝確定/仮アサイン（キャンセル除く）の人数。案件ごとにまとめて数える。
         $filledByProject = Assignment::whereIn('project_id', $projects->pluck('id'))
@@ -331,7 +403,7 @@ class StaffPortalController extends Controller
         // 通常案件の締切＝全体で1つの「一斉締切日」（settings）。追加案件は下の deadlineLabel で個別計算。
         $bulkDeadline = trim((string) Setting::get('entry_deadline', ''));
 
-        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline) {
+        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps) {
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
@@ -376,6 +448,10 @@ class StaffPortalController extends Controller
                 'recruit' => true,
                 'archived' => $off < 0,   // 過去のイベントは募集タブに出さない
                 'draft' => false,
+                // 本人がこの案件に応募済みか＋その内容（画面で応募状態・コメントを復元するために渡す）。
+                'applied'  => $myApps->has($p->id),
+                'myIntent' => optional($myApps->get($p->id))->intent ?? '希望',
+                'myNote'   => optional($myApps->get($p->id))->note ?? '',
             ];
         })->values();
     }

@@ -68,6 +68,8 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     Route::post('/staff-portal/skills', [StaffPortalController::class, 'savePositions']);
     // 稼働希望カレンダー（その月の希望）をDB(shift_preferences)へ本物保存。
     Route::post('/staff-portal/availability', [StaffPortalController::class, 'saveAvailability']);
+    // 案件へのエントリー（応募＋一言コメント）をDB(applications)へ本物保存。
+    Route::post('/staff-portal/entry', [StaffPortalController::class, 'saveEntry']);
 
     // 本人のパスワード変更（初回ログイン後などに自分で変える）。
     Route::get('/password', [PasswordController::class, 'edit']);
@@ -192,8 +194,12 @@ Route::get('/staff-status', fn () => redirect('/staff'));
 // マイページ（S-015）。社員が自分の担当アサイン案件を assignments から読む。
 // ※ 2026-06-25 別ターミナル（小沼さん）が MyPageController を作成済み＝本接続。
 Route::get('/mypage', [MyPageController::class, 'index']);
-// 収支入力。案件一覧を DB から出す（D または営業担当の案件が対象）。保存はMTG後。
+// マイページの通知設定（新人フォロー所感/アサイン確定/締切）を people へ本物保存。
+Route::post('/mypage/notify', [MyPageController::class, 'saveNotify']);
+// 収支入力。案件一覧を DB から出す（D または営業担当の案件が対象）。
 Route::get('/mypage-finance', [MyPageFinanceController::class, 'index']);
+// 収支（売上・経費明細・メモ）を project_finances へ本物保存（イベプラ要望）。
+Route::post('/mypage-finance/save', [MyPageFinanceController::class, 'save']);
 // 設定画面。マスタ件数を DB の実データから表示し、アサインMTG日の予定表を DB(settings) に保存する。
 Route::get('/settings', [SettingsController::class, 'index']);
 Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);

@@ -34,7 +34,7 @@
       </div>
 
       <h2 style="margin:4px 0 4px; font-size:18px;">アサイン担当の状況</h2>
-      <p class="muted" style="font-size:12px; margin:0 0 14px;">アサインを進めるための担当者向けの情報です（全社員向けの情報はダッシュボードにあります）。稼働率の対象月は 2026年7月です。
+      <p class="muted" style="font-size:12px; margin:0 0 14px;">アサインを進めるための担当者向けの情報です（全社員向けの情報はダッシュボードにあります）。稼働率の対象月は {{ now()->format('Y年n月') }}です。
         <a class="btn sm" href="/assign" style="margin-left:8px;">▦ 日別ボードで割り当てる →</a>
       </p>
 

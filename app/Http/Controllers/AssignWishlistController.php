@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 /**
  * 希望まとめ（/assign-wishlist・別ウィンドウ）。
  *
- * いま稼働希望を出しているスタッフ（対象月＝2026-07）の一覧を DB から作る。
+ * いま稼働希望を出しているスタッフ（対象月＝今日の当月。例：7月に開けば2026-07）の一覧を DB から作る。
  * 画面の絞り込み・並べ替え・カード集計は元の JavaScript をそのまま使い、
  * その材料（people 配列）だけを本物のデータに差し替える。
  *
@@ -41,14 +41,16 @@ class AssignWishlistController extends Controller
 
     public function index()
     {
-        $monthStart = Carbon::create(2026, 7, 1)->startOfDay();
-        $monthEnd = Carbon::create(2026, 7, 31)->endOfDay();
+        // 対象月＝今日の当月（当月の1日〜末日）。period は '2026-07' の形の月キー。
+        $period = Carbon::today()->format('Y-m');
+        $monthStart = Carbon::today()->startOfMonth();
+        $monthEnd = Carbon::today()->endOfMonth();
 
         // 案件ID → date_type（本番のみ数えるため）。
         $projectType = Project::pluck('date_type', 'id');
 
         // スタッフごとに一度だけ材料を引いておく（人数分のクエリを避ける）。
-        $prefByStaff = ShiftPreference::where('period', '2026-07')->available()->get()->groupBy('staff_id');
+        $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
         $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
         $posByStaff = StaffRoleEligibility::all()->groupBy('staff_id');
 

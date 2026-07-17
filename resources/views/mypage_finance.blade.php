@@ -77,7 +77,7 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">案件一覧は登録済みのデータ（DB）から表示しています。収支を入力できるのは<b>自分がディレクター（D）または営業担当の案件</b>です。項目は雛型「東京アサイン表」の収支シートに合わせています。入力の保存は準備中で、今はこのブラウザにだけ記憶されます（本番はMTG後）。<a class="back-link" href="/mypage">← マイページに戻る</a></div>
+      <div class="mock-note">案件一覧は登録済みのデータ（DB）から表示しています。収支を入力できるのは<b>自分がディレクター（D）または営業担当の案件</b>です。項目は雛型「東京アサイン表」の収支シートに合わせています。入力した収支は<b>保存されます</b>（開き直すと前回の入力が復元されます）。<a class="back-link" href="/mypage">← マイページに戻る</a></div>
 
       <!-- 案件を選ぶ -->
       <div class="panel mp-wrap">
@@ -113,6 +113,13 @@
           </tfoot>
         </table>
 
+        <!-- メモ（この案件の収支についての補足。保存されます） -->
+        <div style="margin-top:14px;">
+          <label for="memoInput" style="display:block; font-size:13px; font-weight:700; margin-bottom:5px;">メモ（任意）</label>
+          <textarea id="memoInput" rows="2" placeholder="この案件の収支についての補足があれば入力"
+            style="width:100%; max-width:640px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13.5px; font-family:inherit; box-sizing:border-box;"></textarea>
+        </div>
+
         <div class="save-row">
           <button class="btn primary" onclick="saveCase()">この案件の収支を保存する</button>
           <span class="saved-ping" id="savedPing">✓ 保存しました</span>
@@ -134,6 +141,10 @@
   window.MY_ASSIGN_DB = @json($myAssign ?? null);
   window.ECS_CASES_DB = @json($cases ?? null);
   window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
+  // 保存済みの収支（案件ID→{revenue, items, memo}）。案件を選ぶとこの値で各欄を復元する。
+  window.ECS_FINANCES = @json($finances ?? new stdClass);
+  // 保存（POST）に必要な合言葉（CSRFトークン）。他画面と同じ ECS_CSRF を使う。
+  window.ECS_CSRF = @json(csrf_token());
   if (window.ECS_CASES_DB && window.ECS_CASES_DB.length) { window.ECS_CASES = window.ECS_CASES_DB; }
 </script>
 @verbatim
@@ -310,8 +321,14 @@
     }
     document.getElementById('caseSub').textContent = fmtDate(c.off) + '　/　' + role + '　/　必要人数 ' + (c.need||'—') + '名';
 
-    const f = loadStore()[id] || {};
+    // 保存済みの収支は「サーバの値」が正（開き直しても残る）。
+    // サーバに無い案件だけ、これまでのブラウザ記憶（localStorage）を使う。
+    const srv = (window.ECS_FINANCES && window.ECS_FINANCES[id]) || null;
+    const f = srv
+      ? { rev: srv.revenue, items: srv.items || {}, memo: srv.memo || '' }
+      : (loadStore()[id] || {});
     document.getElementById('revInput').value = f.rev || '';
+    document.getElementById('memoInput').value = f.memo || '';
     // 当日スタッフ費の「仮の数量」＝案件の運営人数（DB）。まだ保存が無い案件だけ自動で入れる（手で変更可）。
     // 実施形態に合う行に入れる（オンライン→staff_online／リアルロング→staff_long／それ以外→staff_real）。
     const staffKey = c.fmt === 'online' ? 'staff_online' : (c.fmt === 'long' ? 'staff_long' : 'staff_real');
@@ -330,10 +347,10 @@
     recalc();
   }
 
-  function saveCase(){
+  async function saveCase(){
     const id = document.getElementById('caseSelect').value;
     if (!id) return;
-    const store = loadStore();
+    // 画面の入力を集める（売上・各経費行の数量/金額・メモ）。
     const items = {};
     COST_ITEMS.forEach(it => {
       const tr = document.querySelector('#costBody tr[data-key="'+it.key+'"]');
@@ -344,11 +361,35 @@
         items[it.key] = { amount: Number(tr.querySelector('[data-role="amount-input"]').value || 0) };
       }
     });
-    store[id] = { rev: Number(document.getElementById('revInput').value || 0), items };
+    const revenue = Number(document.getElementById('revInput').value || 0);
+    const memo = document.getElementById('memoInput').value;
+
+    // これまでのブラウザ記憶も残しておく（保険）。ただし正はサーバの値。
+    const store = loadStore();
+    store[id] = { rev: revenue, items, memo };
     saveStore(store);
-    const ping = document.getElementById('savedPing');
-    ping.classList.add('show');
-    setTimeout(() => ping.classList.remove('show'), 2000);
+
+    // サーバへ本物保存（共有DB）。合言葉（CSRF）を付けて送る。
+    try {
+      const res = await fetch('/mypage-finance/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': window.ECS_CSRF,
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ project_id: id, revenue, items, memo }),
+      });
+      if (!res.ok) throw new Error('save failed: ' + res.status);
+      // 保存できたら、画面が持っている「保存済み収支」も最新に更新しておく。
+      if (!window.ECS_FINANCES) window.ECS_FINANCES = {};
+      window.ECS_FINANCES[id] = { revenue, items, memo };
+      const ping = document.getElementById('savedPing');
+      ping.classList.add('show');
+      setTimeout(() => ping.classList.remove('show'), 2000);
+    } catch (e) {
+      alert('保存に失敗しました。通信状況を確認して、もう一度お試しください。');
+    }
   }
 
   function onMonthChange(){

@@ -22,7 +22,7 @@ use Illuminate\Support\Carbon;
  *  ・通算＝people.experience_count。区分（新人/中堅/ベテラン）は通算から画面側で判定。
  *  ・活性度＝対象月の希望日数 ÷ 対象月の本番開催日数（50%↑=アクティブ/30%↑=準/未満=非）。
  *
- * 対象月は当面 2026-07 固定（運用ではアサインMTGの対象月）。
+ * 対象月は「今日の当月」（例：7月に開けば2026-07。運用ではアサインMTGの対象月）。
  */
 class StaffStatusController extends Controller
 {
@@ -38,8 +38,10 @@ class StaffStatusController extends Controller
     public function buildStatus()
     {
         $today = Carbon::today();
-        $monthStart = Carbon::create(2026, 7, 1)->startOfDay();
-        $monthEnd = Carbon::create(2026, 7, 31)->endOfDay();
+        // 対象月＝今日の当月（当月の1日〜末日）。period は '2026-07' の形の月キー。
+        $period = $today->format('Y-m');
+        $monthStart = $today->copy()->startOfMonth();
+        $monthEnd = $today->copy()->endOfMonth();
 
         // 案件ID → date_type（本番/予備日/リハ等）。回数は本番のみ数えるため。
         $projectType = Project::pluck('date_type', 'id');
@@ -54,7 +56,7 @@ class StaffStatusController extends Controller
         // キャンセルされたアサインは数えない（/assign・マイページ・スタッフ画面と同じ扱いにそろえる）。
         // ここだけ全件を数えていると、同じ人の稼働数・連勤・選ばれた率が他画面とズレるため。
         $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
-        $prefByStaff = ShiftPreference::where('period', '2026-07')->available()->get()->groupBy('staff_id');
+        $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
         $appsByStaff = Application::all()->groupBy('staff_id');
 
         $status = Person::staff()->orderByDesc('experience_count')->get()

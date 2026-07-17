@@ -19,15 +19,17 @@ use Illuminate\Support\Facades\DB;
  *  ・直近の確定アサイン（確定したものを案件ごと・確定日時の新しい順）
  *
  * 稼働率・希望日数の定義は稼働状況（StaffStatusController）と同じものを使い、画面間で数字がブレないようにする。
- * 対象月は当面 2026-07 固定（アサインMTGの対象月）。
+ * 対象月は「今日の当月」（例：7月に開けば2026-07）。運用ではアサインMTGの対象月にあたる。
  */
 class AssignDashboardController extends Controller
 {
     public function index()
     {
         $today = Carbon::today();
-        $monthStart = Carbon::create(2026, 7, 1)->startOfDay();
-        $monthEnd = Carbon::create(2026, 7, 31)->endOfDay();
+        // 対象月＝今日の当月（当月の1日〜末日）。period は '2026-07' の形の月キー。
+        $period = $today->format('Y-m');
+        $monthStart = $today->copy()->startOfMonth();
+        $monthEnd = $today->copy()->endOfMonth();
 
         // 案件ごとの「決まっている人数」＝assignments のうちキャンセル以外の実人数（同じ人が
         // 複数日に出ても1人と数える）。案件IDごとに一度だけ集計して引けるようにする。
@@ -100,7 +102,7 @@ class AssignDashboardController extends Controller
         // ── 数値サマリ：希望0件 ＆ 平均稼働率 ＆ 要注意スタッフ ──────────────
         // 稼働状況画面と同じ定義：稼働率＝今月の本番アサイン数 ÷ 対象月の希望日数（希望0件は対象外）。
         $assignsByStaff = Assignment::all()->groupBy('staff_id');
-        $prefByStaff = ShiftPreference::where('period', '2026-07')->available()->get()->groupBy('staff_id');
+        $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
 
         $rates = [];
         $zeroPrefCount = 0;

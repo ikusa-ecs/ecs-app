@@ -343,7 +343,7 @@
           <span class="saved-msg" id="ntSaved">✓ 保存しました</span>
         </div>
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
-          ※ 通知の届け方（メール／チャットワーク等）は今後決めます。今はオン・オフだけ記憶します。
+          ※ 通知の届け方（メール／チャットワーク等）は今後決めます。オン・オフの設定は保存されます。
         </p>
       </div>
 
@@ -403,6 +403,10 @@
   window.ECS_ME = @json($me);
   window.MY_ASSIGN_DB = @json($myAssign);
   window.ECS_CASES_DB = @json($cases);
+  // 通知設定（自分の people.notify_settings。無ければ全オフ）。ロード時のトグル復元に使う。
+  window.ECS_NOTIFY = @json($notify);
+  // 保存（POST /mypage/notify）で使う合言葉（CSRFトークン）。
+  window.ECS_CSRF = '{{ csrf_token() }}';
   // 役割コード（D/SD/MC…）→ 表示ラベル（「D（ディレクター）」等）の正本。暗号表示を避けるため。
   window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
   if (window.ECS_CASES_DB && window.ECS_CASES_DB.length) { window.ECS_CASES = window.ECS_CASES_DB; }
@@ -746,23 +750,36 @@
     if (av && nm) av.textContent = Array.from(nm)[0];
   }
 
-  // 通知設定（個人ごと・このブラウザに記憶。本番はサーバ保存＝MTG後）
-  const NOTIFY_KEY = 'ecs_emp_notify';
-  const NOTIFY_IDS = ['ntFollow', 'ntAssign', 'ntDeadline'];
+  // 通知設定（個人ごと・サーバ（DB）に保存されます）。画面の3つのトグルと保存用のキー名を対応づける。
+  // ntFollow=フォロー所感 / ntAssign=アサイン確定 / ntDeadline=締切間近。
+  const NOTIFY_MAP = { ntFollow: 'follow', ntAssign: 'assign', ntDeadline: 'deadline' };
   function loadNotify() {
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}'); } catch (e) {}
-    NOTIFY_IDS.forEach(id => {
+    // サーバから渡った自分の設定でトグルを復元。無ければ全オフ。
+    const saved = window.ECS_NOTIFY || {};
+    Object.keys(NOTIFY_MAP).forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.checked = (id in saved) ? !!saved[id] : true;   // 既定はすべてオン
+      if (el) el.checked = !!saved[NOTIFY_MAP[id]];
     });
   }
   function saveNotify() {
-    const sel = {};
-    NOTIFY_IDS.forEach(id => { const el = document.getElementById(id); if (el) sel[id] = el.checked; });
-    try { localStorage.setItem(NOTIFY_KEY, JSON.stringify(sel)); } catch (e) {}
-    const msg = document.getElementById('ntSaved');
-    if (msg) { msg.style.display = 'inline'; setTimeout(() => { msg.style.display = 'none'; }, 2500); }
+    // 画面の状態を集めてサーバ（POST /mypage/notify）へ保存する。
+    const payload = {};
+    Object.keys(NOTIFY_MAP).forEach(id => {
+      const el = document.getElementById(id);
+      payload[NOTIFY_MAP[id]] = el ? el.checked : false;
+    });
+    fetch('/mypage/notify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': window.ECS_CSRF || ''
+      },
+      body: JSON.stringify(payload)
+    }).then(r => r.json()).then(() => {
+      const msg = document.getElementById('ntSaved');
+      if (msg) { msg.style.display = 'inline'; setTimeout(() => { msg.style.display = 'none'; }, 2500); }
+    }).catch(() => { alert('保存に失敗しました。時間をおいて、もう一度お試しください。'); });
   }
 
   fillProfile();

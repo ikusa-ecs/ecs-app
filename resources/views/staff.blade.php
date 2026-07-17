@@ -159,14 +159,14 @@
 
       <!-- ===================== 稼働状況タブ ===================== -->
       <div class="pane" id="pane-work">
-      <div class="mock-note">稼働率・連勤・選ばれた率・ご無沙汰・活性度は、登録済みのアサイン・希望・応募データ（DB）から計算して表示しています（対象月＝2026年7月）。データが無い場合は下の見本値を表示します。<br>※「気にかけたい人」のまとめは<b>アサインダッシュボード</b>に移動しました。</div>
+      <div class="mock-note">稼働率・連勤・選ばれた率・ご無沙汰・活性度は、登録済みのアサイン・希望・応募データ（DB）から計算して表示しています（対象月＝{{ now()->format('Y年n月') }}）。データが無い場合は下の見本値を表示します。<br>※「気にかけたい人」のまとめは<b>アサインダッシュボード</b>に移動しました。</div>
 
       <!-- 数値カード -->
       <div class="grid cols-4" style="margin-bottom:20px;">
         <div class="stat">
           <div class="label">今月のアサイン総数</div>
           <div class="value" id="cTotal">0</div>
-          <div class="sub">2026年7月</div>
+          <div class="sub">{{ now()->format('Y年n月') }}</div>
         </div>
         <div class="stat">
           <div class="label">平均稼働率</div>
