@@ -84,6 +84,9 @@
     .e-stat { font-size:11.5px; font-weight:600; }
     .e-stat.assigned { color:#3d7a45; }
     .e-stat.waiting  { color:#a08a73; }
+    .ent-note { font-size:12px; color:#6b5a48; max-width:180px; }
+    .ent-remark { font-family:inherit; font-size:12px; padding:2px 6px; border:1px solid #d8c8b6; border-radius:6px; width:150px; background:#fff; }
+    .ent-remark:focus { outline:2px solid var(--brand-soft); border-color:var(--brand); }
 
     /* 月ごと */
     .month-group { margin-bottom:24px; }
@@ -290,7 +293,8 @@
     render();
   }
 
-  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s){ return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
   // 絞り込みを通すか
   function passFilter(c){
@@ -361,6 +365,10 @@
           <td><span class="e-lv ${e.lv}">${lvLabel[e.lv]}</span></td>
           <td>${posTag(e.pos)}</td>
           <td><span class="e-stat ${e.assigned?'assigned':'waiting'}">${e.assigned?'✓ アサイン済み':'エントリー中'}</span></td>
+          <td class="ent-note">${e.entryNote ? esc(e.entryNote) : '<span class="muted">—</span>'}</td>
+          <td>${e.assigned
+            ? `<input class="ent-remark" value="${escAttr(e.remark||'')}" placeholder="担当メモ" title="アサインの備考と同じ（他のアサイン画面と同期します）" onchange="saveEntryMemo('${c.id}','${e.id}', this.value)">`
+            : '<span class="muted" style="font-size:11px;">アサインすると記入</span>'}</td>
         </tr>`).join('');
       return `
         <div class="ecase" id="ent-${c.id}">
@@ -377,7 +385,7 @@
             <span class="c${shortCls}">アサイン済み <b>${Math.min(c.filled,c.need)}</b>名</span>
           </div>
           <table class="ent-table">
-            <thead><tr><th>No</th><th>名前</th><th>区分</th><th>できるポジション</th><th>状態</th></tr></thead>
+            <thead><tr><th>No</th><th>名前</th><th>区分</th><th>できるポジション</th><th>状態</th><th>本人メモ</th><th>担当メモ</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`;
@@ -496,6 +504,23 @@
         + `<div class="mtx-wrap"><table class="mtx">${head}${body}${foot}</table></div>`
         + `</div>`;
     }).join('');
+  }
+
+  // 案件ごとタブの「担当メモ」＝アサインの備考(remark)と同じもの。/entries/assign(quickToggle)で remark だけ更新。
+  // これで日別ボード・ピックアップ・アサイン画面の備考と同期する（アサイン済みの人だけ記入可）。
+  function saveEntryMemo(pid, sid, val){
+    const src = (window.ECS_ENTRIES_CASES && window.ECS_ENTRIES_CASES.length) ? window.ECS_ENTRIES_CASES : window.ECS_CASES;
+    const c = src.find(x => String(x.id) === String(pid));
+    const e = c && Array.isArray(c.entrants) ? c.entrants.find(x => String(x.id) === String(sid)) : null;
+    const status = (e && e.status) ? e.status : '確定';
+    fetch(window.ECS_ASSIGN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept':'application/json' },
+      body: JSON.stringify({ project_id: pid, staff_id: sid, action: 'assign', remark: val, status: status })
+    })
+    .then(r => r.json())
+    .then(res => { if (res && res.ok){ if (e) e.remark = val; } else { alert((res && res.message) || '担当メモの保存に失敗しました。'); } })
+    .catch(() => alert('通信エラーで担当メモを保存できませんでした。'));
   }
 
   // ===== 月ごとの表：セルをクリックしてアサイン↔解除（A案・即保存） =====

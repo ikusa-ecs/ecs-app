@@ -384,18 +384,20 @@ class AssignBoardController extends Controller
 
         $projectIds = $projects->pluck('id');
 
-        // 応募（applications）＝この案件に「エントリーする」を出した人。
-        $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
-        // 確定/仮アサイン（assignments・キャンセル除く）＝アサイン済みかの判定に使う。status も取る。
+        // 応募（applications）＝この案件に「エントリーする」を出した人。note＝本人が応募時に書いた一言。
+        $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id', 'note']);
+        // 確定/仮アサイン（assignments・キャンセル除く）＝アサイン済みかの判定に使う。status・remark(担当メモ)も取る。
         $assignedRows = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'status']);
+            ->get(['project_id', 'staff_id', 'status', 'remark']);
 
         $people = $this->peopleWithPos(
             $apps->pluck('staff_id')->merge($assignedRows->pluck('staff_id'))->unique()->all()
         );
 
         $appsByProject = $apps->groupBy('project_id');
+        // 案件×人 → 本人の応募メモ（applications.note）。
+        $noteByProject = $apps->groupBy('project_id')->map(fn ($rows) => $rows->pluck('note', 'staff_id')->all());
         $assignedByProject = $assignedRows->groupBy('project_id')
             ->map(fn ($rows) => $rows->pluck('staff_id')->unique()->all());
         // 案件×人 → アサイン状態（'確定'/'仮'）。同じ人に複数行あれば確定を優先。
@@ -409,16 +411,29 @@ class AssignBoardController extends Controller
 
             return $map;
         });
+        // 案件×人 → 担当メモ（assignments.remark）。アサイン画面等と同じ備考＝同期して表示・編集する。
+        $remarkByProject = $assignedRows->groupBy('project_id')->map(function ($rows) {
+            $map = [];
+            foreach ($rows as $r) {
+                if ($r->remark !== null && $r->remark !== '') {
+                    $map[$r->staff_id] = $r->remark;
+                }
+            }
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $people) {
+            return $map;
+        });
+
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
+            $entryNotes = $noteByProject->get($p->id, []);         // [staff_id => 本人の応募メモ]
+            $remarks = $remarkByProject->get($p->id, []);          // [staff_id => 担当メモ(remark)]
             $off = $this->offDays($p->start_date ?? $today, $today);
 
-            // 応募者リスト（applications → 表示用 {no, name, lv, pos, assigned, status}）。
+            // 応募者リスト（applications → 表示用 {no, name, lv, pos, assigned, status, entryNote, remark}）。
             $entrants = ($appsByProject->get($p->id) ?? collect())
                 ->pluck('staff_id')->unique()->values()
-                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus) {
+                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks) {
                     $person = $people->get($sid);
 
                     return [
@@ -430,6 +445,8 @@ class AssignBoardController extends Controller
                         'roleCode' => $this->primaryPosCode($person), // 保存用の役割コード（D/OP/…）
                         'assigned' => in_array($sid, $assignedIds, true),
                         'status' => $assignedStatus[$sid] ?? null,   // '確定'/'仮'/null（未アサイン）
+                        'entryNote' => $entryNotes[$sid] ?? '',      // 本人が応募時に書いた一言（読むだけ）
+                        'remark' => $remarks[$sid] ?? '',            // 担当メモ＝アサインの備考(remark)と同期
                     ];
                 })->all();
 
