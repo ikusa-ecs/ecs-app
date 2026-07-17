@@ -44,6 +44,8 @@
       min-width: 130px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
       padding: 5px 7px; font-family: inherit; font-size: 12.5px; color: var(--ink); cursor: pointer;
     }
+    /* 兼任（サブ役割）：主役割の下に小さく。選ぶと枠を2つ埋める */
+    .role2-sel { margin-top: 4px; font-size: 11.5px; color: #7a6a58; min-width: 130px; }
     /* 担当メモ・巡回数の入力（.role-sel と同じ雰囲気で・縦に並べる） */
     .rp-cell { display: flex; flex-direction: column; gap: 4px; }
     .note-in, .patrol-in {
@@ -52,6 +54,10 @@
     }
     .note-in { width: 140px; }
     .patrol-in { width: 70px; }
+    .remark-in {
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      padding: 5px 7px; font-family: inherit; font-size: 12.5px; color: var(--ink); width: 170px;
+    }
     table.tbl td.chk { width: 36px; text-align: center; }
     table.tbl input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--brand); cursor: pointer; }
     .ng-note { color: var(--danger); font-size: 11.5px; }
@@ -238,8 +244,9 @@
               <th>区分</th>
               <th>できる役割</th>
               <th class="num">経験</th>
-              <th>この案件での役割</th>
+              <th>この案件での役割<span style="display:block; font-weight:400; font-size:10.5px; color:var(--muted);">選ぶと自動でアサイン</span></th>
               <th>担当・巡回</th>
+              <th>備考（一言）</th>
               <th>NG</th>
             </tr>
           </thead>
@@ -292,6 +299,13 @@
                       <option value="{{ $k }}" {{ ($ex['role'] ?? '') === $k ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                   </select>
+                  {{-- 兼任（サブ役割）：1人が2役こなす場合（D兼OP等）。枠は主役割＋兼任の両方に+1で数える --}}
+                  <select name="role2[{{ $s['id'] }}]" class="role-sel role2-sel" title="兼任（サブ役割）＝1人で2役こなす場合に選ぶ">
+                    <option value="">＋兼任なし</option>
+                    @foreach ($roleLabels as $k => $label)
+                      <option value="{{ $k }}" {{ ($ex['role2'] ?? '') === $k ? 'selected' : '' }}>兼 {{ $label }}</option>
+                    @endforeach
+                  </select>
                 </td>
                 <td>
                   {{-- 担当メモ（軍師/サポ等）と巡回数：フォーム内なので input を置くだけで save() が保存する --}}
@@ -301,11 +315,15 @@
                   </div>
                 </td>
                 <td>
+                  {{-- 人ごとの一言（自由記入）。フォーム内なので input を置くだけで save() が保存する --}}
+                  <input type="text" name="remark[{{ $s['id'] }}]" class="remark-in" placeholder="例）昼から/初参加でフォロー" value="{{ $existing[$s['id']]['remark'] ?? '' }}">
+                </td>
+                <td>
                   @if (count($s['ng']))<span class="ng-note">NG: {{ implode('、', $s['ng']) }}</span>@endif
                 </td>
               </tr>
             @empty
-              <tr><td colspan="9" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
+              <tr><td colspan="10" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
             @endforelse
           </tbody>
         </table>
@@ -369,9 +387,11 @@
   function updatePositions() {
     const counts = {};
     checkedRows().forEach(tr => {
-      const sel = tr.querySelector('select.role-sel');
-      const r = sel ? sel.value : '';
+      // 主役割＋兼任（サブ役割）の両方を枠に数える＝1人で2役カバーを反映。
+      const r = (tr.querySelector('select.role-sel:not(.role2-sel)') || {}).value || '';
       if (r) counts[r] = (counts[r] || 0) + 1;
+      const r2 = (tr.querySelector('select.role2-sel') || {}).value || '';
+      if (r2) counts[r2] = (counts[r2] || 0) + 1;
     });
     document.querySelectorAll('.pos-slot').forEach(slot => {
       const role = slot.dataset.role;
@@ -396,9 +416,17 @@
     ngPairs();          // NGペアの警告も更新
     updatePositions();  // ポジション枠の現在数も更新
   }
-  // 役割セレクトを変えたときも枠を数え直す（チェックはそのまま）。
+  // 役割を選んだら＝その人を自動でアサイン（チェックを付ける）。「役割＝アサイン」で1アクション化。
+  // ※役割なしでアサインしたいとき（ポジション枠の無い案件・役割未定で先に押さえる等）は、
+  //   従来どおりチェックだけでOK。役割を「—」に戻してもチェックは自動では外さない（誤操作防止）。
   document.querySelectorAll('select.role-sel').forEach(sel => {
-    sel.addEventListener('change', updatePositions);
+    sel.addEventListener('change', function () {
+      if (this.value) {
+        const cb = this.closest('.staff-row')?.querySelector('input[name="staff_ids[]"]');
+        if (cb) cb.checked = true;
+      }
+      updateCount();   // 選択数・枠の現在数・NG警告をまとめて更新
+    });
   });
   function filterStaff() {
     const q = document.getElementById('staffSearch').value.trim();

@@ -163,6 +163,14 @@
       border: 1px solid var(--brand); border-radius: 6px; width: 66px; }
     .m-patrol-inp { flex: 0 0 auto; font-family: inherit; font-size: 10.5px; padding: 1px 4px;
       border: 1px solid var(--brand); border-radius: 6px; width: 42px; }
+    /* メンバー行の兼任（サブ役割）バッジ */
+    .m-kenin { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+      background: #efe7fb; color: #6d28d9; white-space: nowrap; }
+    /* メンバー行の備考（一言）。控えめなグレーで表示・編集中は入力 */
+    .m-remark { font-size: 10.5px; color: #6b7280; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 150px; }
+    .m-remark-inp { flex: 0 0 auto; font-family: inherit; font-size: 10.5px; padding: 1px 4px;
+      border: 1px solid var(--brand); border-radius: 6px; width: 100px; }
 
     /* カード内：割当メンバー／希望者の折りたたみ（雛形の「名前／P」に対応） */
     .cc-members { margin-top: 2px; }
@@ -349,7 +357,7 @@
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。
-      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, status:m.status, note:m.note, patrol:m.patrol }))
+      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, roleCode2:m.roleCode2, status:m.status, note:m.note, patrol:m.patrol, remark:m.remark }))
     }));
 
   // 各日の「稼働可スタッフ数」（仮）。off → その日に稼働可と出している人数。
@@ -451,11 +459,15 @@
     if (ECS_BOARD) {
       const byName = {};
       dayCases.forEach(c => (c.applicants || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { name:a.name, lv:a.lv, pos:a.pos, applied:[], cal:false });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false });
+        if (a.id && !e.id) e.id = a.id;                 // id を取りこぼさない（DB保存に必要）
+        if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
         if (!e.applied.includes(c.id)) e.applied.push(c.id);
       }));
       ((window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[off]) || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { name:a.name, lv:a.lv, pos:a.pos, applied:[], cal:false });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false });
+        if (a.id && !e.id) e.id = a.id;
+        if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
         e.cal = true;
       });
       return Object.values(byName);
@@ -519,24 +531,59 @@
     );
   }
 
-  // 自動アサイン（モック）＝希望者プールから、同じ日にかぶらない人を必要数ぶん埋める
+  // 自動アサイン＝希望者から、同じ日にかぶらない人を必要数ぶん埋める。
+  // DBボード（ECS_BOARD）＝この案件の実際の希望者（id付き）から選び、1人ずつ本物のアサインとして保存する
+  //   ＝追加後すぐ担当/巡回/備考を編集できる。見本フォールバックのときだけ従来の合成プールを使う。
   function autoAssign(id){
     const c = cases.find(x => x.id === id);
     if (!c) return;
     if (filledOf(c) >= c.need) { alert('この案件はすでに必要人数を満たしています。'); return; }
     const taken  = takenSameDay(c);
     const amap   = assignmentMap();
-    // かぶる人・今月の上限(20件)に達した人を除外して選ぶ
+    const already = new Set(c.assigned.map(m => m.name));
+    const room = c.need - filledOf(c);   // 追加できる残り枠
+
+    if (ECS_BOARD) {
+      // この案件の希望者（応募＋当日稼働可）＝id付き。すでにメンバー・同日かぶり・今月上限は除く。
+      const dayCases = cases.filter(z => z.off === c.off);
+      const pool = dayPeople(c.off, dayCases)
+        .filter(p => p.applied.includes(c.id) || p.cal)
+        .filter(p => p.id && !already.has(p.name) && !taken.has(p.name) && monthCountOf(p.name, amap) < MONTH_CAP);
+      const picked = pool.slice(0, room);
+      if (c.state === 'todo') c.state = 'adj';
+      picked.forEach(p => {
+        const rc = p.roleCode || '';
+        const posLabel = (window.ECS_ROLE_OPTIONS || {})[rc] || p.pos || rc;
+        c.assigned.push({ id: p.id, name: p.name, lv: (p.lv || '-'), pos: posLabel, roleCode: rc, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: 'staff' });
+        fetch(window.ECS_QUICK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+          body: JSON.stringify({ project_id: c.id, staff_id: p.id, action: 'assign', role: rc, status: '仮' })
+        }).then(r => r.json()).then(res => { if (!(res && res.ok)) render(); }).catch(() => render());
+      });
+      render();
+      const total = filledOf(c);
+      if (picked.length === 0) {
+        alert('⚡ 自動で足せる希望者がいませんでした。\n（この案件の希望者が、すでにメンバー／同日かぶり／今月上限のいずれかです）\n→「手動編集」で名簿・社員・派遣から足してください。');
+      } else if (total < c.need) {
+        alert('⚡ 自動アサインしました（希望者から ' + picked.length + '名）。\n必要 ' + c.need + '名に ' + (c.need - total) + '名 不足しています。\n→「手動編集」で名簿・社員・派遣を足して補ってください。');
+      } else {
+        alert('⚡ 自動アサインしました（希望者から ' + picked.length + '名）。\n「' + c.name + '」の必要人数を満たしました。担当や備考はこのあと手動編集で入れられます。');
+      }
+      return;
+    }
+
+    // 見本フォールバック（DBでない）＝従来の合成プールから（保存はしない飾り）。
     const picked = candPool(c)
       .filter(m => !taken.has(m.name) && monthCountOf(m.name, amap) < MONTH_CAP)
       .slice(0, c.need);
     c.assigned = picked.map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:'staff' }));
-    if (c.state === 'todo') c.state = 'adj';    // 未着手 → 調整中へ
+    if (c.state === 'todo') c.state = 'adj';
     render();
     if (picked.length < c.need) {
-      alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に ' + picked.length + '名を割り当てました。\n同じ日の他案件とのかぶり、または今月のアサイン上限(' + MONTH_CAP + '件)で対象外になった人がいて、必要 ' + c.need + '名に ' + (c.need - picked.length) + '名 不足しています。\n→「手動編集」で社員・派遣を足して補ってください。');
+      alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に ' + picked.length + '名を割り当てました（必要 ' + c.need + '名に ' + (c.need - picked.length) + '名 不足）。');
     } else {
-      alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に希望者から ' + c.need + '名を割り当てました（同じ日の他案件とかぶらないよう調整済み）。');
+      alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に希望者から ' + c.need + '名を割り当てました。');
     }
   }
   // メンバーを外す
@@ -546,8 +593,12 @@
     c.assigned.splice(idx, 1);
     render();
   }
-  // 希望者をメンバーに入れる（同じ日に他案件とかぶる場合は確認）
-  function addCandidate(caseId, name, lv, pos){
+  // 希望者をメンバーに入れる（同じ日に他案件とかぶる場合は確認）。
+  // id があれば（DBボード）＝本物のアサインとして quickToggle で保存し、担当/巡回/備考も編集できる形で足す。
+  // id が無いとき（見本フォールバック）は従来どおり簡易表示のまま。
+  function addCandidate(caseId, id, name, lv, pos, roleCode){
+    name = decodeURIComponent(name || '');
+    pos = decodeURIComponent(pos || '');
     const c = cases.find(x => x.id === caseId);
     if (!c) return;
     if (c.assigned.some(m => m.name === name)) { alert(name + ' さんはすでにこの案件のメンバーに入っています。'); return; }
@@ -559,7 +610,27 @@
     if (mc >= MONTH_CAP) {
       if (!confirm(name + ' さんは今月のアサインがすでに上限の ' + MONTH_CAP + '件 に達しています（現在 ' + mc + '件）。\n過重労働防止のための上限を超えます。それでも追加しますか？')) return;
     }
-    c.assigned.push({ name, lv, pos, type:'staff' });
+
+    if (!id) {   // 見本フォールバック（id なし）＝従来どおり簡易表示
+      c.assigned.push({ name, lv, pos, type:'staff' });
+      render();
+      return;
+    }
+
+    // 本物のアサイン：id・roleCode・status を持たせる＝追加直後から担当/巡回/備考を編集・保存できる。
+    const rc = roleCode || '';
+    const posLabel = (window.ECS_ROLE_OPTIONS || {})[rc] || pos || rc;
+    const m = { id: id, name: name, lv: (lv || '-'), pos: posLabel, roleCode: rc, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: 'staff' };
+    c.assigned.push(m);
+    if (c.state === 'todo') c.state = 'adj';
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: id, action: 'assign', role: rc, status: '仮' })
+    })
+      .then(r => r.json())
+      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); } })
+      .catch(() => { alert('通信エラーでメンバー追加を保存できませんでした。'); });
     render();
   }
   // ===== ボード上で完結：確定・公開 =====
@@ -643,7 +714,7 @@
     const roleCode = isEmp ? ((pp.dexp && pp.dexp.length) ? 'D' : 'FC') : firstPosCodeOf(pp.pos);
     const posLabel = (window.ECS_ROLE_OPTIONS || {})[roleCode] || roleCode;
     // id・roleCode・status を持たせる＝追加直後から担当/巡回を編集・保存できる（id が無いと入力欄が出ない）。
-    const m = { id: pp.id, name: pp.name, lv: (isEmp ? '-' : ECS_lvOf(pp)), pos: posLabel, roleCode: roleCode, note: '', patrol: null, status: '仮', type: (isEmp ? 'emp' : 'staff') };
+    const m = { id: pp.id, name: pp.name, lv: (isEmp ? '-' : ECS_lvOf(pp)), pos: posLabel, roleCode: roleCode, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: (isEmp ? 'emp' : 'staff') };
     c.assigned.push(m);
     // 追加した時点で assignments に「仮」で保存する（見本ではなく本物のアサインにする）。
     fetch(window.ECS_QUICK_URL, {
@@ -699,6 +770,19 @@
     if (!found && current) html = `<option value="${current}" selected>${opts[current] || label}</option>` + html;
     return `<select class="m-pos-sel" title="ポジションを変更（選ぶと保存されます）" onchange="changeMemberPos('${c.id}','${m.id}', this.value)">${html}</select>`;
   }
+  // メンバーの兼任（サブ役割）欄。1人が2役こなす場合に選ぶ。手動編集中で id があればプルダウン、それ以外はバッジ表示。
+  function role2CellHtml(c, m){
+    const opts = window.ECS_ROLE_OPTIONS || {};
+    if (!editing.has(c.id) || !m.id){
+      return (m.roleCode2) ? `<span class="m-kenin" title="兼任">兼${escHtml(opts[m.roleCode2] || m.roleCode2)}</span>` : '';
+    }
+    const cur = m.roleCode2 || '';
+    let html = `<option value="">＋兼任なし</option>`;
+    for (const code in opts){
+      html += `<option value="${code}"${code === cur ? ' selected' : ''}>兼${opts[code]}</option>`;
+    }
+    return `<select class="m-pos-sel m-kenin-sel" title="兼任（サブ役割）＝1人で2役こなす場合に選ぶ（選ぶと保存されます）" onchange="changeMemberRole2('${c.id}','${m.id}', this.value)">${html}</select>`;
+  }
 
   // メンバーの担当メモ欄。手動編集中でスタッフIDがあれば入力（datalistで候補）、それ以外は表示のみ。
   function noteCellHtml(c, m){
@@ -715,6 +799,14 @@
     }
     const v = (m.patrol != null && m.patrol !== '') ? m.patrol : '';
     return `<input class="m-patrol-inp" type="number" min="0" placeholder="巡回" value="${v}" title="巡回数（入力すると保存されます）" onchange="changeMemberPatrol('${c.id}','${m.id}', this.value)">`;
+  }
+  // メンバーの備考（一言）欄。手動編集中でスタッフIDがあれば入力、それ以外は一言があれば表示。
+  function remarkCellHtml(c, m){
+    if (!editing.has(c.id) || !m.id) {
+      return (m.remark && String(m.remark).trim()) ? `<span class="m-remark" title="備考：${escHtml(m.remark)}">✎ ${escHtml(m.remark)}</span>` : '';
+    }
+    const v = m.remark ? escHtml(m.remark) : '';
+    return `<input class="m-remark-inp" placeholder="一言" value="${v}" title="備考（一言・入力すると保存されます）" onchange="changeMemberRemark('${c.id}','${m.id}', this.value)">`;
   }
 
   // ポジション変更を assignments に保存（エントリー一覧と同じ quickToggle を再利用）。状態(仮/確定)は維持する。
@@ -737,6 +829,24 @@
         }
       })
       .catch(() => { alert('通信エラーでポジションを保存できませんでした。'); render(); });
+  }
+
+  // 兼任（サブ役割）を assignments に保存。空欄なら解除（null）。状態は維持。
+  function changeMemberRole2(caseId, staffId, roleCode2){
+    const c = cases.find(z => z.id === caseId);
+    const m = c && c.assigned.find(x => x.id === staffId);
+    const status = (m && m.status) ? m.status : '確定';
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: staffId, action: 'assign', role2: roleCode2, status: status })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok){ if (m) m.roleCode2 = roleCode2; }
+        else { alert('兼任の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); render(); }
+      })
+      .catch(() => { alert('通信エラーで兼任を保存できませんでした。'); render(); });
   }
 
   // 担当メモ（軍師・サポ等）を assignments に保存。役割変更(changeMemberPos)と同じ quickToggle を使う。状態は維持。
@@ -774,6 +884,24 @@
         else { alert('巡回数の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); render(); }
       })
       .catch(() => { alert('通信エラーで巡回数を保存できませんでした。'); render(); });
+  }
+
+  // 備考（一言）を assignments に保存。他と同じ quickToggle を使う。状態は維持。
+  function changeMemberRemark(caseId, staffId, remark){
+    const c = cases.find(z => z.id === caseId);
+    const m = c && c.assigned.find(x => x.id === staffId);
+    const status = (m && m.status) ? m.status : '確定';
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: staffId, action: 'assign', remark: remark, status: status })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok){ if (m) m.remark = remark; }
+        else { alert('備考の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); render(); }
+      })
+      .catch(() => { alert('通信エラーで備考を保存できませんでした。'); render(); });
   }
 
   // 希望者一覧を別ウィンドウで開く
@@ -933,7 +1061,7 @@
         ? `<span class="renkin-badge ${dayN >= 4 ? 'hi' : ''}" title="連勤の内訳（この期間に ${dayN}日ぶん）：\n${renkinList}">連${dayN}日</span>`
         : '';
       const capb = m.type === 'staff' ? capBadge(m.name, amap) : '';
-      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${posCellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
+      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
     const memCol =
       `<div class="cc-col">
@@ -950,7 +1078,7 @@
       const st = candStatus(p);
       const statTag = picked ? '<span class="cstat done">✓ アサイン済み</span>' : st.tag;
       const rowCls  = picked ? 'picked' : st.cls;
-      const addBtn = (editMode && !picked) ? `<span class="c-add" title="メンバーに入れる" onclick="addCandidate('${c.id}','${p.name}','${p.lv}','${p.pos}')">＋</span>` : '';
+      const addBtn = (editMode && !picked) ? `<span class="c-add" title="メンバーに入れる" onclick="addCandidate('${c.id}','${p.id||''}','${encodeURIComponent(p.name)}','${p.lv}','${encodeURIComponent(p.pos||'')}','${p.roleCode||''}')">＋</span>` : '';
       return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${statTag}${addBtn}</div>`;
     }).join('');
     const candCol =

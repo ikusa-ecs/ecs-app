@@ -127,12 +127,14 @@
 
     /* メンバー行を編集できるように（役割・担当メモ・巡回を横並び／折り返し可） */
     .pk-mem.pk-mem-edit { flex-wrap:wrap; }
-    .pk-mem-role, .pk-mem-note, .pk-mem-patrol {
+    .pk-mem-role, .pk-mem-role2, .pk-mem-note, .pk-mem-patrol, .pk-mem-remark {
       border:1px solid #d8c8b6; border-radius:6px; padding:2px 6px; font-size:12px; color:#3a2d20; background:#fff;
     }
     .pk-mem-role { min-width:74px; }
+    .pk-mem-role2 { min-width:74px; color:#6d28d9; }
     .pk-mem-note { width:100px; }
     .pk-mem-patrol { width:54px; }
+    .pk-mem-remark { width:130px; }
 
     /* 案件の備考（見落とし防止で目立たせる・折り返しOK） */
     .pk-case-note {
@@ -317,16 +319,17 @@
         // DBの案件＝現メンバー（役割・担当メモ・巡回・状態つき）をそのまま初期値に。
         rosters[c.id] = c.members.map(m => ({
           id: entId(m), name: m.name,
-          roleCode: m.roleCode || '', note: m.note || '',
+          roleCode: m.roleCode || '', roleCode2: m.roleCode2 || '', note: m.note || '',
           patrol: (m.patrol != null ? m.patrol : null),
+          remark: m.remark || '',
           status: m.status || '仮',
         }));
       } else {
         // 見本（c.membersが無い）＝先頭 filled 名を仮メンバー化（保存対象外の飾り）。
         rosters[c.id] = entrantsOf(c).slice(0, c.filled).map(e => ({
           id: entId(e), name: e.name,
-          roleCode: e.roleCode || e.pos || '', note: '',
-          patrol: null, status: '仮',
+          roleCode: e.roleCode || e.pos || '', roleCode2: '', note: '',
+          patrol: null, remark: '', status: '仮',
         }));
       }
     }
@@ -353,7 +356,7 @@
         id: key,
         name: e ? e.name : key,
         roleCode: e ? (e.roleCode || e.pos || '') : '',
-        note: '', patrol: null, status: '仮',
+        roleCode2: '', note: '', patrol: null, remark: '', status: '仮',
       });
     }
     renderList();
@@ -362,7 +365,9 @@
 
   // メンバー行の編集をrosterに反映（再描画しない＝入力中のフォーカスを保つため）。
   function setMemRole(caseId, id, val){ const m = findMem(caseId, id); if (m) m.roleCode = val; }
+  function setMemRole2(caseId, id, val){ const m = findMem(caseId, id); if (m) m.roleCode2 = val; }
   function setMemNote(caseId, id, val){ const m = findMem(caseId, id); if (m) m.note = val; }
+  function setMemRemark(caseId, id, val){ const m = findMem(caseId, id); if (m) m.remark = val; }
   function setMemPatrol(caseId, id, val){
     const m = findMem(caseId, id); if (!m) return;
     const n = parseInt(val, 10);
@@ -379,6 +384,13 @@
       `<option value="${escAttr(code)}" ${code === m.roleCode ? 'selected' : ''}>${esc(label)}</option>`).join('');
     return `<select class="pk-mem-role" onchange="setMemRole('${escAttr(caseId)}','${escAttr(m.id)}',this.value)">`
       + `<option value="">役割</option>${opts}</select>`;
+  }
+  // 兼任（サブ役割）セレクト＝1人で2役こなす場合に選ぶ。
+  function role2SelectHtml(caseId, m){
+    const opts = Object.entries(window.ECS_ROLE_OPTIONS || {}).map(([code, label]) =>
+      `<option value="${escAttr(code)}" ${code === m.roleCode2 ? 'selected' : ''}>兼${esc(label)}</option>`).join('');
+    return `<select class="pk-mem-role2" title="兼任（サブ役割）" onchange="setMemRole2('${escAttr(caseId)}','${escAttr(m.id)}',this.value)">`
+      + `<option value="">＋兼任なし</option>${opts}</select>`;
   }
 
   // 選択状態
@@ -557,12 +569,16 @@
           <div class="pk-mem pk-mem-edit ${isMulti ? 'multi' : ''}">
             <span class="m-name">${esc(m.name)}${isMulti ? '<span class="multi-flag">複数日</span>' : ''}</span>
             ${roleSelectHtml(c.id, m)}
+            ${role2SelectHtml(c.id, m)}
             <input type="text" class="pk-mem-note" list="pk-note-list" placeholder="担当メモ"
                    value="${escAttr(m.note)}"
                    onchange="setMemNote('${escAttr(c.id)}','${escAttr(m.id)}',this.value)">
             <input type="number" class="pk-mem-patrol" min="0" placeholder="巡回"
                    value="${m.patrol != null ? m.patrol : ''}"
                    onchange="setMemPatrol('${escAttr(c.id)}','${escAttr(m.id)}',this.value)">
+            <input type="text" class="pk-mem-remark" placeholder="備考（一言）"
+                   value="${escAttr(m.remark)}"
+                   onchange="setMemRemark('${escAttr(c.id)}','${escAttr(m.id)}',this.value)">
             <span class="m-spacer"></span>
             <button class="pk-btn remove" onclick="toggleMember('${escAttr(c.id)}','${escAttr(m.id)}')">× 外す</button>
           </div>`;
@@ -642,7 +658,7 @@
     const payload = {
       project_id: c.id,
       members: roster.map(m => ({
-        staff_id: m.id, role: m.roleCode, note: m.note, patrol: m.patrol, status: m.status,
+        staff_id: m.id, role: m.roleCode, role2: m.roleCode2, note: m.note, patrol: m.patrol, remark: m.remark, status: m.status,
       })),
     };
 

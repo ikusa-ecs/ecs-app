@@ -102,8 +102,10 @@ class AssignBoardController extends Controller
             'members' => ['nullable', 'array'],
             'members.*.staff_id' => ['required', 'string'],
             'members.*.role' => ['nullable', 'string'],
+            'members.*.role2' => ['nullable', 'string'],
             'members.*.note' => ['nullable', 'string'],
             'members.*.patrol' => ['nullable'],
+            'members.*.remark' => ['nullable', 'string'],
             'members.*.status' => ['nullable', 'in:仮,確定'],
         ]);
 
@@ -133,13 +135,16 @@ class AssignBoardController extends Controller
 
                 $note = trim((string) ($m['note'] ?? ''));
                 $patrolRaw = $m['patrol'] ?? null;
+                $remark = trim((string) ($m['remark'] ?? ''));
                 Assignment::create([
                     'project_id' => $project->id,
                     'staff_id' => $sid,
                     'date' => $date,
                     'role' => AssignmentRole::isValid($m['role'] ?? null) ? $m['role'] : '',
+                    'role2' => AssignmentRole::isValid($m['role2'] ?? null) ? $m['role2'] : null,
                     'note' => $note === '' ? null : mb_substr($note, 0, 100),
                     'patrol' => (is_numeric($patrolRaw) && (int) $patrolRaw >= 0) ? (int) $patrolRaw : null,
+                    'remark' => $remark === '' ? null : mb_substr($remark, 0, 200),
                     'status' => ($m['status'] ?? '仮') === '確定' ? '確定' : '仮',
                     'assigned_by' => null,
                     'assigned_at' => $now,
@@ -188,7 +193,7 @@ class AssignBoardController extends Controller
         // この案件群の割当（キャンセル以外）。
         $assignments = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
+            ->get(['project_id', 'staff_id', 'role', 'role2', 'status', 'note', 'patrol', 'remark']);
 
         // この案件群への応募（applications）＝希望者カラムの元。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
@@ -222,8 +227,10 @@ class AssignBoardController extends Controller
                         'lv' => '-',   // 経験レベルは希望者カラム用。メンバー行では未表示。
                         'pos' => self::POS_LABELS[$a->role] ?? ($a->role ?: '—'),
                         'roleCode' => $a->role ?: '',  // 保存用の役割コード（プルダウンの初期選択）
+                        'roleCode2' => $a->role2 ?: '', // 兼任（サブ役割）
                         'note' => $a->note ?? '',      // 担当メモ（軍師/サポ 等）
                         'patrol' => $a->patrol,        // 巡回数（数値／null）
+                        'remark' => $a->remark ?? '',  // 備考（一言・自由記入）
                         'status' => $a->status,        // 仮/確定（保存時に維持する）
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
                     ];
@@ -238,9 +245,11 @@ class AssignBoardController extends Controller
                     $person = $people->get($sid);
 
                     return [
+                        'id' => $sid,                                   // DB保存に使う（希望者→メンバー化）
                         'name' => $person->name ?? $sid,
                         'lv' => $this->lvCode(optional($person)->skill_level),
                         'pos' => $this->primaryPos($person),
+                        'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
                     ];
                 })->all();
 
@@ -314,9 +323,11 @@ class AssignBoardController extends Controller
             $off = $this->offDays($pref->date, $anchor);
             $person = $people->get($pref->staff_id);
             $out[$off][] = [
+                'id' => $pref->staff_id,                        // DB保存に使う（希望者→メンバー化）
                 'name' => $person->name ?? $pref->staff_id,
                 'lv' => $this->lvCode(optional($person)->skill_level),
                 'pos' => $this->primaryPos($person),
+                'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
             ];
         }
 
@@ -466,7 +477,7 @@ class AssignBoardController extends Controller
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
         $assignedRows = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
+            ->get(['project_id', 'staff_id', 'role', 'role2', 'status', 'note', 'patrol', 'remark']);
 
         $staffIds = $apps->pluck('staff_id')->merge($assignedRows->pluck('staff_id'))->unique();
         $people = $this->peopleWithPos($staffIds->all());
@@ -488,8 +499,10 @@ class AssignBoardController extends Controller
             foreach ($rows as $r) {
                 $map[$r->staff_id] = [
                     'roleCode' => $r->role ?: '',
+                    'roleCode2' => $r->role2 ?: '',
                     'note' => $r->note ?? '',
                     'patrol' => $r->patrol,
+                    'remark' => $r->remark ?? '',
                     'status' => $r->status,
                 ];
             }
@@ -530,9 +543,11 @@ class AssignBoardController extends Controller
                         'id' => $sid,
                         'name' => optional($people->get($sid))->name ?? $sid,
                         'roleCode' => $info['roleCode'] ?? '',
+                        'roleCode2' => $info['roleCode2'] ?? '',
                         'pos' => self::POS_LABELS[$info['roleCode'] ?? ''] ?? ($info['roleCode'] ?? ''),
                         'note' => $info['note'] ?? '',
                         'patrol' => $info['patrol'] ?? null,
+                        'remark' => $info['remark'] ?? '',
                         'status' => $info['status'] ?? '仮',
                     ];
                 })
