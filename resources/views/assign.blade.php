@@ -555,10 +555,15 @@
 
     if (ECS_BOARD) {
       // この案件の希望者（応募＋当日稼働可）＝id付き。すでにメンバー・同日かぶり・今月上限は除く。
+      // 重複防止は「id」でも見る（同姓同名や表記ゆれでも二重アサインしないため）。
+      const assignedIds = new Set(c.assigned.map(m => m.id).filter(Boolean));
       const dayCases = cases.filter(z => z.off === c.off);
+      const seenPick = new Set();   // このクリック内で同じ人を2回入れない
       const pool = dayPeople(c.off, dayCases)
         .filter(p => p.applied.includes(c.id) || p.cal)
-        .filter(p => p.id && !already.has(p.name) && !taken.has(p.name) && monthCountOf(p.name, amap) < MONTH_CAP);
+        .filter(p => p.id && !assignedIds.has(p.id) && !already.has(p.name) && !taken.has(p.name)
+                     && monthCountOf(p.name, amap) < MONTH_CAP)
+        .filter(p => { if (seenPick.has(p.id)) return false; seenPick.add(p.id); return true; });
       const picked = pool.slice(0, room);
       if (c.state === 'todo') c.state = 'adj';
       // 基本1案件につきDは1名。すでにDがいる／2人目以降のDは役割を付けずに追加（あとで手動指定）。

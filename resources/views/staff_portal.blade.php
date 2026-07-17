@@ -677,9 +677,15 @@
       body.append('action', willApply ? 'apply' : 'cancel');
       if (willApply) { body.append('intent', '希望'); body.append('note', note); }
 
-      // 先に画面を反映
+      // 先に画面を反映。エントリーした瞬間にメモ（コメント）欄を開いて、その場で一言添えられるようにする。
       j.state = willApply ? 'applied' : 'open';
+      if (willApply) {
+        commentState[j.id] = commentState[j.id] || { text: '', open: false };
+        commentState[j.id].open = true;
+      }
       renderJobs();
+      // 稼働希望カレンダーの「★エントリー中」も、リロードを待たずその場で反映する。
+      if (typeof refreshEntryDay === 'function') refreshEntryDay(j, willApply);
 
       fetch('/staff-portal/entry', {
         method: 'POST',
@@ -750,32 +756,39 @@
     const PREF_M = parseInt(_pp[1], 10);
     // 本人がDBに保存済みの希望（date "Y-M-D" => ok/ng/maybe）。無ければ空＝全部「未定」で開く。
     const savedPrefs = window.ECS_MY_PREFS || {};
+    // 1つの日セルを「編集可（終日〇→NG→未定を切替）」に描く。保存済み希望を初期状態に。
+    function paintEditable(cell, d) {
+      cell.className = 'cell';
+      let s = 0; // 0=未定,1=稼働可,2=NG
+      const pv = savedPrefs[PREF_Y + '-' + PREF_M + '-' + d];
+      if (pv === 'ok') s = 1; else if (pv === 'ng') s = 2;
+      cell.dataset.state = s;
+      cell.innerHTML = '<div>' + d + '</div><div class="st"></div>';
+      applyCellState(cell);
+      cell.onclick = () => {
+        cell.dataset.state = (parseInt(cell.dataset.state) + 1) % 3;
+        applyCellState(cell);
+      };
+    }
+    // 確定アサインのある日＝イベント（押して変更できない）。
+    function paintEvent(cell, d, title) {
+      cell.className = 'cell s-event';
+      delete cell.dataset.state; cell.onclick = null;
+      cell.title = '確定アサイン：' + title;
+      cell.innerHTML = '<div>' + d + '</div><div class="st">イベント</div>';
+    }
+    // エントリー中の案件がある日＝★（押して変更できない）。
+    function paintEntry(cell, d, title) {
+      cell.className = 'cell s-entry';
+      delete cell.dataset.state; cell.onclick = null;
+      cell.title = 'エントリー中：' + title;
+      cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>';
+    }
     for (let d = 1; d <= 31; d++) {
       const cell = document.createElement('div');
-      cell.className = 'cell';
-      if (eventDays[d]) {
-        // 確定アサインのある日＝イベント（押して変更できない）
-        cell.classList.add('s-event');
-        cell.title = '確定アサイン：' + eventDays[d];
-        cell.innerHTML = '<div>' + d + '</div><div class="st">イベント</div>';
-      } else if (entryDays[d]) {
-        // エントリー中の案件がある日＝★（押して変更できない）
-        cell.classList.add('s-entry');
-        cell.title = 'エントリー中：' + entryDays[d];
-        cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>';
-      } else {
-        let s = 0; // 0=未定,1=稼働可,2=NG
-        const pv = savedPrefs[PREF_Y + '-' + PREF_M + '-' + d];
-        if (pv === 'ok') s = 1;
-        else if (pv === 'ng') s = 2;
-        cell.dataset.state = s;
-        cell.innerHTML = '<div>' + d + '</div><div class="st"></div>';
-        applyCellState(cell);
-        cell.addEventListener('click', () => {
-          cell.dataset.state = (parseInt(cell.dataset.state) + 1) % 3;
-          applyCellState(cell);
-        });
-      }
+      if (eventDays[d]) paintEvent(cell, d, eventDays[d]);
+      else if (entryDays[d]) paintEntry(cell, d, entryDays[d]);
+      else paintEditable(cell, d);
       grid.appendChild(cell);
     }
     // 保存済みのコメントを反映
@@ -788,6 +801,35 @@
       if (s === 1) { cell.classList.add('s-ok'); label.textContent = '終日〇'; }
       else if (s === 2) { cell.classList.add('s-ng'); label.textContent = 'NG'; }
       else { label.textContent = ''; }
+    }
+    // 日番号から該当セルを探す（先頭の空セルは除く）。
+    function dayCellByNum(n) {
+      let found = null;
+      document.querySelectorAll('#calGrid .cell').forEach(cell => {
+        if (cell.classList.contains('empty')) return;
+        const dv = cell.querySelector('div');
+        if (dv && parseInt(dv.textContent, 10) === n) found = cell;
+      });
+      return found;
+    }
+    // エントリーのオン/オフを、リロードを待たずカレンダーへ即反映する（★エントリー中）。
+    function inPrefMonth(dt) { return dt.getFullYear() === PREF_Y && (dt.getMonth() + 1) === PREF_M; }
+    function refreshEntryDay(j, applied) {
+      const dt = ECS_caseDate(j.offset);
+      if (!inPrefMonth(dt)) return;                 // 表示中の月の日だけ
+      const d = dt.getDate();
+      const cell = dayCellByNum(d);
+      if (!cell || cell.classList.contains('s-event')) return;   // 確定アサイン日は触らない
+      if (applied) {
+        entryDays[d] = j.content + ' ' + j.client;
+        paintEntry(cell, d, entryDays[d]);
+      } else {
+        // 同じ日にまだ別のエントリーが残っていれば★は消さない
+        const other = jobs.find(x => x !== j && x.state === 'applied'
+          && (() => { const od = ECS_caseDate(x.offset); return inPrefMonth(od) && od.getDate() === d; })());
+        if (other) { entryDays[d] = other.content + ' ' + other.client; paintEntry(cell, d, entryDays[d]); }
+        else { delete entryDays[d]; paintEditable(cell, d); }
+      }
     }
 
     // 確定アサインの案件をタップ → 案件の詳細ページへ（※遷移先は未定。決まったらここでURLを設定）
