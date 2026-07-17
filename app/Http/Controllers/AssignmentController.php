@@ -27,6 +27,9 @@ class AssignmentController extends Controller
     // 月間アサイン上限（過重労働防止・一律20件／設計書11章F）。超えても保存はできる＝警告のみ。
     private const MONTH_CAP = 20;
 
+    // 「できる役割」バッジに出すコード＝D・MC・OP・軍師(SP/GUN)のみ（FC/CK/受付は全員できる等で非表示）。
+    private const CAN_SHOWN = ['D', 'SD', 'MC', 'OP', 'SP', 'GUN'];
+
     // ※ 役割コード／ラベルの正本は App\Support\AssignmentRole（別表記を作らないため一本化）。
 
     /** アサイン画面（案件1件＋スタッフ名簿＋保存済みアサインを渡す）。 */
@@ -137,7 +140,9 @@ class AssignmentController extends Controller
             ->get()
             ->map(function (Person $p) use ($wish, $scorer) {
                 $can = $p->roleEligibilities->pluck('position')->all();
-                $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $can);
+                // 「できる役割」バッジは D・MC・OP・軍師 だけ表示（FC・CK等は全員できるので出さない／baba 2026-07-17）。
+                $canShown = array_values(array_filter($can, fn ($k) => in_array($k, self::CAN_SHOWN, true)));
+                $posLabels = array_map(fn ($k) => AssignmentRole::label($k), $canShown);
                 $eval = $scorer->evaluate($p);
 
                 return [

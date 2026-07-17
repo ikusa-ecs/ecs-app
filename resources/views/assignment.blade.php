@@ -483,10 +483,11 @@
       // ポジション枠がある案件：役割ごとに、その役割ができるおすすめ上位で埋める
       slots.forEach(slot => {
         const role = slot.dataset.role;
-        const need = parseInt(slot.dataset.need || '0', 10);
+        // 基本1案件につきDは1名＝Dだけは枠の必要数に関わらず上限1で自動配置する。
+        const need = (role === 'D') ? Math.min(1, parseInt(slot.dataset.need || '0', 10)) : parseInt(slot.dataset.need || '0', 10);
         let cur = 0;
         used.forEach(tr => {
-          const sel = tr.querySelector('select.role-sel');
+          const sel = tr.querySelector('select.role-sel:not(.role2-sel)');
           if (sel && sel.value === role) cur++;
         });
         for (const tr of rows) {
@@ -495,7 +496,7 @@
           const canDo = (tr.dataset.pos || '').split('|').filter(Boolean);
           if (!canDo.includes(role)) continue;   // その役割ができない人は飛ばす
           const cb = tr.querySelector('input[name="staff_ids[]"]');
-          const sel = tr.querySelector('select.role-sel');
+          const sel = tr.querySelector('select.role-sel:not(.role2-sel)');
           if (cb) cb.checked = true;
           if (sel) sel.value = role;
           used.add(tr);

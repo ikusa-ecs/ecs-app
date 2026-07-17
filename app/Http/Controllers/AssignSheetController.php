@@ -31,7 +31,8 @@ class AssignSheetController extends Controller
     ];
 
     /** メンバーを並べる優先順（Excelの並び＝D→SD→MC→OP→…に合わせる）。 */
-    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'SP', 'FC', 'RP', 'CK'];
+    // メンバーの並び順＝上から D → (SD) → MC → OP → FC → CK → 軍師/サポ(SP/GUN) → 受付(RP/UKE)。
+    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'FC', 'CK', 'SP', 'GUN', 'RP', 'UKE'];
 
     /** 曜日（日本語）。0=日 〜 6=土。 */
     private const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];

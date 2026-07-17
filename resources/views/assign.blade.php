@@ -418,7 +418,17 @@
     });
   }
   function filledOf(c){ return c.assigned.length; }
-  function buildMembers(c){ return c.assigned; }
+  // メンバーの並び順＝上から D → (SD) → MC → OP → FC → CK → 軍師/サポ → 受付 → その他。
+  const ECS_ROLE_RANK = { D:0, SD:1, MC:2, OP:3, FC:4, CK:5, SP:6, GUN:6, RP:7, UKE:7 };
+  function roleRank(code){ return (code && (code in ECS_ROLE_RANK)) ? ECS_ROLE_RANK[code] : 99; }
+  // 表示用にソートしたコピーを返す（c.assigned 自体は触らない＝削除は id で行う）。
+  function buildMembers(c){
+    return c.assigned.slice().sort((a, b) => {
+      const d = roleRank(a.roleCode) - roleRank(b.roleCode);
+      if (d !== 0) return d;
+      return roleRank(a.roleCode2) - roleRank(b.roleCode2);   // 主役割が同じなら兼任で並べる
+    });
+  }
   function typeBadge(type){
     if (type === 'emp')   return '<span class="m-type emp">社員</span>';
     if (type === 'haken') return '<span class="m-type haken">派遣</span>';
@@ -551,8 +561,11 @@
         .filter(p => p.id && !already.has(p.name) && !taken.has(p.name) && monthCountOf(p.name, amap) < MONTH_CAP);
       const picked = pool.slice(0, room);
       if (c.state === 'todo') c.state = 'adj';
+      // 基本1案件につきDは1名。すでにDがいる／2人目以降のDは役割を付けずに追加（あとで手動指定）。
+      let dCount = c.assigned.filter(m => m.roleCode === 'D').length;
       picked.forEach(p => {
-        const rc = p.roleCode || '';
+        let rc = p.roleCode || '';
+        if (rc === 'D') { if (dCount >= 1) rc = ''; else dCount++; }
         const posLabel = (window.ECS_ROLE_OPTIONS || {})[rc] || p.pos || rc;
         c.assigned.push({ id: p.id, name: p.name, lv: (p.lv || '-'), pos: posLabel, roleCode: rc, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: 'staff' });
         fetch(window.ECS_QUICK_URL, {
@@ -586,12 +599,23 @@
       alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に希望者から ' + c.need + '名を割り当てました。');
     }
   }
-  // メンバーを外す
-  function removeMember(caseId, idx){
+  // メンバーを外す（id基準＝並び替えの影響を受けない）。本物のアサイン（id有）はDBからも外す。
+  function removeMember(caseId, key){
     const c = cases.find(x => x.id === caseId);
     if (!c) return;
-    c.assigned.splice(idx, 1);
+    key = decodeURIComponent(key || '');
+    const i = c.assigned.findIndex(m => String(m.id || m.name) === key);
+    if (i < 0) return;
+    const m = c.assigned[i];
+    c.assigned.splice(i, 1);
     render();
+    if (m.id) {   // DBに保存済みのメンバーは assignments からも削除する
+      fetch(window.ECS_QUICK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+        body: JSON.stringify({ project_id: caseId, staff_id: m.id, action: 'unassign' })
+      }).then(r => r.json()).then(res => { if (!(res && res.ok)) render(); }).catch(() => render());
+    }
   }
   // 希望者をメンバーに入れる（同じ日に他案件とかぶる場合は確認）。
   // id があれば（DBボード）＝本物のアサインとして quickToggle で保存し、担当/巡回/備考も編集できる形で足す。
@@ -1043,7 +1067,7 @@
     const members = buildMembers(c);
     const memRows = members.map((m, i) => {
       const dup = dupNames.has(m.name) ? 'dup' : '';
-      const x = editMode ? `<span class="m-x" title="外す" onclick="removeMember('${c.id}',${i})">×</span>` : '';
+      const x = editMode ? `<span class="m-x" title="外す" onclick="removeMember('${c.id}','${encodeURIComponent(m.id||m.name)}')">×</span>` : '';
       // 連勤（この期間に何日ぶん出ているか）を1個のまとめバッジで表示。
       // 案件ごとの細かいタグ（旧xcase）はやめて、行を短く保つ。同日かぶりは名前の⚠(dup)で警告する。
       // バッジにカーソルを合わせると「どの日・どの案件か」の内訳が出る（title属性）。
