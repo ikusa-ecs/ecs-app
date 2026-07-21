@@ -2,6 +2,7 @@
 
 namespace App\Auth;
 
+use App\Models\Person;
 use App\Support\TestAccounts;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -22,7 +23,12 @@ class PersonUserProvider extends EloquentUserProvider
     public function retrieveById($identifier)
     {
         if ($account = TestAccounts::findById($identifier)) {
-            return TestAccounts::toPerson($account);   // DBに触れない
+            // savable＝保存もするテスト（実在の people 行を返す＝応募・希望が本当に保存される）。
+            if (! empty($account['savable'])) {
+                return Person::find($account['id']) ?? TestAccounts::toPerson($account);
+            }
+
+            return TestAccounts::toPerson($account);   // それ以外は DBに触れない見本
         }
 
         return parent::retrieveById($identifier);
@@ -32,7 +38,12 @@ class PersonUserProvider extends EloquentUserProvider
     public function retrieveByCredentials(array $credentials)
     {
         if ($account = TestAccounts::findByEmail($credentials['email'] ?? null)) {
-            return TestAccounts::toPerson($account);   // DBに触れない
+            // savable＝保存もするテスト（実在の people 行を返す）。
+            if (! empty($account['savable'])) {
+                return Person::find($account['id']) ?? TestAccounts::toPerson($account);
+            }
+
+            return TestAccounts::toPerson($account);   // それ以外は DBに触れない見本
         }
 
         return parent::retrieveByCredentials($credentials);

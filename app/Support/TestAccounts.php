@@ -65,6 +65,19 @@ class TestAccounts
                 'permission'   => 'staff',
                 'must_onboard' => true,        // ← 初期設定がまだ＝初回セットアップへ誘導
             ],
+            // ── 保存もされるスタッフ用（B案）──
+            //   実在するスタッフ S-900（TestLoginSeeder で投入）に、2段階認証なしの一発ログイン。
+            //   savable=true のときは「テストだが実DBに保存する」＝応募・稼働希望が本当に残る。
+            //   スタッフに配って「押すだけ」で、実際に応募・希望提出まで動作確認してもらう用。
+            [
+                'id'         => 'S-900',
+                'name'       => 'テストスタッフ（保存あり）',
+                'email'      => 'test-db-staff@example.com',   // TestLoginSeeder の S-900 と同じ
+                'password'   => 'test',
+                'role'       => 'staff',
+                'permission' => 'staff',
+                'savable'    => true,          // ← 2FAはスキップするが、DB保存はする
+            ],
         ];
     }
 
@@ -131,6 +144,32 @@ class TestAccounts
     public static function isTest(?object $user): bool
     {
         return $user instanceof Person && self::findById($user->getAuthIdentifier()) !== null;
+    }
+
+    /**
+     * その利用者が「保存もするテストアカウント」か（savable=true）。
+     * 一発ログイン（2FAスキップ）しつつ、応募・稼働希望などを実DBに保存させたいときに使う。
+     * 保存の可否を判断する箇所では isTest ではなく「isTest かつ !isSavable のとき保存しない」で判定する。
+     */
+    public static function isSavable(?object $user): bool
+    {
+        if (! $user instanceof Person) {
+            return false;
+        }
+        $account = self::findById($user->getAuthIdentifier());
+
+        return $account !== null && ! empty($account['savable']);
+    }
+
+    /**
+     * その利用者が「DBに触れない見本専用テストアカウント」か。
+     * ＝ テストアカウントだが savable ではない（応募・希望・プロフィール等を保存も読取もしない）。
+     * savable（保存あり・S-900）は実ユーザー扱いなので false になり、保存・読取が通る。
+     * スタッフ画面の保存/読取ゲートは isTest ではなくこの isMockOnly で判定する。
+     */
+    public static function isMockOnly(?object $user): bool
+    {
+        return self::isTest($user) && ! self::isSavable($user);
     }
 
     /** テストアカウントのパスワード照合（平文・固定）。 */

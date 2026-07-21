@@ -118,7 +118,7 @@ class StaffPortalController extends Controller
      */
     private function myProfile($me): ?array
     {
-        if (! $me || TestAccounts::isTest($me)) {
+        if (! $me || TestAccounts::isMockOnly($me)) {
             return null;
         }
 
@@ -153,7 +153,7 @@ class StaffPortalController extends Controller
     public function saveProfile(Request $request)
     {
         $user = Auth::user();
-        if (! $user || TestAccounts::isTest($user)) {
+        if (! $user || TestAccounts::isMockOnly($user)) {
             return response()->json(['ok' => false, 'message' => 'テスト用アカウントは保存できません（見本のため）。']);
         }
 
@@ -184,7 +184,7 @@ class StaffPortalController extends Controller
     public function savePositions(Request $request)
     {
         $user = Auth::user();
-        if (! $user || TestAccounts::isTest($user)) {
+        if (! $user || TestAccounts::isMockOnly($user)) {
             return response()->json(['ok' => false, 'message' => 'テスト用アカウントは保存できません（見本のため）。']);
         }
 
@@ -223,7 +223,7 @@ class StaffPortalController extends Controller
      */
     private function myPrefs($me): array
     {
-        if (! $me || TestAccounts::isTest($me)) {
+        if (! $me || TestAccounts::isMockOnly($me)) {
             return [];
         }
         $map = [];
@@ -243,7 +243,7 @@ class StaffPortalController extends Controller
     /** 希望のコメント（対象月の note を1つ拾う）。 */
     private function myPrefMemo($me, string $period): string
     {
-        if (! $me || TestAccounts::isTest($me)) {
+        if (! $me || TestAccounts::isMockOnly($me)) {
             return '';
         }
         $row = ShiftPreference::where('staff_id', $me->id)
@@ -263,7 +263,7 @@ class StaffPortalController extends Controller
     public function saveAvailability(Request $request)
     {
         $user = Auth::user();
-        if (! $user || TestAccounts::isTest($user)) {
+        if (! $user || TestAccounts::isMockOnly($user)) {
             return response()->json(['ok' => false, 'message' => 'テスト用アカウントは保存できません（見本のため）。']);
         }
 
@@ -340,7 +340,7 @@ class StaffPortalController extends Controller
 
         // テスト用アカウント・未ログインは実DBに本人が居ないので保存しない（見本）。
         // 画面は成功として扱えるよう ok:true を返しつつ saved:false で「保存はしていない」と伝える。
-        if (! $user || TestAccounts::isTest($user)) {
+        if (! $user || TestAccounts::isMockOnly($user)) {
             return response()->json([
                 'ok'      => true,
                 'saved'   => false,
@@ -387,7 +387,7 @@ class StaffPortalController extends Controller
         }
 
         // 本人の応募（案件ID → 行）。テスト/未ログインは空＝応募状態なし。
-        $myApps = ($me && ! TestAccounts::isTest($me))
+        $myApps = ($me && ! TestAccounts::isMockOnly($me))
             ? Application::where('staff_id', $me->id)->get()->keyBy('project_id')
             : collect();
 

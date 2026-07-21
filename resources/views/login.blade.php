@@ -71,11 +71,12 @@
       <p class="mock-entry-label">テスト用ログイン（役割ごと・本番前に外します）</p>
       <p style="text-align:center; font-size:11px; color:var(--muted); margin:-2px 0 10px;">役割によって見える画面が変わります。試したい役割を選んでください。</p>
 
-      {{-- 役割ごとのワンクリック（seedの有無に関係なく必ず入れる版＝App\Support\TestAccounts）。
-           業務画面はDBにデータが入っていれば、この版で入っても中身は表示される。 --}}
+      {{-- 役割ごとのワンクリック（App\Support\TestAccounts）。社員/管理者/Administrator は
+           seedの有無に関係なく必ず入れる見本版。スタッフだけは「保存あり(S-900)」に向けており、
+           応募・稼働希望が実DBに保存される（＝要seed。テストサーバーは投入済み）。 --}}
       @php
         $ecsTestRoles = [
-          ['スタッフ', 'test-staff@ecs.local', '自分の確定アサインだけ'],
+          ['スタッフ', 'test-db-staff@example.com', '応募・稼働希望も本当に保存されます'],
           ['社員', 'test-emp@ecs.local', '業務画面（削除・マスタは不可）'],
           ['管理者', 'test-mgr@ecs.local', '社員＋アカウント発行・名簿取込'],
           ['Administrator', 'test@ecs.local', '全操作（削除・権限・マスタ）'],
@@ -112,7 +113,7 @@
         <div style="margin-top:6px;">
           @php
             $ecsTestRolesDb = [
-              ['スタッフ', 'test-db-staff@example.com'],
+              // スタッフは上の「スタッフで入る」が保存あり(S-900)なので、ここでは重複させない。
               ['社員', 'test-db-emp@example.com'],
               ['管理者', 'test-db-mgr@example.com'],
               ['Administrator', 'test-db@example.com'],
