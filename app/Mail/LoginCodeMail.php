@@ -30,8 +30,9 @@ class LoginCodeMail extends Mailable
 
     public function content(): Content
     {
+        // プレーンテキストのメール（HTMLだと改行がつぶれて1行に見えるため text で送る）。
         return new Content(
-            view: 'emails.login_code',
+            text: 'emails.login_code',
         );
     }
 }
