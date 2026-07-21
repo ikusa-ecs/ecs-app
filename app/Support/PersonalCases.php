@@ -8,6 +8,7 @@ use App\Models\Person;
 use App\Models\Project;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * 「ログイン中の社員（＝自分）」まわりの共通データ組み立て。
@@ -18,13 +19,21 @@ use Illuminate\Support\Collection;
  *   ・自分のアサイン（案件ID → 役割コード）
  * を使えるように、ここに一本化する（データの二重管理を避けるため）。
  *
- * ※認証はMTG後。それまで「自分」は固定（社員 E-007 / baba）。
+ * 「自分」＝ログイン中の本人。認証（ログイン）が入ったので Auth::user() を使う。
+ * 未ログイン時（テスト等）のみ、従来どおり社員 E-007 / baba にフォールバックする。
  */
 class PersonalCases
 {
-    /** ログイン中の社員モデル（認証導入までは E-007／baba に固定）。無ければ null。 */
+    /** ログイン中の本人モデル。未ログイン時のみ E-007／baba にフォールバック。無ければ null。 */
     public static function meModel(): ?Person
     {
+        // ログイン中なら必ずその本人（誰でログインしても自分のデータが出るように）。
+        $user = Auth::user();
+        if ($user instanceof Person) {
+            return $user;
+        }
+
+        // 未ログイン時のフォールバック（従来の見本表示・テスト向け）。
         return Person::where('role', 'employee')
             ->where(fn ($q) => $q->where('id', 'E-007')->orWhere('name', 'baba'))
             ->first();

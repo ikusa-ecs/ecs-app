@@ -27,8 +27,6 @@ class MyPageOwnDataTest extends TestCase
     /** IT-MYP-01：マイページの「自分」はログイン中の本人であること。 */
     public function test_mypage_identifies_the_logged_in_user_as_self(): void
     {
-        $this->markTestSkipped('既知バグ IT-MYP-01：PersonalCases::meModel() が Auth を見ず E-007(baba) 固定。修正後にこの行を削除して有効化する。');
-
         // baba(E-007) と、別の社員（佐藤）を用意し、佐藤でログインする。
         PersonFactory::new()->create(['id' => 'E-007', 'name' => 'baba']);
         $me = PersonFactory::new()->create(['id' => 'E-200', 'name' => '佐藤']);
