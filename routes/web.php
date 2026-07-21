@@ -21,6 +21,7 @@ use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\MyPageFinanceController;
 use App\Http\Controllers\PaperStockController;
 use App\Http\Controllers\PasswordController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonImportController;
 use App\Http\Controllers\ProfileController;
@@ -42,6 +43,14 @@ Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 Route::get('/register', function () {
     return view('register');
 });
+
+// ── パスワード再設定（お忘れの方）＝ログイン前（ゲスト）──
+//   独自実装。メールで再設定リンクを送る（2段階認証のメールコードと同じ SES 基盤）。
+//   送信・保存は total 総当たり対策で軽く throttle をかける。
+Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->name('password.request');
+Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->middleware('throttle:6,1')->name('password.email');
+Route::get('/reset-password', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
+Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1')->name('password.update');
 
 // ── 2段階認証（メールでコード）の入力ページ ──
 //   auth は必要だが twofa/onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。

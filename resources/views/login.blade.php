@@ -27,6 +27,12 @@
     <h1>ログイン</h1>
     <p class="lead">登録済みのメールアドレスとパスワードでログインしてください。</p>
 
+    @if (session('status') === 'password-reset-done')
+      <div style="background:var(--ok-soft, #e7f6ec); color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px;">
+        新しいパスワードを設定しました。新しいパスワードでログインしてください。
+      </div>
+    @endif
+
     @if ($errors->any())
       <div style="background:#fdecec; color:#b91c1c; border:1px solid #f3c0c0; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px;">
         {{ $errors->first() }}
@@ -54,6 +60,10 @@
 
       <button class="btn primary" type="submit" style="width:100%; justify-content:center;">ログイン</button>
     </form>
+
+    <div style="text-align:center; margin-top:12px;">
+      <a href="{{ route('password.request') }}" style="color:var(--muted); font-size:12px; text-decoration:underline;">パスワードをお忘れの方はこちら</a>
+    </div>
 
     {{-- 自己登録は廃止（アカウントは管理者が発行する方針）＝「新規登録」導線は置かない。 --}}
 
