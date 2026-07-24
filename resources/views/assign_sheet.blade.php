@@ -33,6 +33,7 @@
   .t-online { background: #1f9d74; }
   .t-basho  { background: #7a52c9; }
   .t-tokyo  { background: #d9822b; }
+  .t-tohoku { background: #5f8079; }
   .t-help   { background: #0891b2; }
   .t-taiken { background: #be185d; }
   .t-other  { background: #8a7a66; }
@@ -119,6 +120,20 @@
   .mrow .m-patrol { width: 34px; font-size: 10px; padding: 1px 3px; border: 1px solid var(--line);
     border-radius: 5px; font-family: inherit; margin-left: 3px; }
 
+  /* ▼ 案件項目（時間・人数・備考）の編集。編集モードで読み取り表示を入力欄に差し替える。 */
+  .pe-edit { display: none; }
+  .acard.editing .pe-read { display: none; }
+  .acard.editing .pe-edit { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+  /* 空の項目は「編集モードのときだけ」出す（普段は今まで通り、値のある行だけ表示）。 */
+  .acard:not(.editing) .pe-empty { display: none; }
+  /* 編集モードでは進行チェックのチップをクリックで切り替えられる（見た目のヒント）。 */
+  .acard.editing .chips .chip-ck { cursor: pointer; }
+  .pe-in { font-size: 10.5px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 5px;
+    background: #fff; font-family: inherit; width: 52px; color: var(--ink); }
+  .pe-in.num { width: 42px; }
+  .pe-in.wide { width: 100%; }
+  .pe-sep { color: #a89680; font-size: 10px; }
+
   .sheet-empty { padding: 40px; text-align: center; color: #a08a73; }
 </style>
 @endpush
@@ -157,6 +172,7 @@
   <span class="lg"><span class="sw t-online"></span>オンライン</span>
   <span class="lg"><span class="sw t-basho"></span>場所貸し</span>
   <span class="lg"><span class="sw t-tokyo"></span>他拠点⇒東</span>
+  <span class="lg"><span class="sw t-tohoku"></span>東北</span>
   <span class="lg"><span class="sw t-help"></span>ヘルプのみ</span>
   <span class="lg"><span class="sw t-taiken"></span>体験会</span>
   <span class="lg"><span class="sw t-other"></span>その他</span>
@@ -171,34 +187,73 @@
       @php
         $short = $c['need_i'] > 0 && $c['filled'] < $c['need_i'];
 
-        // 値のある項目だけを [ラベル, 値] で積む（空欄の行は出さず、上に詰める）。
-        $rows = [];
-        if ($c['scale'] !== '' || $c['sales'] !== '') $rows[] = ['規模/営業', trim($c['scale'] . '　' . $c['sales'])];
-        if ($c['client'] !== '' || $c['agency'] !== '') $rows[] = ['顧客', $c['client'] . ($c['agency'] !== '' ? '（' . $c['agency'] . '）' : '')];
-        if ($c['operationPlace'] !== '') $rows[] = ['運営場所', $c['operationPlace'] . ($c['isMulti'] ? '（複数開催）' : '')];
-        if ($c['onlineTool'] !== '' || $c['broadcast'] !== '') $rows[] = ['配信', trim($c['onlineTool'] . '　' . $c['broadcast'])];
-        if ($c['meet'] !== '' || $c['leave'] !== '') $rows[] = ['集合/解散', ($c['meet'] !== '' ? $c['meet'] : '—') . ' 〜 ' . ($c['leave'] !== '' ? $c['leave'] : '—')];
-        if ($c['enter'] !== '' || $c['evStart'] !== '' || $c['evEnd'] !== '') $rows[] = ['入/開/終', ($c['enter'] !== '' ? $c['enter'] : '—') . '/' . ($c['evStart'] !== '' ? $c['evStart'] : '—') . '/' . ($c['evEnd'] !== '' ? $c['evEnd'] : '—')];
-        if ($c['guests'] !== '' || $c['teams'] !== '') $rows[] = ['客数/組', ($c['guests'] !== '' ? $c['guests'] . '名' : '') . ($c['teams'] !== '' ? ' ' . $c['teams'] . '組' : '')];
-        // 形式（イベント東(リアル)等）はヘッダーの色つきバッジに一本化＝行では運営人数だけ出す（baba 2026-07-16）。
-        if ($c['need'] !== '') $rows[] = ['運営', $c['need'] . '名'];
-        if ($c['staffRole'] !== '') $rows[] = ['運営方式', $c['staffRole']];
-        if ($c['audio'] !== '') $rows[] = ['音響', $c['audio']];
-        if ($c['location'] !== '') $rows[] = ['会場住所', $c['location']];
-        if ($c['assembly'] !== '' || $c['alcohol'] !== '') $rows[] = ['集合形式', $c['assembly'] . ($c['alcohol'] !== '' ? ' 酒:' . $c['alcohol'] : '')];
-        if ($c['goods'] !== '' || $c['catering'] !== '') $rows[] = ['物品/ケータ', $c['goods'] . ($c['catering'] !== '' ? ' ' . $c['catering'] : '')];
-        if ($c['transport'] !== '') $rows[] = ['移動', $c['transport']];
+        // 各項目を積む。編集できる項目は 'edit'=>true＋'inputs'（欄の指定）を持つ＝編集モードで入力欄に切り替わる。
+        // 空でも常に積み、非編集時は .pe-empty で隠す（上に詰まる）。人の割当（営業/物品/D）はここでは読み取り表示。
         $jisseki = [];
         if ($c['logo'] !== '') $jisseki[] = 'ロゴ:' . $c['logo'];
         if ($c['camera'] !== '') $jisseki[] = 'カメ:' . $c['camera'];
         if ($c['article'] !== '') $jisseki[] = '記事:' . $c['article'];
         if ($c['video'] !== '') $jisseki[] = '動画:' . $c['video'];
-        if ($jisseki) $rows[] = ['実績公開', implode(' ', $jisseki)];
-        if ($c['note'] !== '') $rows[] = ['備考', $c['note']];
+
+        $rows = [
+          ['edit' => true, 'lbl' => '規模/営業',
+            'read' => trim($c['scale'] . '　' . $c['sales']), 'empty' => ($c['scale'] === '' && $c['sales'] === ''),
+            'inputs' => [['f' => 'scale', 'v' => $c['scale'], 'ph' => '規模', 'w' => 'wide']]],
+          ['edit' => true, 'lbl' => '顧客', 'sep' => '／',
+            'read' => $c['client'] . ($c['agency'] !== '' ? '（' . $c['agency'] . '）' : ''), 'empty' => ($c['client'] === '' && $c['agency'] === ''),
+            'inputs' => [['f' => 'client', 'v' => $c['client'], 'ph' => '顧客'], ['f' => 'agency', 'v' => $c['agency'], 'ph' => '代理店']]],
+          ['edit' => true, 'lbl' => '運営場所',
+            'read' => $c['operationPlace'] . ($c['isMulti'] ? '（複数開催）' : ''), 'empty' => ($c['operationPlace'] === ''),
+            'inputs' => [['f' => 'operation_place', 'v' => $c['operationPlace'], 'ph' => '運営場所', 'w' => 'wide'],
+                         ['f' => 'is_multi', 'v' => ($c['isMulti'] ? '1' : '0'), 't' => 'select', 'opts' => ['0' => '単独', '1' => '複数開催']]]],
+          ['edit' => true, 'lbl' => '配信', 'sep' => '／',
+            'read' => trim($c['onlineTool'] . '　' . $c['broadcast']), 'empty' => ($c['onlineTool'] === '' && $c['broadcast'] === ''),
+            'inputs' => [['f' => 'online_tool', 'v' => $c['onlineTool'], 'ph' => 'ツール'], ['f' => 'broadcast', 'v' => $c['broadcast'], 'ph' => '配信']]],
+          ['edit' => true, 'lbl' => '集合/解散', 'sep' => '〜',
+            'read' => ($c['meet'] !== '' ? $c['meet'] : '—') . ' 〜 ' . ($c['leave'] !== '' ? $c['leave'] : '—'), 'empty' => ($c['meet'] === '' && $c['leave'] === ''),
+            'inputs' => [['f' => 'start_time', 'v' => $c['meet'], 'ph' => '集合'], ['f' => 'end_time', 'v' => $c['leave'], 'ph' => '解散']]],
+          ['edit' => true, 'lbl' => '入/開/終', 'sep' => '/',
+            'read' => ($c['enter'] !== '' ? $c['enter'] : '—') . '/' . ($c['evStart'] !== '' ? $c['evStart'] : '—') . '/' . ($c['evEnd'] !== '' ? $c['evEnd'] : '—'),
+            'empty' => ($c['enter'] === '' && $c['evStart'] === '' && $c['evEnd'] === ''),
+            'inputs' => [['f' => 'event_enter_time', 'v' => $c['enter'], 'ph' => '入'], ['f' => 'event_start_time', 'v' => $c['evStart'], 'ph' => '開'], ['f' => 'event_end_time', 'v' => $c['evEnd'], 'ph' => '終']]],
+          ['edit' => true, 'lbl' => '客数/組',
+            'read' => ($c['guests'] !== '' ? $c['guests'] . '名' : '') . ($c['teams'] !== '' ? ' ' . $c['teams'] . '組' : ''), 'empty' => ($c['guests'] === '' && $c['teams'] === ''),
+            'inputs' => [['f' => 'guest_count', 'v' => $c['guests'], 't' => 'number', 'w' => 'num', 'ph' => '客', 'suf' => '名'], ['f' => 'team_count', 'v' => $c['teams'], 't' => 'number', 'w' => 'num', 'ph' => '組', 'suf' => '組']]],
+          ['edit' => true, 'lbl' => '運営',
+            'read' => ($c['need'] !== '' ? $c['need'] . '名' : ''), 'empty' => ($c['need'] === ''),
+            'inputs' => [['f' => 'required_count', 'v' => $c['need'], 't' => 'number', 'w' => 'num', 'ph' => '人数', 'suf' => '名']]],
+          ['edit' => true, 'lbl' => '運営方式',
+            'read' => $c['staffRole'], 'empty' => ($c['staffRole'] === ''),
+            'inputs' => [['f' => 'staff_role', 'v' => $c['staffRole'], 'ph' => '運営方式', 'w' => 'wide']]],
+          ['edit' => true, 'lbl' => '音響',
+            'read' => $c['audio'], 'empty' => ($c['audio'] === ''),
+            'inputs' => [['f' => 'audio_equipment', 'v' => $c['audio'], 'ph' => '音響', 'w' => 'wide']]],
+          ['edit' => true, 'lbl' => '会場住所',
+            'read' => $c['location'], 'empty' => ($c['location'] === ''),
+            'inputs' => [['f' => 'location', 'v' => $c['location'], 'ph' => '会場住所', 'w' => 'wide']]],
+          ['edit' => true, 'lbl' => '集合形式', 'sep' => ' ',
+            'read' => $c['assembly'] . ($c['alcohol'] !== '' ? ' 酒:' . $c['alcohol'] : ''), 'empty' => ($c['assembly'] === '' && $c['alcohol'] === ''),
+            'inputs' => [['f' => 'assembly_type', 'v' => $c['assembly'], 'ph' => '集合形式'],
+                         ['f' => 'alcohol', 'v' => $c['alcohol'], 't' => 'select', 'opts' => ['' => '酒—', '有' => '酒有', '無' => '酒無']]]],
+          ['edit' => true, 'lbl' => '物品/ケータ',
+            'read' => $c['goods'] . ($c['catering'] !== '' ? ' ' . $c['catering'] : ''), 'empty' => ($c['goods'] === '' && $c['catering'] === ''),
+            'inputs' => [['f' => 'catering', 'v' => $c['catering'], 'ph' => 'ケータリング', 'w' => 'wide']]],
+          ['edit' => true, 'lbl' => '移動',
+            'read' => $c['transport'], 'empty' => ($c['transport'] === ''),
+            'inputs' => [['f' => 'transport', 'v' => $c['transport'], 'ph' => '移動', 'w' => 'wide']]],
+          ['edit' => true, 'lbl' => '実績公開', 'sep' => ' ',
+            'read' => implode(' ', $jisseki), 'empty' => ($c['logo'] === '' && $c['camera'] === '' && $c['article'] === '' && $c['video'] === ''),
+            'inputs' => [['f' => 'pub_logo', 'v' => $c['logo'], 'ph' => 'ロゴ'], ['f' => 'pub_camera', 'v' => $c['camera'], 'ph' => 'カメ'], ['f' => 'pub_article', 'v' => $c['article'], 'ph' => '記事'], ['f' => 'pub_video', 'v' => $c['video'], 'ph' => '動画']]],
+          ['edit' => true, 'lbl' => '備考',
+            'read' => $c['note'], 'empty' => ($c['note'] === ''),
+            'inputs' => [['f' => 'note', 'v' => $c['note'], 'ph' => '備考', 'w' => 'wide']]],
+        ];
+        // 担当内訳は自動計算（読み取りのみ）。
         if ($c['roleDetail'] !== '') $rows[] = ['担当内訳', $c['roleDetail']];
         $anyPrep = $c['lineSent'] || $c['handover'] || $c['script'];
       @endphp
       <div class="acard"
+           data-project="{{ $c['id'] }}"
            data-search="{{ mb_strtolower($c['content'] . ' ' . $c['client'] . ' ' . $c['agency']) }}"
            data-short="{{ $short ? '1' : '0' }}">
 
@@ -224,30 +279,54 @@
           </div>
         </div>
 
-        {{-- コンテンツ（見出し・常に出す） --}}
-        <div class="arow hl first"><span class="lbl">案件</span><span class="val">{{ $c['content'] }}</span></div>
+        {{-- コンテンツ（見出し・常に出す）。見出しはコンテンツ名優先で表示、編集は案件名（project_name）を直す。 --}}
+        <div class="arow hl first">
+          <span class="lbl">案件</span>
+          <span class="val pe-read">{{ $c['content'] }}</span>
+          <span class="val pe-edit"><input class="pe-in wide" type="text" value="{{ $c['projectName'] }}" placeholder="案件名" title="案件名（入れると保存）" onchange="ecsSheetSaveProject(this,'project_name',this.value)"></span>
+        </div>
         </div>{{-- /acard-sticky（ここまでが上に貼り付く部分） --}}
 
-        {{-- 値のある項目だけ --}}
+        {{-- 値のある項目だけ（編集できる項目は編集モードで入力欄に切り替わる） --}}
         @foreach ($rows as $r)
-          <div class="arow"><span class="lbl">{{ $r[0] }}</span><span class="val">{{ $r[1] }}</span></div>
+          @if (isset($r['edit']))
+            <div class="arow pe-row {{ $r['empty'] ? 'pe-empty' : '' }}">
+              <span class="lbl">{{ $r['lbl'] }}</span>
+              <span class="val pe-read">{{ $r['read'] !== '' ? $r['read'] : '—' }}</span>
+              <span class="val pe-edit">
+                @foreach ($r['inputs'] as $ii => $in)
+                  @if ($ii > 0 && ! empty($r['sep']))<span class="pe-sep">{{ $r['sep'] }}</span>@endif
+                  @if (($in['t'] ?? 'text') === 'select')
+                    <select class="pe-in {{ $in['w'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（選ぶと保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)">
+                      @foreach ($in['opts'] as $ov => $ol)
+                        <option value="{{ $ov }}" {{ (string) $in['v'] === (string) $ov ? 'selected' : '' }}>{{ $ol }}</option>
+                      @endforeach
+                    </select>
+                  @else
+                    <input class="pe-in {{ $in['w'] ?? '' }}" type="{{ $in['t'] ?? 'text' }}" @if (($in['t'] ?? '') === 'number') min="0" @endif value="{{ $in['v'] }}" placeholder="{{ $in['ph'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（入れると保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)">
+                  @endif
+                  @if (! empty($in['suf']))<span class="pe-sep">{{ $in['suf'] }}</span>@endif
+                @endforeach
+              </span>
+            </div>
+          @else
+            <div class="arow"><span class="lbl">{{ $r[0] }}</span><span class="val">{{ $r[1] }}</span></div>
+          @endif
         @endforeach
 
-        {{-- 進行チェック（1つでも付いていれば出す） --}}
-        @if ($anyPrep)
-          <div class="chips">
-            <span class="chip-ck {{ $c['lineSent'] ? 'on' : '' }}">LINE</span>
-            <span class="chip-ck {{ $c['handover'] ? 'on' : '' }}">引継</span>
-            <span class="chip-ck {{ $c['script'] ? 'on' : '' }}">台本</span>
-          </div>
-        @endif
+        {{-- 進行チェック（LINE/引継/台本）。普段は付いていれば表示、編集モードではクリックでオン/オフを保存。 --}}
+        <div class="chips {{ $anyPrep ? '' : 'pe-empty' }}">
+          <span class="chip-ck {{ $c['lineSent'] ? 'on' : '' }}" onclick="ecsSheetToggleChip(this,'prep_line_sent')">LINE</span>
+          <span class="chip-ck {{ $c['handover'] ? 'on' : '' }}" onclick="ecsSheetToggleChip(this,'prep_handover')">引継</span>
+          <span class="chip-ck {{ $c['script'] ? 'on' : '' }}" onclick="ecsSheetToggleChip(this,'prep_script')">台本</span>
+        </div>
         @if ($c['opsSheet'] !== '')
           <div class="arow"><span class="lbl">運営シート</span><a class="val" href="{{ $c['opsSheet'] }}" target="_blank" rel="noopener">開く</a></div>
         @endif
 
         {{-- メンバー --}}
         <div class="acard-members">
-          <div class="mhead"><span class="p">P</span><span>名前（割り当てメンバー）</span>@if (count($c['members']))<span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span>@endif</div>
+          <div class="mhead"><span class="p">P</span><span>名前（割り当てメンバー）</span><span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span></div>
           @forelse ($c['members'] as $m)
             <div class="mrow" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
               <span class="p">
@@ -318,6 +397,30 @@
       .then(function (r) { return r.json(); })
       .then(function (res) { if (!(res && res.ok)) alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); })
       .catch(function () { alert('通信エラーで保存できませんでした。'); });
+  }
+
+  // 案件の各項目（時間・人数・文字・はい/いいえ）を projects に保存する（送ったキーだけ更新）。
+  function ecsSheetSaveProject(inp, field, value) {
+    var card = inp.closest('.acard');
+    var pid = card && card.getAttribute('data-project');
+    if (!pid) return;
+    fetch('/assign-sheet/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: pid, field: field, value: value })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { if (!(res && res.ok)) alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); })
+      .catch(function () { alert('通信エラーで保存できませんでした。'); });
+  }
+
+  // 進行チェック（LINE/引継/台本）のチップを、編集モードのときだけクリックでオン/オフ保存する。
+  function ecsSheetToggleChip(el, field) {
+    var card = el.closest('.acard');
+    if (!card || !card.classList.contains('editing')) return;   // 編集モード以外では誤操作防止で無反応
+    var on = !el.classList.contains('on');
+    el.classList.toggle('on', on);
+    ecsSheetSaveProject(el, field, on ? '1' : '0');
   }
 
   // 検索ボックス（コンテンツ・顧客）と「人数が足りない案件だけ」で、カードを出し分ける。

@@ -13,6 +13,7 @@ use App\Http\Controllers\AssignPublishController;
 use App\Http\Controllers\AssignSheetController;
 use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\CountDeadlineReminderController;
+use App\Http\Controllers\StatsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\MasterImportController;
@@ -101,6 +102,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
 // 社員側の画面（Blade化済み）
 // ダッシュボードは DB（projects テーブル）から読む。KPI・危険日カレンダーが本物の案件で動く。
 Route::get('/dashboard', [DashboardController::class, 'index']);
+// 集計ダッシュボード＝イベント数（拠点別/オンライン・リアル）・メンバー別/部署別の出勤数を月/四半期/年で集計（baba 2026-07-24）。
+Route::get('/stats', [StatsController::class, 'index']);
 // 案件一覧は DB（projects テーブル）から読む。Controller が cases.js と同じ形に整える。
 Route::get('/projects', [ProjectController::class, 'index']);
 // 案件登録／編集フォーム。?project=<案件ID> が来たら既存案件を読み、各欄に埋めて開く。
@@ -151,6 +154,8 @@ Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
 // アサイン関連の画面（Blade化済み）
 // アサイン表（東京アサイン表そっくりの縦カード）。案件情報＋割り当てメンバーを1画面で見る。月を選んで表示。
 Route::get('/assign-sheet', [AssignSheetController::class, 'index']);
+// アサイン表から案件の時間・人数・備考を直接保存（公開ボードの時間保存と同じ「選ぶ/入れると保存」方式）。
+Route::post('/assign-sheet/project', [AssignSheetController::class, 'updateProject']);
 // クライアント別アサイン履歴。お客様ごとに「常連スタッフ」と過去案件の顔ぶれを見る（見るだけ）。
 Route::get('/assign-history', [AssignHistoryController::class, 'index']);
 // クライアント履歴の照会（AJAX用）。案件登録フォームが ?client=名前 で呼び、リピート判定＋過去案件をJSONで返す。

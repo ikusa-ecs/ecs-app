@@ -44,6 +44,7 @@ class AssignSheetController extends Controller
         'online' => 'オンライン',
         'basho'  => '場所貸し',
         'tokyo'  => '他拠点⇒東',
+        'tohoku' => '東北',
         'help'   => 'ヘルプのみ',
         'taiken' => '体験会',
         'other'  => '',
@@ -165,6 +166,7 @@ class AssignSheetController extends Controller
             return [
                 'id'          => $p->id,
                 'no'          => $i + 1,
+                'projectName' => $this->clean($p->project_name),   // 編集用の生の案件名（見出しはコンテンツ名優先で出す）
                 'date'        => $this->fmtDate($p->start_date),
                 'dayType'     => $p->date_type ?? '本番',
                 'category'    => $p->category ?? '',
@@ -230,6 +232,60 @@ class AssignSheetController extends Controller
             'roleOptions'   => AssignmentRole::positionLabels(),
             'noteOptions'   => $noteOptions,
         ]);
+    }
+
+    /**
+     * アサイン表のカードから、案件の1項目だけを保存する（時間・人数・備考）。
+     * 公開ボードの時間保存と同じ「入れると保存」方式。送られてきた field だけを更新する。
+     */
+    /** 数字で保存する項目（空→null）。 */
+    private const INT_FIELDS = ['guest_count', 'team_count', 'required_count'];
+
+    /** はい/いいえ（真偽）で保存する項目（空→null＝未設定）。 */
+    private const BOOL_FIELDS = ['is_multi', 'alcohol', 'prep_line_sent', 'prep_handover', 'prep_script'];
+
+    /** 文字で保存する項目。 */
+    private const TEXT_FIELDS = [
+        'project_name', 'scale', 'client', 'agency', 'operation_place',
+        'online_tool', 'broadcast', 'staff_role', 'audio_equipment', 'location',
+        'assembly_type', 'catering', 'transport',
+        'pub_logo', 'pub_camera', 'pub_article', 'pub_video', 'note',
+        'start_time', 'end_time', 'event_enter_time', 'event_start_time', 'event_end_time',
+    ];
+
+    public function updateProject(Request $request)
+    {
+        $allowed = array_merge(self::TEXT_FIELDS, self::INT_FIELDS, self::BOOL_FIELDS);
+
+        $data = $request->validate([
+            'project_id' => ['required', 'string'],
+            'field' => ['required', 'string', 'in:' . implode(',', $allowed)],
+            'value' => ['nullable', 'string'],
+        ]);
+
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+
+        $field = $data['field'];
+        $value = trim((string) ($data['value'] ?? ''));
+
+        if (in_array($field, self::INT_FIELDS, true)) {
+            $project->{$field} = ($value === '') ? null : (int) $value;
+        } elseif (in_array($field, self::BOOL_FIELDS, true)) {
+            // '有'/'1'/'true'＝はい、'無'/'0'/'false'＝いいえ、空＝未設定(null)。
+            $project->{$field} = match ($value) {
+                '有', '1', 'true'  => true,
+                '無', '0', 'false' => false,
+                default            => null,
+            };
+        } else {
+            $project->{$field} = ($value === '') ? null : $value;
+        }
+        $project->save();
+
+        return response()->json(['ok' => true]);
     }
 
     /**
@@ -317,6 +373,7 @@ class AssignSheetController extends Controller
         return match (true) {
             str_contains($f, '場所貸し') || str_contains($f, 'ARENA') => 'basho',
             str_contains($f, '他拠点→東') || str_contains($f, '他拠点⇒東') => 'tokyo',
+            str_contains($f, '東北') => 'tohoku',   // 東北の案件は専用色で区別する（baba 2026-07-24）
             str_contains($f, 'ヘルプ') => 'help',
             str_contains($f, '体験') => 'taiken',
             str_contains($f, 'ロング') => 'long',

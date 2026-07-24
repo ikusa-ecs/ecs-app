@@ -5,6 +5,7 @@
   <div class="logo">ECS<small>スタッフアサイン管理</small></div>
   <nav>
     <a class="{{ ($active ?? '') === 'dashboard' ? 'active' : '' }}" href="/dashboard"><span class="nav-icon">▣</span> ダッシュボード</a>
+    <a class="{{ ($active ?? '') === 'stats' ? 'active' : '' }}" href="/stats"><span class="nav-icon">📈</span> 集計ダッシュボード</a>
     <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">🙍</span> マイページ</a>
     <a class="{{ ($active ?? '') === 'employee_availability' ? 'active' : '' }}" href="/employee-availability"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
     <a class="{{ ($active ?? '') === 'mypage_finance' ? 'active' : '' }}" href="/mypage-finance"><span class="nav-icon">💰</span> 収支入力</a>
