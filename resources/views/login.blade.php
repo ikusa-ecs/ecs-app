@@ -67,6 +67,9 @@
 
     {{-- 自己登録は廃止（アカウントは管理者が発行する方針）＝「新規登録」導線は置かない。 --}}
 
+    {{-- テスト用ログインは ECS_TEST_LOGIN=true のときだけ表示。本番で false にすれば、
+         このボタン群も下の注意書きも丸ごと消え、サーバー側の認証も無効になる（＝一発オフ）。 --}}
+    @if (config('ecs.test_login'))
     <div class="mock-entry">
       <p class="mock-entry-label">テスト用ログイン（役割ごと・本番前に外します）</p>
       <p style="text-align:center; font-size:11px; color:var(--muted); margin:-2px 0 10px;">役割によって見える画面が変わります。試したい役割を選んでください。</p>
@@ -135,6 +138,7 @@
     <p class="muted" style="text-align:center; font-size:11px; margin-top:14px;">
       ※テスト用ログインです（パスワードはすべて test）。本番公開前に無効化します（.env の ECS_TEST_LOGIN=false）。
     </p>
+    @endif
   </div>
 </body>
 </html>
