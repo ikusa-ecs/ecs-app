@@ -16,6 +16,17 @@
   .st-tab:hover { background: #f3ece0; text-decoration: none; }
   .st-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
 
+  /* 表示範囲（全拠点／各拠点）を選ぶボタン列 */
+  .st-scope { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+  .st-scope .sc-label { font-size: 12.5px; color: #7a6a58; font-weight: 700; margin-right: 2px; }
+  .st-scope a {
+    padding: 6px 15px; border: 1px solid var(--line); border-radius: 999px;
+    background: #fff; color: var(--muted); font-size: 12.5px; font-weight: 700; text-decoration: none;
+  }
+  .st-scope a:hover { background: #f3ece0; }
+  .st-scope a.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .st-scope a.all { border-style: dashed; }
+
   /* 上部の操作バー（選んだ粒度の中で期間を選ぶ）。タブの下にくっつける。 */
   .st-controls {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -45,7 +56,7 @@
   .st-kpi.accent-att    { border-top: 3px solid #7a52c9; }
 
   /* パネル（見出し付きの箱） */
-  .st-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .st-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 16px; }
   .st-panel {
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
     box-shadow: 0 1px 2px rgba(60,45,30,.06);
@@ -91,16 +102,17 @@
 
 @section('content')
 
-{{-- 期間の粒度をタブ（シート）で選ぶ。案件一覧の下書き/アーカイブと同じ切替方式。 --}}
+{{-- 期間の粒度をタブ（シート）で選ぶ。案件一覧の下書き/アーカイブと同じ切替方式。拠点(office)は引き継ぐ。 --}}
 <div class="st-tabs">
-  <a class="st-tab {{ $span === 'month' ? 'active' : '' }}" href="/stats?span=month">月単位</a>
-  <a class="st-tab {{ $span === 'quarter' ? 'active' : '' }}" href="/stats?span=quarter">四半期</a>
-  <a class="st-tab {{ $span === 'year' ? 'active' : '' }}" href="/stats?span=year">年単位</a>
+  <a class="st-tab {{ $span === 'month' ? 'active' : '' }}" href="/stats?span=month&office={{ urlencode($scopeOffice) }}">月単位</a>
+  <a class="st-tab {{ $span === 'quarter' ? 'active' : '' }}" href="/stats?span=quarter&office={{ urlencode($scopeOffice) }}">四半期</a>
+  <a class="st-tab {{ $span === 'year' ? 'active' : '' }}" href="/stats?span=year&office={{ urlencode($scopeOffice) }}">年単位</a>
 </div>
 
-{{-- 選んだ粒度の中で、どの期間かを選ぶ。選ぶとGETで開き直す。 --}}
+{{-- 選んだ粒度の中で、どの期間かを選ぶ。選ぶとGETで開き直す（拠点も引き継ぐ）。 --}}
 <form method="GET" action="/stats" class="st-controls" id="stForm">
   <input type="hidden" name="span" value="{{ $span }}">
+  <input type="hidden" name="office" value="{{ $scopeOffice }}">
   <span class="lbl">
     @switch($span) @case('quarter') 四半期 @break @case('year') 年 @break @default 月 @endswitch
     を選ぶ
@@ -114,8 +126,17 @@
   </select>
 
   <span class="spacer"></span>
-  <span class="now">{{ $selectedLabel !== '' ? $selectedLabel : '—' }} の集計</span>
+  <span class="now">{{ $selectedLabel !== '' ? $selectedLabel : '—' }}・{{ $scopeOffice !== '' ? $scopeOffice : '全拠点' }} の集計</span>
 </form>
+
+{{-- 表示範囲＝全拠点／各拠点。選ぶと下の集計すべてがその拠点に切り替わる（baba 2026-07-27）。 --}}
+<div class="st-scope">
+  <span class="sc-label">表示範囲</span>
+  <a class="all {{ $scopeOffice === '' ? 'active' : '' }}" href="/stats?span={{ $span }}&period={{ urlencode($selected) }}&office=">全拠点</a>
+  @foreach ($offices as $o)
+    <a class="{{ $scopeOffice === $o ? 'active' : '' }}" href="/stats?span={{ $span }}&period={{ urlencode($selected) }}&office={{ urlencode($o) }}">{{ $o }}</a>
+  @endforeach
+</div>
 
 {{-- KPI：イベント数（合計・リアル・オンライン）と のべ出勤数 --}}
 <div class="st-kpis">
@@ -138,7 +159,8 @@
 </div>
 
 <div class="st-grid">
-  {{-- 拠点（事務所）別イベント数。定番拠点は0でも表示。合計＝全拠点の合計。 --}}
+  {{-- 拠点（事務所）別イベント数。全拠点モードのみ表示（特定の拠点を選んだら他拠点は隠す・baba 2026-07-27）。 --}}
+  @if ($scopeOffice === '')
   <div class="st-panel">
     <h3>拠点別 イベント数</h3>
     @forelse ($byOffice as $b)
@@ -151,44 +173,80 @@
     @endforelse
     <p class="st-note">※ 現在は東京のみ運営のため、ほとんどが東京になります（他拠点は今後対応）。</p>
   </div>
+  @endif
 
-  {{-- 部署別 合計出勤数 --}}
+  {{-- 規模別イベント数（大型／中型／小型） --}}
   <div class="st-panel">
-    <h3>部署別 合計出勤数</h3>
+    <h3>規模別 イベント数</h3>
+    @foreach ($byScale as $s)
+      <div class="st-row {{ $s['count'] === 0 ? 'zero' : '' }}">
+        <span class="r-name">{{ $s['scale'] }}</span>
+        <span class="r-num">{{ $s['count'] }}<small>件</small></span>
+      </div>
+    @endforeach
+  </div>
+</div>
+
+<div class="st-grid">
+  {{-- 他拠点依頼数（東→他拠点／他拠点→東／ヘルプを別々に） --}}
+  <div class="st-panel">
+    <h3>他拠点依頼数</h3>
+    @foreach ($otherBase as $o)
+      <div class="st-row {{ $o['count'] === 0 ? 'zero' : '' }}">
+        <span class="r-name">{{ $o['label'] }}</span>
+        <span class="r-num">{{ $o['count'] }}<small>件</small></span>
+      </div>
+    @endforeach
+    <p class="st-note">実施形態から判定。東京のみ運営の間は少なめです。</p>
+  </div>
+
+  {{-- 部署別 合計出勤・ディレクター＋1人あたり平均 --}}
+  <div class="st-panel">
+    <h3>部署別 出勤・ディレクター</h3>
     <div class="st-depts">
       @foreach ($byDept as $d)
         @php $cls = ['イベプラ' => 'plan', 'セールス' => 'sales', 'クリエイティブ' => 'creative'][$d['dept']] ?? ''; @endphp
         <div class="st-dept {{ $cls }}">
           <div class="d-name">{{ $d['dept'] }}</div>
           <div class="d-num">{{ $d['count'] }}</div>
-          <div class="d-sub">{{ $d['heads'] }}名が参加</div>
+          <div class="d-sub">のべ出勤・{{ $d['active'] }}名参加</div>
+          <div class="d-sub">ディレクター {{ $d['director'] }}件</div>
+          <div class="d-sub avg">1人平均：出勤{{ $d['avgEvents'] }}／D{{ $d['avgDirector'] }}</div>
         </div>
       @endforeach
     </div>
-    <p class="st-note">部署は社員の所属（イベプラ／セールス／クリエイティブ）で集計。出勤数はその期間に出勤した日数（のべ・複数日はその分カウント）です。</p>
+    <p class="st-note">平均＝部署の社員数で割った1人あたり（出勤＝のべ日数／D＝ディレクター担当案件数）。</p>
   </div>
 </div>
 
 @php
-  // 集計の主役は社員（スタッフは出さない）。拠点ごとにブロック分けする（baba 2026-07-24）。
+  // 集計の主役は社員（スタッフは出さない）。
+  // 全拠点モード＝拠点ごとにカード分け／特定の拠点を選んだとき＝部署ごとにカード分け（baba 2026-07-27）。
   $emp = $members->where('kind', '社員')->values();
-  $officeOrder = ['東京', '名古屋', '大阪', '福岡', '北海道', '東北'];
-  $empGrouped = $emp->groupBy(fn ($m) => ($m['office'] ?? '') !== '' ? $m['office'] : '（拠点未設定）');
-  // 表示順＝定番拠点の順→それ以外（未設定など）は後ろ。
-  $officeKeys = collect($officeOrder)->filter(fn ($o) => $empGrouped->has($o))
-      ->merge($empGrouped->keys()->diff($officeOrder))->values();
+  if ($scopeOffice !== '') {
+    $groupBy = '部署';
+    $groupOrder = ['イベプラ', 'セールス', 'クリエイティブ'];
+    $empGrouped = $emp->groupBy(fn ($m) => ($m['dept'] ?? '') !== '' ? $m['dept'] : '（部署未設定）');
+  } else {
+    $groupBy = '拠点';
+    $groupOrder = ['東京', '名古屋', '大阪', '福岡', '北海道', '東北'];
+    $empGrouped = $emp->groupBy(fn ($m) => ($m['office'] ?? '') !== '' ? $m['office'] : '（拠点未設定）');
+  }
+  // 表示順＝定番の順→それ以外（未設定など）は後ろ。
+  $groupKeys = collect($groupOrder)->filter(fn ($k) => $empGrouped->has($k))
+      ->merge($empGrouped->keys()->diff($groupOrder))->values();
 @endphp
 
-{{-- 社員別 出勤数（拠点ごとのカード・各カード内は多い順） --}}
-<div class="st-office-title">社員別 イベント出勤数（拠点ごと・{{ $emp->count() }}名）</div>
+{{-- 社員別 出勤数（全拠点=拠点ごと／拠点別=部署ごとのカード・各カード内は多い順） --}}
+<div class="st-office-title">社員別 イベント出勤数（{{ $groupBy }}ごと・{{ $emp->count() }}名）</div>
 <div class="st-office-cards">
-  @forelse ($officeKeys as $ok)
+  @forelse ($groupKeys as $gk)
     <div class="st-panel">
-      <h3>{{ $ok }}（{{ $empGrouped[$ok]->count() }}名）</h3>
-      @foreach ($empGrouped[$ok] as $m)
+      <h3>{{ $gk }}（{{ $empGrouped[$gk]->count() }}名）</h3>
+      @foreach ($empGrouped[$gk] as $m)
         <div class="st-row">
-          <span class="r-name">{{ $m['name'] }}<span class="sub">{{ $m['dept'] !== '' ? $m['dept'] : '社員' }}</span></span>
-          <span class="r-num">{{ $m['count'] }}回<small>（うち大型{{ $m['big'] }}件）</small></span>
+          <span class="r-name">{{ $m['name'] }}<span class="sub">{{ $scopeOffice === '' ? ($m['dept'] !== '' ? $m['dept'] : '社員') : ($m['office'] !== '' ? $m['office'] : '') }}</span></span>
+          <span class="r-num">{{ $m['count'] }}回<small>（大型{{ $m['big'] }}・D{{ $m['director'] }}）</small></span>
         </div>
       @endforeach
     </div>
@@ -196,6 +254,23 @@
     <div class="st-panel"><div class="empty">この期間に出勤した社員がいません。</div></div>
   @endforelse
 </div>
-<p class="st-note">拠点＝社員の所属オフィス。出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。</p>
+<p class="st-note">全拠点＝拠点ごと／拠点を選ぶと部署ごとに表示。「大型」＝大型イベントの出勤／「D」＝ディレクター担当。出勤は日数ぶん数えます。</p>
+
+{{-- スタッフ別 出勤数（上長要望で追加・baba 2026-07-27） --}}
+@php $stf = $members->where('kind', 'スタッフ')->sortByDesc('count')->values(); @endphp
+<div class="st-panel" style="margin-top:16px;">
+  <h3>スタッフ別 イベント出勤数（{{ $stf->count() }}名）</h3>
+  <div class="st-members">
+    @forelse ($stf as $m)
+      <div class="st-row">
+        <span class="r-name">{{ $m['name'] }}</span>
+        <span class="r-num">{{ $m['count'] }}回<small>（うち大型{{ $m['big'] }}件）</small></span>
+      </div>
+    @empty
+      <div class="empty">この期間に出勤したスタッフがいません。</div>
+    @endforelse
+  </div>
+  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。</p>
+</div>
 
 @endsection

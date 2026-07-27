@@ -63,6 +63,16 @@ class StatsController extends Controller
         // 選んだ期間の案件だけに絞る。
         $inPeriod = $projects->filter(fn (Project $p) => $this->periodKey($p->start_date, $span) === $selected)->values();
 
+        // 表示範囲＝全拠点（既定）／特定の拠点。拠点を選んだら、その拠点のイベントだけに絞る＝
+        // 以降の集計（イベント数・規模・他拠点・出勤・部署・社員・スタッフ）すべてがその拠点の情報になる（baba 2026-07-27）。
+        $scopeOffice = (string) $request->query('office', '');
+        if (! in_array($scopeOffice, self::OFFICE_ORDER, true)) {
+            $scopeOffice = '';   // 全拠点
+        }
+        if ($scopeOffice !== '') {
+            $inPeriod = $inPeriod->filter(fn (Project $p) => $this->officeOf($p) === $scopeOffice)->values();
+        }
+
         // ── イベント数の集計 ──
         $totalEvents = $inPeriod->count();
         $onlineEvents = $inPeriod->filter(fn (Project $p) => $this->isOnline($p->format))->count();
@@ -89,13 +99,26 @@ class StatsController extends Controller
             ->map(fn ($cnt, $office) => ['office' => $office, 'count' => $cnt, 'big' => $officeBig[$office] ?? 0])
             ->values();
 
+        // 規模別イベント数（大型／中型／小型）。0件でも常に表示。
+        $byScale = collect(['大型', '中型', '小型'])->map(fn ($s) => [
+            'scale' => $s,
+            'count' => $inPeriod->filter(fn (Project $p) => (string) $p->scale === $s)->count(),
+        ]);
+
+        // 他拠点依頼数（実施形態から3種を別々に集計・baba 2026-07-27）。
+        $otherBase = [
+            ['label' => '東→他拠点（東京から依頼）', 'count' => $inPeriod->filter(fn (Project $p) => str_contains((string) $p->format, '東→他拠点'))->count()],
+            ['label' => '他拠点→東（巻き取り）', 'count' => $inPeriod->filter(fn (Project $p) => str_contains((string) $p->format, '他拠点→東') || str_contains((string) $p->format, '他拠点⇒東'))->count()],
+            ['label' => 'ヘルプのみ', 'count' => $inPeriod->filter(fn (Project $p) => str_contains((string) $p->format, 'ヘルプ'))->count()],
+        ];
+
         // ── 出勤数の集計 ──（この期間の案件に対するアサイン・キャンセル除く）
         $projectIds = $inPeriod->pluck('id');
         $assignments = $projectIds->isEmpty()
             ? collect()
             : Assignment::whereIn('project_id', $projectIds)
                 ->where('status', '!=', 'キャンセル')
-                ->get(['staff_id', 'project_id']);
+                ->get(['staff_id', 'project_id', 'role']);
 
         // 出勤数＝アサインされた日数ぶん（同じ案件で複数日あれば、その日数だけ数える・baba 2026-07-24）。
         // assignments は「案件×人×日」で1行なので、行数がそのまま出勤日数になる。
@@ -109,6 +132,12 @@ class StatsController extends Controller
             ->groupBy('staff_id')
             ->map(fn (Collection $g) => $g->filter(fn ($a) => isset($bigProjectIds[$a->project_id]))->count());
 
+        // ディレクター数＝役割Dを務めた案件数（同案件は1回・「社員・ディレクター集計」と同じ定義）。
+        $directorByStaff = $assignments
+            ->where('role', 'D')
+            ->groupBy('staff_id')
+            ->map(fn (Collection $g) => $g->pluck('project_id')->unique()->count());
+
         // 関係する人の氏名・種別・部署をまとめて引く。
         $people = Person::whereIn('id', $countByStaff->keys()->all())
             ->get(['id', 'name', 'role', 'department', 'office'])
@@ -116,16 +145,17 @@ class StatsController extends Controller
 
         // メンバー別ランキング（出勤数の多い順）。
         $members = $countByStaff
-            ->map(function ($count, $staffId) use ($people, $bigCountByStaff) {
+            ->map(function ($count, $staffId) use ($people, $bigCountByStaff, $directorByStaff) {
                 $person = $people->get($staffId);
 
                 return [
-                    'name'   => $person->name ?? $staffId,
-                    'dept'   => $person->department ?? '',
-                    'office' => $person->office ?? '',
-                    'kind'   => ($person && $person->role === 'employee') ? '社員' : 'スタッフ',
-                    'count'  => $count,
-                    'big'    => (int) ($bigCountByStaff[$staffId] ?? 0),
+                    'name'     => $person->name ?? $staffId,
+                    'dept'     => $person->department ?? '',
+                    'office'   => $person->office ?? '',
+                    'kind'     => ($person && $person->role === 'employee') ? '社員' : 'スタッフ',
+                    'count'    => $count,
+                    'big'      => (int) ($bigCountByStaff[$staffId] ?? 0),
+                    'director' => (int) ($directorByStaff[$staffId] ?? 0),
                 ];
             })
             ->sortByDesc('count')
@@ -133,22 +163,45 @@ class StatsController extends Controller
 
         $totalAttendance = $countByStaff->sum();
 
-        // 部署別の合計出勤数（イベプラ・セールス＋参考でクリエイティブ）。
-        $byDept = collect(['イベプラ', 'セールス', 'クリエイティブ'])->map(fn ($dept) => [
-            'dept'  => $dept,
-            'count' => $members->where('dept', $dept)->sum('count'),
-            'heads' => $members->where('dept', $dept)->count(),
-        ]);
+        // 部署ごとの社員数（＝平均の分母。所属が設定された社員だけ）。
+        $deptDefs = ['イベプラ', 'セールス', 'クリエイティブ'];
+        $headByDept = Person::where('role', 'employee')
+            ->whereIn('department', $deptDefs)
+            ->get(['id', 'department'])
+            ->groupBy('department')
+            ->map(fn (Collection $g) => $g->count());
+
+        // 部署別＝合計出勤・合計ディレクター＋1人あたり平均（分母＝部署の社員数）。
+        $byDept = collect($deptDefs)->map(function ($dept) use ($members, $headByDept) {
+            $m = $members->where('dept', $dept);
+            $head = (int) ($headByDept[$dept] ?? 0);
+            $sumEvents = $m->sum('count');
+            $sumDirector = $m->sum('director');
+
+            return [
+                'dept'        => $dept,
+                'count'       => $sumEvents,       // 合計出勤（のべ日数）
+                'director'    => $sumDirector,     // 合計ディレクター数
+                'active'      => $m->count(),      // 期間内に出勤した人数
+                'headcount'   => $head,            // 部署の社員数（平均の分母）
+                'avgEvents'   => $head > 0 ? round($sumEvents / $head, 1) : 0,
+                'avgDirector' => $head > 0 ? round($sumDirector / $head, 1) : 0,
+            ];
+        });
 
         return view('stats', [
             'span'            => $span,
             'spanOptions'     => $options,
             'selected'        => $selected,
+            'scopeOffice'     => $scopeOffice,
+            'offices'         => self::OFFICE_ORDER,
             'selectedLabel'   => collect($options)->firstWhere('value', $selected)['label'] ?? '',
             'totalEvents'     => $totalEvents,
             'realEvents'      => $realEvents,
             'onlineEvents'    => $onlineEvents,
             'byOffice'        => $byOffice,
+            'byScale'         => $byScale,
+            'otherBase'       => $otherBase,
             'totalAttendance' => $totalAttendance,
             'byDept'          => $byDept,
             'members'         => $members,
