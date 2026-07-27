@@ -104,6 +104,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
 Route::get('/dashboard', [DashboardController::class, 'index']);
 // 集計ダッシュボード＝イベント数（拠点別/オンライン・リアル）・メンバー別/部署別の出勤数を月/四半期/年で集計（baba 2026-07-24）。
 Route::get('/stats', [StatsController::class, 'index']);
+// 集計ダッシュボードのCSV出力（1枚に全情報・画面と同じ並び。画面と同じ期間・表示範囲）。
+Route::get('/stats/export.csv', [StatsController::class, 'exportCsv']);
 // 案件一覧は DB（projects テーブル）から読む。Controller が cases.js と同じ形に整える。
 Route::get('/projects', [ProjectController::class, 'index']);
 // 案件登録／編集フォーム。?project=<案件ID> が来たら既存案件を読み、各欄に埋めて開く。

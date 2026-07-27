@@ -29,6 +29,106 @@ class StatsController extends Controller
 
     public function index(Request $request)
     {
+        return view('stats', $this->aggregate($request));
+    }
+
+    /**
+     * いまの集計を CSV 1枚にまとめてダウンロード（Excelの文字化け防止に UTF-8 BOM 付き）。
+     * 並びは画面（ダッシュボード）と同じ：イベント数→規模別→他拠点依頼→(全拠点なら)拠点別→部署別→社員別→スタッフ別。
+     * 社員別は画面と同じグループ分け（全拠点＝拠点ごと／拠点を選ぶと部署ごと）。画面と同じ期間・表示範囲で集計する。
+     */
+    public function exportCsv(Request $request)
+    {
+        $data = $this->aggregate($request);
+        $scopeLabel = $data['scopeOffice'] !== '' ? $data['scopeOffice'] : '全拠点';
+
+        // 社員別のグループ分け（画面と同じ）。全拠点＝拠点ごと／特定の拠点＝部署ごと。
+        $emp = $data['members']->where('kind', '社員');
+        if ($data['scopeOffice'] !== '') {
+            $groupCol = '部署';
+            $groupKey = 'dept';
+            $order = ['イベプラ', 'セールス', 'クリエイティブ'];
+        } else {
+            $groupCol = '拠点';
+            $groupKey = 'office';
+            $order = self::OFFICE_ORDER;
+        }
+        $grouped = $emp->groupBy(fn ($m) => ($m[$groupKey] ?? '') !== '' ? $m[$groupKey] : '（' . $groupCol . '未設定）');
+        $groupKeys = collect($order)->filter(fn ($k) => $grouped->has($k))
+            ->merge($grouped->keys()->diff($order))->values();
+
+        // ダッシュボードと同じ並びで行を積む。
+        $rows = [];
+        $rows[] = ['ECS集計ダッシュボード'];
+        $rows[] = ['期間', $data['selectedLabel']];
+        $rows[] = ['表示範囲', $scopeLabel];
+        $rows[] = [];
+        $rows[] = ['■ イベント数'];
+        $rows[] = ['合計', $data['totalEvents']];
+        $rows[] = ['リアル', $data['realEvents']];
+        $rows[] = ['オンライン', $data['onlineEvents']];
+        $rows[] = [];
+        $rows[] = ['■ 規模別イベント数'];
+        foreach ($data['byScale'] as $s) {
+            $rows[] = [$s['scale'], $s['count']];
+        }
+        $rows[] = [];
+        $rows[] = ['■ 他拠点依頼数'];
+        foreach ($data['otherBase'] as $o) {
+            $rows[] = [$o['label'], $o['count']];
+        }
+        $rows[] = [];
+        if ($data['scopeOffice'] === '') {
+            $rows[] = ['■ 拠点別イベント数'];
+            $rows[] = ['拠点', '件数', 'うち大型'];
+            foreach ($data['byOffice'] as $b) {
+                $rows[] = [$b['office'], $b['count'], $b['big']];
+            }
+            $rows[] = [];
+        }
+        $rows[] = ['■ 部署別 出勤・ディレクター'];
+        $rows[] = ['部署', '合計出勤', '合計D', '期間内出勤人数', '部署の社員数', '1人平均出勤', '1人平均D'];
+        foreach ($data['byDept'] as $d) {
+            $rows[] = [$d['dept'], $d['count'], $d['director'], $d['active'], $d['headcount'], $d['avgEvents'], $d['avgDirector']];
+        }
+        $rows[] = [];
+        $rows[] = ['■ 社員別 イベント出勤・ディレクター内訳（' . $groupCol . 'ごと）'];
+        foreach ($groupKeys as $gk) {
+            $g = $grouped[$gk];
+            $rows[] = ['【' . $gk . '】（' . $g->count() . '名）'];
+            $rows[] = ['氏名', 'イベント出勤', 'うち大型', 'D＋SD合計', 'D', 'リアルD', '大型D', '大型SD', 'オンラインD'];
+            foreach ($g as $m) {
+                $rows[] = [$m['name'], $m['count'], $m['big'], $m['dTotal'], $m['d'], $m['realD'], $m['bigD'], $m['bigSD'], $m['onlineD']];
+            }
+            $rows[] = [];
+        }
+        $rows[] = ['■ スタッフ別 イベント出勤'];
+        $rows[] = ['氏名', 'イベント出勤', 'うち大型'];
+        foreach ($data['members']->where('kind', 'スタッフ')->sortByDesc('count') as $m) {
+            $rows[] = [$m['name'], $m['count'], $m['big']];
+        }
+
+        // BOM＋各行を書き出す（$escape='' でPHP8.4のfputcsv非推奨警告を回避）。
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, "\xEF\xBB\xBF");
+        foreach ($rows as $row) {
+            fputcsv($handle, $row, ',', '"', '');
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        $filename = 'ecs-stats_' . ($data['selected'] ?: 'all') . ($data['scopeOffice'] !== '' ? '_office' : '') . '.csv';
+
+        return response($csv, 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /** 画面・CSVで共通の集計を作る。返り値はそのまま view() のデータになる。 */
+    private function aggregate(Request $request): array
+    {
         // 集計対象のイベント＝開催日があり、下書き・中止でない案件（完了＝過去実績は含める）。
         $projects = Project::whereNotNull('start_date')
             ->whereNotIn('status', ['下書き', 'キャンセル', '中止'])
@@ -132,11 +232,46 @@ class StatsController extends Controller
             ->groupBy('staff_id')
             ->map(fn (Collection $g) => $g->filter(fn ($a) => isset($bigProjectIds[$a->project_id]))->count());
 
-        // ディレクター数＝役割Dを務めた案件数（同案件は1回・「社員・ディレクター集計」と同じ定義）。
-        $directorByStaff = $assignments
-            ->where('role', 'D')
-            ->groupBy('staff_id')
-            ->map(fn (Collection $g) => $g->pluck('project_id')->unique()->count());
+        // ディレクター内訳＝役割D/SDの案件数（同案件は1回）＋実施形態・規模別。
+        // 「社員・ディレクター集計」(/projects-agg)と同じ定義：リアル=formatに「リアル」／オンライン=「オンライン」／大型=scale「大型」。
+        //  D計・SD計／リアルD（Dのうちリアル）／大型D（リアル&大型のD）／大型SD（リアル&大型のSD）／オンラインD（Dのうちオンライン）。
+        $projMeta = $inPeriod->keyBy('id')->map(fn (Project $p) => [
+            'real'   => str_contains((string) $p->format, 'リアル'),
+            'online' => str_contains((string) $p->format, 'オンライン'),
+            'big'    => ((string) $p->scale === '大型'),
+        ]);
+        $dirStats = [];   // staff_id => [d, sd, realD, bigD, bigSD, onlineD]
+        $dirSeen = [];    // 案件×人×役割の重複（複数日）を1回に
+        foreach ($assignments->whereIn('role', ['D', 'SD']) as $a) {
+            $meta = $projMeta[$a->project_id] ?? null;
+            if (! $meta) {
+                continue;
+            }
+            $dkey = $a->project_id . '|' . $a->staff_id . '|' . $a->role;
+            if (isset($dirSeen[$dkey])) {
+                continue;
+            }
+            $dirSeen[$dkey] = true;
+            $sid = $a->staff_id;
+            $dirStats[$sid] ??= ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
+            if ($a->role === 'D') {
+                $dirStats[$sid]['d']++;
+                if ($meta['real']) {
+                    $dirStats[$sid]['realD']++;
+                }
+                if ($meta['online']) {
+                    $dirStats[$sid]['onlineD']++;
+                }
+                if ($meta['real'] && $meta['big']) {
+                    $dirStats[$sid]['bigD']++;
+                }
+            } else {
+                $dirStats[$sid]['sd']++;
+                if ($meta['real'] && $meta['big']) {
+                    $dirStats[$sid]['bigSD']++;
+                }
+            }
+        }
 
         // 関係する人の氏名・種別・部署をまとめて引く。
         $people = Person::whereIn('id', $countByStaff->keys()->all())
@@ -145,8 +280,9 @@ class StatsController extends Controller
 
         // メンバー別ランキング（出勤数の多い順）。
         $members = $countByStaff
-            ->map(function ($count, $staffId) use ($people, $bigCountByStaff, $directorByStaff) {
+            ->map(function ($count, $staffId) use ($people, $bigCountByStaff, $dirStats) {
                 $person = $people->get($staffId);
+                $ds = $dirStats[$staffId] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
 
                 return [
                     'name'     => $person->name ?? $staffId,
@@ -155,7 +291,14 @@ class StatsController extends Controller
                     'kind'     => ($person && $person->role === 'employee') ? '社員' : 'スタッフ',
                     'count'    => $count,
                     'big'      => (int) ($bigCountByStaff[$staffId] ?? 0),
-                    'director' => (int) ($directorByStaff[$staffId] ?? 0),
+                    'd'        => $ds['d'],
+                    'sd'       => $ds['sd'],
+                    'dTotal'   => $ds['d'] + $ds['sd'],   // D＋SD合計
+                    'realD'    => $ds['realD'],
+                    'bigD'     => $ds['bigD'],
+                    'bigSD'    => $ds['bigSD'],
+                    'onlineD'  => $ds['onlineD'],
+                    'director' => $ds['d'],               // 部署別の平均で使う（D数）
                 ];
             })
             ->sortByDesc('count')
@@ -189,7 +332,7 @@ class StatsController extends Controller
             ];
         });
 
-        return view('stats', [
+        return [
             'span'            => $span,
             'spanOptions'     => $options,
             'selected'        => $selected,
@@ -205,7 +348,7 @@ class StatsController extends Controller
             'totalAttendance' => $totalAttendance,
             'byDept'          => $byDept,
             'members'         => $members,
-        ]);
+        ];
     }
 
     /**

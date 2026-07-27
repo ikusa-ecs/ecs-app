@@ -79,6 +79,28 @@
   .st-office-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin-bottom: 8px; }
   .st-office-cards .st-panel h3 { border-bottom: 2px solid var(--line); padding-bottom: 6px; }
 
+  /* CSV出力ボタン */
+  .st-csv {
+    padding: 7px 14px; border: 1px solid var(--brand); border-radius: 8px;
+    background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700;
+    text-decoration: none; white-space: nowrap;
+  }
+  .st-csv:hover { opacity: .9; text-decoration: none; }
+
+  /* 社員別のディレクター内訳テーブル（社員・ディレクター集計と同じ列） */
+  .st-emp-block { margin-bottom: 14px; }
+  .st-emp-scroll { overflow-x: auto; }
+  .st-emp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .st-emp-table th, .st-emp-table td {
+    padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--line);
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .st-emp-table th { color: #8a7a66; font-weight: 700; font-size: 11px; }
+  .st-emp-table th.l, .st-emp-table td.l { text-align: left; }
+  .st-emp-table td.l { color: var(--ink); font-weight: 600; }
+  .st-emp-table td.l .sub { font-size: 10.5px; color: #a89680; font-weight: 400; margin-left: 5px; }
+  .st-emp-table tbody tr:hover { background: #faf6f0; }
+
   /* 部署別の合計カード */
   .st-depts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .st-dept { border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-align: center; }
@@ -127,6 +149,7 @@
 
   <span class="spacer"></span>
   <span class="now">{{ $selectedLabel !== '' ? $selectedLabel : '—' }}・{{ $scopeOffice !== '' ? $scopeOffice : '全拠点' }} の集計</span>
+  <a class="st-csv" href="/stats/export.csv?span={{ $span }}&period={{ urlencode($selected) }}&office={{ urlencode($scopeOffice) }}">⬇ CSVで出力</a>
 </form>
 
 {{-- 表示範囲＝全拠点／各拠点。選ぶと下の集計すべてがその拠点に切り替わる（baba 2026-07-27）。 --}}
@@ -237,24 +260,47 @@
       ->merge($empGrouped->keys()->diff($groupOrder))->values();
 @endphp
 
-{{-- 社員別 出勤数（全拠点=拠点ごと／拠点別=部署ごとのカード・各カード内は多い順） --}}
-<div class="st-office-title">社員別 イベント出勤数（{{ $groupBy }}ごと・{{ $emp->count() }}名）</div>
-<div class="st-office-cards">
-  @forelse ($groupKeys as $gk)
-    <div class="st-panel">
-      <h3>{{ $gk }}（{{ $empGrouped[$gk]->count() }}名）</h3>
-      @foreach ($empGrouped[$gk] as $m)
-        <div class="st-row">
-          <span class="r-name">{{ $m['name'] }}<span class="sub">{{ $scopeOffice === '' ? ($m['dept'] !== '' ? $m['dept'] : '社員') : ($m['office'] !== '' ? $m['office'] : '') }}</span></span>
-          <span class="r-num">{{ $m['count'] }}回<small>（大型{{ $m['big'] }}・D{{ $m['director'] }}）</small></span>
-        </div>
-      @endforeach
+{{-- 社員別 出勤数＋ディレクター内訳（全拠点=拠点ごと／拠点別=部署ごと・各グループ内は出勤の多い順）。
+     列は「社員・ディレクター集計」と同じ：出勤／D＋SD合計／D／リアルD／大型D／大型SD／オンラインD。 --}}
+<div class="st-office-title">社員別 イベント出勤・ディレクター内訳（{{ $groupBy }}ごと・{{ $emp->count() }}名）</div>
+@forelse ($groupKeys as $gk)
+  <div class="st-panel st-emp-block">
+    <h3>{{ $gk }}（{{ $empGrouped[$gk]->count() }}名）</h3>
+    <div class="st-emp-scroll">
+      <table class="st-emp-table">
+        <thead>
+          <tr>
+            <th class="l">氏名</th>
+            <th>イベント出勤</th>
+            <th>D＋SD合計</th>
+            <th>D</th>
+            <th>リアルD</th>
+            <th>大型D</th>
+            <th>大型SD</th>
+            <th>オンラインD</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($empGrouped[$gk] as $m)
+            <tr>
+              <td class="l">{{ $m['name'] }}@if ($scopeOffice !== '' && $m['office'] !== '')<span class="sub">{{ $m['office'] }}</span>@endif</td>
+              <td>{{ $m['count'] }}</td>
+              <td>{{ $m['dTotal'] }}</td>
+              <td>{{ $m['d'] }}</td>
+              <td>{{ $m['realD'] }}</td>
+              <td>{{ $m['bigD'] }}</td>
+              <td>{{ $m['bigSD'] }}</td>
+              <td>{{ $m['onlineD'] }}</td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
     </div>
-  @empty
-    <div class="st-panel"><div class="empty">この期間に出勤した社員がいません。</div></div>
-  @endforelse
-</div>
-<p class="st-note">全拠点＝拠点ごと／拠点を選ぶと部署ごとに表示。「大型」＝大型イベントの出勤／「D」＝ディレクター担当。出勤は日数ぶん数えます。</p>
+  </div>
+@empty
+  <div class="st-panel"><div class="empty">この期間に出勤した社員がいません。</div></div>
+@endforelse
+<p class="st-note">全拠点＝拠点ごと／拠点を選ぶと部署ごとに表示。出勤＝出勤日数。D＋SD合計〜オンラインDは「社員・ディレクター集計」と同じ数え方（同じ案件は1回）。</p>
 
 {{-- スタッフ別 出勤数（上長要望で追加・baba 2026-07-27） --}}
 @php $stf = $members->where('kind', 'スタッフ')->sortByDesc('count')->values(); @endphp
