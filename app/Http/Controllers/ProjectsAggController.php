@@ -101,6 +101,21 @@ class ProjectsAggController extends Controller
             }
         }
 
+        // 登録している社員は全員出す＝D/SD実績が無くても0で並べる（アサイン有無に関係なく・baba 2026-07-28）。
+        $allEmployees = Person::where('role', 'employee')->get(['id', 'name', 'department']);
+        foreach ($allEmployees as $e) {
+            if (! isset($agg[$e->id])) {
+                $dept = (string) ($e->department ?? '');
+                $agg[$e->id] = [
+                    'name' => $e->name,
+                    'dept' => $dept,
+                    'deptCls' => $this->deptClass($dept),
+                    'total' => 0, 'd' => 0, 'sd' => 0,
+                    'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0,
+                ];
+            }
+        }
+
         // 個人ごとの担当合計（D＋SD）を入れる。
         foreach ($agg as &$row) {
             $row['total'] = $row['d'] + $row['sd'];

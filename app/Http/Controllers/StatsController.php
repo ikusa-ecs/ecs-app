@@ -273,24 +273,27 @@ class StatsController extends Controller
             }
         }
 
-        // 関係する人の氏名・種別・部署をまとめて引く。
-        $people = Person::whereIn('id', $countByStaff->keys()->all())
+        // 社員は「登録している全員」を出す＝アサインの有無に関係なく表示（baba 2026-07-28）。
+        // スタッフは人数が多いので、この期間に出勤した人だけ。氏名・部署・拠点をまとめて引く。
+        $neededIds = Person::where('role', 'employee')->pluck('id')
+            ->merge($countByStaff->keys())->unique()->values();
+        $people = Person::whereIn('id', $neededIds->all())
             ->get(['id', 'name', 'role', 'department', 'office'])
             ->keyBy('id');
 
-        // メンバー別ランキング（出勤数の多い順）。
-        $members = $countByStaff
-            ->map(function ($count, $staffId) use ($people, $bigCountByStaff, $dirStats) {
-                $person = $people->get($staffId);
-                $ds = $dirStats[$staffId] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
+        // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。出勤の多い順。
+        $members = $people
+            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats) {
+                $id = $person->id;
+                $ds = $dirStats[$id] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
 
                 return [
-                    'name'     => $person->name ?? $staffId,
+                    'name'     => $person->name ?? $id,
                     'dept'     => $person->department ?? '',
                     'office'   => $person->office ?? '',
-                    'kind'     => ($person && $person->role === 'employee') ? '社員' : 'スタッフ',
-                    'count'    => $count,
-                    'big'      => (int) ($bigCountByStaff[$staffId] ?? 0),
+                    'kind'     => $person->role === 'employee' ? '社員' : 'スタッフ',
+                    'count'    => (int) ($countByStaff[$id] ?? 0),
+                    'big'      => (int) ($bigCountByStaff[$id] ?? 0),
                     'd'        => $ds['d'],
                     'sd'       => $ds['sd'],
                     'dTotal'   => $ds['d'] + $ds['sd'],   // D＋SD合計
@@ -300,6 +303,14 @@ class StatsController extends Controller
                     'onlineD'  => $ds['onlineD'],
                     'director' => $ds['d'],               // 部署別の平均で使う（D数）
                 ];
+            })
+            ->filter(function (array $m) use ($scopeOffice) {
+                if ($m['kind'] === '社員') {
+                    // 全拠点＝全社員／拠点を選んだときは、その拠点の社員だけ（他拠点の社員は隠す）。
+                    return $scopeOffice === '' || $m['office'] === $scopeOffice;
+                }
+
+                return $m['count'] > 0;   // スタッフは出勤がある人だけ
             })
             ->sortByDesc('count')
             ->values();
@@ -325,7 +336,7 @@ class StatsController extends Controller
                 'dept'        => $dept,
                 'count'       => $sumEvents,       // 合計出勤（のべ日数）
                 'director'    => $sumDirector,     // 合計ディレクター数
-                'active'      => $m->count(),      // 期間内に出勤した人数
+                'active'      => $m->where('count', '>', 0)->count(),   // 期間内に出勤した人数（0の社員は除く）
                 'headcount'   => $head,            // 部署の社員数（平均の分母）
                 'avgEvents'   => $head > 0 ? round($sumEvents / $head, 1) : 0,
                 'avgDirector' => $head > 0 ? round($sumDirector / $head, 1) : 0,
