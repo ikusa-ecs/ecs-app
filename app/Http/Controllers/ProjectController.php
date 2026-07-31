@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Content;
+use App\Models\Office;
 use App\Models\Person;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,20 +23,38 @@ use Illuminate\Support\Facades\DB;
  */
 class ProjectController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $today = Carbon::today();
 
         // コンテンツID → 名前（見出し用）。1回だけ引いて連想配列にしておく。
         $contentNames = Content::pluck('content_name', 'id');
 
+        // 拠点の表示範囲（全拠点運用・設計書19.2）。管理者以上はスイッチで選んだ拠点、
+        // 一般社員は自拠点固定。null＝全拠点（絞らない）。現状は全員東京なので実質全件。
+        $officeScope = \App\Support\OfficeScope::filter($request);
+
+        // ログイン中の拠点と、コピー/巻き取りを操作できるか（＝アサイン担当＝管理者以上）。
+        $myOffice = Auth::user()->office ?: '東京';
+        $canManageShare = \App\Support\OfficeScope::canSeeAll();
+
         // ディレクター・SD・物品担当の名前は people を一緒に読む（毎回引かないようにする）。
+        // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」も含める（アサイン表と同じ）。
         $projects = Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name'])
+            ->when($officeScope, fn ($q) => $q->where(function ($qq) use ($officeScope) {
+                $qq->where('office', $officeScope)
+                    ->orWhereHas('shares', fn ($s) => $s->where('office', $officeScope));
+            }))
             ->orderBy('start_date')
             ->get();
 
+        // この一覧に出る案件の「拠点間共有」（ヘルプ/巻き取り）をまとめて引く。
+        $sharesByProject = $projects->isEmpty()
+            ? collect()
+            : \App\Models\ProjectShare::whereIn('project_id', $projects->pluck('id')->all())->get()->groupBy('project_id');
+
         // cases.js と同じ項目名に詰め替える（既存の表示JSをそのまま動かすため）。
-        $cases = $projects->map(function (Project $p) use ($today, $contentNames) {
+        $cases = $projects->map(function (Project $p) use ($today, $contentNames, $sharesByProject, $myOffice, $canManageShare) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。cases.js の off と同じ意味。
             $off = $p->start_date
                 ? intdiv(
@@ -118,6 +138,15 @@ class ProjectController extends Controller
                 'archived'   => $effectiveArchived,
                 'is_archived' => $p->is_archived,   // 生の手動状態（null=自動／true/false=手動）。参考用
                 'off'        => $off,
+                // ---- 拠点まわり（全拠点運用・設計書19.2）----
+                'office'        => $p->office ?? '',                          // 登録拠点
+                'sharedOffices' => $sharesByProject->get($p->id, collect())
+                    ->map(fn ($s) => ['office' => $s->office, 'kind' => $s->kind])->values()->all(),
+                'isOwn'         => ($p->office ?? '') === $myOffice,
+                'sharedToMe'    => (bool) $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
+                'myKind'        => optional($sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice))->kind ?? 'ヘルプ',
+                'canCopy'       => $canManageShare && ($p->office ?? '') !== '' && ($p->office ?? '') !== $myOffice
+                    && ! $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
             ];
         })->values();
 
@@ -144,6 +173,12 @@ class ProjectController extends Controller
             'cases'         => $cases,
             'repeatClients' => $repeatClients,
             'employees'     => $employees,
+            // 拠点バッジは「全拠点」表示のときだけ出す（単体拠点なら自明・baba 2026-07-29）。
+            'showOfficeBadge' => $officeScope === null,
+            // コピー/巻き取り操作ができるか（アサイン担当＝管理者以上）。
+            'canManageShare'  => $canManageShare,
+            // 絞り込みの「拠点」プルダウンの並び（拠点マスタの順）。全拠点表示のときだけ画面に出す。
+            'officeOptions'   => \App\Support\OfficeScope::options(),
         ]);
     }
 
@@ -186,6 +221,7 @@ class ProjectController extends Controller
                     'parent_project_id' => $p->parent_project_id,
                     'sales_owner'      => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '') : '',
                     'agency'           => $p->agency,
+                    'office'           => $p->office,
                     'format'           => $p->format,
                     'online_tool'      => $p->online_tool,
                     'base_locations'   => is_array($p->base_locations) ? $p->base_locations : [],
@@ -248,10 +284,19 @@ class ProjectController extends Controller
             ->values()
             ->all();
 
+        // 登録拠点プルダウン用：拠点マスタ（有効なもの・並び順）。全拠点運用の土台（設計書19.2）。
+        $offices = Office::where('active', true)->orderBy('sort_order')->pluck('name')->all();
+
+        // 既定の拠点＝編集ならその案件の拠点／新規ならログイン中の社員の拠点（無ければ東京）。
+        $defaultOffice = $editProject['office']
+            ?? (Auth::user()->office ?? '東京');
+
         return view('project_form', [
             'editProject'    => $editProject,
             'parentProjects' => $parentProjects,
             'salesOwners'    => $salesOwners,
+            'offices'        => $offices,
+            'defaultOffice'  => $defaultOffice,
             // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
             'assignMtgDate'  => \App\Support\AssignMtg::current(),
@@ -344,6 +389,10 @@ class ProjectController extends Controller
             'parent_project_id' => $parentId,
             'sales_owners' => $request->filled('sales_owner') ? [$request->input('sales_owner')] : null,
             'agency' => $request->input('agency'),
+            // 登録拠点＝案件がどの拠点のものか（設計書19.2）。送信値を優先し、
+            // 無ければ編集時は既存を維持／新規はログイン者の拠点（無ければ東京）。
+            'office' => $request->input('office')
+                ?: ($editing->office ?? (Auth::user()->office ?? '東京')),
             'format' => $request->input('format'),
             // オンラインツールは実施形態が「オンライン」のときだけ保存（それ以外は初期値zoomが残らないよう null）。
             'online_tool' => str_contains((string) $request->input('format'), 'オンライン')

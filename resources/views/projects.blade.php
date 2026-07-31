@@ -11,6 +11,9 @@
   window.ECS_CSRF = '{{ csrf_token() }}';   // ケータリング等の保存に使う合言葉
   window.ECS_REPEAT_CLIENTS = @json($repeatClients ?? []);   // リピート（常連）クライアント名の集合（名前→true）
   window.ECS_EMPLOYEES = @json($employees ?? []);   // D／SD／物品担当プルダウン用の社員一覧（id,name）
+  window.ECS_SHOW_OFFICE = @json($showOfficeBadge ?? false);   // 拠点バッジを出すか（全拠点表示のときだけ）
+  window.ECS_CAN_SHARE = @json($canManageShare ?? false);      // コピー/巻き取り操作ができるか（管理者以上）
+  window.ECS_OFFICE_LIST = @json($officeOptions ?? []);        // 絞り込み「拠点」の選択肢（拠点マスタの順）
 </script>
 @verbatim
 <style>
@@ -295,6 +298,25 @@
 @if (session('status'))
 <div class="mock-note" style="background:#e7f0e9; border-color:#cdeccf; color:#15803d;">✓ {{ session('status') }}</div>
 @endif
+@include('partials.office_switch')
+<style>
+  /* 拠点まわり（全拠点運用・設計書19.2）：一覧の拠点バッジ・コピー操作 */
+  .proj-cell .os-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; }
+  .of-badge { font-size: 10.5px; font-weight: 800; color: #fff; background: var(--brand, #8a5a33); border-radius: 6px; padding: 2px 8px; }
+  .of-badge small { font-weight: 600; opacity: .85; }
+  /* 拠点ごとの色（ひと目でどこの案件か分かるように）。東北はアサイン表の日付ヘッダーと同じオリーブ。 */
+  .of-badge.of-tokyo    { background: #8a5a33; }
+  .of-badge.of-osaka    { background: #a14b3c; }
+  .of-badge.of-nagoya   { background: #c2410c; }
+  .of-badge.of-fukuoka  { background: #7c5aa6; }
+  .of-badge.of-tohoku   { background: #5f8079; }
+  .of-badge.of-hokkaido { background: #3f6fa3; }
+  .of-badge.of-etc      { background: #6b7280; }
+  .of-share { font-size: 10.5px; font-weight: 700; color: var(--brand-dark, #6d4526); background: var(--brand-soft, #f6e9dd); border: 1px solid var(--line, #e6d8c8); border-radius: 6px; padding: 2px 8px; }
+  .of-mine { font-size: 10.5px; font-weight: 800; color: #166534; background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 6px; padding: 2px 8px; }
+  .ops .copy-ctl { display: inline-flex; align-items: center; gap: 4px; }
+  .ops .copy-ctl select { font-size: 11px; padding: 1px 4px; }
+</style>
 @verbatim
       <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<b>リピート（常連）のクライアントは、クライアント名を押すと過去のアサインをさかのぼれます。</b><br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（ディレクター・SD・物品担当・移動・音響）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>その場で保存されます</b>（読み込み直しても残ります）。準備チェックだけは次の工程で対応予定です。</div>
 
@@ -322,7 +344,13 @@
               <option value="リアル">リアル系</option>
               <option value="オンライン">オンライン</option>
               <option value="ARENA">ARENA場所貸し</option>
-              <option value="他拠点">他拠点（依頼・巻き取り）</option>
+            </select>
+          </div>
+          <!-- 拠点（全拠点運用・設計書19.2）。選択肢はJSで入れ、「全拠点」表示のときだけ表示する。 -->
+          <div class="f-item" id="fOfficeItem" style="display:none;">
+            <label>拠点</label>
+            <select id="office" onchange="applyFilter()">
+              <option value="">すべて</option>
             </select>
           </div>
           <div class="f-item">
@@ -350,10 +378,21 @@
               <option value="リハ">リハ</option>
             </select>
           </div>
+          <!-- 開催日でしぼる。左だけ＝その日以降／右だけ＝その日まで／両方同じ日＝その1日だけ。 -->
+          <div class="f-item">
+            <label>開催日（この日から〜この日まで）</label>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <input type="date" id="dFrom" onchange="applyFilter()" style="width:140px;">
+              <span style="color:var(--muted,#8a7a6b);">〜</span>
+              <input type="date" id="dTo" onchange="applyFilter()" style="width:140px;">
+              <button class="btn" type="button" onclick="clearDateFilter()" title="日付の絞り込みを外す" style="padding:5px 9px;">×</button>
+            </div>
+          </div>
           <div class="spacer"></div>
           <div class="f-item">
             <label>&nbsp;</label>
             <div style="display:flex; gap:8px;">
+              <button class="btn" type="button" onclick="openChat()">💬 チャットワーク用に書き出し</button>
               <button class="btn" type="button" onclick="openExport()">📤 アサイン表へ書き出し</button>
               <a class="btn" href="/project-import">⬆ CSVで取込</a>
               <a class="btn primary" href="/project-form">＋ 案件を登録</a>
@@ -396,6 +435,38 @@
         ※ 集合・解散の下の小さい数字は「入場 / 開始 / 終了」です。<br>
         ※「状況」はアサインの進み具合です。スタッフ募集をしない案件（会場貸し等）は「—」になります。
       </p>
+
+      <!-- ===== チャットワーク用に書き出し モーダル =====
+           いま絞り込んでいる案件だけを、そのまま貼れる文章にする（表・罫線の記号は使わない）。 -->
+      <div class="exp-bg" id="chatBg" onclick="if(event.target===this) closeChat()">
+        <div class="exp-modal">
+          <div class="exp-head">
+            <h2>💬 チャットワーク用に書き出し</h2>
+            <div class="spacer"></div>
+            <button class="agg-close" type="button" onclick="closeChat()">×</button>
+          </div>
+          <div class="exp-body">
+            <div class="exp-row">
+              <label>書き方</label>
+              <select id="chatStyle" onchange="renderChat()">
+                <option value="short">短い版（1案件1行）</option>
+                <option value="long">詳しい版（1案件2〜3行）</option>
+              </select>
+              <span class="exp-count">いま絞り込んでいる案件：<b id="chatCount">0</b> 件</span>
+              <div class="spacer" style="flex:1;"></div>
+              <button class="btn primary" type="button" onclick="copyChat()">全選択してコピー</button>
+              <span class="copied-msg" id="chatCopied">✓ コピーしました</span>
+            </div>
+            <textarea class="exp-ta" id="chatTa" readonly onclick="this.select()"></textarea>
+            <div class="exp-steps">
+              <b>使い方：</b><br>
+              ① 先に一覧で絞り込む（拠点・開催日・キーワードなど）。<b>いま絞り込んでいる案件だけ</b>が文章になります<br>
+              ② 「全選択してコピー」を押して、チャットワークの入力欄に貼り付け（Ctrl+V）<br>
+              ※ 表や罫線の記号は使っていないので、貼っても崩れません。未定・空欄の項目は出しません。
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- ===== アサイン表へ書き出し モーダル ===== -->
       <div class="exp-bg" id="expBg" onclick="if(event.target===this) closeExport()">
@@ -457,7 +528,11 @@
       area:c.area, catering:c.catering, agency:c.agency,
       logo:c.logo, camera:c.camera, article:c.article, video:c.video,
       note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, scale:c.scale, sd:c.sd, id:c.id,
-      toc:!!c.toc, cateringNote:c.cateringNote,
+      toc:!!c.toc, cateringNote:c.cateringNote, need:c.need,
+      // 拠点まわり（全拠点運用・設計書19.2）。ここに書き写さないと画面側では空になり、
+      // 拠点の札も「自拠点にコピー」も出なくなる（ケータリングで同じ抜けをやった＝注意）。
+      office:c.office || '', sharedOffices:c.sharedOffices || [], isOwn:!!c.isOwn,
+      sharedToMe:!!c.sharedToMe, myKind:c.myKind || 'ヘルプ', canCopy:!!c.canCopy,
       // 詳細プルダウンの現在値（社員ID）。担当なしは null。音響(sound)は上で設定済み。
       directorId:c.director_id, sdId:c.sd_id, goodsId:c.goods_owner_id
     };
@@ -484,6 +559,24 @@
   function atMidnight(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
   function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
   function fmtMD(d) { return (d.getMonth()+1) + '/' + d.getDate(); }
+  // 日付 → "2026-08-01"（日付での絞り込みは、この形の文字列同士の比較でできる）
+  function isoOf(d) {
+    const m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+  // "2026-08-01" → "8/1"（チャットワーク用の見出しに使う）
+  function isoToMD(s) {
+    const a = String(s).split('-');
+    return a.length === 3 ? (Number(a[1]) + '/' + Number(a[2])) : s;
+  }
+  // 拠点 → 札の色クラス（拠点ごとに色を変えて、一覧をスクロールしただけで分かるように）
+  const OFFICE_CLASS = { '東京':'of-tokyo', '大阪':'of-osaka', '名古屋':'of-nagoya', '福岡':'of-fukuoka', '東北':'of-tohoku', '北海道':'of-hokkaido' };
+  function officeClass(name) { return OFFICE_CLASS[name] || 'of-etc'; }
+  // 絞り込みの「拠点」の値（プルダウンを出していないときは常に空＝絞らない）
+  function officeFilterValue() {
+    const el = document.getElementById('office');
+    return (el && window.ECS_SHOW_OFFICE) ? el.value : '';
+  }
 
   const today = atMidnight(new Date());
   const todayY = today.getFullYear();
@@ -688,6 +781,27 @@
         ? `<span class="badge ${statusBadge[p.status]}">${p.status}</span>`
         : '<span class="na">—</span>';
 
+      // 拠点まわり（全拠点運用・設計書19.2）：拠点バッジ（全拠点表示のときだけ）とコピー/巻き取り操作。
+      let officeBadge = '';
+      if (window.ECS_SHOW_OFFICE && p.office) {
+        let extra = '';
+        (p.sharedOffices || []).forEach(function (so) { extra += `<span class="of-share">${so.office}に${so.kind}</span>`; });
+        if (p.sharedToMe) extra += `<span class="of-mine">自拠点にコピー済(${p.myKind})</span>`;
+        officeBadge = `<div class="sub-info os-line"><span class="of-badge ${officeClass(p.office)}">${p.office}${p.isOwn ? '<small>（自拠点）</small>' : ''}</span>${extra}</div>`;
+      }
+      let copyCtl = '';
+      if (window.ECS_CAN_SHARE && p.canCopy) {
+        copyCtl = `<span class="copy-ctl" onclick="event.stopPropagation()">`
+          + `<select id="ck-${p._i}"><option value="ヘルプ">ヘルプ</option><option value="巻き取り">巻き取り</option></select>`
+          + `<a href="#" onclick="event.preventDefault();event.stopPropagation();ecsProjCopy('${p.id}',document.getElementById('ck-${p._i}').value)">📥自拠点にコピー</a></span>`;
+      } else if (window.ECS_CAN_SHARE && p.sharedToMe) {
+        copyCtl = `<span class="copy-ctl" onclick="event.stopPropagation()">`
+          + `<select onchange="ecsProjCopy('${p.id}',this.value)" title="関わり方（選ぶと保存）">`
+          + `<option value="ヘルプ"${p.myKind === 'ヘルプ' ? ' selected' : ''}>ヘルプ</option>`
+          + `<option value="巻き取り"${p.myKind === '巻き取り' ? ' selected' : ''}>巻き取り</option></select>`
+          + `<a href="#" onclick="event.preventDefault();event.stopPropagation();ecsProjRemoveShare('${p.id}')">解除</a></span>`;
+      }
+
       // ----- 案件行（クリックで詳細展開） -----
       const tr = document.createElement('tr');
       tr.className = 'main-row' + (p.draft ? ' draft' : '');
@@ -700,6 +814,8 @@
       tr.dataset.kbn    = kk;
       tr.dataset.recruit = rs;
       tr.dataset.toc     = p.toc ? '1' : '0';
+      tr.dataset.office  = p.office || '';        // 拠点での絞り込み用
+      tr.dataset.date    = isoOf(p.date);         // 開催日（2026-08-01の形）＝日付での絞り込み用
       tr.dataset.catering = isCateringOn(p.catering) ? 'あり' : 'なし';
       tr.dataset.draft  = p.draft ? '1' : '0';
       tr.dataset.archived = p.archived ? '1' : '0';
@@ -721,6 +837,7 @@
           <strong>${p.content}</strong>${tags}${noteFlag}
           <div class="sub-info"><span class="fbadge ${formatClass(p.format)}">${p.format}</span></div>
           <div class="sub-info">${clientLine}</div>
+          ${officeBadge}
         </td>
         <td class="person">
           <div>${p.sales}</div>
@@ -731,6 +848,7 @@
         <td class="ops" onclick="event.stopPropagation()">
           <a href="/project-assign?project=${encodeURIComponent(p.id)}">アサイン</a>
           <a href="/project-form?project=${encodeURIComponent(p.id)}">編集</a>
+          ${copyCtl}
           <a href="#" id="arc-${p._i}" onclick="event.preventDefault(); toggleArchive(${p._i});">${p.archived ? '↩ 戻す' : '🗄 アーカイブ'}</a>
           <a href="#" class="del-link" onclick="event.preventDefault(); deleteProject('${p.id}');">削除</a>
         </td>`;
@@ -902,6 +1020,9 @@
     const toc      = document.getElementById('toc').value;         // ''=すべて / 'toc' / 'tob'
     const catering = document.getElementById('catering').value;    // ''=すべて / 'あり' / 'なし'
     const kbn     = document.getElementById('kbn').value;
+    const office  = officeFilterValue();                           // ''=すべての拠点
+    const dFrom   = document.getElementById('dFrom').value;        // ''か '2026-08-01'
+    const dTo     = document.getElementById('dTo').value;
 
     let shown = 0, total = 0, draftTotal = 0, archivedTotal = 0;
     const groupShown = {};
@@ -923,8 +1044,13 @@
       const okToc = !toc    || (toc === 'toc' ? tr.dataset.toc === '1' : tr.dataset.toc === '0');
       const okCat = !catering || tr.dataset.catering === catering;
       const okKbn = !kbn     || tr.dataset.kbn === kbn;
+      const okOf  = !office  || tr.dataset.office === office;
+      // 開催日は "2026-08-01" の形なので、文字列のまま大小を比べれば日付の前後になる。
+      const okDate = (!dFrom || tr.dataset.date >= dFrom) && (!dTo || tr.dataset.date <= dTo);
       // 絞り込みに一致するか（matched）と、その月が畳まれているか（collapsed）は別。
-      const matched = okTab && okKw && okYo && okFmt && okToc && okCat && okKbn;
+      const matched = okTab && okKw && okYo && okFmt && okToc && okCat && okKbn && okOf && okDate;
+      // チャットワーク用の書き出しは「月を畳んでいても、絞り込みに一致した案件」を対象にする。
+      tr.dataset.matched = matched ? '1' : '0';
       const collapsed = collapsedMonths.has(tr.dataset.group);
       tr.style.display = (matched && !collapsed) ? '' : 'none';
       // 詳細はいったん閉じる
@@ -1015,6 +1141,29 @@
     flashTimer = setTimeout(() => gr.classList.remove('flash'), 1500);
   }
 
+  // 日付の絞り込みを外す（「×」ボタン）。
+  function clearDateFilter() {
+    document.getElementById('dFrom').value = '';
+    document.getElementById('dTo').value = '';
+    applyFilter();
+  }
+
+  // 絞り込みの「拠点」プルダウンを作る。「全拠点」表示のときだけ出す
+  // （1拠点だけ見ているときは全部同じ拠点なので、あっても意味がない）。
+  function buildOfficeFilter() {
+    const item = document.getElementById('fOfficeItem');
+    const sel  = document.getElementById('office');
+    if (!item || !sel) return;
+    if (!window.ECS_SHOW_OFFICE) return;      // 非表示のまま（値も空なので絞られない）
+    (window.ECS_OFFICE_LIST || []).forEach(function (name) {
+      const o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      sel.appendChild(o);
+    });
+    item.style.display = '';
+  }
+
+  buildOfficeFilter();
   buildYmTree();
   applyFilter();
 
@@ -1150,6 +1299,140 @@
       m.classList.add('show');
       setTimeout(() => m.classList.remove('show'), 2500);
     }
+  }
+
+  // ===== チャットワーク用に書き出し =====
+  // いま絞り込んでいる案件（月を畳んでいても対象）を、そのまま貼れる文章にする。
+
+  // 絞り込みを通った案件を、一覧の並び（日程順）のまま集める。
+  function matchedProjects() {
+    const out = [];
+    document.querySelectorAll('#projBody tr.main-row').forEach(tr => {
+      if (tr.dataset.matched !== '1') return;
+      const p = projects[Number(tr.dataset.idx)];
+      if (p) out.push(p);
+    });
+    return out;
+  }
+
+  // 見出し行（何を絞り込んでいるかが分かるように、条件から自動で作る）。
+  function chatHeader(n) {
+    const dFrom = document.getElementById('dFrom').value;
+    const dTo   = document.getElementById('dTo').value;
+    const kw    = document.getElementById('kw').value.trim();
+    const office = officeFilterValue();
+
+    let when = '';
+    if (dFrom && dTo) when = (dFrom === dTo) ? isoToMD(dFrom) : isoToMD(dFrom) + '〜' + isoToMD(dTo);
+    else if (dFrom)   when = isoToMD(dFrom) + '以降';
+    else if (dTo)     when = isoToMD(dTo) + 'まで';
+
+    const bits = [];
+    if (office) bits.push(office);
+    if (when)   bits.push(when);
+    if (kw)     bits.push('「' + kw + '」');
+    if (currentTab === 'draft')         bits.push('下書き');
+    else if (currentTab === 'archived') bits.push('終了ぶん');
+
+    return '■ ' + (bits.length ? bits.join(' ') + ' の案件' : '案件一覧') + '（' + n + '件）';
+  }
+
+  // 1案件ぶんの文章。style='short'＝1行／'long'＝2〜3行。空・未定の項目は出さない。
+  function chatLines(p, style, withOffice) {
+    const d = fmtMD(p.date) + '(' + DOW[p.date.getDay()] + ')';
+    const of = (withOffice && p.office) ? '【' + p.office + '】' : '';
+    const place  = expCell(p.place);
+    const client = expCell(p.client);
+    const dir    = expCell(p.director) === '未定' ? '' : expCell(p.director);
+    const sales  = expCell(p.sales);
+    const need   = expCell(p.need);
+    const meet   = expCell(p.meet);
+    const leave  = expCell(p.leave);
+    const note   = expCell(p.note);
+
+    if (style === 'short') {
+      const parts = [d + ' ' + expCell(p.content) + of];
+      if (place) parts.push(place);
+      if (dir)   parts.push('D:' + dir);
+      if (need)  parts.push('運営' + need + '名');
+      return [parts.join(' ／ ')];
+    }
+
+    // 詳しい版
+    const lines = ['【' + d + '】' + expCell(p.content) + of];
+    const l2 = [];
+    if (place)  l2.push('会場：' + place);
+    if (client) l2.push('クライアント：' + client);
+    if (l2.length) lines.push('　' + l2.join('／'));
+    const l3 = [];
+    if (meet && leave) l3.push('集合' + meet + '〜解散' + leave);
+    if (need)  l3.push('運営' + need + '名');
+    if (dir)   l3.push('D:' + dir);
+    if (sales) l3.push('営業:' + sales);
+    if (l3.length) lines.push('　' + l3.join('／'));
+    if (note) lines.push('　備考：' + note);
+    return lines;
+  }
+
+  function buildChatText() {
+    const style = document.getElementById('chatStyle').value;
+    const list  = matchedProjects();
+    // 1拠点に絞っているときは見出しに拠点が入るので、各行には付けない（くり返しを避ける）。
+    const withOffice = !!window.ECS_SHOW_OFFICE && !officeFilterValue();
+
+    const body = [];
+    list.forEach(p => {
+      body.push(chatLines(p, style, withOffice).join('\n'));
+    });
+    const text = chatHeader(list.length) + '\n\n'
+      + (list.length ? body.join(style === 'long' ? '\n\n' : '\n') : '（該当する案件がありません）');
+    return { text, n: list.length };
+  }
+
+  function openChat() {
+    renderChat();
+    document.getElementById('chatBg').classList.add('show');
+  }
+  function closeChat() { document.getElementById('chatBg').classList.remove('show'); }
+
+  function renderChat() {
+    const { text, n } = buildChatText();
+    document.getElementById('chatTa').value = text;
+    document.getElementById('chatCount').textContent = n;
+    document.getElementById('chatCopied').classList.remove('show');
+  }
+
+  function copyChat() {
+    const ta = document.getElementById('chatTa');
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) { navigator.clipboard.writeText(ta.value).then(()=>{}, ()=>{}); ok = true; }
+    if (ok) {
+      const m = document.getElementById('chatCopied');
+      m.classList.add('show');
+      setTimeout(() => m.classList.remove('show'), 2500);
+    }
+  }
+
+  // 拠点まわり（全拠点運用・設計書19.2）：他拠点の案件を自拠点にコピー／解除する。
+  // フォームを組み立ててPOSTする（サーバーが back() で戻し、緑の完了メッセージが出る）。
+  function ecsProjPost(action, id, kind) {
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = action;
+    let html = `<input type="hidden" name="_token" value="${window.ECS_CSRF}"><input type="hidden" name="project_id">`;
+    if (kind) html += `<input type="hidden" name="kind">`;
+    f.innerHTML = html;
+    f.querySelector('input[name="project_id"]').value = id;   // 値はDOM経由で入れる（引用符の事故防止）
+    if (kind) f.querySelector('input[name="kind"]').value = kind;
+    document.body.appendChild(f);
+    f.submit();
+  }
+  function ecsProjCopy(id, kind) { ecsProjPost('/assign-sheet/share', id, kind || 'ヘルプ'); }
+  function ecsProjRemoveShare(id) {
+    if (confirm('自拠点へのコピーを解除しますか？')) ecsProjPost('/assign-sheet/share/remove', id, null);
   }
 </script>
 @endverbatim
