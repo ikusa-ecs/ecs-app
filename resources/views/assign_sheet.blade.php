@@ -140,6 +140,33 @@
 
 @section('content')
 
+@include('partials.office_switch')
+
+<style>
+  /* 拠点まわり（全拠点運用・設計書19.2）のバッジ・コピー操作 */
+  .acard .os-row .val { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .of-badge {
+    font-size: 11px; font-weight: 800; color: #fff; background: var(--brand, #8a5a33);
+    border-radius: 6px; padding: 2px 8px;
+  }
+  .of-badge small { font-weight: 600; opacity: .85; }
+  .of-share {
+    font-size: 11px; font-weight: 700; color: var(--brand-dark, #6d4526);
+    background: var(--brand-soft, #f6e9dd); border: 1px solid var(--line, #e6d8c8);
+    border-radius: 6px; padding: 2px 8px;
+  }
+  .of-mine {
+    font-size: 11px; font-weight: 800; color: #166534;
+    background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 6px; padding: 2px 8px;
+  }
+  .os-copy-form { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+  .os-copy-btn { padding: 5px 12px; font-size: 12.5px; }
+  .m-help {
+    font-size: 10px; font-weight: 800; color: #166534;
+    background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 999px; padding: 1px 7px; margin-left: 6px;
+  }
+</style>
+
 @php
   // 未充足（メンバー数 < 必要人数）のカード数を数えて表示に使う。
   $shortCount = collect($cards)->filter(fn ($c) => $c['need_i'] > 0 && $c['filled'] < $c['need_i'])->count();
@@ -148,6 +175,8 @@
 <div class="sheet-controls">
   {{-- 月を選ぶと、その月の案件だけ表示（GETで開き直す＝確実で分かりやすい）。 --}}
   <form method="GET" action="/assign-sheet" style="margin:0;">
+    {{-- 選んでいる拠点（管理者のスイッチ）を月切替でも保つ。 --}}
+    <input type="hidden" name="office" value="{{ request('office') }}">
     <select name="month" class="month-sel" onchange="this.form.submit()">
       @forelse ($months as $m)
         <option value="{{ $m['value'] }}" @selected($m['value'] === $selectedMonth)>{{ $m['label'] }}</option>
@@ -287,6 +316,24 @@
         </div>
         </div>{{-- /acard-sticky（ここまでが上に貼り付く部分） --}}
 
+        {{-- 拠点まわり（全拠点運用・設計書19.2）：登録拠点／関わっている他拠点／自拠点にコピー。
+             現状は全員が東京なので、他拠点の案件を見たときだけ「自拠点にコピー」が出る。 --}}
+        @if (($showOfficeBadge ?? false) && $c['office'] !== '')
+          <div class="arow os-row">
+            <span class="lbl">拠点</span>
+            <span class="val">
+              <span class="of-badge">{{ $c['office'] }}@if ($c['isOwn'])<small>（自拠点）</small>@endif</span>
+              @foreach ($c['sharedOffices'] as $so)
+                <span class="of-share">{{ $so['office'] }}に{{ $so['kind'] }}</span>
+              @endforeach
+              @if ($c['sharedToMe'])<span class="of-mine">自拠点にコピー済（{{ $c['myKind'] }}）</span>@endif
+            </span>
+          </div>
+        @endif
+
+        {{-- コピー／巻き取りの操作は「案件一覧」に移設（baba 2026-07-29）。
+             アサイン表では拠点バッジ（上）と、メンバーの「◯◯ヘルプ」表示だけを出す。 --}}
+
         {{-- 値のある項目だけ（編集できる項目は編集モードで入力欄に切り替わる） --}}
         @foreach ($rows as $r)
           @if (isset($r['edit']))
@@ -339,6 +386,8 @@
                 </select>
               </span>
               <span class="nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
+                @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
+                @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
                 @if ($m['note'] !== '' || $m['patrol'] !== null)<span class="m-tag">· {{ $m['note'] }}@if ($m['patrol'] !== null) 巡回{{ $m['patrol'] }}@endif</span>@endif
                 <input class="m-edit m-note" list="sheetNoteOpts" placeholder="担当" value="{{ $m['note'] }}" title="担当メモ（軍師/サポ等・入力で保存）" onchange="ecsSheetSave(this,'note',this.value)">
                 <input class="m-edit m-patrol" type="number" min="0" placeholder="巡" value="{{ $m['patrol'] ?? '' }}" title="巡回数（入力で保存）" onchange="ecsSheetSave(this,'patrol',this.value)">

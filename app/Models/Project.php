@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * 案件。テーブルは projects。設計書8章の projects に対応。
@@ -58,5 +59,11 @@ class Project extends Model
     public function goodsOwner(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'goods_owner_id');
+    }
+
+    /** 拠点間の共有（ヘルプ／巻き取りで関わっている拠点）。全拠点運用・設計書19.2。 */
+    public function shares(): HasMany
+    {
+        return $this->hasMany(ProjectShare::class, 'project_id');
     }
 }

@@ -7,10 +7,13 @@ use App\Models\Content;
 use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ProjectShare;
 use App\Support\AssignmentRole;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * アサイン表（/assign-sheet）。
@@ -52,8 +55,21 @@ class AssignSheetController extends Controller
 
     public function index(Request $request)
     {
+        // 拠点の表示範囲（全拠点運用・設計書19.2）。管理者以上はスイッチで選んだ拠点、
+        // 一般社員は自拠点固定。null＝全拠点。現状は全員東京なので実質全件。
+        $officeScope = OfficeScope::filter($request);
+
+        // ログイン中の拠点と、共有を操作できるか（＝アサイン担当＝管理者以上）。
+        $myOffice = Auth::user()->office ?: '東京';
+        $canManageShare = OfficeScope::canSeeAll();
+
         // 対象になり得る案件＝完了/下書き以外で、開催日がある案件。
+        // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有（ヘルプ/巻き取り）された案件」も含める。
         $projects = Project::with(['director:id,name', 'goodsOwner:id,name'])
+            ->when($officeScope, fn ($q) => $q->where(function ($qq) use ($officeScope) {
+                $qq->where('office', $officeScope)
+                    ->orWhereHas('shares', fn ($s) => $s->where('office', $officeScope));
+            }))
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
@@ -95,12 +111,17 @@ class AssignSheetController extends Controller
                 ->where('status', '!=', 'キャンセル')
                 ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
 
-        // 関係する人の名前・区分をまとめて引く（毎回引かない）。
+        // 関係する人の名前・区分・拠点をまとめて引く（毎回引かない）。拠点はヘルプ表示に使う。
         $people = Person::whereIn('id', $assignments->pluck('staff_id')->unique()->all())
-            ->get(['id', 'name', 'role'])
+            ->get(['id', 'name', 'role', 'office'])
             ->keyBy('id');
 
         $membersByProject = $assignments->groupBy('project_id');
+
+        // この月の案件の「拠点間共有」（ヘルプ/巻き取り）をまとめて引く。案件ごとにまとめる。
+        $sharesByProject = $projectIds->isEmpty()
+            ? collect()
+            : ProjectShare::whereIn('project_id', $projectIds->all())->get()->groupBy('project_id');
 
         // コンテンツID → 名前（見出し用）。
         $contentNames = Content::pluck('content_name', 'id');
@@ -118,7 +139,7 @@ class AssignSheetController extends Controller
                 ->get(['content_id', 'scale', 'position', 'count', 'note', 'patrol'])
                 ->groupBy('content_id');
 
-        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $people, $contentNames, $reqByContent) {
+        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。
             $members = ($membersByProject->get($p->id) ?? collect())
                 ->map(function ($a) use ($people) {
@@ -133,6 +154,7 @@ class AssignSheetController extends Controller
                         'patrol' => $a->patrol,     // 巡回数（数値/null）
                         'status' => $a->status,   // 仮/確定
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
+                        'office' => $person->office ?? '',   // 本人の拠点（ヘルプ表示に使う）
                     ];
                 })
                 ->sortBy(fn ($m) => $this->posRank($m['roleCode']))
@@ -150,6 +172,7 @@ class AssignSheetController extends Controller
                     'patrol' => null,
                     'status' => null,
                     'type' => 'emp',
+                    'office' => '',
                 ]);
             }
 
@@ -163,10 +186,24 @@ class AssignSheetController extends Controller
 
             $sales = is_array($p->sales_owners) ? implode('・', $p->sales_owners) : '';
 
+            // 拠点間共有（全拠点運用・設計書19.2）。この案件に関わっている他拠点と種別。
+            $shareRows = ($sharesByProject->get($p->id) ?? collect())
+                ->map(fn ($s) => ['office' => $s->office, 'kind' => $s->kind])
+                ->values();
+            $myShare = $shareRows->firstWhere('office', $myOffice);
+            $ownerOffice = $p->office ?? '';
+
             return [
                 'id'          => $p->id,
                 'no'          => $i + 1,
                 'projectName' => $this->clean($p->project_name),   // 編集用の生の案件名（見出しはコンテンツ名優先で出す）
+                // ---- 拠点まわり ----
+                'office'        => $ownerOffice,                              // 登録拠点（依頼元）
+                'sharedOffices' => $shareRows->all(),                         // 関わっている他拠点＋種別
+                'isOwn'         => $ownerOffice === $myOffice,                // 自拠点が登録拠点か
+                'sharedToMe'    => (bool) $myShare,                           // 自拠点にコピー済みか
+                'myKind'        => $myShare['kind'] ?? 'ヘルプ',              // 自拠点の関わり方（種別）
+                'canCopy'       => $canManageShare && $ownerOffice !== '' && $ownerOffice !== $myOffice && ! $myShare,
                 'date'        => $this->fmtDate($p->start_date),
                 'dayType'     => $p->date_type ?? '本番',
                 'category'    => $p->category ?? '',
@@ -189,8 +226,9 @@ class AssignSheetController extends Controller
                 'teams'       => $p->team_count !== null ? (string) $p->team_count : '',
                 'need'        => $p->required_count !== null ? (string) $p->required_count : '',
                 'format'      => $this->clean($p->format),
-                'typeKey'     => $this->classifyType($p->format),                 // 日付ヘッダーの色分け用
-                'typeLabel'   => self::TYPE_LABELS[$this->classifyType($p->format)] ?? '',
+                // 日付ヘッダーの色分け＝登録拠点が東北なら専用色（baba 2026-07-24）、それ以外は形態で色分け。
+                'typeKey'     => ($ownerOffice === '東北') ? 'tohoku' : $this->classifyType($p->format),
+                'typeLabel'   => self::TYPE_LABELS[($ownerOffice === '東北') ? 'tohoku' : $this->classifyType($p->format)] ?? '',
                 'staffRole'   => $this->clean($p->staff_role),
                 'lineSent'    => (bool) $p->prep_line_sent,
                 'handover'    => (bool) $p->prep_handover,
@@ -231,6 +269,8 @@ class AssignSheetController extends Controller
             'selectedMonth' => $selectedMonth,
             'roleOptions'   => AssignmentRole::positionLabels(),
             'noteOptions'   => $noteOptions,
+            // 拠点バッジは「全拠点」表示のときだけ出す（単体拠点なら自明なので出さない・baba 2026-07-29）。
+            'showOfficeBadge' => $officeScope === null,
         ]);
     }
 
@@ -286,6 +326,54 @@ class AssignSheetController extends Controller
         $project->save();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 他拠点の案件を「自拠点にコピー」する（全拠点運用・設計書19.2(3)）。
+     * 案件は複製せず、project_shares に「自拠点が関わっている（ヘルプ/巻き取り）」を1行足すだけ。
+     * これで自拠点のアサイン表にこの案件が出て、自拠点スタッフをアサインできるようになる。
+     * 実行できるのはアサイン担当＝管理者以上（ルートで tier:manager）。
+     */
+    public function shareToOffice(Request $request)
+    {
+        $data = $request->validate([
+            'project_id' => ['required', 'string'],
+            'kind' => ['nullable', 'in:ヘルプ,巻き取り'],
+        ]);
+
+        $office = Auth::user()->office ?: '東京';
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return back()->with('status', '案件が見つかりませんでした。');
+        }
+
+        // 自拠点の案件はコピー不要（そのまま自拠点のアサイン表に出ている）。
+        if (($project->office ?? '') === $office) {
+            return back()->with('status', 'これは自拠点の案件です。コピーは不要です。');
+        }
+
+        $kind = $data['kind'] ?? 'ヘルプ';
+
+        // 同じ案件×同じ拠点は1行（updateOrCreate）。種別の変更もここで反映。
+        ProjectShare::updateOrCreate(
+            ['project_id' => $project->id, 'office' => $office],
+            ['kind' => $kind, 'created_by' => Auth::id()]
+        );
+
+        return back()->with('status', "「{$project->project_name}」を自拠点（{$office}）に{$kind}でコピーしました。");
+    }
+
+    /** 自拠点へのコピーを解除する（project_shares から自拠点の行を消す）。tier:manager。 */
+    public function removeShare(Request $request)
+    {
+        $data = $request->validate(['project_id' => ['required', 'string']]);
+
+        $office = Auth::user()->office ?: '東京';
+        ProjectShare::where('project_id', $data['project_id'])
+            ->where('office', $office)
+            ->delete();
+
+        return back()->with('status', '自拠点へのコピーを解除しました。');
     }
 
     /**

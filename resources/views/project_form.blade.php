@@ -288,23 +288,25 @@
             <div class="hint">社員マスタ（社員）から選びます。既定はログイン中の社員です。一覧にない方は「その他（直接入力）」を選ぶと手入力できます。</div>
           </div>
 
+          <!-- 登録拠点：この案件がどの拠点のものか（全拠点運用・設計書19.2）。
+               ここは @verbatim 区間なので中身はJSで入れる（window.ECS_OFFICES / ECS_DEFAULT_OFFICE）。 -->
+          <div class="form-row">
+            <label>登録拠点</label>
+            <select id="officeSel" name="office"></select>
+            <div class="hint">この案件を担当する拠点です。既定はあなたの拠点になります。（全拠点で使うときに、拠点別の集計や他拠点への依頼の基準になります）</div>
+          </div>
+
           <!-- 6. 実施形態 -->
           <div class="form-row full">
             <label>実施形態</label>
             <select id="format" name="format" onchange="onFormatChange()">
-              <option>イベント東(リアル)</option>
-              <option>イベント東(リアルロング)</option>
-              <option>イベント東(オンライン)</option>
+              <option>リアル</option>
+              <option>リアルロング</option>
+              <option>オンライン</option>
               <option>ARENA場所貸し</option>
-              <option>イベント東北(リアル)</option>
-              <option>イベント東北(リアルロング)</option>
-              <option>イベント東北(オンライン)</option>
-              <option>イベント他拠点→東(巻き取り)</option>
-              <option>イベント東→他拠点(巻き取り)</option>
-              <option>イベント他拠点(ヘルプのみ)</option>
               <option>体験会</option>
             </select>
-            <div class="hint">拠点＋形態などから選びます。「オンライン」を選ぶとツールが選べます。リアルロング＝集合〜解散の拘束が9時間を超える案件。</div>
+            <div class="hint">案件の形態を選びます（拠点は上の「登録拠点」で持ちます）。「オンライン」を選ぶとツールが選べます。リアルロング＝集合〜解散の拘束が9時間を超える案件。</div>
             <div class="expand-box" id="toolBox">
               <div class="form-row" style="margin-bottom:0;">
                 <label>オンラインツール</label>
@@ -760,6 +762,11 @@
 <script>window.ECS_PARENTS = @json($parentProjects ?? []);</script>
 {{-- 営業担当プルダウンの選択肢＝社員（role=employee）の名前一覧。 --}}
 <script>window.ECS_SALES = @json($salesOwners ?? []);</script>
+{{-- 登録拠点プルダウンの選択肢（拠点マスタ）と既定値（編集=既存/新規=ログイン者の拠点）。 --}}
+<script>
+  window.ECS_OFFICES = @json($offices ?? ['東京']);
+  window.ECS_DEFAULT_OFFICE = @json($defaultOffice ?? '東京');
+</script>
 {{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
 <script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
 <script src="/ecs/data/cases.js"></script>
@@ -1256,6 +1263,24 @@
       if (other) other.value = init;
     }
     onSalesChange();                         // 手入力欄の表示・name付け替えを反映
+  })();
+
+  // 登録拠点プルダウン：拠点マスタを並べ、初期値（編集＝保存値／新規＝ログイン者の拠点）を選ぶ。
+  (function buildOfficeOptions() {
+    const sel = document.getElementById('officeSel');
+    if (!sel || !Array.isArray(window.ECS_OFFICES)) return;
+    sel.innerHTML = '';
+    window.ECS_OFFICES.forEach(function (name) {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    const init = (window.ECS_EDIT && window.ECS_EDIT.office)
+      ? window.ECS_EDIT.office
+      : (window.ECS_DEFAULT_OFFICE || '東京');
+    if (init && window.ECS_OFFICES.indexOf(init) !== -1) {
+      sel.value = init;
+    }
   })();
 
   // ===== リピート（常連）クライアントの照会 =====

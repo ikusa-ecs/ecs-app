@@ -158,6 +158,9 @@ Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
 Route::get('/assign-sheet', [AssignSheetController::class, 'index']);
 // アサイン表から案件の時間・人数・備考を直接保存（公開ボードの時間保存と同じ「選ぶ/入れると保存」方式）。
 Route::post('/assign-sheet/project', [AssignSheetController::class, 'updateProject']);
+// 他拠点の案件を自拠点にコピー（ヘルプ/巻き取り）／解除。アサイン担当＝管理者以上のみ（全拠点運用・設計書19.2）。
+Route::post('/assign-sheet/share', [AssignSheetController::class, 'shareToOffice'])->middleware('tier:manager');
+Route::post('/assign-sheet/share/remove', [AssignSheetController::class, 'removeShare'])->middleware('tier:manager');
 // クライアント別アサイン履歴。お客様ごとに「常連スタッフ」と過去案件の顔ぶれを見る（見るだけ）。
 Route::get('/assign-history', [AssignHistoryController::class, 'index']);
 // クライアント履歴の照会（AJAX用）。案件登録フォームが ?client=名前 で呼び、リピート判定＋過去案件をJSONで返す。

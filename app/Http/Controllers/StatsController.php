@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ProjectShare;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -132,7 +133,7 @@ class StatsController extends Controller
         // 集計対象のイベント＝開催日があり、下書き・中止でない案件（完了＝過去実績は含める）。
         $projects = Project::whereNotNull('start_date')
             ->whereNotIn('status', ['下書き', 'キャンセル', '中止'])
-            ->get(['id', 'start_date', 'format', 'base_locations', 'scale']);
+            ->get(['id', 'start_date', 'format', 'base_locations', 'scale', 'office']);
 
         // 期間の選択肢を「月／四半期／年」それぞれで作る（案件のある期間だけ）。
         $spanKeys = [
@@ -169,6 +170,8 @@ class StatsController extends Controller
         if (! in_array($scopeOffice, self::OFFICE_ORDER, true)) {
             $scopeOffice = '';   // 全拠点
         }
+        // 拠点で絞る前の「その期間の全拠点ぶん」を控える（他拠点依頼数＝拠点をまたぐ共有の集計に使う）。
+        $periodAll = $inPeriod;
         if ($scopeOffice !== '') {
             $inPeriod = $inPeriod->filter(fn (Project $p) => $this->officeOf($p) === $scopeOffice)->values();
         }
@@ -205,11 +208,23 @@ class StatsController extends Controller
             'count' => $inPeriod->filter(fn (Project $p) => (string) $p->scale === $s)->count(),
         ]);
 
-        // 他拠点依頼数（実施形態から3種を別々に集計・baba 2026-07-27）。
+        // 他拠点依頼数（拠点をまたぐ共有 project_shares から集計・全拠点運用 設計書19.2）。
+        // 「拠点」視点＝拠点を選んでいればその拠点、全拠点のときは東京を基準にする。
+        $home = $scopeOffice !== '' ? $scopeOffice : '東京';
+        $ownerOf = $periodAll->pluck('office', 'id');   // 案件ID → 登録拠点
+        $periodShares = $periodAll->isEmpty()
+            ? collect()
+            : ProjectShare::whereIn('project_id', $periodAll->pluck('id')->all())->get();
         $otherBase = [
-            ['label' => '東→他拠点（東京から依頼）', 'count' => $inPeriod->filter(fn (Project $p) => str_contains((string) $p->format, '東→他拠点'))->count()],
-            ['label' => '他拠点→東（巻き取り）', 'count' => $inPeriod->filter(fn (Project $p) => str_contains((string) $p->format, '他拠点→東') || str_contains((string) $p->format, '他拠点⇒東'))->count()],
-            ['label' => 'ヘルプのみ', 'count' => $inPeriod->filter(fn (Project $p) => str_contains((string) $p->format, 'ヘルプ'))->count()],
+            // 自拠点が登録した案件を、他拠点が巻き取って運営した数。
+            ['label' => "{$home}→他拠点（依頼）", 'count' => $periodShares
+                ->filter(fn ($s) => $s->kind === '巻き取り' && ($ownerOf[$s->project_id] ?? '') === $home)->count()],
+            // 他拠点が登録した案件を、自拠点が巻き取った数。
+            ['label' => "他拠点→{$home}（巻き取り）", 'count' => $periodShares
+                ->filter(fn ($s) => $s->kind === '巻き取り' && $s->office === $home && ($ownerOf[$s->project_id] ?? '') !== $home)->count()],
+            // ヘルプ（人だけ）。自拠点が出した／受けたぶん。
+            ['label' => 'ヘルプ', 'count' => $periodShares
+                ->filter(fn ($s) => $s->kind === 'ヘルプ' && ($s->office === $home || ($ownerOf[$s->project_id] ?? '') === $home))->count()],
         ];
 
         // ── 出勤数の集計 ──（この期間の案件に対するアサイン・キャンセル除く）
@@ -363,27 +378,22 @@ class StatsController extends Controller
     }
 
     /**
-     * 案件 → 拠点（事務所）名。各案件を1つの拠点だけに割り当てる。
-     * ①対象拠点(base_locations)が入っていればその先頭 ②無ければ実施形態から
-     *   （東北→東北／他拠点→「他拠点（未指定）」／東・ARENA→東京／それ以外→その他）。
-     * ※ 現状は東京のみ運営で対象拠点は未入力。他拠点の細かい振り分けは今後の宿題。
+     * 案件 → 拠点（事務所）＝登録拠点（office列）。全拠点運用・設計書19.2。
+     * これがイベント数の「全社合計＝登録拠点のみ」の基準。
+     * 旧データ互換：office が空なら対象拠点(base_locations)→なければ東京扱い。
      */
     private function officeOf(Project $p): string
     {
+        if (! empty($p->office)) {
+            return (string) $p->office;
+        }
+
         $bl = is_array($p->base_locations) ? array_values(array_filter($p->base_locations)) : [];
         if (! empty($bl)) {
             return (string) $bl[0];
         }
 
-        $f = (string) $p->format;
-
-        return match (true) {
-            str_contains($f, '東北')   => '東北',
-            str_contains($f, '他拠点') => '他拠点（未指定）',
-            str_contains($f, 'ARENA') => '東京',
-            str_contains($f, '東')     => '東京',
-            default                    => 'その他',
-        };
+        return '東京';   // 未設定は東京扱い（現状は全件 office あり）
     }
 
     /** オンライン案件かどうか（実施形態に「オンライン」を含む）。 */
