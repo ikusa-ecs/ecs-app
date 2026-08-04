@@ -196,9 +196,13 @@ class ProjectController extends Controller
         if ($projectId) {
             $p = Project::find($projectId);
             if ($p) {
-                // content_ids（ID配列）→ コンテンツ名の配列に戻す（タグ入力に表示するため）。
+                // タグ入力に戻す案件名（コンテンツ）。
+                // 入力された名前をそのまま持っていればそれを使う（単発コンテンツもここに入っている）。
+                // 持っていない古い案件は、これまでどおり content_ids から名前を復元する。
                 $contentNames = [];
-                if (is_array($p->content_ids) && $p->content_ids) {
+                if (is_array($p->content_names) && $p->content_names) {
+                    $contentNames = array_values(array_filter($p->content_names));
+                } elseif (is_array($p->content_ids) && $p->content_ids) {
                     $map = Content::whereIn('id', $p->content_ids)->pluck('content_name', 'id');
                     foreach ($p->content_ids as $cid) {
                         if (isset($map[$cid])) {
@@ -207,9 +211,17 @@ class ProjectController extends Controller
                     }
                 }
 
+                // そのうち台帳に無いもの＝単発コンテンツ。画面で「単発」の印を付けて表示し、
+                // 保存し直しても台帳に登録されないようにする。
+                $inMaster = $contentNames
+                    ? Content::whereIn('content_name', $contentNames)->pluck('content_name')->all()
+                    : [];
+                $oneOffNames = array_values(array_diff($contentNames, $inMaster));
+
                 $editProject = [
                     'id'               => $p->id,
                     'content_names'    => $contentNames,
+                    'oneoff_content_names' => $oneOffNames,
                     'category'         => $p->category,
                     'is_toc'           => (bool) $p->is_toc,
                     'yomi'             => $p->yomi,
@@ -347,7 +359,15 @@ class ProjectController extends Controller
             ->unique()
             ->values();
 
-        $contentIds = $this->resolveContentIds($names);
+        // 画面で「この案件だけで使う」を選んだ名前＝コンテンツ台帳には登録しない（単発コンテンツ）。
+        // その案件限りのコンテンツで台帳が増え続けるのを防ぐため（社内要望・2026-08-04）。
+        $oneOffNames = collect(explode(',', (string) $request->input('oneoff_content_names')))
+            ->map(fn ($s) => trim($s))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $contentIds = $this->resolveContentIds($names, $oneOffNames);
 
         $projectName = $names->isNotEmpty() ? $names->implode('・') : '（コンテンツ未定）';
 
@@ -389,6 +409,9 @@ class ProjectController extends Controller
         $attributes = [
             'project_name' => $projectName,
             'content_ids' => $contentIds,
+            // 入力された名前そのもの。台帳に登録しない単発コンテンツも、ここに残るので
+            // あとで編集画面を開いたときに名前が消えない。
+            'content_names' => $names->all(),
             'category' => $request->input('addtl'),
             'is_toc' => $request->has('is_toc'),   // toC（一般消費者向け）チェック
             'yomi' => $request->input('yomi'),
@@ -715,13 +738,23 @@ class ProjectController extends Controller
     /**
      * コンテンツ名の一覧 → content_ids（配列）。
      * マスタに無ければ CT-### を発番して新規作成する。store()/import() で共用。
+     *
+     * $oneOffNames＝「この案件だけで使う」と選ばれた名前。台帳には作らず、IDも持たない
+     * （名前は projects.content_names に残るので、案件からは見える）。
+     * CSV一括取込は選ぶ画面が無いため渡さない＝今までどおり台帳に登録する。
      */
-    private function resolveContentIds(Collection $names): array
+    private function resolveContentIds(Collection $names, ?Collection $oneOffNames = null): array
     {
-        return $names->map(function ($name) {
+        $oneOffNames = $oneOffNames ?: collect();
+
+        return $names->map(function ($name) use ($oneOffNames) {
             $existing = Content::where('content_name', $name)->first();
             if ($existing) {
                 return $existing->id;
+            }
+            // 台帳に無い名前のうち「この案件だけで使う」ものは、台帳に作らない。
+            if ($oneOffNames->contains($name)) {
+                return null;
             }
             // CT-### の空き番号を発番して新しいコンテンツを作る
             $maxNum = Content::all()
@@ -737,7 +770,7 @@ class ProjectController extends Controller
             ]);
 
             return $newId;
-        })->all();
+        })->filter()->values()->all();   // 単発コンテンツ（null）は content_ids に入れない
     }
 
     /**

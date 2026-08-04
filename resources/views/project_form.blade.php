@@ -88,6 +88,12 @@
     .suggest .item:hover { background: var(--brand-soft); }
     .suggest .add-new { color: var(--brand); font-weight: 600; }
     .suggest .add-new-note { display: block; color: #6b7280; font-weight: 400; font-size: 11.5px; margin-top: 2px; }
+    /* 「この案件だけで使う」を選んだコンテンツ＝タグに小さく印を付けて区別する */
+    .tag .oneoff-mark {
+      display: inline-block; margin-left: 5px; padding: 0 4px; border-radius: 4px;
+      background: #fde68a; color: #7a5200; border: 1px solid #e0b84a;
+      font-size: 10px; font-weight: 700; vertical-align: 1px;
+    }
 
     /* ===== M-2 入力必須の3段階色分け ===== */
     /* 凡例 */
@@ -140,6 +146,8 @@
 <form id="projForm" method="POST" action="/project-form">
 @csrf
 <input type="hidden" name="content_names" id="contentNamesField">
+{{-- 「この案件だけで使う」を選んだコンテンツ名。ここに入っている名前は台帳に登録しない。 --}}
+<input type="hidden" name="oneoff_content_names" id="oneoffNamesField">
 <input type="hidden" name="intent" id="intentField">
 {{-- 編集モードのとき、対象の案件IDを一緒に送る（来ていれば store() は上書き更新する） --}}
 <input type="hidden" name="project_id" id="projectIdField" value="{{ $editProject['id'] ?? '' }}">
@@ -875,9 +883,19 @@
     ? window.ECS_CONTENT_OPTIONS
     : ['水合戦','運動会','縁日','懇親会運営','表彰式','ワークショップ系','謎解き','チャンバラ合戦','ボウリング大会','クイズ大会','BBQ','カジノ'];
   const selectedContents = [];
+  // このうち「この案件だけで使う（台帳に登録しない）」を選んだ名前。単発コンテンツ。
+  const oneOffContents = [];
+  // 入力された名前をそのまま画面に出すと、記号（< > & など）で表示が崩れることがあるので置き換える。
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+    });
+  }
+  function isOneOff(c) { return oneOffContents.indexOf(c) !== -1; }
   function renderContentTags() {
     document.getElementById('contentTags').innerHTML = selectedContents.map(function(c, i) {
-      return '<span class="tag">' + c + '<b onclick="removeContent(' + i + ')">×</b></span>';
+      var mark = isOneOff(c) ? '<span class="oneoff-mark" title="この案件だけで使います（コンテンツ台帳には登録しません）">単発</span>' : '';
+      return '<span class="tag">' + escHtml(c) + mark + '<b onclick="removeContent(' + i + ')">×</b></span>';
     }).join('');
     if (typeof refreshNeedById === 'function') refreshNeedById('contentBox'); // M-2 色更新
     updateUndokaiNote(); // 「運動会」が含まれていれば備考の注意を出す
@@ -890,11 +908,27 @@
       if (note) note.style.display = hasUndokai ? '' : 'none';
     });
   }
-  function removeContent(i) { selectedContents.splice(i, 1); renderContentTags(); renderContentSuggest(); }
-  function addContent(c) {
-    if (c && selectedContents.indexOf(c) === -1) { selectedContents.push(c); renderContentTags(); }
+  function removeContent(i) {
+    var c = selectedContents[i];
+    selectedContents.splice(i, 1);
+    var o = oneOffContents.indexOf(c);
+    if (o !== -1) oneOffContents.splice(o, 1);
+    renderContentTags(); renderContentSuggest();
+  }
+  function addContent(c, oneOff) {
+    if (c && selectedContents.indexOf(c) === -1) {
+      selectedContents.push(c);
+      if (oneOff && !isOneOff(c)) oneOffContents.push(c);
+      renderContentTags();
+    }
     var s = document.getElementById('contentSearch');
     s.value = ''; renderContentSuggest(); s.focus();
+  }
+  // 入力中の名前をそのまま追加する。名前を onmousedown の中に書き込まずに済むので、
+  // 「'」などの記号が入った名前でも壊れない。
+  function addTypedContent(oneOff) {
+    var s = document.getElementById('contentSearch');
+    addContent(s.value.trim(), oneOff);
   }
   function renderContentSuggest() {
     var s = document.getElementById('contentSearch');
@@ -904,9 +938,14 @@
     if (q) items = items.filter(function(c) { return c.indexOf(q) !== -1; });
     var html = items.map(function(c) { return '<div class="item" onmousedown="addContent(\'' + c + '\')">' + c + '</div>'; }).join('');
     if (q && CONTENTS.indexOf(q) === -1 && selectedContents.indexOf(q) === -1) {
-      // 台帳に無い名前＝保存すると新しいコンテンツとして台帳に登録される。表記ゆれを増やさないよう一言添える。
-      html += '<div class="item add-new" onmousedown="addContent(\'' + q + '\')">＋「' + q + '」を新しいコンテンツとして追加'
-            + '<span class="add-new-note">（コンテンツ台帳にも登録されます。似た名前が上に無いか確認してください）</span></div>';
+      // 台帳に無い名前は、使い方が2通りあるので選べるようにする。
+      // ①その案件限りの単発コンテンツ → 台帳を増やさない（既定として上に置く）
+      // ②これから定番で使うコンテンツ → 台帳に登録して次から候補に出す
+      var qs = escHtml(q);
+      html += '<div class="item add-new" onmousedown="addTypedContent(true)">＋「' + qs + '」をこの案件だけで使う'
+            + '<span class="add-new-note">コンテンツ台帳には登録しません（その案件限りのとき）</span></div>'
+            + '<div class="item add-new" onmousedown="addTypedContent(false)">＋「' + qs + '」を新しいコンテンツとして台帳に登録する'
+            + '<span class="add-new-note">次から候補に出ます。似た名前が上に無いか確認してください</span></div>';
     }
     box.innerHTML = html;
     box.classList.toggle('open', html !== '' && document.activeElement === s);
@@ -934,6 +973,8 @@
     if (!check()) return;
     if (!confirmDanger()) return;
     document.getElementById('contentNamesField').value = selectedContents.join(',');
+    // 「この案件だけで使う」を選んだ名前も一緒に送る（この名前は台帳に登録されない）
+    document.getElementById('oneoffNamesField').value = oneOffContents.join(',');
     document.getElementById('intentField').value = intent;
     markCsvDoneBeforeSubmit();
     document.getElementById('projForm').submit();
@@ -958,6 +999,8 @@
     if (!confirmDanger()) return;
     if (!confirm('この案件を確定して保存しますか？')) return;
     document.getElementById('contentNamesField').value = selectedContents.join(',');
+    // 「この案件だけで使う」を選んだ名前も一緒に送る（この名前は台帳に登録されない）
+    document.getElementById('oneoffNamesField').value = oneOffContents.join(',');
     document.getElementById('intentField').value = 'publish';
     markCsvDoneBeforeSubmit();
     document.getElementById('projForm').submit();
@@ -1013,6 +1056,7 @@
   function loadFormSample() {
     // 案件名（コンテンツ）
     selectedContents.length = 0;
+    oneOffContents.length = 0;
     selectedContents.push('水合戦');
     if (document.getElementById('contentTbd').checked) { document.getElementById('contentTbd').checked = false; onTbd(document.getElementById('contentTbd')); }
     renderContentTags();
@@ -1122,7 +1166,12 @@
     // --- コンテンツ（タグ入力）---
     if (Array.isArray(E.content_names)) {
       selectedContents.length = 0;
+      oneOffContents.length = 0;
       E.content_names.forEach(function (n) { if (n) selectedContents.push(n); });
+      // 台帳に無いもの＝単発コンテンツ。印を復元して、保存し直しても台帳に登録されないようにする。
+      if (Array.isArray(E.oneoff_content_names)) {
+        E.oneoff_content_names.forEach(function (n) { if (n) oneOffContents.push(n); });
+      }
       renderContentTags();
     }
 

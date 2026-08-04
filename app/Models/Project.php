@@ -22,6 +22,7 @@ class Project extends Model
     {
         return [
             'content_ids' => 'array',
+            'content_names' => 'array',
             'sales_owners' => 'array',
             'base_locations' => 'array',
             'arena_options' => 'array',
