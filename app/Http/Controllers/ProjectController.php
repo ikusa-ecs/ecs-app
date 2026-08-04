@@ -287,6 +287,16 @@ class ProjectController extends Controller
         // 登録拠点プルダウン用：拠点マスタ（有効なもの・並び順）。全拠点運用の土台（設計書19.2）。
         $offices = Office::where('active', true)->orderBy('sort_order')->pluck('name')->all();
 
+        // 案件名（コンテンツ）の候補＝コンテンツ台帳（有効なもの・名前順）。
+        // 以前は画面に12件ベタ書きで、台帳にあるコンテンツの多くが候補に出なかった（社内FBで指摘あり）。
+        $contentOptions = Content::where('active', true)
+            ->orderBy('content_name')
+            ->pluck('content_name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         // 既定の拠点＝編集ならその案件の拠点／新規ならログイン中の社員の拠点（無ければ東京）。
         $defaultOffice = $editProject['office']
             ?? (Auth::user()->office ?? '東京');
@@ -297,6 +307,7 @@ class ProjectController extends Controller
             'salesOwners'    => $salesOwners,
             'offices'        => $offices,
             'defaultOffice'  => $defaultOffice,
+            'contentOptions' => $contentOptions,
             // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
             'assignMtgDate'  => \App\Support\AssignMtg::current(),

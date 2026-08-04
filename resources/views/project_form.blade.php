@@ -87,6 +87,7 @@
     .suggest .item { padding: 8px 12px; cursor: pointer; font-size: 13.5px; }
     .suggest .item:hover { background: var(--brand-soft); }
     .suggest .add-new { color: var(--brand); font-weight: 600; }
+    .suggest .add-new-note { display: block; color: #6b7280; font-weight: 400; font-size: 11.5px; margin-top: 2px; }
 
     /* ===== M-2 入力必須の3段階色分け ===== */
     /* 凡例 */
@@ -767,6 +768,8 @@
   window.ECS_OFFICES = @json($offices ?? ['東京']);
   window.ECS_DEFAULT_OFFICE = @json($defaultOffice ?? '東京');
 </script>
+{{-- 案件名（コンテンツ）の候補＝コンテンツ台帳（有効なもの）。空ならJS側のベタ書きにフォールバック。 --}}
+<script>window.ECS_CONTENT_OPTIONS = @json($contentOptions ?? []);</script>
 {{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
 <script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
 <script src="/ecs/data/cases.js"></script>
@@ -867,7 +870,10 @@
   initAddtl(); // 初期表示
 
   // ===== 案件名（コンテンツ）：検索して複数選択（タグ入力）=====
-  const CONTENTS = ['水合戦','運動会','縁日','懇親会運営','表彰式','ワークショップ系','謎解き','チャンバラ合戦','ボウリング大会','クイズ大会','BBQ','カジノ'];
+  // 候補はコンテンツ台帳（マスタ）から。台帳が空のときだけ昔のベタ書きを使う（保険）。
+  const CONTENTS = (window.ECS_CONTENT_OPTIONS && window.ECS_CONTENT_OPTIONS.length)
+    ? window.ECS_CONTENT_OPTIONS
+    : ['水合戦','運動会','縁日','懇親会運営','表彰式','ワークショップ系','謎解き','チャンバラ合戦','ボウリング大会','クイズ大会','BBQ','カジノ'];
   const selectedContents = [];
   function renderContentTags() {
     document.getElementById('contentTags').innerHTML = selectedContents.map(function(c, i) {
@@ -898,7 +904,9 @@
     if (q) items = items.filter(function(c) { return c.indexOf(q) !== -1; });
     var html = items.map(function(c) { return '<div class="item" onmousedown="addContent(\'' + c + '\')">' + c + '</div>'; }).join('');
     if (q && CONTENTS.indexOf(q) === -1 && selectedContents.indexOf(q) === -1) {
-      html += '<div class="item add-new" onmousedown="addContent(\'' + q + '\')">＋「' + q + '」を追加</div>';
+      // 台帳に無い名前＝保存すると新しいコンテンツとして台帳に登録される。表記ゆれを増やさないよう一言添える。
+      html += '<div class="item add-new" onmousedown="addContent(\'' + q + '\')">＋「' + q + '」を新しいコンテンツとして追加'
+            + '<span class="add-new-note">（コンテンツ台帳にも登録されます。似た名前が上に無いか確認してください）</span></div>';
     }
     box.innerHTML = html;
     box.classList.toggle('open', html !== '' && document.activeElement === s);

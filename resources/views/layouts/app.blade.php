@@ -48,6 +48,18 @@
   }
 </script>
 
+{{-- 日付の入力欄は、右端のカレンダーマークだけでなく「どこを押しても」カレンダーが開くようにする。
+     ブラウザの既定はマークの上だけなので、社内FBで「押しても反応しない」と指摘があった。 --}}
+<script>
+  document.addEventListener('click', function (e) {
+    var el = e.target;
+    if (!el || el.tagName !== 'INPUT' || el.type !== 'date') return;
+    if (el.readOnly || el.disabled) return;
+    if (typeof el.showPicker !== 'function') return;   // 古いブラウザは今まで通り
+    try { el.showPicker(); } catch (err) {}            // 既に開いている等は無視
+  });
+</script>
+
 {{-- 各画面のJavaScriptは @push('scripts') でここに入る --}}
 @stack('scripts')
 </body>

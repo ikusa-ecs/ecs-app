@@ -32,14 +32,16 @@
   .cal-dow { text-align:center; font-size:11.5px; font-weight:700; color:var(--muted); padding:2px 0; }
   .cal-dow.sat { color:#3b6db5; }
   .cal-dow.sun { color:var(--danger); }
-  .cal-cell { min-height:58px; border:1px solid var(--line); border-radius:6px; padding:3px 5px; background:#fff; position:relative; }
-  .cal-cell.empty { background:transparent; border:none; }
+  .cal-cell { min-height:58px; border:1px solid var(--line); border-radius:6px; padding:3px 5px; background:#fff; position:relative; cursor:pointer; }
+  .cal-cell:hover { border-color:var(--brand); }
+  .cal-cell.empty { background:transparent; border:none; cursor:default; }
+  .cal-cell.empty:hover { border-color:transparent; }
   .cal-cell .dnum { font-size:12.5px; font-weight:700; color:var(--ink); }
   .cal-cell.sat .dnum { color:#3b6db5; }
   .cal-cell.sun .dnum { color:var(--danger); }
   .cal-cell.today { outline:2px solid var(--brand); outline-offset:-2px; }
   .cal-cell.has { background:#f3f7ff; }
-  .cal-cell.danger { background:var(--danger-soft); border-color:var(--danger); cursor:help; }
+  .cal-cell.danger { background:var(--danger-soft); border-color:var(--danger); }
   .cal-cell .cnum { display:inline-block; margin-top:4px; font-size:11px; font-weight:700; color:#3b6db5; }
   .cal-cell.danger .cnum { color:var(--danger); }
   .cal-cell .big-mark { display:inline-block; margin-top:3px; font-size:10px; font-weight:700; background:#fde68a; color:#7a5200; border:1px solid #e0b84a; border-radius:5px; padding:0 4px; }
@@ -50,6 +52,22 @@
   .cal-legend .sw.has { background:#f3f7ff; }
   .cal-legend .sw.danger { background:var(--danger-soft); border-color:var(--danger); }
   .cal-legend .sw.big { background:#fde68a; border-color:#e0b84a; }
+  /* 選んでいる日（クリックした日）＝枠を濃くして分かるようにする。赤（危険日）の背景はそのまま残す。 */
+  .cal-cell.selected { outline:2px solid var(--brand-dark); outline-offset:-2px; box-shadow:0 0 0 3px var(--brand-soft); }
+  /* 日付を押したときに出る「その日の案件」パネル */
+  .day-panel { margin-top:12px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:10px 12px; }
+  .day-panel .dp-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+  .day-panel .dp-date { font-size:14px; font-weight:700; color:var(--brand-dark); }
+  .day-panel .dp-count { font-size:12px; font-weight:700; color:var(--muted); }
+  .day-panel .dp-danger { font-size:11.5px; font-weight:700; color:var(--danger); background:var(--danger-soft); border:1px solid var(--danger); border-radius:5px; padding:1px 6px; }
+  .day-panel .dp-hint { font-size:12.5px; color:var(--muted); }
+  .day-panel .dp-reason { font-size:12px; color:var(--danger); margin:0 0 4px; }
+  .day-panel .dp-item { padding:7px 0; border-top:1px solid var(--line); }
+  .day-panel .dp-item .nm { font-size:13px; font-weight:700; color:var(--brand-dark); text-decoration:none; }
+  .day-panel .dp-item .nm:hover { text-decoration:underline; }
+  .day-panel .dp-item .meta { font-size:12px; color:var(--muted); margin-top:2px; line-height:1.6; }
+  .day-panel .dp-item .meta b { color:var(--ink); font-weight:700; }
+  .day-panel .dp-item .big { display:inline-block; font-size:10px; font-weight:700; background:#fde68a; color:#7a5200; border:1px solid #e0b84a; border-radius:5px; padding:0 4px; margin-left:6px; vertical-align:2px; }
   /* 危険日リスト */
   .dgr-list { margin-top:16px; }
   .dgr-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px solid var(--line); }
@@ -109,6 +127,10 @@
           <span class="lg"><span class="sw has"></span>案件あり</span>
           <span class="lg"><span class="sw big"></span>大型案件あり</span>
           <span class="lg">数字＝その日の件数</span>
+        </div>
+        <!-- 日付を押すと、その日の案件がここに一覧で出る（社内要望・2026-07-31） -->
+        <div class="day-panel" id="dayPanel">
+          <div class="dp-hint">カレンダーの日付を押すと、その日の案件がここに一覧で出ます。</div>
         </div>
         <div class="dgr-list" id="dgrList"></div>
       </div>
@@ -209,10 +231,68 @@
       var d = window.ECS_caseDate(c.off);
       if (d.getFullYear() === y && d.getMonth() === m){
         var day = d.getDate();
-        (map[day] = map[day] || []).push({ scale:c.scale, fmt:c.fmt, need:c.need, name:c.name, client:c.client, sales:c.sales, meet:c.meet, leave:c.leave });
+        // format（実施形態の生テキスト）と id は「日付を押したときの案件リスト」で使う。
+        (map[day] = map[day] || []).push({ id:c.id, scale:c.scale, fmt:c.fmt, need:c.need, name:c.name, client:c.client, sales:c.sales, meet:c.meet, leave:c.leave, format:c.format });
       }
     });
     return map;
+  }
+
+  /* ---- 日付を押したときに出す「その日の案件リスト」 ---- */
+
+  // 案件名などをそのままHTMLに入れると崩れることがあるので、記号を無害な形に置き換える。
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+    });
+  }
+
+  // 案件名のリンク先。案件詳細だけを開くURLは無いので、既にある遷移パターン
+  // （公開ボードの案件名と同じ /projects?focus=YYYY-M ＝案件一覧のその月へ移動して点滅）に合わせる。
+  function monthLink(y, m){ return '/projects?focus=' + y + '-' + (m + 1); }
+
+  // カレンダー下のパネルに、選んだ日の案件を一覧で描く。day が null のときは案内文だけ。
+  function renderDayPanel(y, m, day, items, reasons){
+    var panel = document.getElementById('dayPanel');
+    if (!panel) return;
+    if (day == null){
+      panel.innerHTML = '<div class="dp-hint">カレンダーの日付を押すと、その日の案件がここに一覧で出ます。</div>';
+      return;
+    }
+    items = items || [];
+    reasons = reasons || [];
+    var dowJp = ['日','月','火','水','木','金','土'][new Date(y, m, day).getDay()];
+    var html = '<div class="dp-head">' +
+      '<span class="dp-date">' + y + '年' + (m + 1) + '月' + day + '日（' + dowJp + '）</span>' +
+      '<span class="dp-count">案件 ' + items.length + '件</span>' +
+      (reasons.length ? '<span class="dp-danger">⚠ 危険日</span>' : '') +
+      '</div>';
+    if (reasons.length){
+      html += '<p class="dp-reason">理由：' + esc(reasons.join('。')) + '。</p>';
+    }
+    if (!items.length){
+      html += '<div class="dp-hint">この日は案件がありません。</div>';
+    } else {
+      items.forEach(function(it){
+        var tm = (it.meet && it.meet !== '—') ? (it.meet + '〜' + (it.leave || '—')) : '時間未定';
+        var needTxt = (it.need === '' || it.need == null) ? '未定' : (it.need + '名');
+        var meta = [
+          esc(it.format || '実施形態未設定'),
+          esc(it.client || 'クライアント未定'),
+          '営業：' + esc(it.sales || '—'),
+          esc(tm),
+          '必要人数：<b>' + esc(needTxt) + '</b>',
+          '規模：' + esc(it.scale || '未設定')
+        ].join('　/　');
+        html += '<div class="dp-item">' +
+          '<a class="nm" href="' + monthLink(y, m) + '" title="案件一覧のこの月へ移動します">' +
+            esc(it.name || '（案件名なし）') + '</a>' +
+          (it.scale === '大型' ? '<span class="big">大型</span>' : '') +
+          '<div class="meta">' + meta + '</div>' +
+        '</div>';
+      });
+    }
+    panel.innerHTML = html;
   }
 
   function render(){
@@ -297,8 +377,23 @@
         cell.appendChild(w);
         dangerDays.push({ day:day, reasons:reasons, items:items });
       }
+
+      // 日付を押したら、その日の案件をカレンダー下のパネルに出す（案件0件の日も「ありません」と出す）。
+      // ループ内の変数をそのまま使うと最後の日の分になってしまうので、引数で渡して固定する。
+      (function(cellN, dayN, itemsN, reasonsN){
+        cellN.addEventListener('click', function(){
+          var prev = grid.querySelector('.cal-cell.selected');
+          if (prev) prev.classList.remove('selected');
+          cellN.classList.add('selected');
+          renderDayPanel(y, m, dayN, itemsN, reasonsN);
+        });
+      })(cell, day, items, reasons);
+
       grid.appendChild(cell);
     }
+
+    // 月を描き直したら選択は解除（別の月の日が選ばれたままにならないように）。
+    renderDayPanel(y, m, null);
 
     // 危険日リスト
     var list = document.getElementById('dgrList');

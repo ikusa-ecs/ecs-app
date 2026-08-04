@@ -290,6 +290,65 @@
     .exp-steps b { color: var(--brand-dark); }
     .copied-msg { color: #16a34a; font-weight: 700; font-size: 13px; margin-left: 8px; display: none; }
     .copied-msg.show { display: inline; }
+
+    /* ===== 表示の切替（📋 一覧 / 📅 カレンダー） ===== */
+    .view-tabs { display: flex; gap: 6px; margin: 0 0 10px; }
+    .view-tab {
+      padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px;
+      background: #fff; color: var(--muted); font-size: 13.5px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .view-tab:hover { background: #f3ece0; }
+    .view-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+    /* ===== カレンダー表示（ダッシュボードの危険日カレンダーと同じ見た目にそろえる） ===== */
+    .cal-head { display: flex; align-items: center; gap: 10px; }
+    .cal-head .mlabel { font-size: 15px; font-weight: 700; min-width: 120px; text-align: center; }
+    .cal-nav { border: 1px solid var(--line); background: #fff; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; line-height: 1; font-family: inherit; }
+    .cal-nav:hover { background: var(--brand-soft); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+    .cal-dow { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--muted); padding: 2px 0; }
+    .cal-dow.sat { color: #3b6db5; }
+    .cal-dow.sun { color: var(--danger); }
+    .cal-cell { min-height: 92px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px 5px; background: #fff; }
+    .cal-cell.empty { background: transparent; border: none; }
+    .cal-cell.today { outline: 2px solid var(--brand); outline-offset: -2px; }
+    .cal-cell.has { background: #fbf8f2; }
+    .cal-cell .cal-day { display: flex; align-items: baseline; gap: 5px; }
+    .cal-cell .dnum { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+    .cal-cell.sat .dnum { color: #3b6db5; }
+    .cal-cell.sun .dnum { color: var(--danger); }
+    .cal-cell .cnum { font-size: 10.5px; font-weight: 700; color: var(--brand-dark); }
+
+    /* マスの中に並べる案件（クリックで一覧のその行へ） */
+    .cal-ev {
+      display: block; width: 100%; box-sizing: border-box; text-align: left;
+      border: none; border-radius: 5px; padding: 2px 5px; margin-top: 3px;
+      font-family: inherit; font-size: 10.5px; font-weight: 600; line-height: 1.45;
+      color: #fff; background: var(--brand); cursor: pointer;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cal-ev:hover { filter: brightness(1.12); }
+    /* 拠点ごとの色（一覧の拠点バッジと同じ色にそろえる） */
+    .cal-ev.of-tokyo    { background: #8a5a33; }
+    .cal-ev.of-osaka    { background: #a14b3c; }
+    .cal-ev.of-nagoya   { background: #c2410c; }
+    .cal-ev.of-fukuoka  { background: #7c5aa6; }
+    .cal-ev.of-tohoku   { background: #5f8079; }
+    .cal-ev.of-hokkaido { background: #3f6fa3; }
+    .cal-ev.of-etc      { background: #6b7280; }
+    .cal-ev.draft       { background: #6b5544; }
+    .cal-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+    .cal-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
+    .cal-legend .sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
+    .cal-none { font-size: 12.5px; color: var(--muted); text-align: center; padding: 18px 0 4px; }
+
+    /* カレンダーから飛んできた行を少しだけ光らせる（どこに来たか分かるように） */
+    @keyframes rowFlash {
+      0%   { background: var(--brand-soft); }
+      100% { background: transparent; }
+    }
+    tr.main-row.flash td { animation: rowFlash 1.8s ease-out; }
 </style>
 @endverbatim
 @endpush
@@ -401,12 +460,21 @@
         </div>
       </div>
 
+      <!-- 表示の切替（表で見るか、カレンダーで見るか）。絞り込みはどちらにも効きます。 -->
+      <div class="view-tabs">
+        <button type="button" class="view-tab active" id="vtab-list" onclick="switchView('list')">📋 一覧</button>
+        <button type="button" class="view-tab" id="vtab-cal" onclick="switchView('cal')">📅 カレンダー</button>
+      </div>
+
       <!-- 案件一覧 / 下書き の切替タブ -->
       <div class="list-tabs">
         <a class="list-tab active" id="tab-list" onclick="switchTab('list')">案件一覧</a>
         <a class="list-tab" id="tab-draft" onclick="switchTab('draft')">下書き <span class="tab-badge" id="draftCount">0</span></a>
         <a class="list-tab" id="tab-archived" onclick="switchTab('archived')">🗄 アーカイブ <span class="tab-badge" id="archivedCount">0</span></a>
       </div>
+
+      <!-- ===== 一覧（表）表示 ===== -->
+      <div id="viewList">
 
       <div class="count-line">全 <b id="totalCount">0</b> 件中 <b id="shownCount">0</b> 件を表示（日程の近い順）</div>
 
@@ -435,6 +503,40 @@
         ※ 集合・解散の下の小さい数字は「入場 / 開始 / 終了」です。<br>
         ※「状況」はアサインの進み具合です。スタッフ募集をしない案件（会場貸し等）は「—」になります。
       </p>
+
+      </div><!-- /#viewList -->
+
+      <!-- ===== カレンダー表示（上の絞り込みで残った案件だけを月のマスに置く） ===== -->
+      <div id="viewCal" style="display:none;">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>📅 カレンダー</h2>
+            <div class="spacer"></div>
+            <div class="cal-head">
+              <button class="cal-nav" type="button" id="calPrev" title="前の月" onclick="calMove(-1)">‹</button>
+              <span class="mlabel" id="calLabel">—</span>
+              <button class="cal-nav" type="button" id="calNext" title="次の月" onclick="calMove(1)">›</button>
+              <button class="btn" type="button" onclick="calToday()">今月へ</button>
+            </div>
+          </div>
+          <p class="muted" style="font-size:12px; margin:0 0 4px;">
+            上の絞り込み（拠点・開催日・キーワード・toC・ケータリングなど）で残った案件だけを置いています。
+            この月に出ているのは <b id="calCount">0</b> 件（絞り込み後の全体は <b id="calTotal">0</b> 件）。
+            <b>案件名を押すと一覧に戻り、その案件の詳細が開きます。</b>
+          </p>
+          <div class="cal-grid" id="calDow"></div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="cal-none" id="calNone" style="display:none;">
+            この月には、絞り込みに合う案件がありません。「‹ ›」で前後の月へ移動するか、上の絞り込みを外してみてください。
+          </div>
+          <div class="cal-legend">
+            <span class="lg"><span class="sw" style="background:#fbf8f2;"></span>案件あり</span>
+            <span class="lg"><span class="sw" style="background:#8a5a33;border-color:#8a5a33;"></span>拠点ごとに色分け（下書きは茶色）</span>
+            <span class="lg">マスの右の数字＝その日の件数</span>
+            <span class="lg">案件名の前＝集合時間</span>
+          </div>
+        </div>
+      </div>
 
       <!-- ===== チャットワーク用に書き出し モーダル =====
            いま絞り込んでいる案件だけを、そのまま貼れる文章にする（表・罫線の記号は使わない）。 -->
@@ -1026,6 +1128,9 @@
 
     let shown = 0, total = 0, draftTotal = 0, archivedTotal = 0;
     const groupShown = {};
+    // 絞り込みを通った案件をここにためる（表とカレンダーで同じものを使うため）。
+    // 月を畳んでいても「絞り込みに一致した案件」は入れる＝カレンダーには畳みは関係ない。
+    const matchedList = [];
 
     document.querySelectorAll('#projBody tr.main-row').forEach(tr => {
       const isDraft = tr.dataset.draft === '1';
@@ -1061,6 +1166,8 @@
       if (matched) {
         groupShown[tr.dataset.group] = (groupShown[tr.dataset.group] || 0) + 1;
         if (!collapsed) shown++;   // 表示中の件数は、畳んでいない月のぶんだけ
+        const mp = projects[Number(tr.dataset.idx)];
+        if (mp) matchedList.push(mp);
       }
     });
 
@@ -1079,6 +1186,150 @@
     document.getElementById('draftCount').textContent = draftTotal;
     document.getElementById('archivedCount').textContent = archivedTotal;
     emptyRow.style.display = shown === 0 ? '' : 'none';
+
+    // 絞り込み結果を共通の置き場に入れ替える。カレンダーを見ているときは描き直す。
+    matchedNow = matchedList;
+    if (currentView === 'cal') renderCalendar();
+  }
+
+  // ===== 表示の切替（📋 一覧 / 📅 カレンダー） =====
+  // 考え方：絞り込みは applyFilter が1か所で行い、その結果（matchedNow）を
+  // 表とカレンダーの両方が使う。だから絞り込みはどちらの表示でも同じように効く。
+  let currentView = 'list';   // 'list'＝表 ／ 'cal'＝カレンダー（既定は今までどおり表）
+  let matchedNow  = [];       // 絞り込みを通った案件（applyFilter が毎回入れ替える）
+  const CAL_DOW   = ['月','火','水','木','金','土','日'];
+  const calCursor = new Date(todayY, todayM - 1, 1);   // カレンダーで見ている月の1日
+
+  function switchView(view) {
+    currentView = view;
+    document.getElementById('vtab-list').classList.toggle('active', view === 'list');
+    document.getElementById('vtab-cal').classList.toggle('active', view === 'cal');
+    document.getElementById('viewList').style.display = (view === 'list') ? '' : 'none';
+    document.getElementById('viewCal').style.display  = (view === 'cal')  ? '' : 'none';
+    if (view !== 'cal') return;
+    // 絞り込んだ結果がいま見ている月に1件も無いときは、案件のある一番早い月へ自動で移動する
+    // （例：開催日で来月だけに絞ったのに、カレンダーが今月のままで空、という迷いを防ぐ）。
+    const hit = matchedNow.some(p => p.date.getFullYear() === calCursor.getFullYear()
+                                 && p.date.getMonth()    === calCursor.getMonth());
+    if (!hit && matchedNow.length) {
+      const first = matchedNow.slice().sort((a, b) => a.date - b.date)[0];
+      calCursor.setFullYear(first.date.getFullYear(), first.date.getMonth(), 1);
+    }
+    renderCalendar();
+  }
+  function calMove(n)  { calCursor.setDate(1); calCursor.setMonth(calCursor.getMonth() + n); renderCalendar(); }
+  function calToday()  { calCursor.setFullYear(todayY, todayM - 1, 1); renderCalendar(); }
+
+  // カレンダーを描く（月曜始まり・その日のマスに案件名を並べる）
+  function renderCalendar() {
+    const grid = document.getElementById('calGrid');
+    if (!grid) return;
+    const y = calCursor.getFullYear(), m = calCursor.getMonth();
+    document.getElementById('calLabel').textContent = y + '年' + (m + 1) + '月';
+
+    // 曜日の見出しは最初の1回だけ作る
+    const dowEl = document.getElementById('calDow');
+    if (dowEl && !dowEl.childNodes.length) {
+      CAL_DOW.forEach((d, i) => {
+        const c = document.createElement('div');
+        c.className = 'cal-dow' + (i === 5 ? ' sat' : '') + (i === 6 ? ' sun' : '');
+        c.textContent = d;
+        dowEl.appendChild(c);
+      });
+    }
+
+    // 絞り込みに残った案件を、その月の「日」ごとに仕分ける
+    const byDay = {};
+    let monthCount = 0;
+    matchedNow.forEach(p => {
+      if (p.date.getFullYear() !== y || p.date.getMonth() !== m) return;
+      const day = p.date.getDate();
+      (byDay[day] = byDay[day] || []).push(p);
+      monthCount++;
+    });
+
+    const lead = (new Date(y, m, 1).getDay() + 6) % 7;   // 月曜始まりにするための先頭の空きマス
+    const days = new Date(y, m + 1, 0).getDate();        // その月の日数
+    grid.innerHTML = '';
+    for (let i = 0; i < lead; i++) {
+      const e = document.createElement('div');
+      e.className = 'cal-cell empty';
+      grid.appendChild(e);
+    }
+
+    for (let day = 1; day <= days; day++) {
+      const dow  = new Date(y, m, day).getDay();
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell' + (dow === 6 ? ' sat' : '') + (dow === 0 ? ' sun' : '');
+      if (y === todayY && (m + 1) === todayM && day === today.getDate()) cell.className += ' today';
+
+      const items = (byDay[day] || []).slice()
+        .sort((a, b) => String(a.meet || '').localeCompare(String(b.meet || '')));
+
+      const head = document.createElement('div');
+      head.className = 'cal-day';
+      const num = document.createElement('span');
+      num.className = 'dnum';
+      num.textContent = day;
+      head.appendChild(num);
+      if (items.length) {
+        cell.className += ' has';
+        const cnt = document.createElement('span');
+        cnt.className = 'cnum';
+        cnt.textContent = items.length + '件';
+        head.appendChild(cnt);
+      }
+      cell.appendChild(head);
+
+      // 案件名（長いものは…で省略／カーソルを当てると中身が出る）。押すと一覧のその行へ。
+      items.forEach(p => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cal-ev'
+          + (p.office ? ' ' + officeClass(p.office) : '')
+          + (p.draft ? ' draft' : '');
+        const tm = (p.meet && p.meet !== '—') ? p.meet + ' ' : '';
+        b.textContent = tm + (p.content || '（案件名なし）');   // textContent＝記号もそのまま安全に出る
+        const tip = [
+          fmtMD(p.date) + '(' + DOW[p.date.getDay()] + ') ' + (p.content || '（案件名なし）'),
+          p.office  ? '拠点：' + p.office : '',
+          p.client  ? 'クライアント：' + p.client : '',
+          p.place   ? '会場：' + p.place : '',
+          (p.meet && p.meet !== '—') ? '集合' + p.meet + '〜解散' + (p.leave || '—') : '時間未定',
+          p.need    ? '運営' + p.need + '名' : '',
+          p.director && p.director !== '未定' ? 'D：' + p.director : '',
+          p.draft   ? '※下書き' : ''
+        ].filter(Boolean).join('\n');
+        b.title = tip;
+        b.addEventListener('click', () => jumpToProject(p._i));
+        cell.appendChild(b);
+      });
+
+      grid.appendChild(cell);
+    }
+
+    document.getElementById('calCount').textContent = monthCount;
+    document.getElementById('calTotal').textContent = matchedNow.length;
+    const none = document.getElementById('calNone');
+    if (none) none.style.display = monthCount ? 'none' : '';
+  }
+
+  // カレンダーの案件名を押したとき：一覧に戻り、その行までスクロールして詳細を開く（少し光らせる）
+  let rowFlashTimer = null;
+  function jumpToProject(idx) {
+    const p = projects[idx];
+    if (p && collapsedMonths.has(p.group)) collapsedMonths.delete(p.group);   // 畳んでいる月なら開く
+    switchView('list');
+    applyFilter();                 // 畳みを解いたぶんを反映（このとき詳細はいったん全部閉じる）
+    const tr = document.querySelector('#projBody tr.main-row[data-idx="' + idx + '"]');
+    if (!tr) return;
+    tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toggleDetail(idx);             // その案件の詳細を開く
+    tr.classList.remove('flash');
+    void tr.offsetWidth;           // 同じ案件を続けて押しても光り直すための再描画
+    tr.classList.add('flash');
+    if (rowFlashTimer) clearTimeout(rowFlashTimer);
+    rowFlashTimer = setTimeout(() => tr.classList.remove('flash'), 1800);
   }
 
   // ===== サイドバーの年月フォルダ =====
@@ -1130,6 +1381,16 @@
     document.querySelectorAll('.ym-month-btn').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('ymbtn-' + key);
     if (btn) btn.classList.add('active');
+
+    // カレンダー表示のときは、スクロールではなくカレンダーをその月へ動かす（見えている物が変わる方が自然）
+    if (currentView === 'cal') {
+      const ym = String(key).split('-');
+      if (ym.length === 2) {
+        calCursor.setFullYear(Number(ym[0]), Number(ym[1]) - 1, 1);
+        renderCalendar();
+      }
+      return;
+    }
 
     const gr = document.getElementById('group-' + key);
     if (!gr) return;
