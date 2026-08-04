@@ -212,7 +212,18 @@
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/login\" -UseBasicParsing -TimeoutSec 30; \"HTTP \" + $r.StatusCode + \" / login page OK\" } catch { \"エラー: \" + $_.Exception.Message })",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/\" -UseBasicParsing -MaximumRedirection 0 -TimeoutSec 40 } catch { $r = $_.Exception.Response }; if \\($r\\) { \"応答あり（サーバー稼働中）\" } else { \"応答なし\" })",
       "PowerShell(git *)",
-      "PowerShell($v = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($v\\) { node -v } else { \"node-none\" })"
+      "PowerShell($v = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($v\\) { node -v } else { \"node-none\" })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://ecs-test.ikusa.co.jp/\" -UseBasicParsing -TimeoutSec 20 -MaximumRedirection 3; \"https OK / HTTP \" + $r.StatusCode } catch { \"https 確認できず: \" + $_.Exception.Message })",
+      "PowerShell(php \"C:\\\\Users\\\\onuma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-onuma-ecs-dev-ecs-laravel\\\\fdcda52c-7237-458c-90a2-ab3d0af8c075\\\\scratchpad\\\\check_form.php\")",
+      "PowerShell($c = Get-Command node -ErrorAction SilentlyContinue; if \\($c\\) { $c.Source; node -v } else { \"no node\" })",
+      "Bash(Select-String -Pattern \"^\\\\+\")",
+      "Bash(Select-Object -First 60)",
+      "Bash(Select-String -Pattern \"^\\\\+.*\\(--|===|{{--\\)\")",
+      "Bash(Select-Object -First 40)",
+      "Bash(awk -F: '$1>1190')",
+      "Bash(grep -n 'fillable\\\\|protected $table' -A12 app/Models/Content.php)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/login\" -UseBasicParsing -TimeoutSec 30; \"HTTP \" + $r.StatusCode + \" / ログイン画面OK\" } catch { \"エラー: \" + $_.Exception.Message })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/\" -UseBasicParsing -TimeoutSec 30; \"HTTP \" + $r.StatusCode + \" / 長さ \" + $r.Content.Length } catch { \"エラー: \" + $_.Exception.Message })"
     ]
   }
 }
