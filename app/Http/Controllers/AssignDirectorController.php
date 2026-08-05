@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignmentRole;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,29 +27,27 @@ use Illuminate\Support\Facades\DB;
  */
 class AssignDirectorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $today = Carbon::today();
 
-        // マスに並べる社員＝全社員（people の role='employee'）。
-        // 既定はイベプラ＋新人だけ表示、画面の「＋全社員」で全員に広げる（front 側で出し分け）。
-        // 同姓の取り違えを防ぐため、保存・判定はすべて社員ID基準で行う。
-        $employees = Person::employees()
-            ->orderBy('id')
+        // 拠点の表示範囲（全拠点運用・設計書19.2／2026-08-05 baba確定＝D決めは第1弾）。
+        // 管理者以上はスイッチで選んだ拠点（未選択＝全拠点）、一般社員は自拠点固定。null＝絞らない。
+        $officeScope = OfficeScope::filter($request);
+
+        // この画面に出す案件＝完了/下書き以外。拠点で絞るときは「登録拠点」＋「共有された案件」。
+        // ※ 先に案件を確定させてから、その案件のD/SD/FCだけを引く（他拠点の分まで数えない）。
+        $projects = OfficeScope::applyToProjects(Project::query(), $officeScope)
+            ->orderBy('start_date')
             ->get()
-            ->map(fn (Person $p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'surname' => $this->surname($p->name),       // 例: '田中 健一' → '田中'
-                'department' => $p->department,               // イベプラ / セールス / クリエイティブ
-                'planner' => $p->department === 'イベプラ',   // 既定表示の対象
-                'newbie' => $p->skill_level === '新人',       // 在籍1年未満＝既定表示の対象
-            ])
+            ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))
             ->values();
+        $projectIds = $projects->pluck('id')->all();
 
         // この案件のD/SDを assignments から引く（role='D' / 'SD'）。
         // project_id => ['D'=>['id'=>staff_id,'status'=>...], 'SD'=>...]
-        $dirByProject = Assignment::whereIn('role', [AssignmentRole::D, AssignmentRole::SD])
+        $dirByProject = Assignment::whereIn('project_id', $projectIds)
+            ->whereIn('role', [AssignmentRole::D, AssignmentRole::SD])
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id', 'role', 'status'])
             ->groupBy('project_id')
@@ -62,19 +61,44 @@ class AssignDirectorController extends Controller
 
         // FC（フロアコーディネーター）もこの画面で選べるようにする。
         // project_id => [staff_id, ...]（role='FC'・キャンセル除く・重複排除）。
-        $fcByProject = Assignment::where('role', AssignmentRole::FC)
+        $fcByProject = Assignment::whereIn('project_id', $projectIds)
+            ->where('role', AssignmentRole::FC)
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
             ->map(fn ($rows) => $rows->pluck('staff_id')->unique()->values()->all());
 
+        // 拠点で絞っても「すでにD/SD/FCに入っている他拠点の社員」は残す。
+        // 理由：保存は「いま画面に出ている人で上書き」なので、候補から消えると保存時に担当が外れてしまう。
+        $keepIds = $dirByProject
+            ->flatMap(fn ($roles) => collect($roles)->pluck('id')->all())
+            ->merge($fcByProject->flatten())
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        // マスに並べる社員＝自拠点の社員（people の role='employee'。管理者が全拠点表示なら全員）。
+        // 既定はイベプラ＋新人だけ表示、画面の「＋全社員」で全員に広げる（front 側で出し分け）。
+        // 同姓の取り違えを防ぐため、保存・判定はすべて社員ID基準で行う。
+        $employees = OfficeScope::applyToPeople(Person::employees(), $officeScope, $keepIds)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Person $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'surname' => $this->surname($p->name),       // 例: '田中 健一' → '田中'
+                'department' => $p->department,               // イベプラ / セールス / クリエイティブ
+                'planner' => $p->department === 'イベプラ',   // 既定表示の対象
+                'newbie' => $p->skill_level === '新人',       // 在籍1年未満＝既定表示の対象
+            ])
+            ->values();
+
         // コンテンツID → コンテンツ名（見出し用）
         $contentNames = Content::pluck('content_name', 'id');
 
-        // 過去アーカイブ・下書きは除外（status='完了'＝アーカイブ相当 / '下書き'）。
-        $cases = Project::orderBy('start_date')
-            ->get()
-            ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))
+        // カレンダーに並べる案件（上で拠点・状態を絞り込んだもの）を画面用の形に詰め替える。
+        $cases = $projects
             ->map(function (Project $p) use ($today, $dirByProject, $fcByProject, $contentNames) {
                 $start = $p->start_date;
                 $off = $start ? (int) $today->diffInDays($start, false) : 0;
@@ -128,8 +152,11 @@ class AssignDirectorController extends Controller
         // D/SD/FC 以外のロール（OP・MC等）でその日アサイン済みの社員（チップの色分け用）。
         // FCはこの画面で選べるので $fcByProject 側で扱い、ここでは二重に数えないよう除外する。
         // 形：日付(Y-m-d) => [ staff_id => [role, ...] ]
+        // ※ 他拠点の案件で稼働している分も「その日は埋まっている」として数える（本人の予定なので拠点は問わない）。
+        //   画面に出ている社員の分だけ渡す（見えない人の予定は使わないため）。
         $empBusy = [];
-        Assignment::whereNotIn('role', [AssignmentRole::D, AssignmentRole::SD, AssignmentRole::FC])
+        Assignment::whereIn('staff_id', $employees->pluck('id')->all())
+            ->whereNotIn('role', [AssignmentRole::D, AssignmentRole::SD, AssignmentRole::FC])
             ->where('status', '!=', 'キャンセル')
             ->get(['staff_id', 'date', 'role'])
             ->each(function ($a) use (&$empBusy) {
@@ -141,6 +168,10 @@ class AssignDirectorController extends Controller
             'cases' => $cases,
             'employees' => $employees,
             'empBusy' => $empBusy,
+            'officeScope' => $officeScope,   // 今絞っている拠点（null＝全拠点）。画面の注記に使う。
+            // 「DBに社員がいるか」（拠点で絞る前）。絞った結果が0人でも見本データに戻らないようにするための旗。
+            // ※ これが false のとき（DBが空の環境）だけ、画面は従来どおり見本(cases.js)を表示する。
+            'usingDb' => Person::employees()->exists(),
         ]);
     }
 

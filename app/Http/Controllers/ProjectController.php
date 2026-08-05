@@ -40,11 +40,10 @@ class ProjectController extends Controller
 
         // ディレクター・SD・物品担当の名前は people を一緒に読む（毎回引かないようにする）。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」も含める（アサイン表と同じ）。
-        $projects = Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name'])
-            ->when($officeScope, fn ($q) => $q->where(function ($qq) use ($officeScope) {
-                $qq->where('office', $officeScope)
-                    ->orWhereHas('shares', fn ($s) => $s->where('office', $officeScope));
-            }))
+        $projects = \App\Support\OfficeScope::applyToProjects(
+            Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name']),
+            $officeScope
+        )
             ->orderBy('start_date')
             ->get();
 

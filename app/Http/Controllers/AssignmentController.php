@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -132,9 +133,17 @@ class AssignmentController extends Controller
             $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP
         ))->setProjectMemberNames($memberNames);
 
+        // ── 候補スタッフを拠点で絞る（全拠点運用・2026-08-05 baba確定＝アサイン画面は第1弾）──
+        // 管理者以上はスイッチで選んだ拠点（未選択＝全拠点）、一般社員は自拠点固定。null＝絞らない。
+        // 理由＝ヘルプは「案件を自拠点に持ってきて自拠点のスタッフを入れる」運用なので、候補は自拠点で足りる。
+        // ⚠ すでにこの案件へアサインされている人は、拠点が違っても必ず残す
+        //    （保存は「チェックが入っている人で上書き」なので、候補から消えると保存時に外れてしまう）。
+        $officeScope = OfficeScope::filter($request);
+        $assignedIds = array_keys($existing);
+
         // スタッフ名簿。区分・できる役割・NG・この日の希望＋「おすすめ度（点数・理由）」も一緒に。
         // 並びは「おすすめ順（点数の高い順）」。NG該当（この日NG・NGペア同席）は末尾へ回す。
-        $staff = Person::staff()
+        $staff = OfficeScope::applyToPeople(Person::staff(), $officeScope, $assignedIds)
             ->with(['roleEligibilities', 'ngRelations'])
             ->orderByDesc('experience_count')
             ->get()
@@ -206,6 +215,7 @@ class AssignmentController extends Controller
             'sameDay' => $sameDay,
             'monthCount' => $monthCount,
             'monthCap' => self::MONTH_CAP,
+            'officeScope' => $officeScope,   // 今絞っている拠点（null＝全拠点）。画面の注記に使う。
         ]);
     }
 

@@ -245,6 +245,14 @@
       @if (session('status'))
         <div class="mock-note" style="background:#e7f6e9; border-color:#bfe4c4; color:#15803d;">{{ session('status') }}</div>
       @endif
+
+      {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
+      @include('partials.office_switch')
+      @if ($officeScope)
+        <p class="mock-note" style="background:#fbf6ef; border-color:#e6d8c8; color:#7a6a58;">
+          <b>{{ $officeScope }}</b>の案件と社員だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
+        </p>
+      @endif
 @verbatim
       <details class="help-note">
         <summary>📖 この画面の使い方（クリックで開く）</summary>
@@ -336,12 +344,17 @@
   window.ECS_DIR_CASES   = @json($cases);        // 本物の案件（D/SDは assignments から・ID基準）
   window.ECS_EMPLOYEES   = @json($employees);    // 社員一覧（id・氏名・姓・部署・新人/イベプラ判定）
   window.ECS_EMP_BUSY    = @json($empBusy);      // 他ロール(FC等)のアサイン状況: {Y-m-d:{社員ID:[role]}}
+  window.ECS_DIR_USINGDB = @json($usingDb);      // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
 </script>
 @verbatim
 <script>
   // ===== 社員一覧（DB優先：id・氏名・姓・部署・新人/イベプラ判定。無ければ見本）=====
   // すべて社員ID基準で扱う（同姓の取り違え防止）。
-  const USING_DB = !!(window.ECS_EMPLOYEES && window.ECS_EMPLOYEES.length);
+  // DBの実データを使うかどうか。旗（ECS_DIR_USINGDB）が来ていればそれに従う。
+  // ※ 拠点で絞った結果が0人/0件のときに見本データへ戻ってしまうのを防ぐため（見本の名前が出ると誤解を招く）。
+  const USING_DB = (window.ECS_DIR_USINGDB !== undefined)
+    ? !!window.ECS_DIR_USINGDB
+    : !!(window.ECS_EMPLOYEES && window.ECS_EMPLOYEES.length);
   const EMP = USING_DB ? window.ECS_EMPLOYEES : [
     { id:'田中', name:'田中 健一', surname:'田中', department:'イベプラ',     planner:true,  newbie:false },
     { id:'佐藤', name:'佐藤 大輔', surname:'佐藤', department:'イベプラ',     planner:true,  newbie:false },

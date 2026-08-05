@@ -65,11 +65,10 @@ class AssignSheetController extends Controller
 
         // 対象になり得る案件＝完了/下書き以外で、開催日がある案件。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有（ヘルプ/巻き取り）された案件」も含める。
-        $projects = Project::with(['director:id,name', 'goodsOwner:id,name'])
-            ->when($officeScope, fn ($q) => $q->where(function ($qq) use ($officeScope) {
-                $qq->where('office', $officeScope)
-                    ->orWhereHas('shares', fn ($s) => $s->where('office', $officeScope));
-            }))
+        $projects = OfficeScope::applyToProjects(
+            Project::with(['director:id,name', 'goodsOwner:id,name']),
+            $officeScope
+        )
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))

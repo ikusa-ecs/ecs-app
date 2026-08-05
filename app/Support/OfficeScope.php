@@ -53,4 +53,43 @@ class OfficeScope
     {
         return Office::where('active', true)->orderBy('sort_order')->pluck('name')->all();
     }
+
+    /**
+     * 案件（projects）を拠点で絞る。$office が null なら何もしない（＝全拠点）。
+     *
+     * 「その拠点で登録された案件」＋「その拠点に共有（ヘルパ/巻き取り）された案件」を見せる。
+     * ※ 同じ式を各画面にコピペすると片方だけ直して食い違うので、ここ1か所に置いて呼び出す。
+     */
+    public static function applyToProjects($query, ?string $office)
+    {
+        return $query->when($office, fn ($q) => $q->where(function ($qq) use ($office) {
+            $qq->where('office', $office)
+                ->orWhereHas('shares', fn ($s) => $s->where('office', $office));
+        }));
+    }
+
+    /**
+     * 人（people＝社員・スタッフ）を拠点で絞る。$office が null なら何もしない（＝全拠点）。
+     *
+     * $keepIds ＝拠点が違っても必ず残す人（例：すでにその案件へアサインされている他拠点のヘルプ）。
+     *   理由：D決め・アサイン画面の保存は「いま画面に出ている人で上書き」なので、
+     *        候補から消えた人は保存した瞬間に担当を外されてしまう。それを防ぐための逃げ道。
+     *
+     * ⚠ people.office が空の人は「東京」扱いにする（OfficeScope::filter の既定と同じ考え方）。
+     *   実データ投入時に拠点を埋め直すまでの保険。
+     *
+     * @param  array<int|string, string>  $keepIds
+     */
+    public static function applyToPeople($query, ?string $office, array $keepIds = [])
+    {
+        return $query->when($office, fn ($q) => $q->where(function ($qq) use ($office, $keepIds) {
+            $qq->where('office', $office);
+            if ($office === '東京') {
+                $qq->orWhereNull('office')->orWhere('office', '');
+            }
+            if ($keepIds) {
+                $qq->orWhereIn('id', $keepIds);
+            }
+        }));
+    }
 }
