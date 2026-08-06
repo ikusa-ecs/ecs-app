@@ -7,6 +7,8 @@ use App\Models\Content;
 use App\Models\Office;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\DirectorSync;
+use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -529,14 +531,26 @@ class ProjectController extends Controller
 
         $project = Project::findOrFail($request->input('id'));
 
-        // 担当3項目：送られたキーだけ更新。実在の社員IDのみ採用し、空・不正は null。
-        foreach (['director_id', 'sd_id', 'goods_owner_id'] as $key) {
-            if ($request->has($key)) {
-                $val = trim((string) $request->input($key));
-                $project->{$key} = ($val !== '' && Person::employees()->whereKey($val)->exists())
-                    ? $val
-                    : null;
-            }
+        // D／SD＝アサインの役割なので、保存先は assignments に一本化する（2026-08-05 baba確定）。
+        // 古い列（director_id / sd_id）にも同じ値を「写し」で書く＝表示がまだ古い列を読む画面が壊れないため。
+        // 中身は App\Support\DirectorSync が担当（D決め画面と同じルールを1か所にまとめている）。
+        if ($request->has('director_id') || $request->has('sd_id')) {
+            DirectorSync::apply(
+                $project,
+                $request->input('director_id'),
+                $request->input('sd_id'),
+                $request->has('director_id'),   // 送られたキーだけ触る（セル1つずつ変える運用のため）
+                $request->has('sd_id'),
+            );
+        }
+
+        // 物品担当はアサインの役割ではないので projects のまま（baba確定）。
+        // 実在の社員IDのみ採用し、空・不正は null（担当なし）。
+        if ($request->has('goods_owner_id')) {
+            $val = trim((string) $request->input('goods_owner_id'));
+            $project->goods_owner_id = ($val !== '' && Person::employees()->whereKey($val)->exists())
+                ? $val
+                : null;
         }
 
         // 移動・音響：送られたキーだけ更新。空文字は null（未設定）に。
@@ -627,12 +641,28 @@ class ProjectController extends Controller
                 ->with('import_error', 'CSVにデータ行がありません（1行目の見出しのみ、または空です）。');
         }
 
-        // 見出し行 → 列名→位置 の対応表。テンプレートの列名で引けるようにする。
+        // 見出し行 → 列名→位置 の対応表。
+        // ECSのテンプレートの列名だけでなく、**アサイン表（東京アサイン表）の列名でも読める**
+        // （日程→開催日／コンテンツ→案件名／顧客名(代理店名)→クライアント 等）。
+        // 読み替えの表は App\Support\ProjectImportColumns。2026-08-06 baba要望＝
+        // 「アサイン表をCSVにして、列を並べ替えずにそのまま取り込みたい」。
         $header = str_getcsv(array_shift($lines), ',', '"', '');
-        $col = array_flip(array_map('trim', $header));
+        $resolved = ProjectImportColumns::resolve($header);
+        $col = $resolved['map'];
+        $unmappedColumns = $resolved['unmapped'];   // 取り込まなかった見出し（あとで画面に出す）
+
         $get = function (array $row, string $name) use ($col) {
             $i = $col[$name] ?? null;
-            return ($i !== null && isset($row[$i])) ? trim((string) $row[$i]) : '';
+            $value = ($i !== null && isset($row[$i])) ? trim((string) $row[$i]) : '';
+            if ($value === '') {
+                return '';
+            }
+            // 時刻の列は「8:00」に直す（Excelのシリアル値 0.3333… でも読めるように）。
+            if (in_array($name, ProjectImportColumns::TIME_COLUMNS, true)) {
+                return ProjectImportColumns::normalizeTime($value) ?: $value;
+            }
+
+            return $value;
         };
 
         $okCount = 0;
@@ -647,7 +677,10 @@ class ProjectController extends Controller
             $row = str_getcsv($line, ',', '"', '');
 
             $name = $get($row, '案件名');
-            $date = $get($row, '開催日');
+            // 開催日は「2026/7/20」「2026年7月20日」「Excelの日付（数字）」でも読めるように直す。
+            // 年が入っていない「7/20」は勘で補わない＝エラーにして人に直してもらう。
+            $rawDate = $get($row, '開催日');
+            $date = ProjectImportColumns::normalizeDate($rawDate);
             $count = $get($row, '運営人数');
 
             // --- 必須3項目のチェック（JSの validate と同じ基準）---
@@ -656,7 +689,9 @@ class ProjectController extends Controller
                 $rowErrors[] = '案件名が空です';
             }
             if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || ! $this->isRealDate($date)) {
-                $rowErrors[] = '開催日の形式が不正です（例 2026-07-20）';
+                $rowErrors[] = $rawDate !== ''
+                    ? "開催日が読めません（{$rawDate}）。年から入れてください（例 2026-07-20）"
+                    : '開催日が空です（例 2026-07-20）';
             }
             if ($count === '' || ! ctype_digit($count) || (int) $count < 1) {
                 $rowErrors[] = '運営人数が空または不正です';
@@ -712,8 +747,9 @@ class ProjectController extends Controller
                 'pub_camera' => $get($row, 'カメラ') ?: null,
                 'pub_article' => $get($row, '事例記事') ?: null,
                 'pub_video' => $get($row, '動画') ?: null,
-                // ディレクター・物品担当は名前 → 名簿(people)から一致を探してID化（無ければ空欄）。
-                'director_id' => $this->personIdByName($get($row, 'ディレクター')),
+                // ⚠ ディレクター列は取り込まない（2026-08-05 baba確定＝取込の時点ではDが決まっていないため）。
+                //    Dは「D決め画面」または案件一覧のプルダウンで決める＝保存先は assignments に一本化。
+                // 物品担当は名前 → 名簿(people)から一致を探してID化（無ければ空欄）。アサインの役割ではないので projects のまま。
                 'goods_owner_id' => $this->personIdByName($get($row, '物品担当')),
                 'ops_sheet_url' => $get($row, '運営シートURL') ?: null,
                 'prep_line_sent' => $get($row, '準備:LINE概要送付') === '済',
@@ -729,6 +765,12 @@ class ProjectController extends Controller
         $msg = "CSVから{$okCount}件の案件を取り込みました。";
         if ($errors) {
             $msg .= ' エラー' . count($errors) . '件は取り込みませんでした：' . implode(' / ', $errors);
+        }
+        // どの列を無視したかを必ず知らせる（アサイン表のCSVをそのまま入れたときに
+        // 「入ったつもりで入っていない項目」に気づけるようにするため）。
+        if ($unmappedColumns) {
+            $msg .= ' ※ 取り込まなかった列：' . implode('・', $unmappedColumns)
+                . '（ECSに対応する項目がありません。必要なら教えてください）';
         }
 
         return redirect('/projects')->with('status', $msg);

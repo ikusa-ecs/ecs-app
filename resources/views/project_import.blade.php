@@ -115,6 +115,15 @@
       <div class="panel">
         <div class="sec-title">STEP 1　テンプレートをダウンロード</div>
         <p style="margin:0 0 14px;">まず空のテンプレート（CSV）をダウンロードし、Excelなどで案件を1行ずつ記入してください。</p>
+        <p style="margin:0 0 14px; padding:10px 12px; background:#fbf6ef; border:1px solid var(--line); border-radius:8px; font-size:13px; line-height:1.8;">
+          <b>アサイン表（東京アサイン表）からそのまま取り込めます。</b>
+          「1行に1案件」が並ぶシート（例：<code>202601_list</code>）を <b>CSVで保存してそのままアップロード</b>してください。
+          <b>列を並べ替える必要はありません</b>（日程→開催日、コンテンツ→案件名、顧客名(代理店名)→クライアント のように自動で読み替えます）。<br>
+          日付は <b>年から</b>入れてください（<code>2026/9/20</code>・<code>2026-09-20</code>・Excelの日付セルどれでもOK。<code>9/20</code> のように年が無いものは、年を勘で補わずエラーにします）。
+          時刻は <code>8:00</code> でも、Excelの時刻セルのままでも読めます。
+          ECSに対応する項目が無い列（オンラインツール・拘束 など）は無視し、<b>取り込み後に「取り込まなかった列」として表示</b>します。<br>
+          ※ 月ごとのシート（<code>202605</code> など＝1案件が1ブロックの形）は、この方法では読めません。
+        </p>
         <button class="btn primary" onclick="downloadTemplate()">⬇ 案件取込テンプレート.csv をダウンロード</button>
         <div class="cols-help" style="margin-top:16px;">
           <strong>列の説明（1件＝1行。1件ずつ入力フォームと同じ項目です）：</strong><br>
@@ -124,6 +133,7 @@
           <u>備品・会場</u>　<code>ロゴ</code> <code>カメラ</code> <code>事例記事</code> <code>動画</code>（不要/ほしい/OK/NG/-）　<code>会場住所</code>　<code>屋内外</code>（屋内/屋外）　<code>集合形式</code>（会場現地 等）　<code>お酒</code>（あり/なし）　<code>ケータリング</code>　<code>移動車両</code>　<code>スタッフ募集</code>（募集する/募集しない）<br>
           <u>運営（アサイン後に記入。空欄でOK）</u>　<code>ディレクター</code>（現場のD担当）　<code>物品担当</code>（備品準備）　<code>運営シートURL</code>（スプレッドシートのリンク）　<code>準備:LINE概要送付</code> <code>準備:引き継ぎ</code> <code>準備:台本</code>（済/未）　<code>備考</code><br>
           <span class="muted">※ 「運営」グループ（ディレクター・物品担当・運営シート・準備チェック）は登録後にアサイン画面/案件一覧で入力する項目です。CSVでは空欄のままでかまいません。<br>
+          ※ <b>「ディレクター」列は取り込みません</b>（取込の時点ではDが決まっていないため）。Dは<b>D決め画面</b>または<b>案件一覧のプルダウン</b>で決めてください（どちらで決めても同じ場所に保存されます）。<br>
           ※ 現場種別（アサインの考え方）は記入不要です。屋内外・人数などから自動で設定されます。<br>
           ※ <b>ARENA場所貸し</b>の案件は専用項目が多いため、CSVではなく「1件ずつ入力」での登録をおすすめします（IKUSA対応分は備考に記載でもOK）。</span>
         </div>

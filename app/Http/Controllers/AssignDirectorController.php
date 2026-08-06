@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignmentRole;
+use App\Support\DirectorSync;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -22,8 +23,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Dの保存先：assignments テーブルを role='D' / role='SD' で使う。
  *   （案件 × スタッフ × 日 が1行。D・SDは別の人なので unique 制約に収まる）
- *   ※ 既存の director_id（projects）はアサイン以外の用途で使われているため、
- *     ここでは触らず、D/SD の決定は assignments に集約する。
+ *   ※ D/SD の決定は assignments に一本化する（2026-08-05 baba確定）。
+ *     ただし移行①の間は、古い列（projects.director_id / sd_id）にも同じ値を「写し」で書く
+ *     ＝表示がまだ古い列を読んでいる画面を壊さないため（App\Support\DirectorSync::mirrorToProject）。
+ *     写しをやめるのは、表示の切替が全部終わったあと（移行③）。
  */
 class AssignDirectorController extends Controller
 {
@@ -267,6 +270,14 @@ class AssignDirectorController extends Controller
                         ]);
                     }
                     $saved++;
+                }
+
+                // 古い列（projects.director_id / sd_id）へ「写し」を書く＝移行①（2026-08-05 baba確定）。
+                // 表示がまだ古い列を読んでいる画面（案件一覧・アサイン表など）に、
+                // D決め画面で決めた担当がちゃんと出るようにするため。写しをやめるのは移行③。
+                $projectModel = Project::find($pid);
+                if ($projectModel) {
+                    DirectorSync::mirrorToProject($projectModel, $dId ?: null, $sId ?: null);
                 }
 
                 // FC（複数可）を同期：いま選ばれているFC集合に揃える。
