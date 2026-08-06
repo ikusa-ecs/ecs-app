@@ -138,6 +138,31 @@ class OfficeScopeBoardTest extends TestCase
         $this->assertNotContains($osakaStaff->id, $poolIds);
     }
 
+    /**
+     * 社員・D集計（/projects-agg）＝拠点別。
+     * 絞るのは「社員の所属拠点」だけで、数える案件は絞らない（他拠点への応援も数える）。
+     */
+    public function test_projects_agg_filters_by_employee_office_but_counts_all_projects(): void
+    {
+        $tokyoEmp = PersonFactory::new()->create(['office' => '東京', 'name' => '東京の社員']);
+        $osakaEmp = PersonFactory::new()->create(['office' => '大阪', 'name' => '大阪の社員']);
+
+        // 東京の社員が「大阪の案件」でDを務めた＝他拠点への応援。これも数える。
+        $osakaProject = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon()]);
+        Assignment::create([
+            'project_id' => $osakaProject->id, 'staff_id' => $tokyoEmp->id,
+            'date' => $this->soon(), 'role' => 'D', 'status' => '仮',
+        ]);
+
+        $rows = collect(
+            $this->actingAsPerson($tokyoEmp)->get('/projects-agg')->assertOk()->original->getData()['rows']
+        );
+
+        $this->assertSame(['東京の社員'], $rows->pluck('name')->all(), '他拠点の社員は並べない');
+        $this->assertSame(1, $rows->firstWhere('name', '東京の社員')['d'], '他拠点への応援も数える');
+        $this->assertNotContains($osakaEmp->name, $rows->pluck('name')->all());
+    }
+
     /** スタッフ画面の募集中タブ＝自分の拠点の募集だけ。ただし応募済みの案件は残す。 */
     public function test_staff_portal_recruiting_tab_is_limited_to_my_office(): void
     {

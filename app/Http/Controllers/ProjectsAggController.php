@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\OfficeScope;
+use Illuminate\Http\Request;
 
 /**
  * 社員・ディレクター集計（/projects-agg・案件一覧から開く別ウィンドウ）。
@@ -24,11 +26,20 @@ use App\Models\Project;
  */
 class ProjectsAggController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        // 拠点で絞る（全拠点運用・2026-08-05 baba確定）。
+        // ⚠ここで絞るのは「社員の所属拠点」だけ。数える案件は絞らない＝他拠点への応援も数える
+        //   （その社員がどれだけ担当したかを見る表なので、働いた先の拠点は関係ない）。
+        $office = OfficeScope::filter($request);
+        $officeEmployeeIds = OfficeScope::applyToPeople(Person::employees(), $office)
+            ->pluck('id')
+            ->all();
+
         // D/SD の担当（キャンセル除く）。
         $rows = Assignment::whereIn('role', ['D', 'SD'])
             ->where('status', '!=', 'キャンセル')
+            ->when($office, fn ($q) => $q->whereIn('staff_id', $officeEmployeeIds))
             ->get(['project_id', 'staff_id', 'role']);
 
         // 関係する案件の実施形態・規模・状態。
@@ -102,7 +113,9 @@ class ProjectsAggController extends Controller
         }
 
         // 登録している社員は全員出す＝D/SD実績が無くても0で並べる（アサイン有無に関係なく・baba 2026-07-28）。
-        $allEmployees = Person::where('role', 'employee')->get(['id', 'name', 'department']);
+        // 拠点で絞るときは、その拠点の社員だけを並べる。
+        $allEmployees = OfficeScope::applyToPeople(Person::where('role', 'employee'), $office)
+            ->get(['id', 'name', 'department']);
         foreach ($allEmployees as $e) {
             if (! isset($agg[$e->id])) {
                 $dept = (string) ($e->department ?? '');
@@ -135,7 +148,11 @@ class ProjectsAggController extends Controller
             'projects' => count($projSet),       // 対象になった案件数
         ];
 
-        return view('projects_agg', ['rows' => $list, 'summary' => $summary]);
+        return view('projects_agg', [
+            'rows' => $list,
+            'summary' => $summary,
+            'officeScope' => $office,   // 今絞っている拠点（null＝全拠点）。注記と切替スイッチに使う
+        ]);
     }
 
     /** 部署 → 名前の色クラス（D決め画面と同じ：イベプラ=橙/セールス=藍/クリエイティブ=緑）。 */

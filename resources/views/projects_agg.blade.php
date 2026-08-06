@@ -39,9 +39,15 @@
     <span class="live off" id="live"><span class="dot"></span><span id="liveText">案件一覧と未接続</span></span>
   </div>
 
+  {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
+  @include('partials.office_switch')
+
   <p class="note">
     <b>D決め画面（/assign-director）</b>で保存したD／SD担当の実績を、社員ごとに数えた本物の集計です。<br>
     下書きの案件は数えません。表示は累計（全期間）です。
+    @if ($officeScope)
+      <br><b>{{ $officeScope }}所属の社員</b>だけを並べています。件数は<b>その社員が担当した案件すべて</b>（他拠点への応援も含む）です。
+    @endif
   </p>
 
   @if (($summary['records'] ?? 0) > 0)

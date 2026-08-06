@@ -373,7 +373,21 @@ class AssignmentController extends Controller
         DB::transaction(function () use ($project, $date, $staffIds, $roles, $roles2, $notes, $patrols, $remarks, $data, $now) {
             // date は 'date' キャストで時刻付き保存になり得るため、日付部分だけで照合する
             // （quickToggle と同じ考え方。where('date',$date) だと空振りして再登録が unique 制約で 500 になる）。
-            Assignment::where('project_id', $project->id)->whereDate('date', $date)->delete();
+            //
+            // ⚠ 消すのは「この画面が扱う人」の行だけにする（案A・baba 2026-08-06 確定）。
+            //    この画面の一覧に出るのはスタッフ（people.role='staff'）だけなので、
+            //    社員の行（D/SD/FC＝D決め画面で決めたもの）まで消すと、チェックの付け直しで
+            //    復活できず「アサインを保存したらDが消える」事故になっていた。
+            //    ＝スタッフの行（＋今回送られてきた人の行）だけを消してから作り直す。
+            Assignment::where('project_id', $project->id)
+                ->whereDate('date', $date)
+                ->where(function ($q) use ($staffIds) {
+                    $q->whereIn('staff_id', Person::staff()->select('id'));
+                    if ($staffIds) {
+                        $q->orWhereIn('staff_id', $staffIds);
+                    }
+                })
+                ->delete();
 
             foreach ($staffIds as $sid) {
                 Assignment::create([

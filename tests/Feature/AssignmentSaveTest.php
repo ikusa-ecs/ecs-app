@@ -145,6 +145,49 @@ class AssignmentSaveTest extends TestCase
         $this->assertSame($staffA->id, Assignment::where('project_id', $project->id)->value('staff_id'));
     }
 
+    /**
+     * D決め画面（/assign-director）で決めた社員のD／SD／FCは、アサイン保存で消えない（案A・baba 2026-08-06）。
+     *
+     * この画面の一覧に出るのはスタッフだけなので、社員の行まで消すとチェックの付け直しで復活できず
+     * 「アサインを保存したらDが消えた」事故になっていた。スタッフの上書きは今までどおり効く。
+     */
+    public function test_save_keeps_director_rows_decided_by_employees(): void
+    {
+        $employee = PersonFactory::new()->create();
+        $director = PersonFactory::new()->create();          // 社員＝D決め画面で D になった人
+        $project  = ProjectFactory::new()->create(['start_date' => '2026-09-01']);
+        $staffA   = PersonFactory::new()->staff()->create();
+        $staffB   = PersonFactory::new()->staff()->create();
+
+        // D決め画面が保存した状態を作る（role='D'・社員）。
+        Assignment::create([
+            'project_id' => $project->id, 'staff_id' => $director->id,
+            'date' => '2026-09-01', 'role' => 'D', 'status' => '仮',
+        ]);
+        // スタッフ2名も先に入っている状態にする。
+        $this->actingAsPerson($employee)->post('/project-assign/save', [
+            'project_id' => $project->id,
+            'status'     => '確定',
+            'staff_ids'  => [$staffA->id, $staffB->id],
+            'role'       => [$staffA->id => 'OP', $staffB->id => 'MC'],
+        ]);
+
+        // Dはそのまま残っている（消えない）。
+        $this->assertSame('D', Assignment::where('project_id', $project->id)
+            ->where('staff_id', $director->id)->value('role'), 'D決めで決めたDが消えている');
+
+        // スタッフBを外して保存し直す＝スタッフの上書きは今までどおり効く。
+        $this->actingAsPerson($employee)->post('/project-assign/save', [
+            'project_id' => $project->id,
+            'status'     => '確定',
+            'staff_ids'  => [$staffA->id],
+            'role'       => [$staffA->id => 'OP'],
+        ]);
+
+        $left = Assignment::where('project_id', $project->id)->pluck('staff_id')->all();
+        $this->assertEqualsCanonicalizing([$director->id, $staffA->id], $left);
+    }
+
     /** 権限：スタッフはアサイン保存できず、自分のスタッフ画面へ戻される（行も増えない）。 */
     public function test_staff_cannot_save_assignments(): void
     {
