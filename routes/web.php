@@ -15,6 +15,8 @@ use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\CountDeadlineReminderController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FinanceListController;
+use App\Http\Controllers\FinanceReminderController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\MasterImportController;
 use App\Http\Controllers\EmployeeAvailabilityController;
@@ -234,7 +236,16 @@ Route::post('/mypage/notify', [MyPageController::class, 'saveNotify']);
 // 収支入力。案件一覧を DB から出す（D または営業担当の案件が対象）。
 Route::get('/mypage-finance', [MyPageFinanceController::class, 'index']);
 // 収支（売上・経費明細・メモ）を project_finances へ本物保存（イベプラ要望）。
+// ※ 直せるのは担当のD／営業担当と管理者以上（FinanceAccess::canEdit）。
 Route::post('/mypage-finance/save', [MyPageFinanceController::class, 'save']);
+// 収支一覧（2026-08-06 baba確定）。月ごとに売上・経費・利益と「入力済みか」を並べる。
+// 見るのは社員以上ぜんぶOK（このグループが tier:employee）。直すのは担当と管理者以上だけ。
+Route::get('/finance-list', [FinanceListController::class, 'index']);
+Route::get('/finance-list/export.csv', [FinanceListController::class, 'exportCsv']);
+// 収支未入力リマインド。締切（イベント終了後3営業日）を過ぎて未入力の案件をDへチャットワークでタスク化。
+// GET=対象一覧／POST send=mode(dry件数確認/test/live)。鍵は .env の CHATWORK_TOKEN。
+Route::get('/finance-reminder', [FinanceReminderController::class, 'index']);
+Route::post('/finance-reminder/send', [FinanceReminderController::class, 'send']);
 // 設定画面。マスタ件数を DB の実データから表示し、アサインMTG日の予定表を DB(settings) に保存する。
 Route::get('/settings', [SettingsController::class, 'index']);
 Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);

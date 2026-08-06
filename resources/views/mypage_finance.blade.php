@@ -145,6 +145,11 @@
   window.ECS_FINANCES = @json($finances ?? new stdClass);
   // 保存（POST）に必要な合言葉（CSRFトークン）。他画面と同じ ECS_CSRF を使う。
   window.ECS_CSRF = @json(csrf_token());
+  // 経費の費目＝サーバー側の正本（App\Support\FinanceItems）。ここが唯一の定義で、
+  // 収支の一覧（/finance-list）も同じ定義・同じ計算ルールで合計を出す（金額の食い違い防止）。
+  window.ECS_COST_ITEMS = @json($costItems ?? []);
+  // 収支一覧から「✏ 入力する」で来た案件（権限OKのときだけ入る）。担当以外の案件でも1件だけ選べるようにする。
+  window.ECS_FORCED_CASE = @json($forcedCase ?? null);
   if (window.ECS_CASES_DB && window.ECS_CASES_DB.length) { window.ECS_CASES = window.ECS_CASES_DB; }
 </script>
 @verbatim
@@ -165,36 +170,12 @@
   // 自分が「D（ディレクター）」の案件か？ 見本は'ディレクター'、DBは'D'で入る。
   function isMyDirector(id) { return MY_ASSIGN[id] === 'D' || MY_ASSIGN[id] === 'ディレクター'; }
 
-  // 収支の入力定義（Notion）に合わせた経費項目
+  // 収支の入力定義（Notion）に合わせた経費項目。
+  //   定義はサーバー側の正本（App\Support\FinanceItems）から受け取る。
   //   price 数値 … 単価が1つに決まる項目 → 数量を入れて金額を自動計算
-  //   price null … 単価が複数 or 実費の項目 → 金額を直接入力（自動計算はしない。料金表は備考に参考表示）
-  const COST_ITEMS = [
-    // ── 当日スタッフ費（形態別。単価は1人1日ぶん。数量＝スタッフ人数） ──
-    { key:'staff_online', name:'当日スタッフ費（オンライン）',   price:7000,  unit:'名', note:'交通費込み・1人1日ぶん' },
-    { key:'staff_real',   name:'当日スタッフ費（リアル）',       price:10000, unit:'名', note:'交通費込み・1人1日ぶん' },
-    { key:'staff_long',   name:'当日スタッフ費（リアルロング）', price:12000, unit:'名', note:'交通費込み・1人1日ぶん' },
-    { key:'stay_pre',     name:'前泊手当',                       price:2000,  unit:'件', note:'前泊ありの場合 ＋2,000/件' },
-    { key:'stay_post',    name:'後泊手当',                       price:2000,  unit:'件', note:'後泊ありの場合 ＋2,000/件' },
-    // ── 単価が決まっている費用 ──
-    { key:'food',          name:'飲食費（水分含む）', price:1000,  unit:'人',            note:'' },
-    { key:'print_conveni', name:'コンビニ印刷費',     price:1000,  unit:'件',            note:'コンビニで印刷した分' },
-    { key:'goods_move',    name:'輸送費',             price:2000,  unit:'コンテナ(片道)', note:'1コンテナ1箱・片道。大型/チャーターは下の実費へ' },
-    { key:'move_air',      name:'スタッフ移動費（飛行機）',   price:20000, unit:'片道', note:'' },
-    { key:'move_taxi',     name:'スタッフ移動費（タクシー）', price:2000,  unit:'片道', note:'' },
-    { key:'move_bus',      name:'スタッフ移動費（高速バス）', price:2000,  unit:'片道', note:'' },
-    { key:'parking',       name:'駐車場費',           price:3000,  unit:'日', note:'' },
-    { key:'lodging',       name:'宿泊費',             price:11000, unit:'泊', note:'5人で泊まったら5泊。前泊・後泊手当も含む' },
-    { key:'trainer',       name:'研修講師費',         price:77000, unit:'日', note:'OODAチャンバラ・サバ研はスタッフ費で計上' },
-    // ── 単価が複数 or 実費（金額を直接入力。料金表は備考の参考。1,000円未満は四捨五入） ──
-    { key:'highway',       name:'高速費（ガソリン・ETC含む）', price:null, unit:'実費', note:'片道：30km1,800/50km3,000/90km5,400/120km7,200/150km9,000/180km10,800/210km12,600' },
-    { key:'rentacar',      name:'レンタカー費',               price:null, unit:'実費', note:'ハイエース基準：1泊2日16,000/2泊3日29,000/3泊4日42,000/4泊5日55,000' },
-    { key:'food_cater',    name:'フード手配費',               price:null, unit:'実費', note:'ケータリング/オードブル/BBQ/格付け/マグロ等。業者別ルールは収支定義を参照' },
-    { key:'outsource',     name:'外注費',                     price:null, unit:'実費', note:'MC・音響・配信・警備・設備など' },
-    { key:'print_input',   name:'入稿印刷費',                 price:null, unit:'実費', note:'パッケージ以外' },
-    { key:'goods_buy',     name:'物品購入費',                 price:null, unit:'実費', note:'該当イベントのみで使う物品（今後使う物は計上しない）' },
-    { key:'move_irregular',name:'イレギュラー輸送費',         price:null, unit:'実費', note:'大型物品輸送・チャーター便など' },
-    { key:'onsite',        name:'緊急購入物品費',             price:null, unit:'実費', note:'現場で緊急的に購入した物品' }
-  ];
+  //   price null … 実費の項目 → 金額を直接入力（合計時に1,000円単位へ切り上げ）
+  //   ※ ここに費目をベタ書きしないこと。一覧（/finance-list）の計算と食い違う原因になる。
+  const COST_ITEMS = window.ECS_COST_ITEMS || [];
 
   function dateOf(off){ return (window.ECS_caseDate ? window.ECS_caseDate(off)
     : (function(){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+off); return d; })()); }
@@ -213,11 +194,15 @@
   function byId(id){ return (window.ECS_CASES||[]).find(c => c.id===id); }
 
   // 収支の対象＝自分が「D（ディレクター）」の案件、または「営業担当」の案件
+  // 収支を入力できる案件＝自分がD／営業担当の案件。
+  // ＋収支一覧から「✏ 入力する」で来た案件（ECS_FORCED_CASE）も1件だけ加える
+  //   （権限の判定はサーバー側で済んでいる＝管理者が他の人の担当案件を直すときの導線）。
   function targetCases(){
     const map = {};
+    const forced = window.ECS_FORCED_CASE || null;
     (window.ECS_CASES||[]).forEach(c => {
       if (c.draft) return;
-      if (isMyDirector(c.id) || c.sales === ME) map[c.id] = c;
+      if (isMyDirector(c.id) || c.sales === ME || c.id === forced) map[c.id] = c;
     });
     return Object.values(map).sort((a,b)=>a.off-b.off);
   }

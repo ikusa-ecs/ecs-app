@@ -16,6 +16,10 @@ use Tests\TestCase;
  *   ・経費明細（JSON）が正しい形で保存される
  *   ・マイナス金額は0に補正・空の費目は保存されない（cleanItems の安全処理）
  *   ・同じ案件をもう一度保存すると上書きされる（案件1件＝1行／行が増えない）
+ *
+ * ※ 2026-08-06 baba確定で「直せるのは担当のD／営業担当と管理者以上だけ」になったため、
+ *   各テストでは保存する社員をその案件の営業担当にしてから実行する
+ *   （担当以外が保存できないことは FinanceListTest で確認している）。
  */
 class FinanceSaveTest extends TestCase
 {
@@ -24,8 +28,8 @@ class FinanceSaveTest extends TestCase
     /** 社員：売上・経費明細・メモが project_finances に保存される。 */
     public function test_employee_persists_finance(): void
     {
-        $p = ProjectFactory::new()->create();
         $me = PersonFactory::new()->create(); // 既定＝社員（tier:employee を通る）
+        $p = ProjectFactory::new()->create(['sales_owners' => [$me->name]]);   // この人が営業担当＝保存できる
 
         $this->actingAsPerson($me)
             ->postJson('/mypage-finance/save', [
@@ -56,8 +60,8 @@ class FinanceSaveTest extends TestCase
     /** cleanItems：マイナス金額は0に補正・空の費目（すべて0）は保存しない。 */
     public function test_finance_sanitizes_items(): void
     {
-        $p = ProjectFactory::new()->create();
         $me = PersonFactory::new()->create();
+        $p = ProjectFactory::new()->create(['sales_owners' => [$me->name]]);   // この人が営業担当＝保存できる
 
         $this->actingAsPerson($me)
             ->postJson('/mypage-finance/save', [
@@ -81,8 +85,8 @@ class FinanceSaveTest extends TestCase
     /** updateOrCreate：同じ案件を再保存すると上書き（行は1件のまま）。 */
     public function test_finance_overwrites_same_project(): void
     {
-        $p = ProjectFactory::new()->create();
         $me = PersonFactory::new()->create();
+        $p = ProjectFactory::new()->create(['sales_owners' => [$me->name]]);   // この人が営業担当＝保存できる
 
         $this->actingAsPerson($me)->postJson('/mypage-finance/save', [
             'project_id' => $p->id, 'revenue' => 100000, 'memo' => '初回',

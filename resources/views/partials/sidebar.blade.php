@@ -9,6 +9,8 @@
     <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">🙍</span> マイページ</a>
     <a class="{{ ($active ?? '') === 'employee_availability' ? 'active' : '' }}" href="/employee-availability"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
     <a class="{{ ($active ?? '') === 'mypage_finance' ? 'active' : '' }}" href="/mypage-finance"><span class="nav-icon">💰</span> 収支入力</a>
+    {{-- 収支一覧＝月ごとの売上・経費・利益と「入力済みか」。見るのは社員以上ぜんぶ・直すのは担当と管理者以上。 --}}
+    <a class="{{ ($active ?? '') === 'finance_list' ? 'active' : '' }}" href="/finance-list"><span class="nav-icon">📊</span> 収支一覧</a>
     {{-- 使い方ガイド（社内向け）。別タブで開く＝作業を邪魔しない。機能が増えたら guide.blade.php を更新。 --}}
     <a href="/guide" target="_blank" rel="noopener"><span class="nav-icon">📋</span> 使い方ガイド</a>
 
@@ -23,6 +25,8 @@
         <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>
         <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
         <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">⏰</span> 人数確定リマインド</a>
+        {{-- 収支未入力リマインド＝締切(イベント終了後3営業日)を過ぎて未入力の案件をDへタスク化。 --}}
+        <a class="{{ ($active ?? '') === 'finance_reminder' ? 'active' : '' }}" href="/finance-reminder"><span class="nav-icon">💸</span> 収支未入力リマインド</a>
         <a href="#" onclick="(window.openAggWindow ? openAggWindow() : window.open('/projects-agg','ecs_agg','width=820,height=640')); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
       </div>
     </div>
