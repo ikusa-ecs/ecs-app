@@ -1,0 +1,167 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Application;
+use App\Models\Assignment;
+use Database\Factories\PersonFactory;
+use Database\Factories\ProjectFactory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Tests\TestCase;
+
+/**
+ * 拠点で見える範囲を絞る・第2弾（2026-08-05 baba確定）。
+ *
+ * 対象＝日別ボード（/assign）・エントリー一覧（/entries）・ピックアップ（/pickup）・
+ *       公開ボード（/assign-publish）＋スタッフ画面の募集中タブ。
+ *
+ * 方針（第1弾と同じ）：
+ *  ・一般社員／スタッフ … 自拠点だけ。管理者以上 … 既定は全拠点・?office= で切替
+ *  ・案件は絞るが、その案件に紐づく人（応募者・現メンバー）は他拠点でも残す
+ *    （消えると保存＝上書きで担当が外れる／応募を取り消せなくなる）
+ */
+class OfficeScopeBoardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** 近い将来の日付（日別ボードは基準日〜21日先だけを出すため）。 */
+    private function soon(int $plusDays = 3): string
+    {
+        return Carbon::today()->addDays($plusDays)->format('Y-m-d');
+    }
+
+    /** 4画面すべて、一般社員には自拠点の案件だけが出る。 */
+    public function test_board_screens_show_only_own_office_for_employee(): void
+    {
+        $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
+        $tokyo = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon(4)]);
+
+        foreach ([
+            '/assign' => 'boardCases',
+            '/entries' => 'entriesCases',
+            '/pickup' => 'pickupCases',
+            '/assign-publish' => 'cases',
+        ] as $url => $key) {
+            $data = $this->actingAsPerson($tokyoEmp)->get($url)
+                ->assertOk("画面 {$url} が開けませんでした")
+                ->original->getData();
+
+            $this->assertSame('東京', $data['officeScope'], "{$url} は自拠点で固定される");
+            $this->assertSame(
+                [$tokyo->id],
+                collect($data[$key])->pluck('id')->all(),
+                "{$url} に他拠点の案件が出てしまっている"
+            );
+        }
+    }
+
+    /** 管理者は既定で全拠点。?office= を付けたときだけ絞られる。 */
+    public function test_board_screens_let_manager_switch_office(): void
+    {
+        $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
+        $tokyo = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        $osaka = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon(4)]);
+
+        $all = $this->actingAsPerson($manager)->get('/assign-publish')
+            ->assertOk()->original->getData();
+        $this->assertNull($all['officeScope']);
+        $this->assertEqualsCanonicalizing(
+            [$tokyo->id, $osaka->id],
+            collect($all['cases'])->pluck('id')->all()
+        );
+
+        $only = $this->actingAsPerson($manager)->get('/assign-publish?office=' . urlencode('大阪'))
+            ->assertOk()->original->getData();
+        $this->assertSame('大阪', $only['officeScope']);
+        $this->assertSame([$osaka->id], collect($only['cases'])->pluck('id')->all());
+    }
+
+    /** ピックアップ：案件は絞るが、その案件のメンバー（他拠点のヘルプ）は残す。 */
+    public function test_pickup_keeps_members_from_other_offices(): void
+    {
+        $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
+        $osakaHelper = PersonFactory::new()->staff()->create(['office' => '大阪']);
+        $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        Assignment::create([
+            'project_id' => $project->id, 'staff_id' => $osakaHelper->id,
+            'date' => $this->soon(), 'role' => 'OP', 'status' => '確定',
+        ]);
+
+        $cases = collect(
+            $this->actingAsPerson($tokyoEmp)->get('/pickup')->assertOk()->original->getData()['pickupCases']
+        );
+
+        $members = collect($cases->firstWhere('id', $project->id)['members'])->pluck('id')->all();
+        $this->assertContains($osakaHelper->id, $members, '他拠点のメンバーが消えると保存で担当が外れてしまう');
+    }
+
+    /** エントリー一覧：他拠点のスタッフの応募も、自拠点の案件なら見える。 */
+    public function test_entries_keeps_applicants_from_other_offices(): void
+    {
+        $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
+        $osakaStaff = PersonFactory::new()->staff()->create(['office' => '大阪']);
+        $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        Application::create([
+            'project_id' => $project->id, 'staff_id' => $osakaStaff->id,
+            'intent' => '希望', 'applied_at' => now(),
+        ]);
+
+        $cases = collect(
+            $this->actingAsPerson($tokyoEmp)->get('/entries')->assertOk()->original->getData()['entriesCases']
+        );
+
+        $entrants = collect($cases->firstWhere('id', $project->id)['entrants'])->pluck('id')->all();
+        $this->assertContains($osakaStaff->id, $entrants, '応募は本人の意思表示なので隠さない');
+    }
+
+    /** 日別ボードの「希望者（その日稼働可）」は自拠点のスタッフだけ。 */
+    public function test_board_available_pool_is_limited_to_my_office(): void
+    {
+        $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
+        $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京']);
+        $osakaStaff = PersonFactory::new()->staff()->create(['office' => '大阪']);
+        ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+
+        foreach ([$tokyoStaff, $osakaStaff] as $s) {
+            \App\Models\ShiftPreference::create([
+                'staff_id' => $s->id, 'date' => $this->soon(), 'availability' => '稼働可',
+                'period' => Carbon::today()->addDays(3)->format('Y-m'),
+            ]);
+        }
+
+        $data = $this->actingAsPerson($tokyoEmp)->get('/assign')->assertOk()->original->getData();
+        $poolIds = collect($data['boardAvail'])->flatten(1)->pluck('id')->unique()->all();
+
+        $this->assertContains($tokyoStaff->id, $poolIds);
+        $this->assertNotContains($osakaStaff->id, $poolIds);
+    }
+
+    /** スタッフ画面の募集中タブ＝自分の拠点の募集だけ。ただし応募済みの案件は残す。 */
+    public function test_staff_portal_recruiting_tab_is_limited_to_my_office(): void
+    {
+        $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京']);
+        $tokyoJob = ProjectFactory::new()->create([
+            'office' => '東京', 'start_date' => $this->soon(), 'is_recruiting' => true,
+        ]);
+        $osakaJob = ProjectFactory::new()->create([
+            'office' => '大阪', 'start_date' => $this->soon(4), 'is_recruiting' => true,
+        ]);
+        $osakaApplied = ProjectFactory::new()->create([
+            'office' => '大阪', 'start_date' => $this->soon(5), 'is_recruiting' => true,
+        ]);
+        Application::create([
+            'project_id' => $osakaApplied->id, 'staff_id' => $tokyoStaff->id,
+            'intent' => '希望', 'applied_at' => now(),
+        ]);
+
+        $ids = collect(
+            $this->actingAsPerson($tokyoStaff)->get('/staff-portal')->assertOk()->original->getData()['recruitJobs']
+        )->pluck('id')->all();
+
+        $this->assertContains($tokyoJob->id, $ids);
+        $this->assertContains($osakaApplied->id, $ids, '応募済みの案件は他拠点でも残す');
+        $this->assertNotContains($osakaJob->id, $ids, '関係のない他拠点の募集は出さない');
+    }
+}

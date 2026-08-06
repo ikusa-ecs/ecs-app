@@ -10,6 +10,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -43,15 +44,18 @@ class AssignBoardController extends Controller
     public function assign(Request $request)
     {
         $anchor = $this->boardAnchor($request);
+        $office = OfficeScope::filter($request);
 
         return view('assign', [
-            'staffPool' => $this->staffPool(),
-            'boardCases' => $this->boardCases($anchor),
-            'boardAvail' => $this->boardAvail($anchor),       // off → その日に稼働可/希望のスタッフ一覧
+            'staffPool' => $this->staffPool($office),
+            'boardCases' => $this->boardCases($anchor, $office),
+            'boardAvail' => $this->boardAvail($anchor, $office), // off → その日に稼働可/希望のスタッフ一覧
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
             'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
             'roleOptions' => AssignmentRole::positionLabels(), // ポジション編集プルダウンの選択肢（正本）
             'noteOptions' => $this->allNoteOptions(),          // 担当メモ入力の候補（軍師/サポ 等）
+            'officeScope' => $office,                          // 今絞っている拠点（null＝全拠点）。注記に使う
+            'usingDb' => Project::exists(),                    // DBに案件があるか（絞って0件でも見本に戻さない旗）
         ]);
     }
 
@@ -71,22 +75,30 @@ class AssignBoardController extends Controller
     }
 
     /** エントリー一覧 /entries。案件＋応募者（applications）を DB から渡す。 */
-    public function entries()
+    public function entries(Request $request)
     {
+        $office = OfficeScope::filter($request);
+
         return view('entries', [
-            'staffPool' => $this->staffPool(),
-            'entriesCases' => $this->entriesCases(),
+            'staffPool' => $this->staffPool($office),
+            'entriesCases' => $this->entriesCases($office),
+            'officeScope' => $office,
+            'usingDb' => Project::exists(),
         ]);
     }
 
     /** ピックアップ /pickup。案件＋候補者（応募＋当日稼働可）＋現メンバーを DB から渡す。 */
-    public function pickup()
+    public function pickup(Request $request)
     {
+        $office = OfficeScope::filter($request);
+
         return view('pickup', [
-            'staffPool' => $this->staffPool(),
-            'pickupCases' => $this->pickupCases(),
+            'staffPool' => $this->staffPool($office),
+            'pickupCases' => $this->pickupCases($office),
             'roleOptions' => AssignmentRole::positionLabels(),   // 担当役割プルダウンの選択肢（正本）
             'noteOptions' => $this->allNoteOptions(),            // 担当メモ入力の候補（軍師/サポ 等）
+            'officeScope' => $office,
+            'usingDb' => Project::exists(),
         ]);
     }
 
@@ -157,12 +169,13 @@ class AssignBoardController extends Controller
 
     /**
      * スタッフ名の一覧（経験回数の多い順）。NAME_POOL の単一ソース。
+     * 拠点で絞るときは自拠点のスタッフだけ（$office が null なら全拠点）。
      *
      * @return list<string>
      */
-    private function staffPool(): array
+    private function staffPool(?string $office = null): array
     {
-        return Person::staff()
+        return OfficeScope::applyToPeople(Person::staff(), $office)
             ->orderByDesc('experience_count')
             ->pluck('name')
             ->all();
@@ -174,10 +187,12 @@ class AssignBoardController extends Controller
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function boardCases(Carbon $anchor): Collection
+    private function boardCases(Carbon $anchor, ?string $office = null): Collection
     {
         // ボード対象＝完了/下書きでなく、開催日があり、基準日〜21日先の案件。
-        $projects = Project::orderBy('start_date')
+        // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」（案件一覧と同じ）。
+        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
             ->map(fn (Project $p) => [$p, $this->offDays($p->start_date, $anchor)])
@@ -304,12 +319,17 @@ class AssignBoardController extends Controller
      *
      * @return array<int, array<int, array<string, string>>>
      */
-    private function boardAvail(Carbon $anchor): array
+    private function boardAvail(Carbon $anchor, ?string $office = null): array
     {
         $end = $anchor->copy()->addDays(21);
 
+        // 希望者カラムに出す「候補プール」なので、拠点で絞るときは自拠点のスタッフだけにする。
         $prefs = ShiftPreference::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
             ->whereIn('availability', ['稼働可', '希望'])
+            ->when($office, fn ($q) => $q->whereIn(
+                'staff_id',
+                OfficeScope::applyToPeople(Person::staff(), $office)->pluck('id')->all()
+            ))
             ->get(['staff_id', 'date']);
 
         if ($prefs->isEmpty()) {
@@ -370,11 +390,14 @@ class AssignBoardController extends Controller
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function entriesCases(): Collection
+    private function entriesCases(?string $office = null): Collection
     {
         $today = Carbon::today();
 
-        $projects = Project::orderBy('start_date')
+        // 拠点で絞るのは「案件」だけ。応募者（applications）は本人が手を挙げた記録なので、
+        // 他拠点のスタッフが応募していてもそのまま出す（隠すと応募が無かったように見えてしまう）。
+        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));
 
@@ -476,11 +499,13 @@ class AssignBoardController extends Controller
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function pickupCases(): Collection
+    private function pickupCases(?string $office = null): Collection
     {
         $today = Carbon::today();
 
-        $projects = Project::with('director:id,name')
+        // 拠点で絞るのは「案件」だけ。候補者＝応募者∪現メンバー＝その案件に紐づく人なので、
+        // 他拠点の人でもそのまま出す（メンバーが消えると保存＝上書きで担当が外れてしまう）。
+        $projects = OfficeScope::applyToProjects(Project::with('director:id,name'), $office)
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\Setting;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -21,11 +22,16 @@ use Illuminate\Support\Carbon;
 class AssignPublishController extends Controller
 {
     /** 公開ボードを表示（DBの案件＋公開状態を渡す）。 */
-    public function index()
+    public function index(Request $request)
     {
         $today = Carbon::today();
 
-        $cases = Project::orderBy('start_date')->get()->map(function (Project $p) use ($today) {
+        // 拠点の表示範囲（全拠点運用・2026-08-05 baba確定＝公開ボードは第2弾）。
+        // 管理者以上は既定で全拠点（スイッチで選択）、一般社員は自拠点固定。
+        $office = OfficeScope::filter($request);
+
+        $cases = OfficeScope::applyToProjects(Project::query(), $office)
+            ->orderBy('start_date')->get()->map(function (Project $p) use ($today) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400)
@@ -60,6 +66,7 @@ class AssignPublishController extends Controller
             'cases'  => $cases,
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
             'entryDeadline' => Setting::get('entry_deadline', ''), // 通常案件の一斉締切日（DB保存・空=未設定）
+            'officeScope' => $office,                       // 今絞っている拠点（null＝全拠点）。注記に使う
         ]);
     }
 

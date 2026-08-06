@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
+use App\Support\OfficeScope;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -377,19 +378,32 @@ class StaffPortalController extends Controller
      */
     private function recruitJobs(Carbon $today, $me)
     {
+        // 本人の応募（案件ID → 行）。テスト/未ログインは空＝応募状態なし。
+        // ※ 拠点で絞るときに「すでに応募した案件」を落とさないよう、先に引いておく。
+        $myApps = ($me && ! TestAccounts::isMockOnly($me))
+            ? Application::where('staff_id', $me->id)->get()->keyBy('project_id')
+            : collect();
+
+        // 募集は自分の拠点の案件だけ見せる（全拠点運用・2026-08-05 baba確定＝公開ボードと合わせる）。
+        // スタッフは権限 staff なので OfficeScope は常に「自分の拠点」を返す（切替は無い）。
+        // ⚠ すでに応募した案件は、他拠点でも残す（応募したのに一覧から消えると取り消せなくなる）。
+        $office = OfficeScope::filter(request());
+        $appliedIds = $myApps->keys()->all();
+
         $projects = Project::where('is_recruiting', true)
             ->whereNotIn('status', ['完了', '下書き'])
+            ->when($office, fn ($q) => $q->where(function ($qq) use ($office, $appliedIds) {
+                OfficeScope::applyToProjects($qq, $office);
+                if ($appliedIds) {
+                    $qq->orWhereIn('id', $appliedIds);
+                }
+            }))
             ->orderBy('start_date')
             ->get();
 
         if ($projects->isEmpty()) {
             return collect();
         }
-
-        // 本人の応募（案件ID → 行）。テスト/未ログインは空＝応募状態なし。
-        $myApps = ($me && ! TestAccounts::isMockOnly($me))
-            ? Application::where('staff_id', $me->id)->get()->keyBy('project_id')
-            : collect();
 
         // 充足数＝確定/仮アサイン（キャンセル除く）の人数。案件ごとにまとめて数える。
         $filledByProject = Assignment::whereIn('project_id', $projects->pluck('id'))

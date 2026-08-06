@@ -158,6 +158,13 @@
 @endpush
 
 @section('content')
+      {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
+      @include('partials.office_switch')
+      @if ($officeScope)
+        <p class="mock-note" style="background:#fbf6ef;">
+          <b>{{ $officeScope }}</b>の案件だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
+        </p>
+      @endif
 @verbatim
       <div class="mock-note">
         この公開ボードは<b>案件データ・公開状態とも実際のDBにつながっています</b>（公開ボタンを押すとDBに保存され、閉じても・他のPCでも残ります）。<br>

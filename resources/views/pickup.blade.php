@@ -156,6 +156,13 @@
 @endpush
 
 @section('content')
+      {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
+      @include('partials.office_switch')
+      @if ($officeScope)
+        <p class="mock-note" style="background:#fbf6ef;">
+          <b>{{ $officeScope }}</b>の案件だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
+        </p>
+      @endif
 @verbatim
       <div class="mock-note">
         これは見た目確認用のモックです。案件・人数・メンバー・希望者はすべて仮の見本です。<br>
@@ -219,6 +226,8 @@
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
 <!-- DBの案件＋候補者（応募＋当日稼働可）＋現メンバー。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_PICKUP_CASES = @json($pickupCases ?? []);</script>
+<!-- DBに案件があるか（拠点で絞って0件になっても見本データに戻さないための旗）。 -->
+<script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
 <!-- DB保存に必要な橋渡し（CSRF・保存先URL・役割/担当メモの選択肢）。@verbatimの外で渡す。 -->
 <script>
   window.ECS_CSRF = '{{ csrf_token() }}';
@@ -273,8 +282,11 @@
 
   // ID→案件（本番日の参照などに使う。アーカイブ含む全件から探す）
   // DBの案件リスト（ECS_PICKUP_CASES）があればそれを使い、空なら見本cases.jsにフォールバック。
-  const ALL = (window.ECS_PICKUP_CASES && window.ECS_PICKUP_CASES.length)
-    ? window.ECS_PICKUP_CASES : (window.ECS_CASES || []);
+  // ※ 旗（ECS_USINGDB）が立っていれば、DBの結果が0件でも見本には戻さない（拠点で絞った0件をそのまま見せる）。
+  const USING_DB = (window.ECS_USINGDB !== undefined && window.ECS_USINGDB !== null)
+    ? !!window.ECS_USINGDB
+    : !!(window.ECS_PICKUP_CASES && window.ECS_PICKUP_CASES.length);
+  const ALL = USING_DB ? (window.ECS_PICKUP_CASES || []) : (window.ECS_CASES || []);
   function getCase(id){ return ALL.find(c => c.id === id) || null; }
 
   // 子案件（前日設営・リハ・予備日）の「本番はいつか」

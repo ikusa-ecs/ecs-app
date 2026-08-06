@@ -261,6 +261,13 @@
 @endpush
 
 @section('content')
+      {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
+      @include('partials.office_switch')
+      @if ($officeScope)
+        <p class="mock-note" style="background:#fbf6ef;">
+          <b>{{ $officeScope }}</b>の案件と、{{ $officeScope }}のスタッフ（希望者）だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
+        </p>
+      @endif
 @verbatim
       <div class="mock-note">
         案件・割当メンバー・希望者・その日の稼働可・件数バッジは、登録済みのデータ（DB）を表示しています。<br>
@@ -323,6 +330,8 @@
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
 <!-- DBのボード用案件＋割当メンバー（実データ）。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_BOARD_CASES = @json($boardCases ?? []);</script>
+<!-- DBに案件があるか（拠点で絞って0件になっても見本データに戻さないための旗）。 -->
+<script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
 <!-- 希望者カラム用：その日に稼働可/希望のスタッフ（off→一覧）と、今月のアサイン件数（名前→件数）。 -->
 <script>window.ECS_BOARD_AVAIL = @json($boardAvail ?? []);</script>
 <script>window.ECS_BOARD_MONTH = @json($boardMonth ?? []);</script>
@@ -345,7 +354,11 @@
   // ※ボードは「近い日（今日〜3週間先）の本番・予備日」を日ごとに並べる。過去・下書き・
   //   遠い月の案件は出さない（それらは案件一覧／スタッフ画面で見る）。同じ1つのデータから作る。
   // DBのボードデータ（割当メンバー込み）があればそれを使う。空なら見本cases.jsで動かす（フォールバック）。
-  const ECS_BOARD = (window.ECS_BOARD_CASES && window.ECS_BOARD_CASES.length) ? window.ECS_BOARD_CASES : null;
+  // ※ 旗（ECS_USINGDB）が立っていれば、DBの結果が0件でも見本には戻さない（拠点で絞った結果を正しく「0件」と見せる）。
+  const USING_DB = (window.ECS_USINGDB !== undefined && window.ECS_USINGDB !== null)
+    ? !!window.ECS_USINGDB
+    : !!(window.ECS_BOARD_CASES && window.ECS_BOARD_CASES.length);
+  const ECS_BOARD = USING_DB ? (window.ECS_BOARD_CASES || []) : null;
   const cases = (ECS_BOARD || ECS_CASES)
     .filter(c => !c.archived && !c.draft && c.off >= 0 && c.off <= 21)
     .map(c => ({

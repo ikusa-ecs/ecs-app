@@ -157,6 +157,13 @@
 @endpush
 
 @section('content')
+      {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
+      @include('partials.office_switch')
+      @if ($officeScope)
+        <p class="mock-note" style="background:#fbf6ef;">
+          <b>{{ $officeScope }}</b>の案件だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
+        </p>
+      @endif
 @verbatim
       <div class="mock-note">
         <b>どの案件に、誰がエントリー（希望）してくれているか</b>を確認する画面です（DBの本物データ）。<br>
@@ -216,6 +223,8 @@
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
 <!-- DBの案件＋応募者（実データ）。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_ENTRIES_CASES = @json($entriesCases ?? []);</script>
+<!-- DBに案件があるか（拠点で絞って0件になっても見本データに戻さないための旗）。 -->
+<script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
 <!-- エントリー一覧「月ごと」からのアサイン保存（A案）用。 -->
 <script>
   window.ECS_ASSIGN_URL = '/entries/assign';
@@ -276,8 +285,11 @@
   // 募集対象の案件だけ（募集する・下書きでない）。過去/未来の絞りは「この日から」で行う（passFilter）。
   // DBの案件リスト（ECS_ENTRIES_CASES）があればそれを使い、空なら見本cases.jsにフォールバック。
   function targetCases(){
-    const src = (window.ECS_ENTRIES_CASES && window.ECS_ENTRIES_CASES.length)
-      ? window.ECS_ENTRIES_CASES : window.ECS_CASES;
+    // ※ 旗（ECS_USINGDB）が立っていれば、DBの結果が0件でも見本には戻さない（拠点で絞った0件をそのまま見せる）。
+    const usingDb = (window.ECS_USINGDB !== undefined && window.ECS_USINGDB !== null)
+      ? !!window.ECS_USINGDB
+      : !!(window.ECS_ENTRIES_CASES && window.ECS_ENTRIES_CASES.length);
+    const src = usingDb ? (window.ECS_ENTRIES_CASES || []) : window.ECS_CASES;
     return src
       .filter(c => c.recruit && !c.draft)
       .sort((a,b) => a.off - b.off);
