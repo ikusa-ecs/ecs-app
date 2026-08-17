@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Content;
 use App\Models\Project;
+use Database\Seeders\Concerns\DemoOnly;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -17,8 +18,15 @@ use Illuminate\Support\Carbon;
  */
 class TestExtraProjectSeeder extends Seeder
 {
+    use DemoOnly;
+
     public function run(): void
     {
+        // 本番など、見本データを入れてはいけない環境では何もしない（安全装置）。
+        if ($this->demoBlocked()) {
+            return;
+        }
+
         $today = Carbon::today();
 
         // 規模 → 目安の運営人数（必要人数）。

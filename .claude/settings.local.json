@@ -223,7 +223,16 @@
       "Bash(awk -F: '$1>1190')",
       "Bash(grep -n 'fillable\\\\|protected $table' -A12 app/Models/Content.php)",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/login\" -UseBasicParsing -TimeoutSec 30; \"HTTP \" + $r.StatusCode + \" / ログイン画面OK\" } catch { \"エラー: \" + $_.Exception.Message })",
-      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/\" -UseBasicParsing -TimeoutSec 30; \"HTTP \" + $r.StatusCode + \" / 長さ \" + $r.Content.Length } catch { \"エラー: \" + $_.Exception.Message })"
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000/\" -UseBasicParsing -TimeoutSec 30; \"HTTP \" + $r.StatusCode + \" / 長さ \" + $r.Content.Length } catch { \"エラー: \" + $_.Exception.Message })",
+      "Read(//g//**)",
+      "Bash(APP_ENV=production php artisan tinker --execute=\"echo '見本データ: '.\\(config\\('ecs.seed_demo'\\)?'入る⚠':'入らない（守られている）'\\).PHP_EOL;\")",
+      "Bash(grep -nE '^#{1,3} ' G:/.shortcut-targets-by-id/1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H/ECS再開発2026_Claude開発/作業リスト_共有.md)",
+      "Bash(grep -n 'staff\\\\b\\\\|$staff\\\\|スタッフ名簿\\\\|foreach' resources/views/assignment.blade.php)",
+      "Bash(sed 's/\\\\\\(PASSWORD=\\\\\\).*/\\\\1***/')",
+      "Bash(grep -n 'ECS_PUBLISH\\\\|window.ECS\\\\|@json\\($cases\\)\\\\|CASES =' resources/views/assign_publish.blade.php)",
+      "Bash(python -)",
+      "Bash(python -c ' *)",
+      "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Http\\\\\\\\\\\\\\\\Controllers\\\\\\\\\\\\\\\\MyPageFinanceController\" routes/web.php)"
     ]
   }
 }

@@ -14,30 +14,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // ECS の見本データ（社員・スタッフ・コンテンツ・案件）。
-        // ※すべて開発・動作確認用のダミー（メールは @example.com）。本番には入れない。
-        $this->call([
-            ContentSeeder::class,                 // コンテンツ・マスタ（先に投入）
-            ContentRoleRequirementSeeder::class,  // コンテンツ別・規模別の必要人数（仮の見本／コンテンツの後）
-            RoleRequirementSeeder::class,         // 必要アサイン人数リスト（本物・CSV取込／見本の後で上書き＋商品追加）
-            PersonSeeder::class,                  // 人名簿（社員・スタッフ）
-            StaffProfileSeeder::class,            // スタッフのポジション可否・NGペア（people を参照）
-            ProjectSeeder::class,                 // 案件（ディレクター等で people を参照するため最後）
-        ]);
+        // ① 見本（ダミー）データ。架空の社員・スタッフ・コンテンツ・案件。
+        //    ★本番には入らない（各シーダーが DemoOnly で自分で判定して止まる）。
+        //    ②の本物で仮値を上書きしてもらうため、②より先に呼ぶ。
+        $this->call(DemoSeeder::class);
 
-        // テスト/デモ環境のときだけ、アサイン・応募・希望などの動作確認用データも入れる
-        // （ECS_TEST_LOGIN 有効時のみ）。これで migrate:fresh --seed 一発でアサイン表・
-        // マイページ等が“埋まった状態”になる。本番（flag=false）では入らない。
-        if (config('ecs.test_login', false)) {
-            $this->call([
-                DemoActivitySeeder::class,        // アサイン・応募・希望（/staff-status・/assign-sheet 等が埋まる）
-                DemoMyPageSeeder::class,          // baba(E-007) のアサイン・営業担当案件（/mypage が埋まる）
-            ]);
-        }
+        // ② 本物の初期データ。本番でも入れる。
+        //    必要アサイン人数リスト（IKUSA公式・CSV取込）＝①の仮の人数を上書きし、
+        //    リストにあるコンテンツも追加する。ここは環境で分けない。
+        $this->call(RoleRequirementSeeder::class);
 
-        // DB接続版のテスト用ログイン（シーダー内で ECS_TEST_LOGIN を判定）。
-        $this->call([
-            TestLoginSeeder::class,
-        ]);
+        // ③ DB接続版のテスト用ログイン。ECS_TEST_LOGIN が有効なときだけ入る
+        //    （判定はシーダー内。本番は既定で無効なので入らない）。
+        $this->call(TestLoginSeeder::class);
     }
 }

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Person;
 use App\Models\StaffRoleEligibility;
+use Database\Seeders\Concerns\DemoOnly;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -17,8 +18,15 @@ use Illuminate\Support\Carbon;
  */
 class TestStaffSeeder extends Seeder
 {
+    use DemoOnly;
+
     public function run(): void
     {
+        // 本番など、見本データを入れてはいけない環境では何もしない（安全装置）。
+        if ($this->demoBlocked()) {
+            return;
+        }
+
         $today = Carbon::today();
 
         $names = [

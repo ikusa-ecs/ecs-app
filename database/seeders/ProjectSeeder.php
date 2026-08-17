@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Project;
+use Database\Seeders\Concerns\DemoOnly;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -14,8 +15,15 @@ use Illuminate\Support\Carbon;
  */
 class ProjectSeeder extends Seeder
 {
+    use DemoOnly;
+
     public function run(): void
     {
+        // 本番など、見本データを入れてはいけない環境では何もしない（安全装置）。
+        if ($this->demoBlocked()) {
+            return;
+        }
+
         $today = Carbon::today();
 
         // 社員の姓 → people ID（cases.js の dir/goods は姓だけなので解決する）

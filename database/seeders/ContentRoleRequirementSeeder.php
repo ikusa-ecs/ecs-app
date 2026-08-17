@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\ContentRoleRequirement;
 use App\Support\AssignmentRole;
+use Database\Seeders\Concerns\DemoOnly;
 use Illuminate\Database\Seeder;
 
 /**
@@ -20,6 +21,8 @@ use Illuminate\Database\Seeder;
  */
 class ContentRoleRequirementSeeder extends Seeder
 {
+    use DemoOnly;
+
     /** 規模ごとの標準編成（仮）。役割コードは AssignmentRole の正本に合わせる。 */
     private const TEMPLATES = [
         '大型' => ['D' => 1, 'OP' => 1, 'MC' => 2, 'FC' => 3, 'CK' => 1, 'SP' => 1, 'RP' => 2],
@@ -46,6 +49,11 @@ class ContentRoleRequirementSeeder extends Seeder
 
     public function run(): void
     {
+        // 本番など、見本データを入れてはいけない環境では何もしない（安全装置）。
+        if ($this->demoBlocked()) {
+            return;
+        }
+
         // メイン：規模ごとの標準編成
         foreach (self::MAIN as $contentId => $scales) {
             foreach ($scales as $scale) {

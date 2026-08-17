@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Content;
+use Database\Seeders\Concerns\DemoOnly;
 use Illuminate\Database\Seeder;
 
 /**
@@ -12,8 +13,15 @@ use Illuminate\Database\Seeder;
  */
 class ContentSeeder extends Seeder
 {
+    use DemoOnly;
+
     public function run(): void
     {
+        // 本番など、見本データを入れてはいけない環境では何もしない（安全装置）。
+        if ($this->demoBlocked()) {
+            return;
+        }
+
         $contents = [
             ['id' => 'CT-001', 'content_name' => '運動会',         'category' => '盛り上げ系', 'is_physical' => true],
             ['id' => 'CT-002', 'content_name' => '水合戦',         'category' => '盛り上げ系', 'is_physical' => true],

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Person;
+use Database\Seeders\Concerns\DemoOnly;
 use Illuminate\Database\Seeder;
 
 /**
@@ -12,8 +13,15 @@ use Illuminate\Database\Seeder;
  */
 class PersonSeeder extends Seeder
 {
+    use DemoOnly;
+
     public function run(): void
     {
+        // 本番など、見本データを入れてはいけない環境では何もしない（安全装置）。
+        if ($this->demoBlocked()) {
+            return;
+        }
+
         // ── 社員（employee）── dept: plan=イベプラ / sales=セールス / creative=クリエイティブ
         $employees = [
             ['id' => 'E-001', 'name' => '田中 健一', 'department' => 'イベプラ',     'hire_date' => '2021-12-01',
