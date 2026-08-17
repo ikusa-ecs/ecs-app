@@ -40,11 +40,15 @@
       position: sticky; top: 56px; z-index: 9;
     }
     .s-tabs button {
-      flex: 1 1 calc(50% - 3px); min-width: 0; border: 1px solid var(--line); background: #fff;
-      color: var(--muted); border-radius: 999px; padding: 9px 8px;
-      font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
-      display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;
+      /* タブ5つを狭い画面では3＋2の2段に折り返す（1段に5つは入らないため）。 */
+      flex: 1 1 calc(33.333% - 4px); min-width: 0; border: 1px solid var(--line); background: #fff;
+      color: var(--muted); border-radius: 999px; padding: 9px 5px;
+      font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;
     }
+    /* タブ名の長短の出し分け。既定（スマホ）は短いほうを見せる。 */
+    .s-tabs button .lb-l { display: none; }
+    .s-tabs button .lb-s { display: inline; }
     .s-tabs button .ti { font-size: 15px; flex: 0 0 auto; }
     .s-tabs button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
     .s-tabs button .pill {
@@ -87,13 +91,19 @@
       cursor: pointer; white-space: nowrap;
     }
     .job-filter .jf-today:active { background: var(--brand-soft); }
-    /* 「追加案件のみ」の絞り込みボタン。押すと赤くなって、追加案件だけが並ぶ。 */
-    .job-filter .jf-extra {
-      flex: 0 0 auto; border: 1px solid var(--danger); background: #fff;
-      color: var(--danger); border-radius: 8px; padding: 0 12px;
+    /* 絞り込みボタンの並び。スマホでも押しやすいよう、プルダウンではなくボタンにしている。
+       押すと色が変わるので「いま何で絞っているか」が一目で分かる。 */
+    .job-toggles { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .job-toggles .jf-tg {
+      flex: 1 1 auto; border: 1px solid var(--line); background: #fff;
+      color: var(--muted); border-radius: 999px; padding: 9px 14px;
       font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+      white-space: nowrap;
     }
-    .job-filter .jf-extra.on { background: var(--danger); color: #fff; }
+    .job-toggles .jf-tg.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+    /* 追加案件は「急ぎ」なので赤で区別する（案件カードの赤枠と揃える）。 */
+    .job-toggles .jf-tg.extra { border-color: var(--danger); color: var(--danger); }
+    .job-toggles .jf-tg.extra.on { background: var(--danger); border-color: var(--danger); color: #fff; }
 
     /* 募集案件の並び（広い画面では自動で2列に／狭い画面では幅に合わせて1列に縮む） */
     .job-grid {
@@ -253,6 +263,7 @@
     .lk-item .lk-name { font-size: 14.5px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
     .lk-item .lk-memo { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
     .lk-item .lk-go { flex: 0 0 auto; font-size: 13px; color: var(--muted); }
+    .lk-none { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.7; }
     /* プロフィール：身長・靴・服サイズを横3列に */
     .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     .field-row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
@@ -303,7 +314,10 @@
     @media (min-width: 720px) {
       .s-header { padding: 16px 26px 14px; }
       .s-tabs { padding: 10px 22px; top: 60px; }
-      .s-tabs button { flex: 0 0 auto; min-width: 140px; }
+      /* PCは5つとも1段に収まるので、長いタブ名に戻す。 */
+      .s-tabs button { flex: 1 1 auto; min-width: 110px; font-size: 13px; padding: 9px 12px; gap: 5px; }
+      .s-tabs button .lb-l { display: inline; }
+      .s-tabs button .lb-s { display: none; }
       .s-body { padding: 22px 24px 40px; }
     }
   </style>
@@ -320,12 +334,15 @@
 
     <!-- タブ -->
     <div class="s-tabs">
+      {{-- タブ名は画面幅で長短を出し分ける（lb-l＝PC用の長い名前／lb-s＝スマホ用の短い名前）。
+           スマホは5つを2段（3＋2）に並べるため、長いままだと1マスに収まらない。 --}}
       <button class="active" data-tab="tab-jobs" onclick="switchTab(this)">
-        <span class="ti">📋</span>募集中の案件 <span class="pill" id="openCount">0</span>
+        <span class="ti">📋</span><span class="lb-l">募集中の案件</span><span class="lb-s">募集中</span> <span class="pill" id="openCount">0</span>
       </button>
-      <button data-tab="tab-pref" onclick="switchTab(this)"><span class="ti">📅</span>稼働希望</button>
-      <button data-tab="tab-assign" onclick="switchTab(this)"><span class="ti">✓</span>確定アサイン</button>
-      <button data-tab="tab-settings" onclick="switchTab(this)"><span class="ti">⚙️</span>設定</button>
+      <button data-tab="tab-pref" onclick="switchTab(this)"><span class="ti">📅</span><span class="lb-l">稼働希望</span><span class="lb-s">稼働希望</span></button>
+      <button data-tab="tab-assign" onclick="switchTab(this)"><span class="ti">✓</span><span class="lb-l">確定アサイン</span><span class="lb-s">アサイン</span></button>
+      <button data-tab="tab-links" onclick="switchTab(this)"><span class="ti">🔗</span><span class="lb-l">リンク集</span><span class="lb-s">リンク</span></button>
+      <button data-tab="tab-settings" onclick="switchTab(this)"><span class="ti">⚙️</span><span class="lb-l">設定</span><span class="lb-s">設定</span></button>
     </div>
 
     <div class="s-body">
@@ -347,15 +364,18 @@
             <option value="東京">東京</option>
             <option value="オンライン">オンライン</option>
           </select>
-          <select id="jobState" onchange="renderJobs()">
-            <option value="">状態すべて</option>
-            <option value="open">募集中のみ</option>
-            <option value="applied">エントリー中のみ</option>
-          </select>
           <input type="date" id="jobFrom" onchange="renderJobs()" title="この日以降の案件を表示します">
           <button type="button" class="jf-today" onclick="setJobToday()">今日から</button>
-          {{-- 追加案件（あとから増えた急ぎの募集）だけを見たいときに使う絞り込み --}}
-          <button type="button" class="jf-extra" id="jfExtra" onclick="toggleExtraOnly()">🔥 追加案件のみ</button>
+        </div>
+
+        {{-- 絞り込みボタン。以前「状態」はプルダウンだったが、スマホでは押しにくく
+             選んでいることも分かりにくかったので、押すと色が変わるボタンにした。
+             「募集中」「エントリー中」はどちらか片方だけ（もう一度押すと解除）。
+             「追加案件」はそれとは別に、重ねて絞り込める。 --}}
+        <div class="job-toggles">
+          <button type="button" class="jf-tg" id="jfOpen" onclick="setJobState('open')">📋 募集中のみ</button>
+          <button type="button" class="jf-tg" id="jfApplied" onclick="setJobState('applied')">★ エントリー中のみ</button>
+          <button type="button" class="jf-tg extra" id="jfExtra" onclick="toggleExtraOnly()">🔥 追加案件のみ</button>
         </div>
 
         <div class="sec-title" id="jobSecTitle">募集中の案件</div>
@@ -412,16 +432,15 @@
         </div>
       </div>
 
-      <!-- ===== タブ4：設定 ===== -->
-      <div class="tab-panel" id="tab-settings">
+      {{-- ===== タブ4：リンク集 =====
+           中身は共通設定（/settings の「スタッフ画面のリンク集」）で社員が登録する（settings.staff_links）。
+           最初は設定タブの中に置いていたが「どこにあるか分からない」との声があり、専用タブに独立させた。 --}}
+      <div class="tab-panel" id="tab-links">
         <div class="settings-wrap">
-
-          {{-- ⓪ 便利リンク集。中身は共通設定（/settings）で社員が登録する（settings.staff_links）。
-               1件も登録が無いときはカードごと出さない＝空っぽの箱を見せないため。 --}}
-          @if(!empty($staffLinks))
           <div class="m-card">
-            <h3>🔗 便利リンク</h3>
+            <h3>🔗 リンク集</h3>
             <p class="sub">よく使うページをまとめています。タップすると別のタブで開きます。</p>
+            @if(!empty($staffLinks))
             <div class="lk-items">
               @foreach($staffLinks as $link)
               <a class="lk-item" href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer">
@@ -433,8 +452,17 @@
               </a>
               @endforeach
             </div>
+            @else
+            {{-- 空っぽのまま黙って出すと「壊れている」と思われるので、理由を書いておく。 --}}
+            <p class="lk-none">まだリンクが登録されていません。担当者が登録すると、ここに並びます。</p>
+            @endif
           </div>
-          @endif
+        </div>
+      </div>
+
+      <!-- ===== タブ5：設定 ===== -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="settings-wrap">
 
           <!-- ① プロフィール（自分の情報） -->
           <div class="m-card">
@@ -580,11 +608,26 @@
     const stateBadge = { open:{c:'open', t:'募集中'}, applied:{c:'applied', t:'エントリー中'}, closed:{c:'closed', t:'締切・満員'} };
     const fmtLabel = { real:{c:'fmt-real', t:'リアル'}, long:{c:'fmt-long', t:'リアルロング'}, online:{c:'fmt-online', t:'オンライン'} };
 
-    // 「🔥 追加案件のみ」の on/off。true のあいだは追加案件だけを表示する。
+    // 絞り込みボタンの状態。
+    // jobStateFilter … ''＝すべて / 'open'＝募集中のみ / 'applied'＝エントリー中のみ（どちらか片方）
+    // extraOnly      … 追加案件だけに絞るか（上とは別に重ねられる）
+    let jobStateFilter = '';
     let extraOnly = false;
+
+    function syncToggleButtons() {
+      document.getElementById('jfOpen').classList.toggle('on', jobStateFilter === 'open');
+      document.getElementById('jfApplied').classList.toggle('on', jobStateFilter === 'applied');
+      document.getElementById('jfExtra').classList.toggle('on', extraOnly);
+    }
+    // 同じボタンをもう一度押したら解除（＝すべて表示に戻る）。
+    function setJobState(v) {
+      jobStateFilter = (jobStateFilter === v) ? '' : v;
+      syncToggleButtons();
+      renderJobs();
+    }
     function toggleExtraOnly() {
       extraOnly = !extraOnly;
-      document.getElementById('jfExtra').classList.toggle('on', extraOnly);
+      syncToggleButtons();
       renderJobs();
     }
 
@@ -592,7 +635,7 @@
     function renderJobs() {
       const kw    = document.getElementById('jobKw').value.trim();
       const area  = document.getElementById('jobArea').value;
-      const state = document.getElementById('jobState').value;
+      const state = jobStateFilter;
       const fromStr = document.getElementById('jobFrom').value;
       const fromDate = fromStr ? (function(){ const p = fromStr.split('-'); return new Date(+p[0], (+p[1]) - 1, +p[2]); })() : null;
       const grid  = document.getElementById('jobGrid');

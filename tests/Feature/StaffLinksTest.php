@@ -45,16 +45,30 @@ class StaffLinksTest extends TestCase
         $this->assertSame(['スタッフNotion', 'アンケートフォーム'], array_column($links, 'title'));
     }
 
-    /** 1件も登録が無いときは、空っぽの「便利リンク」カードを出さない。 */
-    public function test_no_card_is_shown_when_there_are_no_links(): void
+    /**
+     * 1件も登録が無いときは、リンク行を出さず「まだ登録がありません」と理由を出す。
+     * （黙って空にすると「壊れている」と思われるため。）
+     */
+    public function test_an_explanation_is_shown_when_there_are_no_links(): void
     {
         $staff = PersonFactory::new()->staff()->create();
 
         $res = $this->actingAsPerson($staff)->get('/staff-portal')->assertOk();
 
-        // CSSにも「便利リンク」の説明コメントがあるので、リンク行そのものが無いことで判定する。
         $res->assertDontSee('class="lk-item"', false);
+        $res->assertSee('まだリンクが登録されていません');
         $this->assertSame([], $res->original->getData()['staffLinks']);
+    }
+
+    /** リンク集は専用タブ（tab-links）として独立している＝設定タブの中に埋もれていない。 */
+    public function test_links_have_their_own_tab(): void
+    {
+        $staff = PersonFactory::new()->staff()->create();
+
+        $this->actingAsPerson($staff)->get('/staff-portal')
+            ->assertOk()
+            ->assertSee('data-tab="tab-links"', false)
+            ->assertSee('id="tab-links"', false);
     }
 
     /** http/https 以外のURLは保存を拒否する（スタッフ画面にそのままリンクとして出るため）。 */
