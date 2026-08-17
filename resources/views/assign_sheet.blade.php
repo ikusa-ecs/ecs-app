@@ -135,6 +135,86 @@
   .pe-sep { color: #a89680; font-size: 10px; }
 
   .sheet-empty { padding: 40px; text-align: center; color: #a08a73; }
+
+  /* =========================================================================
+     スマホ表示（画面の横幅が720px以下のときだけ効く）。PCの見た目は一切変えない。
+     方針：カードの帯は「横スクロールでOK」（baba要望）なので横並びのまま残す。
+     直すのはその周り＝操作バーと凡例を画面幅に収め、
+     「横に伸びてよいのはカードの帯の中だけ」という状態にする。
+     ========================================================================= */
+  @media (max-width: 720px) {
+
+    /* 操作バーは横1列に並べると375pxの画面からはみ出すので、上から順に積む。 */
+    .sheet-controls { gap: 8px; padding: 10px 11px; }
+
+    /* 月切替の選択欄は <form> で包まれている。中身だけ広げても包みが縮んだままなので、
+       まず包みの form を1行いっぱいに広げる。 */
+    .sheet-controls form { flex: 1 1 100%; }
+
+    /* 月切替は固定130pxだと右に中途半端な余りが出るだけなので幅いっぱいに。
+       文字を16pxにするのは、これより小さいとiPhoneが選んだ瞬間に画面を勝手に拡大するため。 */
+    .sheet-controls .month-sel { width: 100%; min-width: 0; font-size: 16px; padding: 10px 11px; }
+
+    /* 絞り込み欄はHTML側に min-width:190px が直接書いてあり、ふつうの指定では上書きできない。
+       そこで !important で打ち消してから、1行いっぱいに広げる。 */
+    .sheet-controls input[type="search"] {
+      flex: 1 1 100%;
+      width: 100%;
+      min-width: 0 !important;
+      font-size: 16px;
+      padding: 10px 11px;
+    }
+
+    /* 「count を右端に寄せる」ためだけの隙間要素。縦積みでは1行まるごと無駄になるので消す。 */
+    .sheet-controls .spacer { display: none; }
+
+    /* チェックと件数は、消した隙間の代わりに左右へ振り分けて1行に収める。 */
+    .sheet-controls label.chk { flex: 1 1 auto; }
+    .sheet-controls .count { margin-left: auto; }
+
+    /* 色の凡例は9個あって縦に伸びすぎるので、文字と隙間を少し詰める。 */
+    .sheet-legend { gap: 6px 10px; margin-bottom: 8px; font-size: 11px; }
+
+    /* カードの帯。ここだけ指で横になぞって見る（＝ページ全体は横に広がらない）。
+       高さの引き算(100vh-172px)はPCの操作バーが1行前提の数字で、
+       スマホでは操作バーが数行になるぶん枠が画面の下からはみ出す。
+       そこで画面の高さに対する割合で決め直す。 */
+    .sheet-scroll {
+      max-height: 72vh;
+      -webkit-overflow-scrolling: touch;   /* iPhoneで指を離しても滑って動く（ぬるっとしたスクロール） */
+      overscroll-behavior: contain;        /* 端まで来たときにページごと動いてしまうのを防ぐ */
+    }
+
+    /* 202pxのままだと375pxの画面に1枚しか入らない。170pxなら2枚見えて隣の日と見比べられる。 */
+    .acard { width: 170px; }
+
+    /* カードが狭くなるぶん、左の項目名の欄も詰めて、右の中身に使える幅を確保する。 */
+    .arow .lbl { flex: 0 0 46px; }
+
+    /* 編集ボタンは指で押すには小さすぎるので、押せる大きさにする。 */
+    .mhead .m-edit-btn { padding: 4px 10px; font-size: 11px; }
+    .acard.editing .chips .chip-ck { padding: 4px 10px; }
+
+    /* ▼ 編集モードの入力欄。10px前後のままだとタップのたびにiPhoneが画面を拡大してしまうので16pxにする。
+       そのぶん横幅を取るので、案件項目は1行に1つずつ縦に積む。 */
+    .acard.editing .pe-in,
+    .acard.editing .m-role,
+    .acard.editing .m-note,
+    .acard.editing .m-patrol { font-size: 16px; padding: 4px 6px; }
+    .acard.editing .pe-in { width: 100%; }
+    .acard.editing .pe-in.num { width: 72px; }
+
+    /* メンバー行は、役割・担当・巡回の幅をカード170pxに収まる値へ決め打ちする。
+       割合(100%)にすると入れ物からはみ出してカードの外に飛び出すため。
+       役割の欄は編集中だけ広がってよいので、左の固定46pxもここで解く。 */
+    .acard.editing .mrow .p { flex: 0 0 auto; }
+    .acard.editing .m-role { max-width: none; width: 60px; }
+    .acard.editing .m-note { width: 84px; }
+    .acard.editing .m-patrol { width: 52px; margin-left: 0; margin-top: 3px; }
+
+    /* 案件が無いときの案内。40pxの余白は狭い画面では大きすぎる。 */
+    .sheet-empty { padding: 24px 12px; font-size: 13px; }
+  }
 </style>
 @endpush
 

@@ -349,6 +349,45 @@
       100% { background: transparent; }
     }
     tr.main-row.flash td { animation: rowFlash 1.8s ease-out; }
+
+    /* ===== スマホ（720px以下）=====
+       この画面は絞り込み欄が min-width:130px、日付欄が140px×2、書き出しボタンが4つ横並びで、
+       合計するとスマホの幅（375px）を大きく超えていた＝ページごと横に伸びて読めなかった。
+       狭いときだけ「1列に積む・欄を幅いっぱいに・ボタンは2つずつ折り返す」に切り替える。 */
+    @media (max-width: 720px) {
+      .filter-bar { gap: 10px; }
+      /* 絞り込みは1項目＝1行。欄は幅いっぱいに伸ばす（固定130pxをやめる）。 */
+      .filter-bar .f-item { flex: 1 1 100%; min-width: 0; }
+      .filter-bar .f-item input,
+      .filter-bar .f-item select { width: 100%; min-width: 0; font-size: 16px; }
+      .filter-bar .spacer { display: none; }
+
+      /* 開催日の「〜」は縦に折り返さず、2つの日付欄で幅を分け合う。 */
+      .f-dates { flex-wrap: wrap; }
+      .f-dates input[type="date"] { width: auto !important; flex: 1 1 40%; }
+
+      /* 書き出し・登録ボタンは2つずつ折り返して、指で押せる大きさにする。 */
+      .f-actions { flex-wrap: wrap; }
+      .f-actions .btn { flex: 1 1 calc(50% - 4px); justify-content: center; text-align: center; font-size: 12.5px; padding: 10px 8px; }
+
+      /* 表示切替・一覧/下書きタブは折り返す */
+      .view-tabs, .list-tabs { flex-wrap: wrap; }
+      .view-tab, .list-tab { flex: 1 1 auto; text-align: center; }
+
+      /* 案件を開いたときの詳細も1列に積む */
+      .detail-panel { gap: 10px 14px; }
+      .detail-panel .d-item { flex: 1 1 100%; min-width: 0; }
+      .detail-panel .cat-select,
+      .detail-panel .cat-note { max-width: 100%; min-width: 0; }
+      .mini-field input, .mini-field select { min-width: 0; }
+
+      /* カレンダー表示は7列のまま（曜日が縦に揃っていないと意味がないため）、マス目を小さくする */
+      .cal-head .mlabel { min-width: 0; flex: 1; font-size: 14px; }
+      .cal-grid { gap: 2px; }
+      .cal-cell { min-height: 58px; padding: 2px 2px 3px; }
+      .cal-cell .dnum { font-size: 11px; }
+      .cal-ev { font-size: 9px; padding: 1px 3px; }
+    }
 </style>
 @endverbatim
 @endpush
@@ -440,7 +479,7 @@
           <!-- 開催日でしぼる。左だけ＝その日以降／右だけ＝その日まで／両方同じ日＝その1日だけ。 -->
           <div class="f-item">
             <label>開催日（この日から〜この日まで）</label>
-            <div style="display:flex; gap:5px; align-items:center;">
+            <div class="f-dates" style="display:flex; gap:5px; align-items:center;">
               <input type="date" id="dFrom" onchange="applyFilter()" style="width:140px;">
               <span style="color:var(--muted,#8a7a6b);">〜</span>
               <input type="date" id="dTo" onchange="applyFilter()" style="width:140px;">
@@ -450,7 +489,7 @@
           <div class="spacer"></div>
           <div class="f-item">
             <label>&nbsp;</label>
-            <div style="display:flex; gap:8px;">
+            <div class="f-actions" style="display:flex; gap:8px;">
               <button class="btn" type="button" onclick="openChat()">💬 チャットワーク用に書き出し</button>
               <button class="btn" type="button" onclick="openExport()">📤 アサイン表へ書き出し</button>
               <a class="btn" href="/project-import">⬆ CSVで取込</a>

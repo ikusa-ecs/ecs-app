@@ -132,6 +132,66 @@
     table.ov-tbl tfoot td { background: #faf5ee; font-weight: 700; color: #5a4a38; }
     table.ov-tbl tfoot td.few { background: #fbe3e3; color: #b91c1c; }
     .ov-note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+
+    /* =========================================================================
+       スマホ対応（375px幅を想定）。ここから下は画面が狭いときだけ効く。
+       PCの見た目は一切変えない。共通の指定は public/ecs/style.css の同じ
+       @media に入っているので、ここには「この画面だけの困りごと」だけ書く。
+       ========================================================================= */
+    @media (max-width: 720px) {
+
+      /* タブは2つを半分ずつに。指で押しやすい大きさをそろえるため。 */
+      .ea-tabs { gap: 6px; margin-bottom: 12px; }
+      .ea-tab { flex: 1 1 0; min-width: 0; padding: 10px 8px; font-size: 13px; }
+
+      /* 月切替バー：「2026年 8月」の表示が固定150pxだと
+         狭い画面で〈 〉ボタンごと外へはみ出すので、幅を縮めて折り返せるようにする。 */
+      .ea-monthbar { gap: 10px; flex-wrap: wrap; margin: 2px 0 12px; }
+      .ea-monthbar button { width: 44px; height: 44px; font-size: 18px; }  /* 指で押せる44px角に */
+      .ea-monthbar .mon { min-width: 0; flex: 1 1 auto; font-size: 16px; }
+
+      /* カード：内側の余白が18pxもあるとカレンダー7列ぶんの幅が足りなくなる。 */
+      .ea-card { padding: 12px; border-radius: 10px; margin-bottom: 12px; }
+      .ea-card .sub { font-size: 11.5px; margin-bottom: 10px; }
+
+      /* カレンダーは7列のまま（曜日が縦にそろっていることが大事なので列は減らさない）。
+         代わりに すき間と文字を小さくして、375pxでも1マス約44px＝指で押せる大きさを確保する。 */
+      .cal-grid { gap: 3px; }
+      .cal-grid .dow { font-size: 11px; }
+      .cell { min-height: 52px; padding: 3px 1px; font-size: 12px; border-radius: 8px; }
+      .cell .dnum { font-size: 11px; margin-left: 3px; }
+      .cell .badge { font-size: 8px; padding: 1px 2px; top: 2px; right: 2px; }
+      .cell .st { font-size: 15px; margin-top: 2px; }
+      .cell .stsub { font-size: 8px; }
+      .cell.weekday.off .st { font-size: 11px; }
+
+      /* 凡例は項目が多いので、すき間をつめて2〜3段に折り返す。 */
+      .ea-legend { gap: 8px 12px; font-size: 11px; margin-top: 10px; }
+
+      /* 入力欄：max-width:640px は狭い画面では効かないが、
+         親の幅からはみ出さないよう念のため上限を画面幅にそろえる。 */
+      .ea-fields { max-width: 100%; min-width: 0; gap: 12px; }
+      /* 数値欄の固定120pxと14pxの文字は、iPhoneで入力すると勝手に拡大されるので
+         幅いっぱい・16pxにする（16px未満だと自動ズームが起きる）。 */
+      .ea-field input[type=number] { width: 100%; font-size: 16px; }
+      .ea-field textarea { font-size: 16px; }
+      .ea-save button { width: 100%; padding: 12px 16px; font-size: 15px; }
+      .ea-saved { display: block; margin: 8px 0 0; }
+
+      /* 右下に浮く保存ボタン：PCと同じ大きさだと画面のはしに寄りすぎて
+         カレンダーの日付に重なるため、少し小さくして角に寄せる。 */
+      .ea-float-save { right: 12px; bottom: 12px; padding: 12px 18px; font-size: 14px; }
+
+      /* 全社員一覧の表：入れ物の中だけを横スクロールさせる。
+         入れ物自体が広がるとページごと横に伸びてしまうので、上限を親の幅にそろえる。 */
+      .ov-wrap { max-width: 100%; min-width: 0; -webkit-overflow-scrolling: touch; }
+      table.ov-tbl { font-size: 12px; }
+      table.ov-tbl th, table.ov-tbl td { padding: 5px 6px; }
+      /* 希望休・備考の列は最低130pxもいらない。表が横に長くなりすぎるのを防ぐ。 */
+      table.ov-tbl td.offcol, table.ov-tbl th.offcol,
+      table.ov-tbl td.memocol, table.ov-tbl th.memocol { min-width: 100px; max-width: 150px; }
+      .ov-note { font-size: 11px; }
+    }
   </style>
 @endverbatim
 @endpush

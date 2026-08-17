@@ -29,6 +29,72 @@
            border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; margin-bottom: 14px; }
   .tag-future { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--warn-soft); color: #b45309; font-weight: 600; }
   .tag-past { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: #ece3d4; color: #7a6a58; }
+
+  /* =====================================================================
+     スマホ幅（720px以下）だけに効く指定。PCの見た目は一切変わりません。
+     この画面の表は table.ps で、共通CSSの表対応（table.tbl）が効かないため
+     ここで面倒を見ます。
+     ===================================================================== */
+  @media (max-width: 720px) {
+    /* カードの余白を詰めて、狭い画面でも表に幅を回す */
+    .ps-card { padding: 12px; border-radius: 10px; }
+    .ps-intro { font-size: 12.5px; }
+
+    /* 文字と余白を少し小さくして、横スクロールの距離を短くする */
+    table.ps { font-size: 12.5px; }
+    table.ps th, table.ps td { padding: 7px 8px; }
+
+    /* 数字の列は折り返すと桁がバラけて読めなくなるので nowrap のまま。
+       そのぶん表は画面より横に長くなるが、表を囲った .table-scroll のおかげで
+       ページ全体ではなく「表の中だけ」を指でなぞって見る形になる。 */
+
+    /* コンテンツ名（1列目）だけは折り返してよい。
+       名前は長く、nowrap のままだと横スクロールの距離が極端に伸びるため。
+       幅の下限・上限を決めて、1文字ずつ縦に割れるのを防ぐ。 */
+    table.ps.ps-sticky th.l:first-child,
+    table.ps.ps-sticky td.l:first-child {
+      white-space: normal;
+      min-width: 8.5em;
+      max-width: 12em;
+      line-height: 1.5;
+    }
+
+    /* 罫線の引き方を「セルごと」に切り替える。
+       まとめ引き（border-collapse: collapse）のままだと、次で列を left:0 に貼り付けたとき
+       罫線だけが取り残されて消えるブラウザがあるため。見た目は変わらない。 */
+    table.ps.ps-sticky { border-collapse: separate; border-spacing: 0; }
+    /* セルごとに引くと、合計行のある表だけ「最終行の下線」と「合計行の上線」が二重に出る。
+       下線側を消して1本にする（合計行が無い表は下線を残したいので対象外）。 */
+    table.ps.ps-sticky tbody:has(+ tfoot) tr:last-child td { border-bottom: 0; }
+
+    /* 横になぞっている間も「今どの行を見ているか」が分かるよう、
+       コンテンツ名の列は左端に貼り付けたまま残す。
+       貼り付ける列は、下を流れる列が透けないよう背景色を必ず指定する。
+       右の区切り線は box-shadow で描く（罫線だと表側に持っていかれることがあるため）。 */
+    table.ps.ps-sticky th.l:first-child,
+    table.ps.ps-sticky td.l:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #fff;
+      box-shadow: 1px 0 0 var(--line);
+    }
+    table.ps.ps-sticky thead th.l:first-child,
+    table.ps.ps-sticky tfoot td.l:first-child { background: #faf7f1; }
+
+    /* 入庫数の入力欄。16px未満だと iPhone が入力時に勝手に画面を拡大するため 16px。
+       高さも指で押せる大きさにする。 */
+    .ps-recv {
+      width: 5.5em;
+      min-height: 40px;
+      padding: 8px 9px;
+      font-size: 16px;
+    }
+
+    /* 保存ボタンは横並びが入りきらないので折り返し、押しやすいよう幅いっぱいにする */
+    .ps-actions { flex-wrap: wrap; gap: 8px; }
+    .ps-btn { width: 100%; padding: 12px 18px; font-size: 14px; }
+  }
 </style>
 @endpush
 
@@ -57,7 +123,9 @@
   @else
     <form method="post" action="/paper-stock/receipts">
       @csrf
-      <table class="ps">
+      {{-- 表が画面より広いとき、ページごと横に伸びずに表の中だけ横スクロールさせる入れ物 --}}
+      <div class="table-scroll">
+      <table class="ps ps-sticky">
         <thead>
           <tr>
             <th class="l">コンテンツ（印刷物）</th>
@@ -96,6 +164,7 @@
           </tr>
         </tfoot>
       </table>
+      </div>
       <div class="ps-actions">
         <button type="submit" class="ps-btn">入庫数を保存</button>
       </div>
@@ -112,7 +181,9 @@
 <div class="ps-card">
   <h3>コンテンツ × 月（必要枚数）</h3>
   <p class="sub">開催月ごとの枚数です（今後・開催済みの合計）。次にいつ・何枚要るかの見通しに使えます。</p>
-  <table class="ps">
+  {{-- 月が増えるほど横に長くなる表なので、表の中だけ横スクロールさせる --}}
+  <div class="table-scroll">
+  <table class="ps ps-sticky">
     <thead>
       <tr>
         <th class="l">コンテンツ</th>
@@ -135,6 +206,7 @@
       @endforeach
     </tbody>
   </table>
+  </div>
 </div>
 @endif
 
@@ -142,6 +214,8 @@
 @if(count($detail) > 0)
 <div class="ps-card">
   <h3>明細（案件ごと・{{ count($detail) }}件）</h3>
+  {{-- 列が8つある表なので、表の中だけ横スクロールさせる --}}
+  <div class="table-scroll">
   <table class="ps">
     <thead>
       <tr>
@@ -166,6 +240,7 @@
       @endforeach
     </tbody>
   </table>
+  </div>
 </div>
 @endif
 

@@ -71,6 +71,121 @@
     .saved-ping { color: #2e7d32; font-weight: 700; font-size: 13px; opacity: 0; transition: opacity .2s; }
     .saved-ping.show { opacity: 1; }
     .empty-note { color: var(--muted); font-size: 13px; margin: 10px 2px; }
+
+    /* =========================================================
+       スマホ表示（画面の横幅が720px以下のときだけ効く）
+       PCの見た目は一切変えない。ここは「指で入力する画面」なので、
+       ①はみ出さない ②文字を大きく ③押しやすい を最優先にしている。
+       共通の土台（/ecs/style.css の同じ幅の指定）で足りないぶんだけ書く。
+       ========================================================= */
+    @media (max-width: 720px) {
+
+      /* 案件を選ぶバー：横並びだと375pxに収まらないので、ラベルの下に選択欄を置く縦積みに */
+      .pick-bar { display: block; }
+      .pick-bar label { display: block; margin: 12px 0 4px; }
+      .pick-bar label[for="monthFilter"] { margin-top: 0; }
+      /* 選択欄は幅いっぱい。文字は16px＝これより小さいとiPhoneが触るたびに勝手に拡大するため */
+      .pick-bar select { width: 100%; font-size: 16px; padding: 10px 11px; }
+      /* 320px固定だと画面（375px）からはみ出すので、下限をやめて幅いっぱいに */
+      .pick-bar #caseSelect { min-width: 0; }
+
+      /* 売上欄：ラベル・入力・注意書きを縦に積む。入力欄は幅いっぱいで押しやすく */
+      .rev-box { display: block; margin-bottom: 10px; }
+      .rev-box label { display: block; margin-bottom: 5px; }
+      .rev-box .yen-input { width: 100%; }
+      .rev-box .note-cell { display: block; margin-top: 6px; line-height: 1.6; }
+
+      /* 金額の入力欄も16px。小さいままだとiPhoneで拡大され、以後ずっと横スクロールになる */
+      .yen-input { font-size: 16px; padding: 10px 11px; }
+      /* メモ欄は文字サイズがHTMLに直接書いてあるので、!important で16pxに上書きする */
+      #memoInput { font-size: 16px !important; padding: 10px 11px !important; }
+
+      /* 経費の表：6列を横に並べると画面に入りきらず、横スクロールして入力欄を探すことになる。
+         スマホでは1費目＝1枚のカードとして縦に積み、項目名はCSSで付け直す。 */
+      #finPanel table.tbl { display: block; overflow-x: visible; font-size: 13px; }
+      #finPanel table.tbl thead { display: none; }        /* 見出し行は各行に文字で付けるので隠す */
+      #finPanel table.tbl tbody,
+      #finPanel table.tbl tfoot { display: block; }
+
+      #costBody tr {
+        display: block;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        background: #fff;
+      }
+      #costBody tr:hover { background: #fff; }            /* PC用のマウス反転はスマホでは不要 */
+      #costBody td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        text-align: left;
+        border-bottom: 0;                                  /* カードの中に横線が出ないように */
+        padding: 4px 0;
+        min-height: 34px;
+      }
+      /* 1列目＝費目の名前。カードの見出しとして幅いっぱいに出す */
+      #costBody td:first-child {
+        display: block;
+        font-weight: 700;
+        padding: 0 0 6px;
+        line-height: 1.45;
+      }
+      /* 隠した見出し行の代わりに、各行の左へ項目名を出す */
+      #costBody td::before {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        flex: 0 0 auto;
+      }
+      #costBody td:nth-child(2)::before { content: '単価'; }
+      #costBody td:nth-child(3)::before { content: '数量'; }
+      #costBody td:nth-child(4)::before { content: '単位'; }
+      #costBody td:nth-child(5)::before { content: '金額'; }
+      #costBody td.note-cell::before   { content: '備考 '; }
+      /* 備考はPCでは1行に省略しているが、スマホでは折り返して全部読めるようにする */
+      #costBody td.note-cell {
+        display: block;
+        max-width: none;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        padding-top: 6px;
+        line-height: 1.55;
+      }
+      #costBody td.note-cell:empty { display: none; }      /* 備考が無い費目は行ごと出さない */
+
+      /* 入力欄はカードの右側に。指で押せる幅を確保する */
+      #costBody input.yen-input { width: 120px; flex: 0 0 auto; text-align: right; }
+      #costBody input.qty-input { width: 96px; }
+
+      /* 合計・利益の行：カードと同じ横並び1行にする。
+         色はもともと td に付いているが、この形だと文字の後ろにしか色が乗らないので tr に移す */
+      #finPanel table.tbl tfoot tr {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 8px;
+      }
+      #finPanel table.tbl tfoot td { border-bottom: 0; padding: 0; background: transparent; }
+      #finPanel table.tbl tfoot td:empty { display: none; }  /* 空のセルが余白として並ばないように */
+      #finPanel tr.total-row  { background: var(--brand-soft); }
+      #finPanel tr.profit-row { background: #eef6ee; }
+      #finPanel table.tbl tfoot td.amount-cell { font-size: 15px; }
+
+      /* 保存ボタン：画面幅いっぱい＋高さを出して、片手でも押し外さないように */
+      .save-row { display: block; margin-top: 18px; }
+      .save-row .btn { width: 100%; padding: 13px 16px; font-size: 15px; }
+      .saved-ping { display: block; margin-top: 8px; text-align: center; }
+
+      /* 下の注意書きは小さすぎると読めないので少しだけ大きく・行間を広げる */
+      #finPanel > p.note-cell { font-size: 12px; line-height: 1.7; }
+    }
   </style>
 @endverbatim
 @endpush

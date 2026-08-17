@@ -5,7 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ECS @yield('title')</title>
-  <link rel="stylesheet" href="/ecs/style.css">
+  {{-- 共通CSS。末尾の ?v= はファイルの更新日時。中身を直すたびに数字が変わるので、
+       スマホやPCが古いCSSを覚えたまま「直したのに変わらない」となるのを防ぐ。 --}}
+  <link rel="stylesheet" href="/ecs/style.css?v={{ \App\Support\Asset::ver('ecs/style.css') }}">
   {{-- 前回「メニューをたたんだ」状態を、画面が表示される前に復元する（一瞬メニューが見えてから消える"チラつき"を防ぐ）。 --}}
   <script>
     try { if (localStorage.getItem('ecs_nav_hidden') === '1') document.documentElement.classList.add('nav-collapsed'); } catch (e) {}

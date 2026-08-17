@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ECS スタッフ画面（エントリー・希望・アサイン／スマホ・PC両対応）</title>
-  <link rel="stylesheet" href="/ecs/style.css">
+  <link rel="stylesheet" href="/ecs/style.css?v={{ \App\Support\Asset::ver('ecs/style.css') }}">
   @verbatim
   <style>
     /* ===== スタッフ用ポータル（スマホ・PC両対応＝レスポンシブ） ===== */

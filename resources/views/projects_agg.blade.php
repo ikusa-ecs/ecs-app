@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>社員・ディレクター集計（ECS）</title>
-  <link rel="stylesheet" href="/ecs/style.css">
+  <link rel="stylesheet" href="/ecs/style.css?v={{ \App\Support\Asset::ver('ecs/style.css') }}">
   @verbatim
   <style>
     body { background: var(--bg); padding: 18px 20px; }

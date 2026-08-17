@@ -195,6 +195,81 @@
     .bulk-row:last-child { border-bottom: none; }
     .bulk-date { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; min-width: 64px; }
     .bulk-name { flex: 1; font-size: 13px; color: var(--ink); }
+
+    /* =====================================================================
+       スマホ表示（幅720px以下）だけに効く指定。ここから下しか触っていないので、
+       PCの見た目は今までと1ピクセルも変わりません。
+       共通の土台（/ecs/style.css の同じ幅の指定）で表・メニュー・入力欄などは
+       すでに対応済みなので、ここでは「この画面だけが持っている作り」で
+       375pxの画面からはみ出す・押しにくい所だけを直しています。
+       ===================================================================== */
+    @media (max-width: 720px) {
+
+      /* パネルの左右の余白を2pxずつ削って、中身に使える幅を少しでも増やす */
+      .mp-wrap.panel { padding: 12px; }
+
+      /* プロフィール欄：名前の枠が「最低180px」のままだと、丸アイコン＋余白と合わせて
+         375pxの画面では横にはみ出すので、余った分だけ伸びる形に変える。 */
+      .prof-card { gap: 10px; }
+      .prof-main { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
+      .prof-name { font-size: 16px; }
+      /* 2つのボタンは横幅を半分ずつ分け合って、指で押しやすい大きさにそろえる */
+      .prof-card .line-btn { flex: 1 1 140px; padding: 11px 10px; font-size: 13px; }
+
+      /* 月の絞り込み：選ぶ欄の文字が16px未満だと、iPhoneが押した瞬間に画面を勝手に
+         拡大してしまう（そのあと元に戻らず操作しづらい）ので16pxにする。 */
+      .mp-filter { gap: 8px; }
+      .mp-filter select { flex: 1 1 150px; min-width: 0; font-size: 16px; padding: 10px 11px; }
+      .mp-filter .note { flex: 1 1 100%; }   /* 説明文は折り返して次の行へ */
+
+      /* リスト／カレンダーの切替は2つで1行を分け合う。高さも約40pxにして指で押せるように。 */
+      .view-tab { flex: 1 1 0; padding: 10px 8px; }
+
+      /* 表の中の小さなボタン（📅登録・💰収支入力）は高さ28pxほどしかなく指では押しにくいので大きくする。
+         表は横になぞってスクロールできるので、少し広がってもページ自体ははみ出さない。 */
+      .tbl .cal-btn,
+      .tbl .fin-btn { padding: 9px 12px; font-size: 12.5px; }
+
+      /* アーカイブの開閉は文字だけで当たり判定が薄いので、上下に余白を足して押しやすくする */
+      .arch-toggle { padding: 10px 0; margin-top: 12px; }
+
+      /* --- カレンダー表示 ---
+         曜日がタテにそろって見えることがこの表の価値なので、7列は絶対に崩さない。
+         そのかわりマス目の余白・文字を小さくして、375pxでも7列が収まるようにする。 */
+      .mp-cal-grid { gap: 3px; }
+      /* マス目は既定だと「中身の最小幅」より縮まない＝長い案件名があると7列が画面をはみ出す。
+         それを止めるための指定（はみ出す代わりに中で折り返す）。 */
+      .mp-cal-grid > * { min-width: 0; }
+      .mp-cal-grid .dow { font-size: 10.5px; padding-bottom: 2px; }
+      .mp-cell { min-height: 58px; padding: 2px; font-size: 11px; gap: 2px; border-radius: 7px; }
+      .mp-cell .dnum { font-size: 10.5px; }
+      /* 1マスが約43px幅しかないので案件カードは最小限に。ただし押せる高さ（26px）は残す。 */
+      .mp-ev { font-size: 9px; line-height: 1.2; padding: 3px 2px 3px 3px; min-height: 26px; border-radius: 4px; overflow-wrap: anywhere; }
+      .mp-ev .ev-pos { display: block; overflow-wrap: anywhere; }
+      .mp-cal-legend { gap: 10px; }
+
+      /* 通知設定・アカウントの行：説明文とボタンを横に並べると、375pxでは
+         ボタンに押されて文字が3〜4行に折れて読みにくいので、上下に積む。 */
+      .set-row { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 0; }
+      .set-row .set-control { align-self: flex-start; }
+      .set-row .line-btn { width: 100%; }   /* 端まで伸ばして押しやすく */
+
+      /* --- 「今後をまとめて登録」の小窓（モーダル） --- */
+      /* 中身が画面より縦に長くなっても、小窓ごと上下にスクロールして最後まで読めるようにする */
+      .cal-modal-bg { padding: 10px; align-items: flex-start; overflow-y: auto; }
+      .cal-modal { max-width: 100%; max-height: calc(100vh - 20px); border-radius: 10px; }
+      .cal-modal-head { padding: 10px 12px; }
+      .cal-modal-head h2 { font-size: 14px; }
+      /* ×は文字だけだと当たり判定が小さくて閉じられないので、指で押せる四角にする */
+      .cal-modal-close { width: 40px; height: 40px; font-size: 24px; flex-shrink: 0; }
+      .cal-modal-body { padding: 10px 12px; }
+      /* 日付・案件名・登録ボタンを1行に並べると横にはみ出すので、
+         ボタンだけ下の行に回して幅いっぱいにする（押し間違いも減る）。 */
+      .bulk-row { flex-wrap: wrap; gap: 6px 10px; padding: 10px 0; }
+      .bulk-date { min-width: 0; }
+      .bulk-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+      .bulk-row .cal-btn { flex: 0 0 100%; text-align: center; padding: 11px 12px; font-size: 13px; }
+    }
   </style>
 @endverbatim
 @endpush

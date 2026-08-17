@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ECS 新規登録</title>
-  <link rel="stylesheet" href="/ecs/style.css">
+  <link rel="stylesheet" href="/ecs/style.css?v={{ \App\Support\Asset::ver('ecs/style.css') }}">
   @verbatim
   <style>
     body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; background: #3a2d20; padding: 32px 12px; }
