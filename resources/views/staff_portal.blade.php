@@ -30,23 +30,27 @@
       padding: 2px 9px; border-radius: 999px;
     }
 
-    /* タブ（上に固定） */
+    /* タブ（上に固定）
+       スマホでは4つが1行に収まらず、以前は横スクロールにしていたため
+       「募集中の案件」の件数バッジが画面の外に出て見切れていた。
+       折り返して2段（2×2）にすることで、狭い画面でも数字まで必ず見えるようにする。 */
     .s-tabs {
-      display: flex; gap: 6px; background: var(--panel);
+      display: flex; gap: 6px; flex-wrap: wrap; background: var(--panel);
       padding: 8px 12px; border-bottom: 1px solid var(--line);
-      position: sticky; top: 56px; z-index: 9; overflow-x: auto;
+      position: sticky; top: 56px; z-index: 9;
     }
     .s-tabs button {
-      flex: 1; min-width: 96px; border: 1px solid var(--line); background: #fff;
+      flex: 1 1 calc(50% - 3px); min-width: 0; border: 1px solid var(--line); background: #fff;
       color: var(--muted); border-radius: 999px; padding: 9px 8px;
       font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
       display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;
     }
-    .s-tabs button .ti { font-size: 15px; }
+    .s-tabs button .ti { font-size: 15px; flex: 0 0 auto; }
     .s-tabs button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
     .s-tabs button .pill {
       font-size: 11px; background: var(--danger); color: #fff;
       border-radius: 999px; padding: 0 6px; font-weight: 700;
+      flex: 0 0 auto;   /* 件数バッジは絶対に縮ませない（見切れの原因だったため） */
     }
     .s-tabs button.active .pill { background: #fff; color: var(--brand-dark); }
 
@@ -83,6 +87,13 @@
       cursor: pointer; white-space: nowrap;
     }
     .job-filter .jf-today:active { background: var(--brand-soft); }
+    /* 「追加案件のみ」の絞り込みボタン。押すと赤くなって、追加案件だけが並ぶ。 */
+    .job-filter .jf-extra {
+      flex: 0 0 auto; border: 1px solid var(--danger); background: #fff;
+      color: var(--danger); border-radius: 8px; padding: 0 12px;
+      font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .job-filter .jf-extra.on { background: var(--danger); color: #fff; }
 
     /* 募集案件の並び（広い画面では自動で2列に／狭い画面では幅に合わせて1列に縮む） */
     .job-grid {
@@ -332,6 +343,8 @@
           </select>
           <input type="date" id="jobFrom" onchange="renderJobs()" title="この日以降の案件を表示します">
           <button type="button" class="jf-today" onclick="setJobToday()">今日から</button>
+          {{-- 追加案件（あとから増えた急ぎの募集）だけを見たいときに使う絞り込み --}}
+          <button type="button" class="jf-extra" id="jfExtra" onclick="toggleExtraOnly()">🔥 追加案件のみ</button>
         </div>
 
         <div class="sec-title" id="jobSecTitle">募集中の案件</div>
@@ -536,6 +549,14 @@
     const stateBadge = { open:{c:'open', t:'募集中'}, applied:{c:'applied', t:'エントリー中'}, closed:{c:'closed', t:'締切・満員'} };
     const fmtLabel = { real:{c:'fmt-real', t:'リアル'}, long:{c:'fmt-long', t:'リアルロング'}, online:{c:'fmt-online', t:'オンライン'} };
 
+    // 「🔥 追加案件のみ」の on/off。true のあいだは追加案件だけを表示する。
+    let extraOnly = false;
+    function toggleExtraOnly() {
+      extraOnly = !extraOnly;
+      document.getElementById('jfExtra').classList.toggle('on', extraOnly);
+      renderJobs();
+    }
+
     // ===== 募集案件の行を描画 =====
     function renderJobs() {
       const kw    = document.getElementById('jobKw').value.trim();
@@ -551,6 +572,8 @@
         .filter(j => !area  || j.area === area)
         .filter(j => !state || j.state === state)
         .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
+        // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
+        .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
         .sort((a,b) => {
           const pa = anchorJob(a), pb = anchorJob(b);
           // 追加案件を先頭に
