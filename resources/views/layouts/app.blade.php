@@ -3,7 +3,18 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" id="ecsViewport">
+  {{-- 「PC表示に切り替える」を選んでいる端末では、画面の幅を1200pxとして扱わせる。
+       ＝スマホでも今までのPCの見た目のまま（指で拡大・移動して見る形）になる。
+       画面が表示される前にここで差し替えるので、切り替わりのチラつきが起きない。 --}}
+  <script>
+    try {
+      if (localStorage.getItem('ecs_force_pc') === '1') {
+        document.getElementById('ecsViewport').setAttribute('content', 'width=1200');
+        document.documentElement.classList.add('force-pc');
+      }
+    } catch (e) {}
+  </script>
   <title>ECS @yield('title')</title>
   {{-- 共通CSS。末尾の ?v= はファイルの更新日時。中身を直すたびに数字が変わるので、
        スマホやPCが古いCSSを覚えたまま「直したのに変わらない」となるのを防ぐ。 --}}

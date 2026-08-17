@@ -87,9 +87,38 @@
         </form>
       </div>
     @endauth
+
+    {{-- 表示の切り替え（困ったとき用の逃げ道）。
+         ふだんは画面の幅で自動的にスマホ表示／PC表示が決まるが、
+         列の多い画面などは「スマホでもPC表示のまま拡大して見たい」ことがあるため、
+         手動で上書きできるようにする。選んだ状態はその端末に記憶する。
+         スマホ・タブレット（端末の実寸が狭いもの）でしか意味がないので、
+         PCでは JS 側で丸ごと隠している。 --}}
+    <button type="button" class="pc-mode-btn" id="pcModeBtn" onclick="ECStogglePcMode()" hidden></button>
   </div>
 </aside>
 <script>
+  // --- 表示の切り替え（スマホ表示 ⇔ PC表示）---
+  // 仕組み：PC表示を選ぶと「この画面は1200px幅として扱って」とブラウザに伝えるだけ。
+  //         画面を作り分けているわけではないので、直す場所は今までどおり1か所で済む。
+  // 切り替えは読み込み直して反映する（表示の指定を途中で変えると、機種によって効かないため）。
+  function ECStogglePcMode(){
+    var on = document.documentElement.classList.contains('force-pc');
+    try { localStorage.setItem('ecs_force_pc', on ? '0' : '1'); } catch (e) {}
+    location.reload();
+  }
+  (function(){
+    var btn = document.getElementById('pcModeBtn');
+    if (!btn) return;
+    var forced = document.documentElement.classList.contains('force-pc');
+    // screen.width＝端末そのものの横幅。PC表示に切り替えても変わらないので、
+    // 「いまPC表示中でも、元はスマホ」を正しく見分けられる。
+    var narrowDevice = (window.screen && window.screen.width <= 900);
+    if (!narrowDevice && !forced) return;               // PCでは出さない
+    btn.hidden = false;
+    btn.textContent = forced ? '📱 スマホ表示に戻す' : '🖥 PC表示に切り替える';
+  })();
+
   // グループ見出しをクリックすると、その下の項目を開閉する。
   function ECStoggleGroup(el){
     var g = el.closest('.nav-group');

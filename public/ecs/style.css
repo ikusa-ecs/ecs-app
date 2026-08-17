@@ -107,6 +107,26 @@ a:hover { text-decoration: underline; }
 }
 .sidebar .userbox strong { color: #4b3a2c; display: block; font-size: 13px; }
 
+/* 「🖥 PC表示に切り替える」＝左メニューのいちばん下に置く逃げ道のボタン。
+   日常的に押すものではないので、目立たせず、迷ったときに見つかる位置にする。
+   PCでは JS が hidden のまま残すので出ない。 */
+.sidebar .pc-mode-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed #c9b596;
+  border-radius: 8px;
+  background: transparent;
+  color: #8a755e;
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: center;
+}
+.sidebar .pc-mode-btn:hover { background: #dccbb1; color: #4f4338; }
+.sidebar .pc-mode-btn[hidden] { display: none; }
+
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .topbar {
