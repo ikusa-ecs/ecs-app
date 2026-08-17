@@ -19,6 +19,10 @@
   {{-- 左メニュー（共通） --}}
   @include('partials.sidebar')
 
+  {{-- スマホでメニューを開いている間だけ出る「後ろの暗い幕」。押すと閉じる。
+       PCでは常に非表示（CSSで狭い画面のときだけ表示している）。 --}}
+  <button type="button" class="nav-backdrop" onclick="ECScloseNav()" aria-label="メニューを閉じる" tabindex="-1"></button>
+
   {{-- 本文 --}}
   <div class="main">
     <div class="topbar">
@@ -40,12 +44,32 @@
   </div>
 </div>
 
-{{-- ☰ボタンで左メニューを開閉する。たたんだ状態はブラウザに記憶する（次回も同じ状態で開く）。 --}}
+{{-- ☰ボタンで左メニューを開閉する。
+     PC   ＝メニューを丸ごと消して本文をフル幅に。たたんだ状態はブラウザに記憶する。
+     スマホ＝本文の上に重ねてスライドで出す。こちらは記憶しない（毎回、閉じた状態で始まる）。
+             横に並べたままだと375pxの画面で本文が143pxしか残らないため、作りを分けている。 --}}
 <script>
+  function ECSisNarrow(){
+    return window.matchMedia('(max-width: 720px)').matches;
+  }
   function ECStoggleNav(){
-    var hidden = document.documentElement.classList.toggle('nav-collapsed');
+    var root = document.documentElement;
+    if (ECSisNarrow()) { root.classList.toggle('nav-open'); return; }
+    var hidden = root.classList.toggle('nav-collapsed');
     try { localStorage.setItem('ecs_nav_hidden', hidden ? '1' : '0'); } catch (e) {}
   }
+  function ECScloseNav(){
+    document.documentElement.classList.remove('nav-open');
+  }
+
+  {{-- メニュー内のリンクを押したら閉じる（そのページへ移動するので開けっぱなしにしない）。 --}}
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('.sidebar nav a') : null;
+    if (a) ECScloseNav();
+  });
+  {{-- Escキーでも閉じる。画面を広げたとき（横向き・PC表示）に開いたままにならないようにもする。 --}}
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') ECScloseNav(); });
+  window.addEventListener('resize', function () { if (!ECSisNarrow()) ECScloseNav(); });
 </script>
 
 {{-- 日付の入力欄は、右端のカレンダーマークだけでなく「どこを押しても」カレンダーが開くようにする。
