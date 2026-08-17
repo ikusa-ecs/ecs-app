@@ -232,7 +232,8 @@
       "Bash(grep -n 'ECS_PUBLISH\\\\|window.ECS\\\\|@json\\($cases\\)\\\\|CASES =' resources/views/assign_publish.blade.php)",
       "Bash(python -)",
       "Bash(python -c ' *)",
-      "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Http\\\\\\\\\\\\\\\\Controllers\\\\\\\\\\\\\\\\MyPageFinanceController\" routes/web.php)"
+      "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Http\\\\\\\\\\\\\\\\Controllers\\\\\\\\\\\\\\\\MyPageFinanceController\" routes/web.php)",
+      "Bash(vendor/bin/phpunit --filter=test_non_http_urls_are_rejected)"
     ]
   }
 }

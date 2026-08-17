@@ -242,6 +242,17 @@
 
     /* ===== 設定タブ ===== */
     .settings-wrap { max-width: 560px; margin: 0 auto; }
+    /* 便利リンク集（Notion・アンケートフォーム等）。1行まるごとタップできる大きさにする。 */
+    .lk-items { display: flex; flex-direction: column; gap: 8px; }
+    .lk-item {
+      display: flex; align-items: center; gap: 12px; text-decoration: none;
+      border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; background: #fff;
+    }
+    .lk-item:active { background: var(--brand-soft); }
+    .lk-item .lk-txt { flex: 1; min-width: 0; }
+    .lk-item .lk-name { font-size: 14.5px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+    .lk-item .lk-memo { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+    .lk-item .lk-go { flex: 0 0 auto; font-size: 13px; color: var(--muted); }
     /* プロフィール：身長・靴・服サイズを横3列に */
     .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     .field-row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
@@ -404,6 +415,26 @@
       <!-- ===== タブ4：設定 ===== -->
       <div class="tab-panel" id="tab-settings">
         <div class="settings-wrap">
+
+          {{-- ⓪ 便利リンク集。中身は共通設定（/settings）で社員が登録する（settings.staff_links）。
+               1件も登録が無いときはカードごと出さない＝空っぽの箱を見せないため。 --}}
+          @if(!empty($staffLinks))
+          <div class="m-card">
+            <h3>🔗 便利リンク</h3>
+            <p class="sub">よく使うページをまとめています。タップすると別のタブで開きます。</p>
+            <div class="lk-items">
+              @foreach($staffLinks as $link)
+              <a class="lk-item" href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer">
+                <span class="lk-txt">
+                  <span class="lk-name">{{ $link['title'] }}</span>
+                  @if(!empty($link['memo']))<span class="lk-memo">{{ $link['memo'] }}</span>@endif
+                </span>
+                <span class="lk-go">開く ↗</span>
+              </a>
+              @endforeach
+            </div>
+          </div>
+          @endif
 
           <!-- ① プロフィール（自分の情報） -->
           <div class="m-card">

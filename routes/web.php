@@ -251,6 +251,8 @@ Route::get('/settings', [SettingsController::class, 'index']);
 Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);
 // 危険日（手動指定）を settings に保存。ダッシュボードの危険日カレンダーに反映される。
 Route::post('/settings/danger-dates', [SettingsController::class, 'saveDangerDates']);
+// スタッフ画面の便利リンク集（Notion・アンケートフォーム等）を settings に保存。
+Route::post('/settings/staff-links', [SettingsController::class, 'saveStaffLinks']);
 
 // マスタ管理（コンテンツ・拠点＝追加/編集/削除、ポジション＝表示のみ）。
 Route::get('/masters', [MasterController::class, 'index']);

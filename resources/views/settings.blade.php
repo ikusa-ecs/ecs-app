@@ -76,6 +76,30 @@
     .big-row .badd { font-size: 12px; padding: 3px 10px; white-space: nowrap; }
     .big-row .badd.done { opacity: .6; }
     .mtg-chip.danger { background: #fdecec; border-color: #f1b5b5; color: #b91c1c; }
+
+    /* ①-3 スタッフ画面の便利リンク集（1行＝1リンク。名前・URL・ひとこと） */
+    .lk-list { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+    .lk-empty { font-size: 12.5px; color: var(--muted); margin: 4px 0 12px; }
+    .lk-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fff;
+    }
+    .lk-row .lk-ord { display: flex; flex-direction: column; gap: 2px; }
+    .lk-row .lk-ord button {
+      border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer;
+      font-size: 10px; line-height: 1; padding: 3px 5px; font-family: inherit; color: var(--muted);
+    }
+    .lk-row .lk-ord button:disabled { opacity: .3; cursor: default; }
+    .lk-row .lk-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+    .lk-row input {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 13.5px; font-family: inherit; background: #fff; box-sizing: border-box;
+    }
+    .lk-row input.bad { border-color: #e08a8a; background: #fdf4f4; }
+    .lk-row .lk-rm {
+      border: 1px solid #f0b9b9; background: #fff; color: var(--danger); border-radius: 8px;
+      padding: 7px 11px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
   </style>
 @endverbatim
 @endpush
@@ -149,6 +173,29 @@
         </p>
       </div>
 
+      <!-- ①-3 スタッフ画面の便利リンク集 -->
+      <div class="panel settings-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>スタッフ画面のリンク集</h2></div>
+        <p class="muted" style="font-size:12.5px; margin:0 0 8px;">
+          スタッフNotion・アンケートフォームなど、<strong>スタッフによく開いてもらいたい外部ページ</strong>をここに登録します。
+          登録するとスタッフ画面の「設定」タブに一覧で出て、1タップで開けます。URLが変わったらここを直すだけでOKです。
+        </p>
+
+        <div id="linkList" class="lk-empty"><!-- JSでリンク行を描画 --></div>
+
+        <div class="save-bar" style="margin-top:4px;">
+          <button class="line-btn" onclick="addStaffLink()">＋ リンクを追加</button>
+        </div>
+
+        <div class="save-bar">
+          <button class="btn primary" onclick="saveStaffLinks()">リンク集を保存する</button>
+          <span class="saved-msg" id="linkSaved">✓ 保存しました</span>
+        </div>
+        <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
+          ※ URLは <code>https://</code> から始まるものだけ登録できます（安全のため）。「追加」だけでは保存されません。最後に「リンク集を保存する」を押してください。
+        </p>
+      </div>
+
       <!-- ② 通知設定は「個人ごとの設定」なので マイページ へ移動（2026-07-01 baba） -->
 
       <!-- ③ マスタ管理 -->
@@ -201,6 +248,8 @@
   window.ECS_DANGER_DATES = @json($dangerDates ?? []);
   // 大型案件の開催日一覧（これから）＝危険日にワンクリックで足す候補。
   window.ECS_BIG_EVENTS = @json($bigEventDates ?? []);
+  // スタッフ画面の便利リンク集（[{title,url,memo}, ...]）。
+  window.ECS_STAFF_LINKS = @json($staffLinks ?? []);
   // 保存POST用のCSRFトークン。
   window.ECS_CSRF = @json(csrf_token());
 </script>
@@ -349,6 +398,91 @@
       .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
   }
 
+  // --- ①-3 スタッフ画面のリンク集（DBに保存＝全スタッフの画面に効く）---
+  // 画面上の作業コピー。追加/並べ替え/削除→最後にまとめて保存する（他の設定と同じ流儀）。
+  let STAFF_LINKS = Array.isArray(window.ECS_STAFF_LINKS) ? window.ECS_STAFF_LINKS.map(l => ({
+    title: l.title || '', url: l.url || '', memo: l.memo || '',
+  })) : [];
+
+  function escAttrS(s) {   // input の value に安全に入れるためのエスケープ
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderStaffLinks() {
+    const box = document.getElementById('linkList');
+    if (!box) return;
+    if (!STAFF_LINKS.length) {
+      box.className = 'lk-empty';
+      box.textContent = 'まだ登録がありません。「＋ リンクを追加」から足してください。';
+      return;
+    }
+    box.className = 'lk-list';
+    box.innerHTML = STAFF_LINKS.map(function (l, i) {
+      // URLが https:// で始まっていない行は赤枠にして、保存前に気づけるようにする。
+      const badUrl = l.url !== '' && !/^https?:\/\//i.test(l.url);
+      return '<div class="lk-row">' +
+        '<div class="lk-ord">' +
+          '<button onclick="moveStaffLink(' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + ' title="上へ">▲</button>' +
+          '<button onclick="moveStaffLink(' + i + ',1)"' + (i === STAFF_LINKS.length - 1 ? ' disabled' : '') + ' title="下へ">▼</button>' +
+        '</div>' +
+        '<div class="lk-fields">' +
+          '<input type="text" placeholder="表示する名前（例：スタッフNotion）" value="' + escAttrS(l.title) + '" oninput="editStaffLink(' + i + ',\'title\',this.value)">' +
+          '<input type="url" class="' + (badUrl ? 'bad' : '') + '" placeholder="https://..." value="' + escAttrS(l.url) + '" oninput="editStaffLink(' + i + ',\'url\',this.value)">' +
+          '<input type="text" placeholder="ひとこと説明（任意・例：マニュアルはこちら）" value="' + escAttrS(l.memo) + '" oninput="editStaffLink(' + i + ',\'memo\',this.value)">' +
+        '</div>' +
+        '<button class="lk-rm" onclick="removeStaffLink(' + i + ')">削除</button>' +
+      '</div>';
+    }).join('');
+  }
+  function addStaffLink() {
+    STAFF_LINKS.push({ title: '', url: '', memo: '' });
+    renderStaffLinks();
+  }
+  // 入力中は再描画しない（カーソルが飛ぶため）。値だけ控えておく。
+  function editStaffLink(i, key, val) {
+    if (STAFF_LINKS[i]) STAFF_LINKS[i][key] = val;
+  }
+  function removeStaffLink(i) {
+    if (!confirm('このリンクを削除します。よろしいですか？')) return;
+    STAFF_LINKS.splice(i, 1);
+    renderStaffLinks();
+  }
+  function moveStaffLink(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= STAFF_LINKS.length) return;
+    const tmp = STAFF_LINKS[i];
+    STAFF_LINKS[i] = STAFF_LINKS[j];
+    STAFF_LINKS[j] = tmp;
+    renderStaffLinks();
+  }
+  function saveStaffLinks() {
+    // 名前もURLも空の行（追加しただけの行）は、そのまま捨てて保存する。
+    const links = STAFF_LINKS.filter(l => (l.title || '').trim() !== '' || (l.url || '').trim() !== '');
+
+    const ng = links.find(l => (l.title || '').trim() === '' || !/^https?:\/\//i.test((l.url || '').trim()));
+    if (ng) {
+      alert('名前と、https:// から始まるURLの両方を入れてください。（赤枠の行を確認してください）');
+      STAFF_LINKS = links;
+      renderStaffLinks();
+      return;
+    }
+
+    fetch('/settings/staff-links', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': window.ECS_CSRF,
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ links: links }),
+    })
+      .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+      .then(res => { if (Array.isArray(res.links)) STAFF_LINKS = res.links; renderStaffLinks(); flashSaved('linkSaved'); })
+      .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
+  }
+
   // --- マスタ件数を DB の実データで表示（嘘の固定件数を置き換え）---
   function fillMasterCounts() {
     const mc = window.ECS_SETTINGS_COUNTS;
@@ -362,6 +496,7 @@
   // 初期表示
   renderMtg();
   renderDanger();
+  renderStaffLinks();
   fillMasterCounts();
 </script>
 @endverbatim

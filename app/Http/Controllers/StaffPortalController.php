@@ -11,6 +11,7 @@ use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
+use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -92,6 +93,7 @@ class StaffPortalController extends Controller
             'prefPeriod' => $prefPeriod,                     // 稼働希望カレンダーの対象月（当月）
             'myPrefs' => $this->myPrefs($me),               // 本人の希望（カレンダー初期表示）
             'myPrefMemo' => $this->myPrefMemo($me, $prefPeriod), // 希望のコメント（初期表示）
+            'staffLinks' => StaffLinks::all(),               // 便利リンク集（共通設定で社員が編集）
         ]);
     }
 

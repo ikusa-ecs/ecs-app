@@ -8,8 +8,10 @@ use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
 use App\Support\DangerDays;
+use App\Support\StaffLinks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * 設定（S / /settings）。
@@ -56,6 +58,8 @@ class SettingsController extends Controller
             'dangerDates' => DangerDays::dates(),
             // 大型案件の開催日一覧（これから開催・完了/下書き以外）＝危険日にワンクリックで足す候補。
             'bigEventDates' => $this->bigEventDates(),
+            // スタッフ画面に出す便利リンク集（Notion・アンケートフォーム等）。
+            'staffLinks' => StaffLinks::all(),
         ]);
     }
 
@@ -120,6 +124,38 @@ class SettingsController extends Controller
             'ok'      => true,
             'dates'   => $list,
             'current' => AssignMtg::current(),
+        ]);
+    }
+
+    /**
+     * スタッフ画面の便利リンク集を保存する（POST /settings/staff-links）。
+     * 全スタッフに見える共通設定なので settings テーブル（key='staff_links'）にまとめて保存する。
+     * URLが変わるたびにコードを直さなくて済むよう、この画面から社員が編集できる。
+     */
+    public function saveStaffLinks(Request $request)
+    {
+        // このアプリは api/* 以外を JSON で返さない設定（bootstrap/app.php）なので、
+        // $request->validate() だと失敗時に画面ごとリダイレクトされてしまう。
+        // ここは画面から fetch で叩くAJAXなので、自分で検証して JSON の 422 を返す。
+        $validator = Validator::make($request->all(), [
+            'links'         => ['present', 'array', 'max:50'],
+            'links.*.title' => ['required', 'string', 'max:' . StaffLinks::MAX_TITLE],
+            // http/https だけ許可（javascript: などをスタッフ画面に出さないため）
+            'links.*.url'   => ['required', 'string', 'max:' . StaffLinks::MAX_URL, 'url:http,https'],
+            'links.*.memo'  => ['nullable', 'string', 'max:' . StaffLinks::MAX_MEMO],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'ok'      => false,
+                'message' => '名前と、https:// から始まるURLの両方を入れてください。',
+                'errors'  => $validator->errors()->toArray(),
+            ], 422);
+        }
+
+        return response()->json([
+            'ok'    => true,
+            'links' => StaffLinks::save($validator->validated()['links']),
         ]);
     }
 }
