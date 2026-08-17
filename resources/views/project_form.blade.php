@@ -138,6 +138,52 @@
       background: var(--brand-soft); border: 1px solid var(--line); color: var(--muted); }
     .danger-hint.warn { background: #fde8e8; border-color: var(--danger); color: #b91c1c; font-weight: 600; }
     .danger-hint .dh-reasons { margin: 4px 0 0; padding-left: 18px; font-weight: 600; }
+
+    /* ===== スマホ（狭い画面）で案件を登録できるようにする =====
+       この画面はPC前提で作ってあり、入力欄が横2列・短い欄はさらに横3〜4列に
+       並ぶため、スマホでは1つ1つの欄が細くなりすぎて入力できなかった。
+       狭いときは全部を縦1列に落とし、下の操作バーも押しやすい形に変える。 */
+    @media (max-width: 720px) {
+      /* 入力欄はすべて縦1列に。横に細く並ぶより、縦に長いほうがスマホでは扱いやすい。 */
+      .form-grid { grid-template-columns: 1fr; }
+      .triple { grid-template-columns: 1fr; gap: 0; }
+      /* 時刻・人数などの短い欄だけは2列。1列にすると縦に長くなりすぎるため。 */
+      .quad { grid-template-columns: 1fr 1fr; gap: 0 12px; }
+      .triple .form-row, .quad .form-row { margin-bottom: 16px; }
+
+      /* iPhoneは文字が16px未満の入力欄をタップすると勝手に拡大するので、
+         スマホのときだけ16pxにして拡大を止める（拡大されると位置がずれて操作しづらい）。 */
+      .form-row input[type="text"],
+      .form-row input[type="number"],
+      .form-row input[type="date"],
+      .form-row input[type="time"],
+      .form-row input[type="email"],
+      .form-row select,
+      .form-row textarea,
+      .tag-input input { font-size: 16px; }
+
+      /* 下の操作バー：横一列だとボタンがはみ出すので、縦積みで全幅にする。
+         スマホでは画面に貼り付け（sticky）をやめてフォームの最後に置く。
+         ボタン3〜4個を縦に並べると画面の1/3が埋まり、入力欄が隠れてしまうため。
+         並びは上から「キャンセル →（次の日程）→ 下書き → 確定」。
+         画面の一番下＝指が当たりやすい位置に「確定」を置く。
+         うっかり触っても、消えてしまうキャンセルより保存のほうが安全なため。 */
+      .form-actions {
+        position: static;
+        flex-direction: column; align-items: stretch; gap: 8px;
+        padding: 12px 14px;
+      }
+      .form-actions .spacer { display: none; }
+      .form-actions .btn { width: 100%; text-align: center; padding: 13px 16px; }
+
+      /* 切替タブ（1件ずつ / CSV取込）は2つで折り返せるように */
+      .mode-tabs { flex-wrap: wrap; }
+      .mode-tabs a { flex: 1; text-align: center; }
+
+      /* 横並びのラジオ・凡例は折り返す */
+      .radio-row { flex-wrap: wrap; gap: 10px 18px; }
+      .req-legend { gap: 8px 14px; padding: 10px 12px; }
+    }
 </style>
 @endverbatim
 @endpush
