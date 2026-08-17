@@ -192,7 +192,8 @@
           <span class="saved-msg" id="linkSaved">✓ 保存しました</span>
         </div>
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
-          ※ URLは <code>https://</code> から始まるものだけ登録できます（安全のため）。「追加」だけでは保存されません。最後に「リンク集を保存する」を押してください。
+          ※ URLは <code>https://</code> から始まるものだけ登録できます（安全のため）。「追加」だけでは保存されません。最後に「リンク集を保存する」を押してください。<br>
+          ※ 文字数は<strong>名前 {{ $staffLinkLimits['title'] }}文字・ひとこと説明 {{ $staffLinkLimits['memo'] }}文字</strong>まで（スタッフのスマホ画面で折り返して崩れないようにするため）。それ以上は入力できません。
         </p>
       </div>
 
@@ -250,6 +251,8 @@
   window.ECS_BIG_EVENTS = @json($bigEventDates ?? []);
   // スタッフ画面の便利リンク集（[{title,url,memo}, ...]）。
   window.ECS_STAFF_LINKS = @json($staffLinks ?? []);
+  // 各入力欄の文字数上限（正本は App\Support\StaffLinks の定数）。
+  window.ECS_STAFF_LINK_LIMITS = @json($staffLinkLimits ?? ['title' => 40, 'memo' => 60, 'url' => 500]);
   // 保存POST用のCSRFトークン。
   window.ECS_CSRF = @json(csrf_token());
 </script>
@@ -258,8 +261,48 @@
   // --- 「保存しました」を一定時間だけ表示 ---
   function flashSaved(id) {
     const el = document.getElementById(id);
+    if (!el) return;
     el.style.display = 'inline';
     setTimeout(() => { el.style.display = 'none'; }, 2500);
+  }
+
+  // --- 保存POSTの共通処理 ---
+  // 以前は失敗すると何が起きても「通信環境を確認して」と出していたので、原因が分からなかった。
+  // いちばん多いのは 419＝ログインの有効期限切れ（画面を開きっぱなしにしていた）で、
+  // これは通信ではなく「再読み込みすれば直る」問題なので、そう言葉で出す。
+  function postSave(url, payload) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': window.ECS_CSRF,
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }).then(function (r) {
+      if (r.ok) return r.json();
+      return r.text().then(function (body) {
+        let msg = '';
+        try { msg = (JSON.parse(body) || {}).message || ''; } catch (e) { /* HTMLが返ってきた等 */ }
+        let text;
+        if (r.status === 419)      text = 'ログインの有効期限が切れました。\nこの画面を再読み込み（F5）してから、もう一度入力して保存してください。';
+        else if (r.status === 401) text = 'ログアウトされています。もう一度ログインしてください。';
+        else if (r.status === 403) text = 'この操作をする権限がありません。管理者に連絡してください。';
+        else if (r.status === 422) text = msg || '入力した内容に問題があります。もう一度確認してください。';
+        else if (r.status === 404) text = '保存先が見つかりません（コード404）。アプリの更新が反映されていない可能性があります。';
+        else                       text = '保存中にエラーが出ました（コード ' + r.status + '）。' + (msg ? '\n' + msg : '');
+        const err = new Error(text);
+        err.ecsShown = true;   // 下の saveFailed でそのまま出してよい印
+        throw err;
+      });
+    });
+  }
+
+  // 保存に失敗したときの案内。fetch そのものが失敗したときだけ「通信」の話をする。
+  function saveFailed(e) {
+    alert(e && e.ecsShown
+      ? e.message
+      : 'サーバーに繋がりませんでした。電波やネットワークを確認して、もう一度お試しください。');
   }
 
   // --- ① アサインMTG日の予定表（DBに保存＝全員・全画面に効く）---
@@ -315,18 +358,11 @@
     renderMtg();
   }
   function saveMtgDates() {
-    fetch('/settings/mtg-dates', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': window.ECS_CSRF,
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ dates: MTG_DATES }),
-    })
-      .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
-      .then(res => { if (Array.isArray(res.dates)) MTG_DATES = res.dates; renderMtg(); flashSaved('mtgSaved'); })
-      .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
+    // 第2引数に失敗処理を渡す＝保存成功後の画面更新でつまずいても「保存失敗」と誤表示しない。
+    postSave('/settings/mtg-dates', { dates: MTG_DATES }).then(
+      res => { if (Array.isArray(res.dates)) MTG_DATES = res.dates; renderMtg(); flashSaved('mtgSaved'); },
+      saveFailed
+    );
   }
 
   // --- ①-2 危険日（手動指定）（DBに保存＝ダッシュボードのカレンダーに効く）---
@@ -384,18 +420,10 @@
     renderDanger();
   }
   function saveDangerDates() {
-    fetch('/settings/danger-dates', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': window.ECS_CSRF,
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ dates: DANGER_DATES }),
-    })
-      .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
-      .then(res => { if (Array.isArray(res.dates)) DANGER_DATES = res.dates; renderDanger(); flashSaved('dangerSaved'); })
-      .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
+    postSave('/settings/danger-dates', { dates: DANGER_DATES }).then(
+      res => { if (Array.isArray(res.dates)) DANGER_DATES = res.dates; renderDanger(); flashSaved('dangerSaved'); },
+      saveFailed
+    );
   }
 
   // --- ①-3 スタッフ画面のリンク集（DBに保存＝全スタッフの画面に効く）---
@@ -403,6 +431,9 @@
   let STAFF_LINKS = Array.isArray(window.ECS_STAFF_LINKS) ? window.ECS_STAFF_LINKS.map(l => ({
     title: l.title || '', url: l.url || '', memo: l.memo || '',
   })) : [];
+
+  // 入力欄の文字数上限。超えると保存が弾かれるので、そもそも入力できないようにする。
+  const LK_MAX = window.ECS_STAFF_LINK_LIMITS || { title: 40, memo: 60, url: 500 };
 
   function escAttrS(s) {   // input の value に安全に入れるためのエスケープ
     return String(s == null ? '' : s)
@@ -428,9 +459,9 @@
           '<button onclick="moveStaffLink(' + i + ',1)"' + (i === STAFF_LINKS.length - 1 ? ' disabled' : '') + ' title="下へ">▼</button>' +
         '</div>' +
         '<div class="lk-fields">' +
-          '<input type="text" placeholder="表示する名前（例：スタッフNotion）" value="' + escAttrS(l.title) + '" oninput="editStaffLink(' + i + ',\'title\',this.value)">' +
-          '<input type="url" class="' + (badUrl ? 'bad' : '') + '" placeholder="https://..." value="' + escAttrS(l.url) + '" oninput="editStaffLink(' + i + ',\'url\',this.value)">' +
-          '<input type="text" placeholder="ひとこと説明（任意・例：マニュアルはこちら）" value="' + escAttrS(l.memo) + '" oninput="editStaffLink(' + i + ',\'memo\',this.value)">' +
+          '<input type="text" maxlength="' + LK_MAX.title + '" placeholder="表示する名前（' + LK_MAX.title + '文字まで・例：スタッフNotion）" value="' + escAttrS(l.title) + '" oninput="editStaffLink(' + i + ',\'title\',this.value)">' +
+          '<input type="url" maxlength="' + LK_MAX.url + '" class="' + (badUrl ? 'bad' : '') + '" placeholder="https://..." value="' + escAttrS(l.url) + '" oninput="editStaffLink(' + i + ',\'url\',this.value)">' +
+          '<input type="text" maxlength="' + LK_MAX.memo + '" placeholder="ひとこと説明（任意・' + LK_MAX.memo + '文字まで）" value="' + escAttrS(l.memo) + '" oninput="editStaffLink(' + i + ',\'memo\',this.value)">' +
         '</div>' +
         '<button class="lk-rm" onclick="removeStaffLink(' + i + ')">削除</button>' +
       '</div>';
@@ -458,10 +489,19 @@
     renderStaffLinks();
   }
   function saveStaffLinks() {
-    // 名前もURLも空の行（追加しただけの行）は、そのまま捨てて保存する。
-    const links = STAFF_LINKS.filter(l => (l.title || '').trim() !== '' || (l.url || '').trim() !== '');
+    // NotionなどからURLを貼ると、前後に空白や改行が付いてくることがある。
+    // 見た目では気づけないのに保存だけ弾かれる（サーバー側のURLチェックに落ちる）ので、
+    // 送る前にここで取り除いてしまう。
+    const trimmed = STAFF_LINKS.map(l => ({
+      title: (l.title || '').trim(),
+      url:   (l.url   || '').replace(/[\s　]+/g, '').trim(),   // 全角スペースも除去
+      memo:  (l.memo  || '').trim(),
+    }));
 
-    const ng = links.find(l => (l.title || '').trim() === '' || !/^https?:\/\//i.test((l.url || '').trim()));
+    // 名前もURLも空の行（追加しただけの行）は、そのまま捨てて保存する。
+    const links = trimmed.filter(l => l.title !== '' || l.url !== '');
+
+    const ng = links.find(l => l.title === '' || !/^https?:\/\//i.test(l.url));
     if (ng) {
       alert('名前と、https:// から始まるURLの両方を入れてください。（赤枠の行を確認してください）');
       STAFF_LINKS = links;
@@ -469,18 +509,22 @@
       return;
     }
 
-    fetch('/settings/staff-links', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': window.ECS_CSRF,
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ links: links }),
-    })
-      .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
-      .then(res => { if (Array.isArray(res.links)) STAFF_LINKS = res.links; renderStaffLinks(); flashSaved('linkSaved'); })
-      .catch(() => { alert('保存に失敗しました。通信環境を確認してもう一度お試しください。'); });
+    // 長さオーバーはサーバーに弾かれる。どの行のどこが長いのかを、送る前に名指しで伝える。
+    const tooLong = links.find(l => l.title.length > LK_MAX.title || l.memo.length > LK_MAX.memo || l.url.length > LK_MAX.url);
+    if (tooLong) {
+      const where = tooLong.title.length > LK_MAX.title ? '「表示する名前」（' + LK_MAX.title + '文字まで）'
+                  : tooLong.memo.length  > LK_MAX.memo  ? '「ひとこと説明」（' + LK_MAX.memo + '文字まで）'
+                  :                                       'URL（' + LK_MAX.url + '文字まで）';
+      alert('「' + (tooLong.title || tooLong.url) + '」の行の ' + where + ' が長すぎます。短くしてから保存してください。');
+      STAFF_LINKS = links;
+      renderStaffLinks();
+      return;
+    }
+
+    postSave('/settings/staff-links', { links: links }).then(
+      res => { if (Array.isArray(res.links)) STAFF_LINKS = res.links; renderStaffLinks(); flashSaved('linkSaved'); },
+      saveFailed
+    );
   }
 
   // --- マスタ件数を DB の実データで表示（嘘の固定件数を置き換え）---

@@ -97,6 +97,62 @@ class StaffLinksTest extends TestCase
             ->assertStatus(422);
     }
 
+    /**
+     * 長さオーバーで弾いたときは、理由が分かる日本語を返す。
+     * （以前は理由に関係なく「名前とURLを入れてください」と返していたので、
+     *   「ひとこと説明が長すぎる」で失敗しても原因不明の保存エラーに見えた。）
+     */
+    public function test_a_too_long_memo_says_why(): void
+    {
+        $manager = PersonFactory::new()->manager()->create();
+
+        $res = $this->actingAsPerson($manager)
+            ->postJson('/settings/staff-links', ['links' => [
+                [
+                    'title' => 'スタッフNotion',
+                    'url' => 'https://example.com/notion',
+                    'memo' => str_repeat('あ', StaffLinks::MAX_MEMO + 1),
+                ],
+            ]])
+            ->assertStatus(422);
+
+        $this->assertStringContainsString('ひとこと説明', $res->json('message'));
+        $this->assertStringContainsString((string) StaffLinks::MAX_MEMO, $res->json('message'));
+        $this->assertSame([], StaffLinks::all());
+    }
+
+    /** 名前が長すぎる場合も、名前が原因だと分かるメッセージになる。 */
+    public function test_a_too_long_title_says_why(): void
+    {
+        $manager = PersonFactory::new()->manager()->create();
+
+        $res = $this->actingAsPerson($manager)
+            ->postJson('/settings/staff-links', ['links' => [
+                ['title' => str_repeat('あ', StaffLinks::MAX_TITLE + 1), 'url' => 'https://example.com'],
+            ]])
+            ->assertStatus(422);
+
+        $this->assertStringContainsString('表示する名前', $res->json('message'));
+    }
+
+    /** 上限ちょうどは通る（境界で1文字ずれていないことの確認）。 */
+    public function test_the_limit_itself_is_accepted(): void
+    {
+        $manager = PersonFactory::new()->manager()->create();
+
+        $this->actingAsPerson($manager)
+            ->postJson('/settings/staff-links', ['links' => [
+                [
+                    'title' => str_repeat('あ', StaffLinks::MAX_TITLE),
+                    'url' => 'https://example.com',
+                    'memo' => str_repeat('い', StaffLinks::MAX_MEMO),
+                ],
+            ]])
+            ->assertOk();
+
+        $this->assertCount(1, StaffLinks::all());
+    }
+
     /** 空の配列を保存すると、リンク集がまるごと空になる（全部消す操作）。 */
     public function test_saving_an_empty_list_clears_the_links(): void
     {

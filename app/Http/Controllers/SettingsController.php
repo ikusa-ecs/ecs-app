@@ -60,6 +60,12 @@ class SettingsController extends Controller
             'bigEventDates' => $this->bigEventDates(),
             // スタッフ画面に出す便利リンク集（Notion・アンケートフォーム等）。
             'staffLinks' => StaffLinks::all(),
+            // 入力欄の文字数上限。画面側で入力を止めるために渡す（正本は StaffLinks の定数）。
+            'staffLinkLimits' => [
+                'title' => StaffLinks::MAX_TITLE,
+                'memo' => StaffLinks::MAX_MEMO,
+                'url' => StaffLinks::MAX_URL,
+            ],
         ]);
     }
 
@@ -143,12 +149,23 @@ class SettingsController extends Controller
             // http/https だけ許可（javascript: などをスタッフ画面に出さないため）
             'links.*.url'   => ['required', 'string', 'max:' . StaffLinks::MAX_URL, 'url:http,https'],
             'links.*.memo'  => ['nullable', 'string', 'max:' . StaffLinks::MAX_MEMO],
+        ], [
+            // 既定の英語メッセージ（links.0.memo ...）では何が悪いか分からないので日本語で出す。
+            'links.*.title.required' => '「表示する名前」が空の行があります。',
+            'links.*.title.max'      => '「表示する名前」は' . StaffLinks::MAX_TITLE . '文字までです。長い行を短くしてください。',
+            'links.*.url.required'   => 'URLが空の行があります。',
+            'links.*.url.url'        => 'URLは https:// から始まる形で入れてください。',
+            'links.*.url.max'        => 'URLは' . StaffLinks::MAX_URL . '文字までです。',
+            'links.*.memo.max'       => '「ひとこと説明」は' . StaffLinks::MAX_MEMO . '文字までです。長い行を短くしてください。',
         ]);
 
         if ($validator->fails()) {
+            // 以前は理由に関係なく「名前とURLを入れてください」と返していたため、
+            // 「説明が長すぎる」で弾かれても画面に理由が出ず、原因不明の保存失敗に見えていた。
+            // 実際に引っかかった項目のメッセージをそのまま返す。
             return response()->json([
                 'ok'      => false,
-                'message' => '名前と、https:// から始まるURLの両方を入れてください。',
+                'message' => $validator->errors()->first(),
                 'errors'  => $validator->errors()->toArray(),
             ], 422);
         }
