@@ -103,6 +103,8 @@
 @endsection
 
 @push('scripts')
+{{-- CSVの文字コード（UTF-8 / Excel保存のShift_JIS）を見分けて読む共通処理 --}}
+<script src="/ecs/csv-read.js?v={{ \App\Support\Asset::ver('ecs/csv-read.js') }}"></script>
 @verbatim
 <script>
   // ===== 名簿CSV取込：テンプレDL・プレビュー・検証（サーバーの基準と同じ）=====
@@ -225,9 +227,8 @@
 
   function piReadAndPreview(file) {
     if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function (e) { piRender(piParse(String(e.target.result))); };
-    reader.readAsText(file, 'UTF-8');
+    // 文字コードは ECS_readCsvFile が見分ける（UTF-8／Excel保存のShift_JIS どちらでも読める）。
+    ECS_readCsvFile(file, function (text) { piRender(piParse(text)); });
   }
 
   function piImport() {

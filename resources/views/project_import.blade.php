@@ -214,6 +214,8 @@
 
 @push('scripts')
 <script src="/ecs/data/cases.js"></script>
+{{-- CSVの文字コード（UTF-8 / Excel保存のShift_JIS）を見分けて読む共通処理 --}}
+<script src="/ecs/csv-read.js?v={{ \App\Support\Asset::ver('ecs/csv-read.js') }}"></script>
 @verbatim
 <script>
   // ===== STEP1：テンプレートCSVのダウンロード（実際に動きます）=====
@@ -332,16 +334,15 @@
   function readAndPreview(file) {
     if (!file) return;
     document.getElementById('fileName').textContent = '選択：' + file.name;
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const rows = parseCsvToRows(e.target.result);
+    // 文字コードは ECS_readCsvFile が見分ける（UTF-8／Excel保存のShift_JIS どちらでも読める）。
+    ECS_readCsvFile(file, function (text) {
+      const rows = parseCsvToRows(text);
       if (!rows.length) {
         alert('CSVにデータ行が見つかりませんでした。見出し行＋データ行があるCSVを選んでください。');
         return;
       }
       renderRows(rows, true);  // true＝実ファイル（取込可能）
-    };
-    reader.readAsText(file);    // テンプレートはUTF-8(BOM付き)。既定のUTF-8で読む。
+    });
   }
 
   // ===== ドラッグ＆ドロップ（枠にCSVを落として読み込む）=====
