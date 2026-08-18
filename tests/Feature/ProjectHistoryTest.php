@@ -7,6 +7,7 @@ use App\Support\ProjectHistoryRecorder;
 use Database\Factories\PersonFactory;
 use Database\Factories\ProjectFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -149,6 +150,31 @@ class ProjectHistoryTest extends TestCase
         $res->assertOk();
         $res->assertSee('東京の案件');
         $res->assertDontSee('大阪の案件');
+    }
+
+    /**
+     * 保存先テーブルがまだ無いサーバー（`php artisan migrate` 未実行）でも、
+     * ①画面は開ける（500にしない）②案件の保存も通る。
+     * 履歴は補助の機能なので、本体の業務を止めてはいけない。
+     */
+    public function test_missing_table_does_not_break_anything(): void
+    {
+        $employee = PersonFactory::new()->create(['office' => '東京']);
+        $project  = ProjectFactory::new()->create(['office' => '東京', 'start_time' => '12:00']);
+
+        Schema::drop('project_histories');
+
+        // ① 画面は開けて、案内が出る
+        $res = $this->actingAsPerson($employee)->get('/project-history');
+        $res->assertOk();
+        $res->assertSee('まだ変更の記録はありません');
+
+        // ② 案件の保存も通る（履歴だけ残らない）
+        $project->update(['start_time' => '10:00']);
+        $this->assertSame('10:00', $project->fresh()->start_time);
+
+        // ③ 案件編集画面も開ける
+        $this->actingAsPerson($employee)->get('/project-form?project=' . urlencode($project->id))->assertOk();
     }
 
     /** 管理者は全拠点の履歴を見られる。 */

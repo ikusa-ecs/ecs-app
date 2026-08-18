@@ -34,6 +34,17 @@
   ※ 見るだけの画面です。記録は消せません（消せると記録の意味が無くなるため）。
 </p>
 
+@if ($needsSetup)
+  {{-- 履歴の保存先テーブルがまだ無いサーバー（`php artisan migrate` 未実行）。
+       エラー画面にせず、何をすれば記録が始まるかだけ伝える。 --}}
+  <div class="panel">
+    <p class="hist-empty">
+      まだ変更の記録はありません。<br>
+      <small>※ このサーバーでは履歴の保存場所がまだ作られていません。サーバーで <code>php artisan migrate</code> を1回実行すると、そのあとの変更がここに残るようになります。</small>
+    </p>
+  </div>
+@else
+
 {{-- 絞り込み。選ぶとそのまま送信する（「表示」ボタンを押させない）。 --}}
 <div class="panel">
   <form method="get" action="/project-history" class="ph-bar">
@@ -120,5 +131,7 @@
     @endif
   @endif
 </div>
+
+@endif
 
 @endsection

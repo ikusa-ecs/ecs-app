@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Project;
 use App\Models\ProjectHistory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * 案件の編集履歴を残す係（先-1／2026-08-18）。**記録の入口はここ1か所だけ。**
@@ -44,10 +45,35 @@ class ProjectHistoryRecorder
         return self::$enabled;
     }
 
+    /**
+     * いま履歴を残せる状態か。
+     * ・止められていない（withoutRecording の外）
+     * ・保存先テーブルが出来ている（`php artisan migrate` 済み）
+     *
+     * ⚠ テーブルの有無を見るのが大事な理由：**これが無いと、まだ migrate していないサーバーでは
+     *   「案件を保存するだけでエラー」になる。** 履歴は補助の機能なので、保存先が無ければ
+     *   黙って残さないだけにして、案件そのものの保存は必ず通す。
+     *
+     * ※ 結果は覚えない（案件の保存1回につき1回だけ確認する程度の負担なので）。
+     *   覚えないことで、あとから migrate したその時点から記録が始まる。
+     */
+    public static function available(): bool
+    {
+        if (! self::$enabled) {
+            return false;
+        }
+        try {
+            return Schema::hasTable('project_histories');
+        } catch (\Throwable $e) {
+            // DBに繋がらない等。履歴は補助なので、ここで例外を投げて本体の保存を止めない。
+            return false;
+        }
+    }
+
     /** 新規登録を1行残す。 */
     public static function recordCreated(Project $project): void
     {
-        if (! self::$enabled) {
+        if (! self::available()) {
             return;
         }
 
@@ -57,7 +83,7 @@ class ProjectHistoryRecorder
     /** 削除を1行残す（案件が消えても「誰が消したか」は残る）。 */
     public static function recordDeleted(Project $project): void
     {
-        if (! self::$enabled) {
+        if (! self::available()) {
             return;
         }
 
@@ -70,7 +96,7 @@ class ProjectHistoryRecorder
      */
     public static function recordUpdated(Project $project): void
     {
-        if (! self::$enabled) {
+        if (! self::available()) {
             return;
         }
 

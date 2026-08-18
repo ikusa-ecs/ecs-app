@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\ProjectHistory;
 use App\Support\OfficeScope;
+use App\Support\ProjectHistoryRecorder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 
 /**
@@ -33,6 +35,22 @@ class ProjectHistoryController extends Controller
 
     public function index(Request $request)
     {
+        // 保存先テーブルがまだ無いサーバー（migrate 未実行）でも、エラー画面にせず
+        // 「まだ記録はありません」と案内だけ出す。履歴は補助の機能なので画面は開けるようにする。
+        if (! ProjectHistoryRecorder::available()) {
+            return view('project_history', [
+                'histories'      => new LengthAwarePaginator([], 0, self::PER_PAGE),
+                'projectId'      => '',
+                'projectLabel'   => null,
+                'personId'       => '',
+                'period'         => 'all',
+                'periods'        => self::PERIODS,
+                'peopleOptions'  => collect(),
+                'projectOptions' => collect(),
+                'needsSetup'     => true,
+            ]);
+        }
+
         $projectId = trim((string) $request->query('project', ''));
         $personId  = trim((string) $request->query('person', ''));
         $period    = (string) $request->query('period', '30');
@@ -65,26 +83,26 @@ class ProjectHistoryController extends Controller
 
         // 絞り込みプルダウンの選択肢は「履歴に実際に出てくる人・案件」だけにする
         // （名簿全員を並べると、一度も触っていない人まで出て選びにくいため）。
+        //
+        // ⚠ `distinct()` ＋ 選択していない列での並べ替え（例：ORDER BY id）は **MySQLではエラーになる**
+        //   （SQLiteでは通るので気づきにくい／2026-08-18 にテストサーバーで500になった）。
+        //   同じ意味を groupBy＋max() で書く。これならSQLiteでもMySQLでも通る。
         $scopeQuery = fn () => ProjectHistory::query()
             ->when($visibleIds !== null, fn ($q) => $q->whereIn('project_id', $visibleIds));
 
         $peopleOptions = $scopeQuery()
             ->whereNotNull('person_id')
-            ->select('person_id', 'person_name')
-            ->distinct()
+            ->selectRaw('person_id, max(person_name) as person_name')
+            ->groupBy('person_id')
             ->orderBy('person_name')
-            ->get()
-            ->unique('person_id')
-            ->values();
+            ->get();
 
         $projectOptions = $scopeQuery()
-            ->select('project_id', 'project_name')
-            ->distinct()
-            ->orderByDesc('id')
+            ->selectRaw('project_id, max(project_name) as project_name, max(id) as last_id')
+            ->groupBy('project_id')
+            ->orderByDesc('last_id')   // 最近さわった案件を上に
             ->limit(300)
-            ->get()
-            ->unique('project_id')
-            ->values();
+            ->get();
 
         // 表示中の案件名（?project= で1件に絞ったときの見出し用）。
         $projectLabel = $projectId !== ''
@@ -100,6 +118,7 @@ class ProjectHistoryController extends Controller
             'periods'        => self::PERIODS,
             'peopleOptions'  => $peopleOptions,
             'projectOptions' => $projectOptions,
+            'needsSetup'     => false,
         ]);
     }
 }

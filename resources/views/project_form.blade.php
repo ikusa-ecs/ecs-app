@@ -249,14 +249,22 @@
             <div class="auto-hint" id="addtlNote"></div>
           </div>
 
-          <!-- 1.5 toC -->
-          <div class="form-row full">
+          <!-- 1.5 toC ｜ リピート案件（横並び・2026-08-18 baba要望でリピートをここへ移した） -->
+          <div class="form-row">
             <label>toC</label>
             <div class="check-row">
               <input type="checkbox" id="isToc" name="is_toc">
               <label for="isToc">toCの案件</label>
             </div>
             <div class="hint">toCの案件のときにチェックします。未チェック＝toB扱い。</div>
+          </div>
+          <div class="form-row non-arena">
+            <label>リピート</label>
+            <div class="check-row">
+              <input type="checkbox" id="isRepeat" name="is_repeat">
+              <label for="isRepeat">リピート案件（過去に実施したことがある）</label>
+            </div>
+            <div class="hint">過去に同じ内容を実施したことがある案件のときにチェックします。</div>
           </div>
 
           <!-- 2. 確度（ヨミ） ｜ スタッフ募集（横並び） -->
@@ -568,20 +576,21 @@
             </div>
           </div>
 
-          <!-- 入場 ｜ 開始 ｜ 終了（横3列） -->
+          <!-- 入場 ｜ 開始 ｜ 終了（横3列）
+               data-need="later" ＝未入力のあいだ黄色セル（後で必要・今は未定でOK）。baba要望 2026-08-18 -->
           <div class="full">
             <div class="triple">
               <div class="form-row">
                 <label>イベント入場</label>
-                <input type="time" name="event_enter_time">
+                <input type="time" name="event_enter_time" data-need="later">
               </div>
               <div class="form-row">
                 <label>イベント開始</label>
-                <input type="time" name="event_start_time">
+                <input type="time" name="event_start_time" data-need="later">
               </div>
               <div class="form-row">
                 <label>イベント終了</label>
-                <input type="time" name="event_end_time">
+                <input type="time" name="event_end_time" data-need="later">
               </div>
             </div>
           </div>
@@ -621,15 +630,67 @@
               </div>
             </div>
           </div>
-          <div class="form-row full non-arena">
-            <div class="check-row">
-              <input type="checkbox" id="isRepeat" name="is_repeat">
-              <label for="isRepeat">リピート案件（過去に実施したことがある）</label>
+          <!-- 場所（会場住所） ｜ 屋内/屋外 ｜ 集合形式（横3列）
+               baba要望 2026-08-18＝人数の行のすぐ下に置く（当日の段取りをまとめて決められるように） -->
+          <div class="full">
+            <div class="triple">
+              <div class="form-row">
+                <label>会場住所<span class="req-mark yellow">必須</span></label>
+                <input type="text" id="venue" name="location" data-need="later" placeholder="例）東京都江東区夢の島2-1-3 〇〇公園">
+                <div class="tbd-row">
+                  <input type="checkbox" id="venueTbd" class="tbd-check" data-tbd-for="venue">
+                  <label for="venueTbd">未定</label>
+                </div>
+              </div>
+              <div class="form-row non-arena">
+                <label>屋内 / 屋外</label>
+                <div class="radio-row">
+                  <label><input type="radio" name="outdoor" value="屋内"> 屋内</label>
+                  <label><input type="radio" name="outdoor" value="屋外" checked> 屋外</label>
+                </div>
+              </div>
+              <div class="form-row non-arena">
+                <label>集合形式<span class="req-mark yellow">必須</span></label>
+                <select name="assembly_type" data-need="later">
+                  <option value="" selected>未定</option>
+                  <option>会場現地</option>
+                  <option>大住</option>
+                  <option>広宣</option>
+                  <option>事務所+会場現地</option>
+                  <option>駅</option>
+                  <option>空港</option>
+                  <option>その他（備考に記載）</option>
+                </select>
+                <div class="hint">スタッフがどこに集合するか。詳細は備考へ。</div>
+              </div>
             </div>
           </div>
 
-          <!-- 音響機材 -->
-          <div class="form-row full non-arena">
+          <!-- お酒 ｜ ケータリング（横並び。移動・車両は音響機材の横へ移した・2026-08-18） -->
+          <div class="form-row non-arena">
+            <label>お酒</label>
+            <div class="radio-row">
+              <label><input type="radio" name="alcohol" value="あり"> あり</label>
+              <label><input type="radio" name="alcohol" value="なし" checked> なし</label>
+            </div>
+          </div>
+          <div class="form-row non-arena">
+            <label>ケータリング</label>
+            <select name="catering">
+              <option>無</option>
+              <option>ケータリング</option>
+              <option>オードブル</option>
+              <option>お弁当</option>
+              <option>キッチンカー</option>
+              <option>BBQ</option>
+              <option>LH発注あり（格付け）</option>
+              <option>LH発注あり（ゴチ）</option>
+              <option>その他</option>
+            </select>
+          </div>
+
+          <!-- 音響機材 ｜ 移動・車両（横並び・2026-08-18 baba要望） -->
+          <div class="form-row non-arena">
             <label>音響機材</label>
             <select name="audio_equipment">
               <option>会場音響</option>
@@ -640,6 +701,22 @@
               <option>SANWA</option>
               <option>TOA</option>
               <option>不要</option>
+            </select>
+          </div>
+          <div class="form-row non-arena">
+            <label>移動・車両</label>
+            <select name="transport">
+              <option>ー</option>
+              <option>IKUSAカー</option>
+              <option>IKUSAカー2台</option>
+              <option>IKUSAカー3台</option>
+              <option>電車</option>
+              <option>レンタカー</option>
+              <option>IKUSAカー+レンタカー</option>
+              <option>電車+IKUSAカー</option>
+              <option>電車+レンタカー</option>
+              <option>飛行機</option>
+              <option>飛行機+レンタカー</option>
             </select>
           </div>
 
@@ -694,84 +771,6 @@
             <div class="form-row">
               <label>運営シートURL</label>
               <input type="text" name="ops_sheet_url" placeholder="https://docs.google.com/spreadsheets/d/... を貼り付け">
-            </div>
-          </div>
-
-          <!-- 場所（会場住所） ｜ 屋内/屋外 ｜ 集合形式（横3列） -->
-          <div class="full">
-            <div class="triple">
-              <div class="form-row">
-                <label>会場住所<span class="req-mark yellow">必須</span></label>
-                <input type="text" id="venue" name="location" data-need="later" placeholder="例）東京都江東区夢の島2-1-3 〇〇公園">
-                <div class="tbd-row">
-                  <input type="checkbox" id="venueTbd" class="tbd-check" data-tbd-for="venue">
-                  <label for="venueTbd">未定</label>
-                </div>
-              </div>
-              <div class="form-row non-arena">
-                <label>屋内 / 屋外</label>
-                <div class="radio-row">
-                  <label><input type="radio" name="outdoor" value="屋内"> 屋内</label>
-                  <label><input type="radio" name="outdoor" value="屋外" checked> 屋外</label>
-                </div>
-              </div>
-              <div class="form-row non-arena">
-                <label>集合形式<span class="req-mark yellow">必須</span></label>
-                <select name="assembly_type" data-need="later">
-                  <option value="" selected>未定</option>
-                  <option>会場現地</option>
-                  <option>大住</option>
-                  <option>広宣</option>
-                  <option>事務所+会場現地</option>
-                  <option>駅</option>
-                  <option>空港</option>
-                  <option>その他（備考に記載）</option>
-                </select>
-                <div class="hint">スタッフがどこに集合するか。詳細は備考へ。</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- お酒 ｜ ケータリング ｜ 移動・車両（横3列） -->
-          <div class="full non-arena">
-            <div class="triple">
-              <div class="form-row">
-                <label>お酒</label>
-                <div class="radio-row">
-                  <label><input type="radio" name="alcohol" value="あり"> あり</label>
-                  <label><input type="radio" name="alcohol" value="なし" checked> なし</label>
-                </div>
-              </div>
-              <div class="form-row">
-                <label>ケータリング</label>
-                <select name="catering">
-                  <option>無</option>
-                  <option>ケータリング</option>
-                  <option>オードブル</option>
-                  <option>お弁当</option>
-                  <option>キッチンカー</option>
-                  <option>BBQ</option>
-                  <option>LH発注あり（格付け）</option>
-                  <option>LH発注あり（ゴチ）</option>
-                  <option>その他</option>
-                </select>
-              </div>
-              <div class="form-row">
-                <label>移動・車両</label>
-                <select name="transport">
-                  <option>ー</option>
-                  <option>IKUSAカー</option>
-                  <option>IKUSAカー2台</option>
-                  <option>IKUSAカー3台</option>
-                  <option>電車</option>
-                  <option>レンタカー</option>
-                  <option>IKUSAカー+レンタカー</option>
-                  <option>電車+IKUSAカー</option>
-                  <option>電車+レンタカー</option>
-                  <option>飛行機</option>
-                  <option>飛行機+レンタカー</option>
-                </select>
-              </div>
             </div>
           </div>
 

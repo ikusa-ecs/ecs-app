@@ -345,13 +345,15 @@ class ProjectController extends Controller
 
         // 編集で開いたときだけ、この案件の変更履歴（先-1）を新しい順に少しだけ添える。
         // 全部見たいときは専用画面（/project-history）へ。複製で開いたときは元案件の履歴なので出さない。
-        $histories = $projectId
+        // ※ 保存先テーブルがまだ無いサーバー（migrate 未実行）でも、この画面が開けなくならないようにする。
+        $canShowHistory = $projectId && \App\Support\ProjectHistoryRecorder::available();
+        $histories = $canShowHistory
             ? ProjectHistory::where('project_id', $projectId)
                 ->orderByDesc('id')
                 ->limit(self::FORM_HISTORY_LIMIT)
                 ->get()
             : collect();
-        $historyTotal = $projectId
+        $historyTotal = $canShowHistory
             ? ProjectHistory::where('project_id', $projectId)->count()
             : 0;
 
