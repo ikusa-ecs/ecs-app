@@ -24,6 +24,8 @@
         <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
         <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>
         <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+        {{-- 編集履歴＝「誰がいつ何を変えたか」。複数人で同じ案件を触るときの言った言わないを防ぐ。 --}}
+        <a class="{{ ($active ?? '') === 'project_history' ? 'active' : '' }}" href="/project-history"><span class="nav-icon">🕘</span> 編集履歴</a>
         <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">⏰</span> 人数確定リマインド</a>
         {{-- 収支未入力リマインド＝締切(イベント終了後3営業日)を過ぎて未入力の案件をDへタスク化。 --}}
         <a class="{{ ($active ?? '') === 'finance_reminder' ? 'active' : '' }}" href="/finance-reminder"><span class="nav-icon">💸</span> 収支未入力リマインド</a>

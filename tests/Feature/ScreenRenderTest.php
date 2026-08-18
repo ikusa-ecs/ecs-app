@@ -23,7 +23,7 @@ class ScreenRenderTest extends TestCase
     {
         $employee = PersonFactory::new()->create();
 
-        foreach (['/dashboard', '/projects', '/project-form'] as $url) {
+        foreach (['/dashboard', '/projects', '/project-form', '/project-history'] as $url) {
             $this->actingAsPerson($employee)->get($url)
                 ->assertOk("画面 {$url} が開けませんでした");
         }

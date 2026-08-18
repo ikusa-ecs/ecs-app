@@ -233,7 +233,17 @@
       "Bash(python -)",
       "Bash(python -c ' *)",
       "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Http\\\\\\\\\\\\\\\\Controllers\\\\\\\\\\\\\\\\MyPageFinanceController\" routes/web.php)",
-      "Bash(vendor/bin/phpunit --filter=test_non_http_urls_are_rejected)"
+      "Bash(vendor/bin/phpunit --filter=test_non_http_urls_are_rejected)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(curl -s -c C:/Users/onuma/AppData/Local/Temp/claude/C--Users-onuma-ecs-dev-ecs-laravel/5c6bf99b-b061-4b80-9cb6-f9fc5fe3e748/scratchpad/cj.txt http://127.0.0.1:8000/login -o C:/Users/onuma/AppData/Local/Temp/claude/C--Users-onuma-ecs-dev-ecs-laravel/5c6bf99b-b061-4b80-9cb6-f9fc5fe3e748/scratchpad/login.html -w 'status=%{http_code}\\\\n')",
+      "PowerShell(php artisan test --filter=MyPage)",
+      "Bash(perl -pi -e 's/AppSupportAsset::ver/\\\\\\\\App\\\\\\\\Support\\\\\\\\Asset::ver/g' resources/views/login.blade.php)",
+      "Bash(perl -pi -e 's/AppSupportAsset::ver/XAppXSupportXAsset::ver/g' resources/views/login.blade.php)",
+      "Bash(git fetch *)",
+      "Bash(awk '{print $5, $NF}')",
+      "Bash(echo \"=== 稼働管理\\\\\\\\ECS ===\")",
+      "Bash(awk 'NR>=1425 && NR<=1445' /g/.shortcut-targets-by-id/1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H/ECS再開発2026_Claude開発/ECS_設計書_v1.1.md)",
+      "Bash(awk '/^## 20\\\\./{for\\(i=NR-8;i<NR;i++\\) print i\": \"a[i]} {a[NR]=$0}' /g/.shortcut-targets-by-id/1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H/ECS再開発2026_Claude開発/ECS_設計書_v1.1.md)"
     ]
   }
 }

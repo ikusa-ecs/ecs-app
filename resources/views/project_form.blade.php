@@ -799,6 +799,51 @@
       </div>
 @endverbatim
 </form>
+
+{{-- ===== 編集履歴（先-1・2026-08-18）=====
+     編集で開いたときだけ出す。複製で開いたときは「元の案件」の履歴になってしまうので出さない。
+     ねらい＝9月から複数人で同じ案件を触るので「集合時間を変えたのは誰？」をここで追えるようにする。
+     ※ 上のフォーム本体は「Bladeを解釈しない区間」なので、この履歴欄はその外側に置くこと
+        （区間の中に入れると Blade の @if が動かない）。 --}}
+@if (! empty($editProject) && empty($copyFrom))
+  <div class="panel hist-panel">
+    <div class="sec-title">編集履歴</div>
+
+    @if ($histories->isEmpty())
+      <p class="hist-empty">まだ変更の記録はありません。（この案件を保存すると、ここに「誰がいつ何を変えたか」が残ります）</p>
+    @else
+      <ul class="hist-list">
+        @foreach ($histories as $h)
+          <li class="hist-item">
+            <div class="hist-meta">
+              <span class="hist-when">{{ $h->created_at?->format('Y/m/d H:i') }}</span>
+              <span class="hist-who">{{ $h->person_name ?: 'システム' }}</span>
+            </div>
+            @if ($h->action === 'created')
+              <div class="hist-body"><span class="hist-tag new">新規登録</span>この案件を登録しました。</div>
+            @elseif ($h->action === 'deleted')
+              <div class="hist-body"><span class="hist-tag del">削除</span>この案件を削除しました。</div>
+            @else
+              <div class="hist-body">
+                <span class="hist-field">{{ $h->field_label ?: $h->field }}</span>
+                <span class="hist-old">{{ $h->old_value }}</span>
+                <span class="hist-arrow">→</span>
+                <span class="hist-new">{{ $h->new_value }}</span>
+              </div>
+            @endif
+          </li>
+        @endforeach
+      </ul>
+
+      @if ($historyTotal > $historyLimit)
+        <p class="hist-more">
+          新しい順に{{ $historyLimit }}件を表示しています（全{{ $historyTotal }}件）。
+          <a href="/project-history?project={{ urlencode($editProject['id']) }}">この案件の履歴をすべて見る</a>
+        </p>
+      @endif
+    @endif
+  </div>
+@endif
 @endsection
 
 @push('scripts')

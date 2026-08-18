@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\Office;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ProjectHistory;
 use App\Support\DirectorSync;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
@@ -25,6 +26,9 @@ use Illuminate\Support\Facades\DB;
  */
 class ProjectController extends Controller
 {
+    /** 案件編集画面の下に出す編集履歴の件数（続きは /project-history で見る）。 */
+    private const FORM_HISTORY_LIMIT = 20;
+
     public function index(Request $request)
     {
         $today = Carbon::today();
@@ -339,8 +343,23 @@ class ProjectController extends Controller
         $defaultOffice = $editProject['office']
             ?? (Auth::user()->office ?? '東京');
 
+        // 編集で開いたときだけ、この案件の変更履歴（先-1）を新しい順に少しだけ添える。
+        // 全部見たいときは専用画面（/project-history）へ。複製で開いたときは元案件の履歴なので出さない。
+        $histories = $projectId
+            ? ProjectHistory::where('project_id', $projectId)
+                ->orderByDesc('id')
+                ->limit(self::FORM_HISTORY_LIMIT)
+                ->get()
+            : collect();
+        $historyTotal = $projectId
+            ? ProjectHistory::where('project_id', $projectId)->count()
+            : 0;
+
         return view('project_form', [
             'editProject'    => $editProject,
+            'histories'      => $histories,
+            'historyTotal'   => $historyTotal,
+            'historyLimit'   => self::FORM_HISTORY_LIMIT,
             // 複製で開いたときだけ中身が入る（元になった案件の ID と名前）。画面の案内文に使う。
             'copyFrom'       => $copyFrom,
             'parentProjects' => $parentProjects,

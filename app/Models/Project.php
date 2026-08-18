@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ProjectHistoryRecorder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -42,6 +43,24 @@ class Project extends Model
             'staff_published' => 'boolean',
             'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）
         ];
+    }
+
+    /**
+     * 編集履歴（先-1／2026-08-18）を残すための入口。
+     * 案件を書き換える画面はどれもここを通るので、画面ごとの書き足しは要らない。
+     * 中身は App\Support\ProjectHistoryRecorder に置く（このモデルは薄いままにする）。
+     */
+    protected static function booted(): void
+    {
+        static::created(fn (Project $project) => ProjectHistoryRecorder::recordCreated($project));
+        static::updated(fn (Project $project) => ProjectHistoryRecorder::recordUpdated($project));
+        static::deleted(fn (Project $project) => ProjectHistoryRecorder::recordDeleted($project));
+    }
+
+    /** 編集履歴（新しい順に取り出すのは呼び出し側で）。 */
+    public function histories(): HasMany
+    {
+        return $this->hasMany(ProjectHistory::class, 'project_id');
     }
 
     /** ディレクター（社員）。people を参照。 */

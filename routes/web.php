@@ -29,6 +29,7 @@ use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonImportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectHistoryController;
 use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
@@ -122,6 +123,8 @@ Route::post('/projects/cells', [ProjectController::class, 'saveCells']);
 Route::post('/projects/archive', [ProjectController::class, 'setArchive']);
 // 案件の削除（キャンセルになった案件を消す）。案件の削除＝社員以上でOK（baba 2026-07-14）。関連アサインも一緒に消す。
 Route::post('/projects/{id}/delete', [ProjectController::class, 'destroy']);
+// 案件の編集履歴（先-1・2026-08-18）。誰がいつ何を何に変えたかを見るだけの画面。
+Route::get('/project-history', [ProjectHistoryController::class, 'index']);
 Route::get('/project-import', function () {
     return view('project_import');
 });
