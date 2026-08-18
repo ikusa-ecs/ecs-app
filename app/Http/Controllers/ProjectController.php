@@ -8,6 +8,7 @@ use App\Models\Office;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectHistory;
+use App\Support\CsvText;
 use App\Support\DirectorSync;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
@@ -679,9 +680,10 @@ class ProjectController extends Controller
             'csv' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
-        // CSV を行配列にする（BOM除去・CRLF対応）。
+        // CSV を行配列にする（BOM除去・文字コードをUTF-8にそろえる・CRLF対応）。
+        // ExcelがShift_JISで保存したCSVもここで読めるようにしている（App\Support\CsvText）。
         $raw = (string) file_get_contents($request->file('csv')->getRealPath());
-        $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw);          // 先頭BOMを除去
+        $raw = CsvText::toUtf8($raw);
         $lines = preg_split('/\r\n|\r|\n/', trim($raw));
 
         if (count($lines) < 2) {

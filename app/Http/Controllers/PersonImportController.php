@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Person;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
+use App\Support\CsvText;
 use Illuminate\Http\Request;
 
 /**
@@ -34,9 +35,9 @@ class PersonImportController extends Controller
             'csv' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
-        // CSV を行配列にする（BOM除去・CRLF対応）。
+        // CSV を行配列にする（BOM除去・文字コードをUTF-8にそろえる・CRLF対応）。
         $raw = (string) file_get_contents($request->file('csv')->getRealPath());
-        $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw);
+        $raw = CsvText::toUtf8($raw);
         $lines = preg_split('/\r\n|\r|\n/', trim($raw));
 
         if (count($lines) < 2) {

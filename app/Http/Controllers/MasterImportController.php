@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Content;
+use App\Support\CsvText;
 use Illuminate\Http\Request;
 
 /**
@@ -120,7 +121,8 @@ class MasterImportController extends Controller
     private function readCsv(Request $request): array
     {
         $raw = (string) file_get_contents($request->file('csv')->getRealPath());
-        $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw);
+        // BOM除去＋文字コードをUTF-8にそろえる（ExcelがShift_JISで保存したCSVもここで読める）。
+        $raw = CsvText::toUtf8($raw);
         $lines = preg_split('/\r\n|\r|\n/', trim($raw));
 
         if (count($lines) < 2) {
