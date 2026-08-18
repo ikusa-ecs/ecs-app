@@ -989,6 +989,7 @@
         <td class="ops" onclick="event.stopPropagation()">
           <a href="/project-assign?project=${encodeURIComponent(p.id)}">アサイン</a>
           <a href="/project-form?project=${encodeURIComponent(p.id)}">編集</a>
+          <a href="/project-form?copy=${encodeURIComponent(p.id)}" title="この案件をもとに新しい案件を作ります（元の案件は変わりません）">⧉ 複製</a>
           ${copyCtl}
           <a href="#" id="arc-${p._i}" onclick="event.preventDefault(); toggleArchive(${p._i});">${p.archived ? '↩ 戻す' : '🗄 アーカイブ'}</a>
           <a href="#" class="del-link" onclick="event.preventDefault(); deleteProject('${p.id}');">削除</a>

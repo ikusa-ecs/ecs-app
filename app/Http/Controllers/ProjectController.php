@@ -188,14 +188,23 @@ class ProjectController extends Controller
      * ?project=<案件ID> が来たら既存案件を DB から読み、各欄に埋める用のデータ（$editProject）を渡す。
      * 来なければ $editProject = null ＝ 新規登録フォームとして開く。
      * 流し込めるのは store() が実際に保存している項目だけ（ロゴ等のモック項目は対象外）。
+     *
+     * ?copy=<案件ID>（複製・先人の要件定義 #1）が来たときも中身の作り方は編集と同じ。
+     * 違いは最後に「引き継がない項目」を落とすところだけ＝元の案件は一切変更しない（読むだけ）。
+     * project_id を空で渡すので store() は新規作成になる（CSV取込の流し込みと同じ仕組み）。
      */
     public function form(Request $request)
     {
         $editProject = null;
         $projectId = $request->query('project');
+        $copyId = $request->query('copy');
+        $copyFrom = null;                       // 複製のとき、元になった案件の表示用の情報
 
-        if ($projectId) {
-            $p = Project::find($projectId);
+        // 編集と複製で読む先は同じ。?project= が優先（両方来ることは想定しない）。
+        $sourceId = $projectId ?: $copyId;
+
+        if ($sourceId) {
+            $p = Project::find($sourceId);
             if ($p) {
                 // タグ入力に戻す案件名（コンテンツ）。
                 // 入力された名前をそのまま持っていればそれを使う（単発コンテンツもここに入っている）。
@@ -272,6 +281,22 @@ class ProjectController extends Controller
                     'note'             => $p->note,
                     'status'           => $p->status,
                 ];
+
+                // ── 複製のときだけ、新規登録として開き直す ──
+                // 引き継がない項目（2026-08-18 baba 了承）：
+                //   ・案件ID … 空にすると store() が新しい案件として発番する（元の案件は無傷）
+                //   ・開催日 … 同じ日で二重に登録する事故を防ぐため、必ず入れ直してもらう
+                //   ・運営シートURL … 元の案件のシートを指したままにしない
+                // ※ ステータスは持ち回らなくてよい。新規は「下書き保存」か「確定」かで store() が決めるため。
+                if (! $projectId) {
+                    $copyFrom = [
+                        'id'   => $p->id,
+                        'name' => $p->project_name ?: '（名称未定）',
+                    ];
+                    $editProject['id'] = null;
+                    $editProject['start_date'] = '';
+                    $editProject['ops_sheet_url'] = '';
+                }
             }
         }
 
@@ -316,6 +341,8 @@ class ProjectController extends Controller
 
         return view('project_form', [
             'editProject'    => $editProject,
+            // 複製で開いたときだけ中身が入る（元になった案件の ID と名前）。画面の案内文に使う。
+            'copyFrom'       => $copyFrom,
             'parentProjects' => $parentProjects,
             'salesOwners'    => $salesOwners,
             'offices'        => $offices,

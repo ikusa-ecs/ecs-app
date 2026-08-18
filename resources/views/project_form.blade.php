@@ -197,7 +197,13 @@
 <input type="hidden" name="intent" id="intentField">
 {{-- 編集モードのとき、対象の案件IDを一緒に送る（来ていれば store() は上書き更新する） --}}
 <input type="hidden" name="project_id" id="projectIdField" value="{{ $editProject['id'] ?? '' }}">
-@if(!empty($editProject))
+@if(!empty($copyFrom))
+{{-- 複製で開いたとき。project_id は空なので「確定」で新しい案件として登録される（元の案件は変わらない）。 --}}
+<div class="mock-note" style="background:#f0fdf4;border-color:#bbe7c8;color:#166534;">
+  ⧉ 案件「{{ $copyFrom['name'] }}」（{{ $copyFrom['id'] }}）をもとに<b>新しい案件を作ります</b>。元の案件は変わりません。<br>
+  <b>開催日</b>は空にしてあります（同じ日で二重に登録しないため）。<b>運営シートURL</b>も空です。必要なところを直して「確定」を押してください。
+</div>
+@elseif(!empty($editProject))
 <div class="mock-note" style="background:#eef6ff;border-color:#bcd8f0;color:#1d4ed8;">
   ✎ 既存案件「{{ $editProject['id'] }}」を編集しています。内容を直して「確定」を押すと、この案件に上書き保存されます。
 </div>
