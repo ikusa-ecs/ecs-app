@@ -6,15 +6,15 @@
 
 ## 作業を始める前に、必ず下記を読むこと（設計の「正」はすべて共有Googleドライブ `ECS再開発2026_Claude開発` にある。コピーは作らない＝唯一の正。※2026-06-30にOneDriveからここへ移行）
 > 共有ドライブの実体パス＝`G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発`
-- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\エンジニア引き継ぎ資料.md`   ← 全体の入口
-- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_開発の背景と注意点（引き継ぎメモ）.md`  ← **決定の背景・理由・事故りやすい罠（AIの記憶を人が読める形に写したもの）。担当が抜けても誰でも動けるように。まずこれを読む**
-- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\作業リスト_共有.md`          ← 現在地・次にやること・設計の宿題
+- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\作業リスト_共有.md`          ← **最初にここ。現在地・返事待ち・触ると壊れる場所・まだ決めていないこと**
+- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_開発の背景と注意点（引き継ぎメモ）.md`  ← **決定の背景・理由・事故りやすい罠（AIの記憶を人が読める形に写したもの）。担当が抜けても誰でも動けるように**
 - `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_設計書_v1.1.md`        ← 要件・データ設計の本体（正）
 - `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_図解_v1.1.md`          ← 図解（Mermaid）
-- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\エンジニア確認事項_Laravel.md`  ← 技術の確定事項＋MTGで決めたいこと
-- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\要検討事項まとめ.md`           ← 決定事項の一覧
+- `G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS実装一覧_詳細版.md`      ← 今どの画面に何があるか（実装の現物一覧）
 
 > 設計の「正」は常に最新版（現在 v1.1）。v0.7〜v1.0 は過去版。
+> 役目を終えた資料（エンジニア引き継ぎ資料・エンジニア確認事項・要検討事項まとめ・保存データ整理・案件一覧の表示項目決定）は
+> `記録・その他\役目を終えた資料\` に移動済み（2026-08-18）。決定内容は設計書と作業リストに反映済みなので、通常は読まなくてよい。
 > Cursorでは共有ドライブの実体が見えないことがある。その場合の確実な開き方＝上の `G:\.shortcut-targets-by-id\...` パスを直接指定（マイドライブのショートカット経由は不可）。
 
 ## 作業ルール（小沼さんは非エンジニア）
