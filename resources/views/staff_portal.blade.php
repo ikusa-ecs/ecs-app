@@ -386,17 +386,16 @@
       <!-- ===== タブ2：稼働希望 ===== -->
       <div class="tab-panel" id="tab-pref">
         <div class="pref-wrap">
-          <div class="notice"><b>2026年7月分</b>の希望を入力中　／　締切：<b>6月25日</b>まで</div>
+          {{-- 見出しと締切は対象月から計算（当月）。以前は2026年7月が直書きで、保存対象月とズレていた。 --}}
+          <div class="notice"><b>{{ $prefMeta['label'] }}分</b>の希望を入力中　／　締切：<b>{{ $prefMeta['deadline'] }}</b>まで</div>
 
           <div class="m-card">
             <h3>稼働できる日を選んでください</h3>
             <p class="sub">日付をタップ（クリック）するたびに「終日〇 → NG → 未定」と切り替わります。「終日〇」はその日は一日じゅう稼働できる（どの案件にも入れる）という意味です。「★エントリー中」はエントリーした案件がある日、「イベント」は確定アサインが入っている日です（どちらもタップでは変えられません）。</p>
-            <div class="cal-head"><div class="mon">2026年 7月</div></div>
+            <div class="cal-head"><div class="mon">{{ $prefMeta['year'] }}年 {{ $prefMeta['month'] }}月</div></div>
             <div class="cal-grid" id="calGrid">
               <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
-              <!-- 7/1は火曜。前に日月の空きセル2つ -->
-              <div class="cell empty"></div>
-              <div class="cell empty"></div>
+              {{-- 1日までの空きマスは対象月の曜日から作る（以前は「7/1は火曜」で2つ固定だった） --}}
             </div>
             <div class="legend">
               <span><i class="dot ok"></i>終日〇</span>
@@ -550,6 +549,7 @@
     window.ECS_MY_PREFS = @json($myPrefs ?? []);
     window.ECS_PREF_PERIOD = @json($prefPeriod ?? '');
     window.ECS_MY_PREF_MEMO = @json($myPrefMemo ?? '');
+    window.ECS_PREF_META = @json($prefMeta ?? null);
   </script>
   @verbatim
   <script>
@@ -849,15 +849,28 @@
     // ===== 稼働希望カレンダー（既存スマホ画面から移植） =====
     const grid = document.getElementById('calGrid');
     // 確定アサイン（公開済み）の日＝「イベント」、エントリー中の日＝「★」。すべて共通データから作る。
+    // 対象月（DB保存・読込にも使う）。サーバーが渡す当月（ECS_PREF_META）を正とする。
+    // 以前は画面が「2026年7月」固定だったため、月が変わると表示と保存対象月がズレていた。
+    const _meta = window.ECS_PREF_META || null;
+    const _pp = (window.ECS_PREF_PERIOD || '').split('-');
+    const PREF_Y = _meta ? _meta.year  : (parseInt(_pp[0], 10) || today.getFullYear());
+    const PREF_M = _meta ? _meta.month : (parseInt(_pp[1], 10) || (today.getMonth() + 1));
+    const PREF_DAYS = _meta ? _meta.days : new Date(PREF_Y, PREF_M, 0).getDate();
+    const PREF_FIRST_DOW = _meta ? _meta.firstDow : new Date(PREF_Y, PREF_M - 1, 1).getDay();
+
     const eventDays = {};
     const entryDays = {};
-    // 確定（イベント）＝DBの公開済み案件。エントリー中＝募集タブ（cases.js）の応募中案件。
-    (window.ECS_PUBLISHED || []).forEach(j => { const d = addDays(today, j.off); eventDays[d.getDate()] = j.content + ' ' + j.client; });
-    jobs.filter(j => j.state === 'applied').forEach(j => { const d = ECS_caseDate(j.offset); if (!eventDays[d.getDate()]) entryDays[d.getDate()] = j.content + ' ' + j.client; });
-    // 対象月（DB保存・読込に使う）。画面は 2026年7月 固定。
-    const _pp = (window.ECS_PREF_PERIOD || '2026-07').split('-');
-    const PREF_Y = parseInt(_pp[0], 10);
-    const PREF_M = parseInt(_pp[1], 10);
+    // 確定（イベント）＝DBの公開済み案件。エントリー中＝募集タブの応募中案件。
+    // ⚠ 表示中の月の日だけ拾う（inPrefMonth）。以前は日番号だけで入れていたため、
+    //    別の月の確定アサインが同じ日番号のマスに「イベント」として出ていた。
+    (window.ECS_PUBLISHED || []).forEach(j => {
+      const d = addDays(today, j.off);
+      if (inPrefMonth(d)) eventDays[d.getDate()] = j.content + ' ' + j.client;
+    });
+    jobs.filter(j => j.state === 'applied').forEach(j => {
+      const d = ECS_caseDate(j.offset);
+      if (inPrefMonth(d) && !eventDays[d.getDate()]) entryDays[d.getDate()] = j.content + ' ' + j.client;
+    });
     // 本人がDBに保存済みの希望（date "Y-M-D" => ok/ng/maybe）。無ければ空＝全部「未定」で開く。
     const savedPrefs = window.ECS_MY_PREFS || {};
     // 1つの日セルを「編集可（終日〇→NG→未定を切替）」に描く。保存済み希望を初期状態に。
@@ -888,7 +901,13 @@
       cell.title = 'エントリー中：' + title;
       cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>';
     }
-    for (let d = 1; d <= 31; d++) {
+    // 1日の前の空きマス（曜日合わせ）を対象月から作る。
+    for (let i = 0; i < PREF_FIRST_DOW; i++) {
+      const pad = document.createElement('div');
+      pad.className = 'cell empty';
+      grid.appendChild(pad);
+    }
+    for (let d = 1; d <= PREF_DAYS; d++) {
       const cell = document.createElement('div');
       if (eventDays[d]) paintEvent(cell, d, eventDays[d]);
       else if (entryDays[d]) paintEntry(cell, d, entryDays[d]);

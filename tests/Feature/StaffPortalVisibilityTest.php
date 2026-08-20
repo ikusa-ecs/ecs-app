@@ -44,6 +44,44 @@ class StaffPortalVisibilityTest extends TestCase
         )->all();
     }
 
+    /**
+     * 稼働希望カレンダーは「当月」で開く（見出し・締切・日数・1日の曜日）。
+     * 以前は画面に2026年7月が直書きされており、保存される月とズレていた。
+     */
+    public function test_preference_calendar_uses_current_month(): void
+    {
+        $me = PersonFactory::new()->staff()->create();
+        $now = Carbon::now();
+
+        $data = $this->actingAsPerson($me)->get('/staff-portal')->assertOk()->original->getData();
+
+        $this->assertSame($now->format('Y-m'), $data['prefPeriod']);
+        $meta = $data['prefMeta'];
+        $this->assertSame((int) $now->year, $meta['year']);
+        $this->assertSame((int) $now->month, $meta['month']);
+        $this->assertSame($now->daysInMonth, $meta['days']);
+        $this->assertSame((int) $now->copy()->startOfMonth()->dayOfWeek, $meta['firstDow']);
+        // 締切＝前月25日
+        $this->assertSame(
+            $now->copy()->startOfMonth()->subMonthNoOverflow()->day(25)->format('n月j日'),
+            $meta['deadline']
+        );
+    }
+
+    /** ?period= を渡せばその月で開く（見出し・日数もその月になる）。 */
+    public function test_preference_calendar_follows_period_parameter(): void
+    {
+        $me = PersonFactory::new()->staff()->create();
+
+        $meta = $this->actingAsPerson($me)->get('/staff-portal?period=2027-02')
+            ->assertOk()->original->getData()['prefMeta'];
+
+        $this->assertSame(2027, $meta['year']);
+        $this->assertSame(2, $meta['month']);
+        $this->assertSame(28, $meta['days'], '2027年2月は28日');
+        $this->assertSame('1月25日', $meta['deadline']);
+    }
+
     /** 募集タブ：公開ONの案件だけ出る。登録しただけ（非公開）の案件は出さない。 */
     public function test_recruiting_tab_shows_published_projects_only(): void
     {

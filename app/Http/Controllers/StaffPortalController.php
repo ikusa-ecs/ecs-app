@@ -132,6 +132,7 @@ class StaffPortalController extends Controller
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
             'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
             'prefPeriod' => $prefPeriod,                     // 稼働希望カレンダーの対象月（当月）
+            'prefMeta' => $this->prefMeta($prefPeriod),      // その月の見出し・締切・日数・1日の曜日
             'myPrefs' => $this->myPrefs($me),               // 本人の希望（カレンダー初期表示）
             'myPrefMemo' => $this->myPrefMemo($me, $prefPeriod), // 希望のコメント（初期表示）
             'staffLinks' => StaffLinks::all(),               // 便利リンク集（共通設定で社員が編集）
@@ -151,6 +152,30 @@ class StaffPortalController extends Controller
         }
 
         return now()->format('Y-m');
+    }
+
+    /**
+     * 稼働希望カレンダーの「その月の情報」。画面の見出し・締切・マスの並びに使う。
+     *
+     * これまで画面に「2026年7月」「締切：6月25日」「1日は火曜（＝先頭の空マス2つ）」「31日ぶん」が
+     * 直書きされていたため、月が変わると表示と保存対象月がズレていた。ここで月から計算して渡す。
+     * 希望の締切＝対象月の前月25日（例：2026-07分 → 6月25日）。
+     *
+     * @return array{year:int,month:int,days:int,firstDow:int,label:string,deadline:string}
+     */
+    private function prefMeta(string $period): array
+    {
+        [$y, $m] = array_map('intval', array_pad(explode('-', $period), 2, 1));
+        $first = Carbon::create($y, $m, 1)->startOfDay();
+
+        return [
+            'year'     => $y,
+            'month'    => $m,
+            'days'     => $first->daysInMonth,
+            'firstDow' => (int) $first->dayOfWeek,   // 0=日曜
+            'label'    => $y . '年' . $m . '月',
+            'deadline' => $first->copy()->subMonthNoOverflow()->day(25)->format('n月j日'),
+        ];
     }
 
     /** DBの availability → カレンダーの状態語（ok/ng/maybe）。「希望」も画面では〇(ok)扱い。 */
