@@ -1,13 +1,14 @@
-{{-- ECS 使い方ガイド（アプリ内ページ）。中身は docs/ECS_ガイド_社内向け.html と同じ。 --}}
+{{-- ECS 使い方ガイド（アプリ内ページ／社員向け）。左メニューの「📋 使い方ガイド」から開く。 --}}
 {{-- 機能が増えたらこのファイルを更新する＝アプリ内のガイドが最新になる（生きた説明書）。 --}}
-{{-- CSSのメディアクエリ等をBladeに解釈させないため、全体をverbatimブロックで囲んでいる。 --}}
+{{-- 更新したら、いちばん下の「更新履歴」にも1行足すこと。 --}}
+{{-- CSSのメディアクエリ等をBladeに解釈させないため、全体をBladeが解釈しない区間で囲んでいる。 --}}
 @verbatim
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ECS 仕様＆使い方ガイド（社内向け）</title>
+<title>ECS 使い方ガイド（社員向け）</title>
 <style>
   :root{
     --brand:#a15c2e; --brand-soft:#f6ede4; --ink:#2f2a24; --muted:#7a6f63;
@@ -64,6 +65,7 @@
   .note{ background:var(--warn-soft); border:1px solid #ecd9b6; border-radius:10px; padding:12px 14px; font-size:13.5px; }
   .tip{ background:var(--ok-soft); border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13.5px; }
   .pill{ display:inline-block; background:var(--brand-soft); color:var(--brand); border-radius:20px; padding:1px 10px; font-size:12px; font-weight:700; }
+  .menu{ display:inline-block; background:#f3ece4; border:1px solid var(--line); border-radius:6px; padding:0 7px; font-size:13.5px; font-weight:700; }
 
   .fb-btn{
     display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
@@ -72,7 +74,6 @@
   }
   .fb-btn:hover{ background:#8a4d24; }
   .fb-url{ margin:10px 0 0; font-size:11.5px; color:var(--muted); word-break:break-all; }
-  .qr{ width:150px; height:150px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 
   footer{ color:var(--muted); font-size:12px; text-align:center; margin-top:8px; }
 
@@ -92,185 +93,293 @@
 <div class="wrap">
 
   <header class="doc">
-    <h1>ECS 仕様＆使い方ガイド</h1>
-    <p>スタッフアサイン管理システム ／ 社内確認用</p>
+    <h1>ECS 使い方ガイド</h1>
+    <p>スタッフアサイン管理システム ／ 社員向け</p>
   </header>
-  <div class="meta">2026年7月17日版 ・ 開発中のプロトタイプについての説明です（内容は今後変わることがあります）</div>
+  <div class="meta">2026年8月20日版 ・ 機能が増えたときは、このページと最後の「更新履歴」を更新します</div>
 
-  <div class="tip" style="text-align:center; padding:16px 14px; margin-bottom:24px;">
-    <p style="margin:0 0 10px; font-size:15px;"><b>ECS はこちらから開けます（テスト環境）</b></p>
-    <a class="fb-btn" href="http://ecs-test.ikusa.co.jp/" target="_blank" rel="noopener">🔗 ECS を開く</a>
-    <p class="fb-url">http://ecs-test.ikusa.co.jp/</p>
-    <div style="margin-top:14px;">
-      <img class="qr" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjIyMCIgaGVpZ2h0PSIyMjAiIHZpZXdCb3g9IjAgMCAyMjAgMjIwIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjIwIiBoZWlnaHQ9IjIyMCIgZmlsbD0iI2ZmZmZmZiIvPjxnIHRyYW5zZm9ybT0ic2NhbGUoNy41ODYpIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyLDIpIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04IDBMOCAxTDEwIDFMMTAgMFpNMTMgMEwxMyAyTDExIDJMMTEgNEwxMCA0TDEwIDNMOSAzTDkgMkw4IDJMOCA1TDkgNUw5IDZMOCA2TDggN0w5IDdMOSA4TDggOEw4IDlMNyA5TDcgOEw2IDhMNiA5TDcgOUw3IDEwTDYgMTBMNiAxMUw1IDExTDUgOUw0IDlMNCA4TDAgOEwwIDEzTDEgMTNMMSAxNUwwIDE1TDAgMTZMMSAxNkwxIDE1TDMgMTVMMyAxNEw0IDE0TDQgMTVMNyAxNUw3IDE2TDUgMTZMNSAxN0w4IDE3TDggMThMOSAxOEw5IDIwTDEwIDIwTDEwIDIxTDExIDIxTDExIDIyTDkgMjJMOSAyMUw4IDIxTDggMjVMOSAyNUw5IDI0TDEwIDI0TDEwIDIzTDExIDIzTDExIDI1TDE1IDI1TDE1IDIzTDE2IDIzTDE2IDIyTDEzIDIyTDEzIDIxTDEyIDIxTDEyIDIwTDEzIDIwTDEzIDE5TDE0IDE5TDE0IDIxTDE1IDIxTDE1IDIwTDE2IDIwTDE2IDIxTDE3IDIxTDE3IDIyTDE4IDIyTDE4IDIzTDE3IDIzTDE3IDI0TDE4IDI0TDE4IDI1TDI1IDI1TDI1IDI0TDIzIDI0TDIzIDIzTDI0IDIzTDI0IDIyTDI1IDIyTDI1IDIwTDI0IDIwTDI0IDE5TDI1IDE5TDI1IDE1TDI0IDE1TDI0IDE0TDI1IDE0TDI1IDEyTDIzIDEyTDIzIDExTDIxIDExTDIxIDEyTDIwIDEyTDIwIDlMMjMgOUwyMyAxMEwyNCAxMEwyNCA5TDI1IDlMMjUgOEwyNCA4TDI0IDlMMjMgOUwyMyA4TDIwIDhMMjAgOUwxOSA5TDE5IDExTDE4IDExTDE4IDhMMTcgOEwxNyA0TDE1IDRMMTUgMUwxNCAxTDE0IDBaTTE2IDBMMTYgM0wxNyAzTDE3IDBaTTEyIDRMMTIgNUwxMCA1TDEwIDZMOSA2TDkgN0wxMCA3TDEwIDhMOSA4TDkgOUwxMCA5TDEwIDEwTDcgMTBMNyAxMUw2IDExTDYgMTJMNCAxMkw0IDlMMyA5TDMgMTNMMiAxM0wyIDEyTDEgMTJMMSAxM0wyIDEzTDIgMTRMMyAxNEwzIDEzTDQgMTNMNCAxNEw1IDE0TDUgMTNMNiAxM0w2IDE0TDcgMTRMNyAxNUw5IDE1TDkgMTZMOCAxNkw4IDE3TDkgMTdMOSAxOEwxMCAxOEwxMCAxN0w5IDE3TDkgMTZMMTEgMTZMMTEgMTdMMTMgMTdMMTMgMThMMTUgMThMMTUgMTlMMTYgMTlMMTYgMThMMTUgMThMMTUgMTdMMTYgMTdMMTYgMTZMMTcgMTZMMTcgMTRMMTQgMTRMMTQgMTNMMTMgMTNMMTMgMTBMMTQgMTBMMTQgOEwxNSA4TDE1IDdMMTYgN0wxNiA1TDE1IDVMMTUgNFpNMTIgNUwxMiA4TDExIDhMMTEgMTFMMTIgMTFMMTIgMTBMMTMgMTBMMTMgOUwxMiA5TDEyIDhMMTMgOEwxMyA2TDE0IDZMMTQgN0wxNSA3TDE1IDVaTTEwIDZMMTAgN0wxMSA3TDExIDZaTTE1IDlMMTUgMTJMMTcgMTJMMTcgMTNMMTggMTNMMTggMTJMMTcgMTJMMTcgOVpNMSAxMEwxIDExTDIgMTFMMiAxMFpNNiAxMkw2IDEzTDcgMTNMNyAxNEw5IDE0TDkgMTVMMTAgMTVMMTAgMTRMMTEgMTRMMTEgMTNMMTAgMTNMMTAgMTJMOCAxMkw4IDEzTDcgMTNMNyAxMlpNMTkgMTJMMTkgMTNMMjAgMTNMMjAgMTJaTTIxIDEyTDIxIDE0TDE5IDE0TDE5IDE1TDIwIDE1TDIwIDE2TDIxIDE2TDIxIDE1TDIyIDE1TDIyIDE2TDI0IDE2TDI0IDE1TDIyIDE1TDIyIDE0TDI0IDE0TDI0IDEzTDIyIDEzTDIyIDEyWk0xMiAxM0wxMiAxNEwxMyAxNEwxMyAxNUwxMSAxNUwxMSAxNkwxMyAxNkwxMyAxN0wxNSAxN0wxNSAxNUwxNCAxNUwxNCAxNEwxMyAxNEwxMyAxM1pNMTMgMTVMMTMgMTZMMTQgMTZMMTQgMTVaTTMgMTZMMyAxN0w0IDE3TDQgMTZaTTE3IDE3TDE3IDIwTDIwIDIwTDIwIDE3Wk0yMSAxN0wyMSAxOEwyNCAxOEwyNCAxN1pNMTEgMThMMTEgMjBMMTIgMjBMMTIgMThaTTE4IDE4TDE4IDE5TDE5IDE5TDE5IDE4Wk0yMSAxOUwyMSAyMkwyMiAyMkwyMiAyMUwyMyAyMUwyMyAxOVpNMTkgMjFMMTkgMjJMMjAgMjJMMjAgMjFaTTE4IDIzTDE4IDI0TDIwIDI0TDIwIDIzWk0yMSAyM0wyMSAyNEwyMiAyNEwyMiAyM1pNMCAwTDAgN0w3IDdMNyAwWk0xIDFMMSA2TDYgNkw2IDFaTTIgMkwyIDVMNSA1TDUgMlpNMjUgMEwxOCAwTDE4IDdMMjUgN1pNMjQgMUwxOSAxTDE5IDZMMjQgNlpNMjMgMkwyMCAyTDIwIDVMMjMgNVpNMCAyNUw3IDI1TDcgMThMMCAxOFpNMSAyNEw2IDI0TDYgMTlMMSAxOVpNMiAyM0w1IDIzTDUgMjBMMiAyMFoiIGZpbGw9IiMwMDAwMDAiLz48L2c+PC9nPjwvc3ZnPgo=" alt="ECSのQRコード">
-      <p style="margin:4px 0 0; font-size:12px; color:var(--muted);">📱 スマホはこのQRコードから（読み取ってアクセス）</p>
-    </div>
-    <p style="margin:10px 0 0; font-size:12px; color:var(--muted);">※ 現在は動作確認用のテスト環境です。ログインには管理者が発行したアカウントが必要です。</p>
+  <div class="tip" style="margin-bottom:24px;">
+    <p style="margin:0;"><b>このガイドは、細かい操作を調べるための場所です。</b>全部を読む必要はありません。困ったときに、下の目次から該当のところだけ開いてください。<br>
+    まず全体をつかみたい方は「<b>3. 基本の流れ</b>」と「<b>7. これだけは気をつけてください</b>」の2つだけ読めば十分です。</p>
   </div>
 
   <nav class="toc">
     <b>目次</b>
     <ol>
-      <li><a href="#about">ECSとは</a></li>
+      <li><a href="#about">ECSとは（何をする道具か）</a></li>
       <li><a href="#roles">誰が使う・何ができる（4つの権限）</a></li>
-      <li><a href="#features">主な機能（できること）</a></li>
       <li><a href="#flow">基本の流れ</a></li>
       <li><a href="#login">ログインの仕方（2段階認証）</a></li>
-      <li><a href="#try">テスト環境の試し方（4つの権限を体験）</a></li>
-      <li><a href="#faq">よくある操作</a></li>
-      <li><a href="#status">フィードバック・いまの状況</a></li>
+      <li><a href="#screens">画面ごとの使い方</a></li>
+      <li><a href="#faq">やりたいことから探す（早見表）</a></li>
+      <li><a href="#care">これだけは気をつけてください</a></li>
+      <li><a href="#mobile">スマホで使う</a></li>
+      <li><a href="#help">こまったとき・ご意見</a></li>
+      <li><a href="#history">更新履歴</a></li>
     </ol>
   </nav>
 
   <section id="about">
-    <h2>1. ECSとは</h2>
+    <h2>1. ECSとは（何をする道具か）</h2>
     <p class="lead">ECS は、イベントの<b>案件</b>と、そこに入る<b>社員・スタッフのアサイン（誰がどの現場に入るか）</b>を、ひとつの場所で管理するための社内システムです。</p>
-    <p>これまで、案件情報・募集・連絡・アサイン表などが複数の場所（スプレッドシート／LINE／プロキャス等）に分かれていて、情報のズレが起きやすい状態でした。ECS は「<b>情報を1か所に集めて、見える・記録する</b>」ことを目的にしています。</p>
-    <p class="why">※ 当日の連絡や確定の合図（LINEグループ招待など）は、これまでどおり LINE・チャットワークで行います。ECS は「見せる・記録する」役割です。</p>
+    <p>これまで案件情報・募集・希望・アサイン表が、スプレッドシートやチャットなど複数の場所に分かれていて、情報のズレが起きやすい状態でした。ECS は「<b>情報を1か所に集めて、見える・記録する</b>」ことを目的にしています。</p>
+    <div class="note">
+      <b>ECS がやらないこと＝連絡</b>。当日の連絡や、確定後のグループ招集などは、これまでどおり <b>LINE・チャットワーク</b>で行ってください。<br>
+      ECS ＝<b>見せる・記録する</b> ／ LINE・チャットワーク ＝<b>連絡する</b>、という分担です。
+    </div>
   </section>
 
   <section id="roles">
     <h2>2. 誰が使う・何ができる（4つの権限）</h2>
-    <p>ログインする人は、役割によって<b>見える画面・できる操作</b>が変わります。</p>
+    <p>ログインする人は、役割によって<b>見える画面・できる操作</b>が変わります。上にいくほどできることが増えます。</p>
     <table>
       <tr><th>権限</th><th>主な人</th><th>できること</th></tr>
-      <tr><td><b>スタッフ</b></td><td>現場運営スタッフ</td><td>自分の確定アサインの確認、参加希望の入力、自分のプロフィール編集</td></tr>
-      <tr><td><b>社員</b></td><td>営業・運営など</td><td>案件の登録・編集・閲覧、アサイン、案件の削除まで</td></tr>
-      <tr><td><b>管理者</b></td><td>アサイン担当</td><td>社員のことに加えて、アカウントの発行・名簿の一括取込</td></tr>
-      <tr><td><b>Administrator</b></td><td>全体管理</td><td>すべての操作（マスタ・アカウントの削除、権限の付与、システム設定）</td></tr>
+      <tr><td><b>スタッフ</b></td><td>現場運営スタッフ</td><td>自分の確定アサインの確認、募集へのエントリー（応募）、稼働希望の入力、自分のプロフィール編集</td></tr>
+      <tr><td><b>社員</b></td><td>セールス・イベプラなど</td><td>案件の登録・編集・削除、アサインの業務画面、収支の入力</td></tr>
+      <tr><td><b>管理者</b></td><td>アサイン担当</td><td>社員のことに加えて、アカウントの発行、名簿の一括取込、他拠点の案件の扱い</td></tr>
+      <tr><td><b>Administrator</b></td><td>全体管理</td><td>すべての操作（マスタや人の削除、権限の付与）</td></tr>
     </table>
-    <p class="why">※ 権限は上にいくほどできることが増えます。スタッフは自分に関係することだけ、という考え方です。</p>
-  </section>
 
-  <section id="features">
-    <h2>3. 主な機能（できること）</h2>
-
-    <h3>案件まわり</h3>
+    <h3>拠点（オフィス）による見える範囲</h3>
     <ul>
-      <li><b>案件一覧・登録</b>：イベント案件を登録し、一覧で確認・編集。CSVでまとめて取り込みも可能。一覧の詳細で担当（D／SD／物品／移動／音響）や手動アーカイブも保存されます。</li>
-      <li><b>ダッシュボード</b>：件数の集計や、日程が近い・重なっている「危険日」をカレンダーで確認（危険日は手動でも追加できます）。</li>
-      <li><b>収支入力</b>：案件ごとに売上・経費（明細）・メモを入力して利益を計算・保存。</li>
-    </ul>
-
-    <h3>アサイン（誰をどの現場に）</h3>
-    <ul>
-      <li><b>アサイン表</b>：案件と割り当てメンバーを1画面でまとめて確認。担当・巡回・役割・備考をその場で編集・保存。</li>
-      <li><b>D決め・手動アサイン</b>：ディレクターを決め、案件ごとに人を割り当てて保存。同じ日のダブルブッキングや、必要人数の過不足を色で確認。役割を選ぶとその人が自動でアサインされ、1人が2役こなす「兼任」や、人ごとの「備考」も残せます（基本Dは1名）。</li>
-      <li><b>日別ボード・ピックアップ・エントリー一覧</b>：日ごと／案件ごとに、希望者を見ながらその場でアサイン。エントリー一覧では応募者の一言メモも確認できます。</li>
-      <li><b>自動アサイン（補助）</b>：希望者から候補をまとめて仮置き。人は確認して微調整するだけ（「誰を入れるか」の本格提案は今後強化）。</li>
-      <li><b>スタッフ公開ボード</b>：確定したアサインを「公開」すると、担当スタッフの画面に表示される。案件ごとの備考も全員に共有されます。</li>
-    </ul>
-
-    <h3>名簿・希望</h3>
-    <ul>
-      <li><b>スタッフ／社員名簿</b>：登録された人の情報・稼働状況を確認。CSVで一括登録（「できるポジション」列も取込可）、CSV書き出しも可能。社員のサイズなども編集できます。</li>
-      <li><b>できる役割</b>：D・MC・OP・軍師を管理。OP（音響）は「オンライン可／リアル可」で区別できます。</li>
-      <li><b>参加希望・出勤可能日</b>：スタッフ・社員が入れる日を入力・集約。</li>
-    </ul>
-
-    <h3>スタッフ側の画面（スマホ想定）</h3>
-    <ul>
-      <li><b>スタッフ用ポータル</b>：自分の確定アサイン・お知らせ・締切を、スマホで見やすく表示。募集中の案件へエントリー（応募＋一言メモ）でき、稼働希望カレンダーにも反映されます。</li>
-      <li><b>マイページ</b>：自分の担当した案件をカレンダーで確認。通知のオン／オフも設定できます。</li>
-    </ul>
-
-    <h3>そのほかの便利機能</h3>
-    <ul>
-      <li><b>人数確定リマインド</b>：開催が近い案件を、担当へチャットワークで自動お知らせ。</li>
-      <li><b>謎解きの紙 在庫</b>：必要枚数・消費・在庫を自動で集計。</li>
-      <li><b>共通設定</b>：コンテンツ・拠点などのマスタ管理、アサインMTGの予定管理。</li>
+      <li>案件は<b>登録した拠点のもの</b>として持ちます。</li>
+      <li><b>一般社員は自分の拠点の案件だけ</b>が見えます。<b>管理者以上は全拠点</b>が見え、画面上部のスイッチで切り替えられます。</li>
+      <li>他拠点の応援は、案件を複製せず「<b>ヘルプ／巻き取り</b>」として記録します（詳しくは「5. 画面ごとの使い方」のアサイン表）。</li>
     </ul>
   </section>
 
   <section id="flow">
-    <h2>4. 基本の流れ</h2>
-    <p>ふだんの使い方は、おおまかにこの順番です。</p>
+    <h2>3. 基本の流れ</h2>
+    <p>ふだんの使い方は、この順番です。</p>
     <ol class="steps">
-      <li><b>案件を登録する</b>（営業・運営）— イベントの案件を ECS に入れる。</li>
-      <li><b>希望を集める</b> — スタッフ・社員が「入れる日」を入力する。</li>
-      <li><b>アサインを決める</b>（アサイン担当）— ディレクターを決め、案件ごとに人を割り当てる。</li>
-      <li><b>確定して公開する</b> — 内容が固まったら「公開」にして、スタッフに見えるようにする。</li>
-      <li><b>スタッフが自分の担当を確認</b> — スタッフはスマホで自分の確定アサインを見る。</li>
-    </ol>
-  </section>
-
-  <section id="login">
-    <h2>5. ログインの仕方（2段階認証）</h2>
-    <p>ECS には <b>顧客の社名などの情報</b>が入るため、ログインは<b>2段階認証</b>で守ります（パスワードに加えて、メールに届く確認コードが必要）。</p>
-    <ol class="steps">
-      <li><b>アカウントは管理者が発行</b> — 自分で新規登録はできません。管理者が発行し、仮パスワードを受け取ります。</li>
-      <li><b>メールアドレスとパスワードでログイン</b> — ログイン画面で入力します。</li>
-      <li><b>メールに届く6桁コードを入力</b> — 登録メール宛にコードが届くので、画面に入力します。<span class="pill">10分間有効</span></li>
-      <li><b>初回は初期設定</b> — 初めてのログイン時は、パスワードの変更と、身長・靴のサイズなどのプロフィール入力をお願いします。</li>
+      <li><b>案件を登録する</b>（セールス・案件担当）— <span class="menu">案件登録</span> から入れる。エクセルの表をまとめて取り込むこともできます。</li>
+      <li><b>希望を集める</b>（アサイン担当）— <span class="menu">スタッフ公開ボード</span> で案件を<b>公開</b>して募集をかけ、スタッフがエントリー（応募）します。社員は <span class="menu">社員の出勤可能日</span> で入れる日を出します。</li>
+      <li><b>アサインを決める</b>（アサイン担当）— <span class="menu">D決め（ディレクター）</span> でD・SDを決め、<span class="menu">日別ボード</span> や <span class="menu">案件別アサイン</span> で人を割り当てます。</li>
+      <li><b>アサインを確定して、スタッフに公開する</b>（アサイン担当）— 「✓ 確定にする」→「📣 スタッフに公開」の<b>2段階</b>。ここまでやって、はじめて本人に見えます。</li>
+      <li><b>イベントが終わったら、収支を入力する</b>（D・営業担当）— <span class="menu">収支入力</span> から。締切はイベント後3営業日です。</li>
     </ol>
     <div class="note" style="margin-top:12px;">
-      <b>コードが届かないときは</b>：入力画面の「コードを再送する」を押すと、新しいコードが届きます。パスワードを忘れたときの再発行も、今後メールで対応予定です。
+      <b>公開しないと、スタッフには案件があること自体が見えません。</b>エントリーも集まりません。アサインの作業でいちばん忘れやすいところです。
     </div>
   </section>
 
-  <section id="try">
-    <h2>6. テスト環境の試し方（4つの権限を体験）</h2>
-    <p>テスト環境では、<b>アカウント発行や2段階認証なしで</b>、4つの権限をワンクリックで体験できます。役割によって見える画面がどう変わるかを確認できます。</p>
+  <section id="login">
+    <h2>4. ログインの仕方（2段階認証）</h2>
+    <p>ECS にはお客様の社名や個人情報が入るため、ログインは<b>2段階認証</b>で守っています（パスワードに加えて、メールに届く確認コードが必要）。</p>
     <ol class="steps">
-      <li>上の「<b>ECS を開く</b>」からログイン画面を開く。</li>
-      <li>画面の「<b>テスト用ログイン</b>」から、試したい役割のボタンを押す（<b>パスワード入力は不要</b>・押すだけ）。</li>
-      <li>ログイン後、左メニューや各画面を触ってみる。役割によって<b>見えるメニューが変わります</b>。</li>
-      <li>別の役割を試すときは、左メニュー下の「<b>ログアウト</b>」を押してから、別のボタンを選ぶ。</li>
+      <li><b>アカウントは管理者が発行します</b> — 自分で新規登録はできません。</li>
+      <li><b>メールアドレスとパスワードを入れる</b> — ログイン画面で入力します。</li>
+      <li><b>メールに届く6桁のコードを入れる</b> — <span class="pill">10分間有効</span>。<b>5回続けて間違えるとロック</b>がかかります。届かないときは「コードを再送する」を押してください。</li>
+      <li><b>初回だけ、初期設定をします</b> — 新しいパスワード（8文字以上）と、氏名・プロフィール（身長・靴のサイズなど）を入れていただきます。</li>
     </ol>
+    <div class="note" style="margin-top:12px;">
+      <b>パスワードを忘れたときは</b>、ログイン画面の「パスワードをお忘れですか」から、メールで再設定できます。<br>
+      <b>あとから変えたいときは</b>、左メニューの一番下にある <span class="menu">マイプロフィール</span> <span class="menu">パスワード変更</span> から変更できます。
+    </div>
+  </section>
 
-    <table>
-      <tr><th>押すボタン</th><th>権限</th><th>ログイン後に見えるもの</th></tr>
-      <tr><td>スタッフ</td><td>スタッフ</td><td>自分の確定アサインだけ（スマホ想定のスタッフ画面）</td></tr>
-      <tr><td>社員</td><td>社員</td><td>業務画面（案件・アサインなど。削除やマスタ操作は不可）</td></tr>
-      <tr><td>管理者</td><td>管理者</td><td>社員に加えて、アカウント発行・名簿CSV取込</td></tr>
-      <tr><td>Administrator</td><td>Administrator</td><td>すべての操作（削除・権限付与・設定）</td></tr>
-    </table>
+  <section id="screens">
+    <h2>5. 画面ごとの使い方</h2>
+    <p>左のメニューがすべての入口です。見出しをクリックすると開閉します。ここでは<b>メニューの名前</b>ごとに、何をする画面かと、つまずきやすい点を書いています。</p>
 
-    <p><b>初回ログインも体験できます</b>：「🆕 初回ログインを体験」ボタンを押すと、管理者に発行された直後のスタッフとして、<b>パスワード設定＋プロフィール入力</b>の流れを体験できます。</p>
-
-    <div class="note">※「テスト用ログイン」ボタンは体験用です（本番公開前に外します）。本物のログイン（メールアドレス＋パスワード＋メールに届くコード）は「5. ログインの仕方」をご覧ください。</div>
-
-    <h3>役割ごとに見てほしいこと（フィードバックの観点）</h3>
+    <h3>はじめに見る</h3>
     <ul>
-      <li><b>スタッフ</b>：自分の確定アサインや希望の出し方が、スマホで分かりやすいか。</li>
-      <li><b>社員</b>：案件の登録・一覧・編集がスムーズか。</li>
-      <li><b>管理者（アサイン担当）</b>：アサインの流れ（D決め → 手動アサイン → 公開）が回せそうか。</li>
-      <li><b>Administrator</b>：アカウント発行・共通設定・名簿まわりが分かりやすいか。</li>
+      <li><b>ダッシュボード</b>：会社全体の忙しさをひと目で見る画面。上の4つの数字（今月・今週・大型・来月）と、<b>危険日カレンダー</b>（赤いマス＝大型2件以上／リアル5件以上／必要28名以上。人が手で追加した日も赤くなります）。<b>日付をクリック</b>すると、その日の案件が下に一覧で出ます。</li>
+      <li><b>マイページ</b>：自分が関わる案件だけを月ごとに見る画面。「📅登録」でGoogleカレンダーへ、終わった案件は「💰収支入力」へ進めます。下のほうに通知設定がありますが、<b>今は設定を保存できるだけ</b>で、届け方（メールかチャットワークか）は今後決めます。</li>
+      <li><b>社員の出勤可能日</b>：イベントに入れる日を月ごとに申告します。クリックするたびに 〇（出勤可）→ ×（不可）→ △（条件つき）→ 未入力 と変わります。平日枠は「希望休」のオン・オフ。<b>最後に「この月の内容を保存する」を必ず押してください。</b></li>
+      <li><b>収支入力</b>：終わった案件の売上・経費を入れて利益を出します。入れられるのは<b>自分がD、または営業担当</b>になっている案件です。<b>収支一覧</b>で全体を確認できます。目的は Salesforce に登録して案件別の粗利を集計することです（経理の正式な数字ではありません）。</li>
+      <li><b>使い方ガイド</b>：このページです。別のタブで開くので、作業の邪魔になりません。</li>
+    </ul>
+
+    <h3>案件のこと</h3>
+    <ul>
+      <li><b>案件登録</b>：1件ずつ入力します。<b>色で「埋めるべき欄」が分かります</b>＝🔴赤＝必須なのに空白（埋まらないと保存できません）／🟡黄＝後で必要（今わからなければ空白でOK・<b>決まり次第入力</b>）／⬜白＝入力済み、または色が付かない欄。<b>まず赤をなくし、そのあと黄色を減らす</b>のがコツです。
+        <ul>
+          <li>決まっていない項目は「<b>未定／仮</b>」にチェックを入れれば保存できます。開催日は「日付未定」→「いつ頃？」に自由記述（例：8月後半）。</li>
+          <li><b>必須3点＝案件名・開催日・運営人数</b>。値を入れるか「未定」にチェックしないと保存できません。</li>
+          <li>保存は<b>下書き／確定</b>の2通り。危険日に当たると警告が出ますが、<b>確認だけで保存は止まりません</b>。</li>
+          <li>予備日・リハは「＋同じ内容で次の日程を追加」で作れます。</li>
+          <li><b>イベント数に数える／数えない</b>を選べます。「自動」のときは、社内の数え方にあわせて<b>体験会と、案件名にEXPOを含む案件は数えません</b>。それ以外は数えます。手で選べば自動より優先されます。</li>
+        </ul>
+      </li>
+      <li><b>案件一覧</b>：登録した案件の司令塔です。キーワード・確度・実施形態・拠点・開催日などで絞り込めます。タブは 案件一覧／下書き／🗄アーカイブ（開催日が過ぎると自動で移動）。
+        <ul>
+          <li><b>行をクリック</b>すると詳細パネルが開き、D・SD・物品担当などを設定できます。<b>1つ選び直すたびに、その項目だけ保存されます。</b></li>
+          <li>行の右のボタン＝<b>アサイン</b>（割り当て画面へ）／<b>編集</b>／<b>⧉複製</b>（同じ内容で新しい案件を作る・元はそのまま）／<b>🗄アーカイブ</b>（一覧から片づける・戻せます）／<b>削除</b>（⚠元に戻せません）。</li>
+          <li>上のボタン＝<b>📤 アサイン表へ書き出し</b>（月を選ぶと、スプレッドシートにそのまま貼れる形でコピーできます）／<b>💬 チャットワーク用に書き出し</b>（絞り込んだ案件を、そのまま貼れる文章にします）／<b>⬆CSVで取込</b>。</li>
+          <li><b>「リピート」バッジ</b>が付いたクライアント名をクリックすると、そのお客様の過去の案件と、入ったメンバー（氏名＋役割）が出ます。前回と同じ顔ぶれで組みたいときに使ってください。案件が2件以上あるお客様がリピートになります。<b>リピートかどうかは企業名で判断しているので、案件登録では企業名を正式名称で入れてください。</b></li>
+        </ul>
+      </li>
+      <li><b>CSV一括取込</b>：エクセルの表をまとめて取り込みます。テンプレートをダウンロード → 1行1案件 → ドラッグ＆ドロップ → エラー行（赤）をクリックして直す、の流れです。<b>アサイン表の列名のまま読めます。</b>Excelで保存し直したファイル（Shift_JIS）も自動で見分けて読みます。年が無い日付（9/20 など）は勘で補わずエラーにします。案件・人の名簿・コンテンツ台帳それぞれに取込画面があります。</li>
+      <li><b>編集履歴</b>：<b>誰が・いつ・何を・何から何に</b>変えたかが自動で残ります。案件編集画面の一番下（新しい順20件）と、専用画面（案件・人・期間で絞り込み）で見られます。どの画面から変えても残ります。履歴は消せません。</li>
+      <li><b>アサイン表</b>：これまで現場で使ってきたアサイン表と同じ形の画面です。1案件＝縦のカードで、月を選ぶとその月の案件が横に並びます。<b>見るだけの画面ではありません</b>＝集合／解散、入り／開始／終了、お客様人数・組数、運営人数などは<b>入れた時点で保存</b>されます（保存ボタンは不要）。メンバー欄の「✎編集」でポジション・担当メモ（軍師・サポ）・巡回数を直せます。他拠点の人には「○○ヘルプ」、まだ仮の人には「仮」が付きます。
+        <ul>
+          <li><b>他拠点の応援</b>：「📥自拠点にコピー」→ <b>ヘルプ</b>（案件は相手拠点のまま、人だけ出す）か <b>巻き取り</b>（案件を自拠点に引っぱって運営する）を選びます。案件は複製されず、関わりを1行記録するだけです。操作できるのは<b>管理者以上</b>で、「解除」で元に戻せます。依頼元で情報が更新されると、コピー先にも反映されます。</li>
+        </ul>
+      </li>
+      <li><b>人数確定リマインド</b>：開催が近いのにお客様人数が未確定の案件を、担当へチャットワークでお知らせします。<b>収支未入力リマインド</b>は、終わったのに収支が入っていない案件のお知らせです。</li>
+      <li><b>社員・ディレクター集計</b>／<b>集計ダッシュボード</b>：D・SDの担当バランスや、拠点別・種別別の件数を見られます。CSVでも出せます。</li>
+    </ul>
+
+    <h3>アサインのこと（アサイン担当）</h3>
+    <ul>
+      <li><b>アサインダッシュボード</b>：まずここを見て、今の状況をつかみます。数字カード（募集中の案件／今週の確定／希望0件の人／平均稼働率）と、<b>「気にかけたい人」</b>（希望を出しているのに入れていない人／連勤／稼働率30%未満／応募が多いのに選ばれていない人／しばらくアサインが無い人）。毎回目を通してください。</li>
+      <li><b>スタッフ公開ボード</b>：<b>ここが公開の唯一の入口です。</b>
+        <ol>
+          <li>📣 お知らせ文を書く（スタッフ画面の一番上に出ます）</li>
+          <li>🗓 締切日を入れる（表示だけ・過ぎても応募は受け付けます）</li>
+          <li>案件ごとに「<b>公開する</b>」を押す（まとめて公開もできます）</li>
+          <li>集合〜解散の時間を確認する（スタッフだけ集合時間が違う場合も、ここで変えて募集できます）</li>
+          <li><b>📣 スタッフに伝えること</b>＝集合場所の詳細・服装・持ち物・当日の注意事項。入れると<b>本人の確定アサインの詳細</b>に出ます</li>
+        </ol>
+        「👁 スタッフ画面を見る」で、スタッフにどう見えるかを確認できます。<b>非公開に戻すと、確定した案件もスタッフから見えなくなります。</b>
+      </li>
+      <li><b>お知らせ送信</b>：スタッフへのお知らせを送ります。<b>自動では送りません</b>＝画面のボタンを押したときだけ送ります。</li>
+      <li><b>D決め（ディレクター）</b>：月次MTGで D・SD・FC を決める画面。社員名をクリック → 小窓で案件ごとに選びます。チップの色＝🟩緑：D・SD担当／🟦青：別の役割で稼働中／⬜グレー：空き。<b>最後に「D／SDを保存」を押してください。</b>開催日が未入力の案件は保存できません。</li>
+      <li><b>日別ボード</b>：<b>ダブルブッキングに気づくための画面</b>です。同じ日の案件を横に並べて見ます（既定は今日から3週間分）。日付のヘッダーに「稼働可◯名／割当済◯名／残り◯名」が出て、<b>同じ日に重なった人は赤字＋⚠</b>。名前のそばの「今月 ◯/20」は月の件数（<b>上限20件</b>・到達で赤／残り2件で橙）。左がメンバー、右が希望者で、「＋」で追加、⚡で<b>自動アサイン</b>（条件に合う人をまとめて仮に入れます＝人は確認するだけ）。押した時点で保存されます。</li>
+      <li><b>案件別アサイン（案件を選ぶ）</b>：案件ごとに役割を選んで割り当てます。「この日 希望・稼働可 の人だけ」で候補を絞れます。「選択◯/必要◯名」で人数を確認。<b>＋兼任</b>で1人が2役（例：D兼OP）もできます（人数は1人のまま）。<b>⚠保存は上書きです＝チェックを外した人は消えます。</b>ダブルブッキング・NGペア・月20件超は<b>警告が出ても保存できます</b>。</li>
+      <li><b>エントリー一覧</b>：誰がどの案件に応募したかが分かります。月まとめ表は<b>マスをクリック</b>で 未 → 仮 → 確定 と進むので、この画面のままアサインできます。応募時の一言メモも見られます。</li>
+      <li><b>ピックアップ</b>：複数の案件を並べて見る画面。同じ希望を出している人を見つけやすいので、<b>複数の日程を同じメンバーで組みたいとき</b>に便利です。本番・予備日・リハをまとめて選べます。</li>
+      <li><b>スタッフ集計</b>：希望を出しているのに入れていない人を探す画面。希望数／アサイン数／その割合が並びます。<b>別の窓で開く</b>ので、アサインしながら確認できます。</li>
+    </ul>
+
+    <h3>名簿・希望</h3>
+    <ul>
+      <li><b>スタッフ（名簿・稼働状況）</b>：登録された人の情報と稼働率を見る画面。「詳細」を開くと、いちばん上に<b>本人プロフィール</b>（一言アピール／好きなコンテンツ・苦手なコンテンツ／得意なポジション・苦手なポジション／スキル／身長・靴のサイズ／エリア・最寄り駅）が出ます。衣装の準備や当日の配置に使ってください。
+        <ul>
+          <li><b>メモ（イベプラ・Dからの印象）</b>：初めて現場に入ったスタッフの<b>所感</b>を、ひとことで書いてください。次に組むアサイン担当がこれを見て決めます。</li>
+          <li>CSVで一括登録（「できるポジション」列も取込可）・CSV書き出しもできます。</li>
+        </ul>
+      </li>
+      <li><b>社員名簿</b>：社員の情報・サイズなどを編集できます。</li>
+      <li><b>アカウント発行</b>（管理者以上）：新しいアカウントを発行します。</li>
+      <li><b>共通設定</b>：コンテンツ・拠点などのマスタ、アサインMTGの予定、危険日の手動追加、スタッフ画面の便利リンク集を管理します。</li>
+      <li><b>謎解きの紙 在庫</b>：必要枚数・消費・在庫を自動で集計します。</li>
+      <li><b>Administrator（管理）</b>：権限の付与や、人・マスタの削除ができます。</li>
     </ul>
   </section>
 
   <section id="faq">
-    <h2>7. よくある操作</h2>
+    <h2>6. やりたいことから探す（早見表）</h2>
     <table>
       <tr><th>やりたいこと</th><th>どこで</th></tr>
-      <tr><td>自分の担当（確定アサイン）を見たい</td><td>スタッフ用ポータル ／ マイページ</td></tr>
-      <tr><td>入れる日（参加希望）を出したい</td><td>スタッフ用ポータル（スタッフ）／ 出勤可能日（社員）</td></tr>
-      <tr><td>案件を登録・編集したい</td><td>案件登録／案件一覧（社員以上）</td></tr>
-      <tr><td>人を割り当てたい</td><td>D決め → 手動アサイン → スタッフ公開ボード（アサイン担当）</td></tr>
+      <tr><td>案件を登録したい</td><td>案件登録（1件ずつ）／CSV一括取込（まとめて）</td></tr>
+      <tr><td>似た案件をもう1件作りたい</td><td>案件一覧 → 行の「⧉複製」</td></tr>
+      <tr><td>誰がいつ何を変えたか知りたい</td><td>編集履歴（または案件編集画面の一番下）</td></tr>
+      <tr><td>スタッフに募集をかけたい</td><td>スタッフ公開ボード → 「公開する」</td></tr>
+      <tr><td>人を割り当てたい</td><td>D決め → 日別ボード／案件別アサイン</td></tr>
+      <tr><td>確定した担当をスタッフに見せたい</td><td>「✓ 確定にする」→「📣 スタッフに公開」</td></tr>
+      <tr><td>持ち物・服装・集合場所を伝えたい</td><td>スタッフ公開ボード → 「📣 スタッフに伝えること」</td></tr>
+      <tr><td>スタッフにお知らせを送りたい</td><td>お知らせ送信（ボタンを押したときだけ送信）</td></tr>
+      <tr><td>同じ日の取り合いを確認したい</td><td>日別ボード</td></tr>
+      <tr><td>希望を出しているのに入れていない人を探したい</td><td>アサインダッシュボード「気にかけたい人」／スタッフ集計</td></tr>
+      <tr><td>いまの表（スプレッドシート）に貼りたい</td><td>案件一覧 → 「📤 アサイン表へ書き出し」</td></tr>
+      <tr><td>チャットワークに案件を貼りたい</td><td>案件一覧 → 「💬 チャットワーク用に書き出し」</td></tr>
+      <tr><td>入れる日を出したい</td><td>社員の出勤可能日（社員）／スタッフ画面（スタッフ）</td></tr>
+      <tr><td>終わった案件の収支を入れたい</td><td>収支入力（マイページの終了案件からも進めます）</td></tr>
       <tr><td>アカウントを発行したい</td><td>アカウント発行（管理者以上）</td></tr>
       <tr><td>自分のプロフィール・パスワードを変えたい</td><td>左メニュー下の「マイプロフィール」「パスワード変更」</td></tr>
     </table>
   </section>
 
-  <section id="status">
-    <h2>8. フィードバック・いまの状況</h2>
+  <section id="care">
+    <h2>7. これだけは気をつけてください</h2>
+    <ol class="steps">
+      <li><b>公開しないと、スタッフには見えません。</b>アサインを本人に見せるには「✓ 確定にする」→「📣 スタッフに公開」の2段階が必要です（間違って公開しないよう、あえて2段階にしています）。非公開に戻すと、確定した案件も見えなくなります。</li>
+      <li><b>警告は出ても、保存は止まりません。</b>ダブルブッキング・NGペア・月20件超え・危険日は<b>お知らせだけ</b>で、保存自体はできてしまいます。警告が出たら必ず中身を確認してください。</li>
+      <li><b>手動アサインの保存は「上書き」です。</b>チェックを外した人は消えます。保存前に、外れている人がいないか見てください。</li>
+      <li><b>削除は元に戻せません。</b>案件を削除すると、紐づいたアサイン・予備日・リハも一緒に消えます。一覧から片づけたいだけなら「🗄アーカイブ」を使ってください（こちらは戻せます）。</li>
+      <li><b>企業名は正式名称で登録してください。</b>リピート（前回の顔ぶれ）は企業名で判断しているため、書き方がずれると同じお客様だと分かりません。</li>
+    </ol>
+  </section>
 
-    <div class="tip" style="text-align:center; padding:18px 14px;">
-      <p style="margin:0 0 10px; font-size:15px;"><b>お気づきの点は、フィードバックシートへお願いします。</b></p>
-      <p style="margin:0 0 12px; font-size:13px; color:var(--muted);">使ってみて「分かりにくい」「こうしてほしい」があれば、下のフォームから送ってください。いただいた声を改善に反映します。</p>
+  <section id="mobile">
+    <h2>8. スマホで使う</h2>
+    <p>社員側の画面は、よく使う<b>7つ</b>がスマホでも見やすい形になっています。</p>
+    <ul>
+      <li>案件登録 ／ 案件一覧 ／ アサイン表（横スクロール） ／ マイページ ／ 社員の出勤可能日 ／ 収支入力 ／ 謎解きの紙 在庫</li>
+      <li>スマホでは<b>左メニューが横から出ます</b>（見出しをタップ）。</li>
+      <li>左メニューの下にある「<b>🖥 PC表示に切り替える</b>」を押せば、スマホでもPCと同じ見た目にできます。</li>
+    </ul>
+    <p class="why">※ アサインを「する」画面（日別ボード・案件別アサイン・D決めなど）は情報量が多いため、パソコンでの利用を想定しています。</p>
+  </section>
+
+  <section id="help">
+    <h2>9. こまったとき・ご意見</h2>
+    <ul>
+      <li><b>操作が分からない</b>：このガイドの「6. やりたいことから探す」を見てください。使い方講座の動画（社員向け・全4部）もあります。</li>
+      <li><b>コードが届かない／ログインできない</b>：「4. ログインの仕方」を見てください。ロックがかかった場合は管理者にご連絡ください。</li>
+      <li><b>他拠点の案件が見えない</b>：一般社員は自拠点だけが見える仕様です。必要な場合は管理者にご相談ください。</li>
+    </ul>
+
+    <div class="tip" style="text-align:center; padding:18px 14px; margin-top:14px;">
+      <p style="margin:0 0 10px; font-size:15px;"><b>「分かりにくい」「こうしてほしい」をお寄せください。</b></p>
+      <p style="margin:0 0 12px; font-size:13px; color:var(--muted);">いただいた声をもとに改善します。使っていて引っかかったところを、そのまま書いてください。</p>
       <a class="fb-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSchd5XQ_fOrkLWd5DhcLHsgd-Xoc1H-u7xTPLldKgsgkH7FRw/viewform" target="_blank" rel="noopener">📝 フィードバックを送る（フォーム）</a>
       <p class="fb-url">https://docs.google.com/forms/d/e/1FAIpQLSchd5XQ_fOrkLWd5DhcLHsgd-Xoc1H-u7xTPLldKgsgkH7FRw/viewform</p>
       <p style="margin:14px 0 6px; font-size:13px; color:var(--muted);">これまでにいただいた声は、こちらのシートにまとまっています。</p>
       <a class="fb-btn" href="https://docs.google.com/spreadsheets/d/1rSUOKRigGY1R7sACzGUZqJ-qRUp6XvranrqEAX2DV7Q/edit?gid=330669090#gid=330669090" target="_blank" rel="noopener">📊 フィードバックシートを開く</a>
       <p class="fb-url">https://docs.google.com/spreadsheets/d/1rSUOKRigGY1R7sACzGUZqJ-qRUp6XvranrqEAX2DV7Q/edit</p>
     </div>
-
-    <h3>いまの状況</h3>
-    <p>ECS は現在<b>開発中（プロトタイプ）</b>です。主要な機能は動いており、以前は見本だった多くの操作（<b>エントリー（応募）・収支入力・通知設定・案件詳細の編集・手動アーカイブ・公開ボードの備考</b>など）も、いまは<b>ちゃんと保存される</b>ようになりました。名簿・アサイン・希望などのデータも本物です。</p>
-    <p>これから進める主なもの：<b>ログインの本接続</b>（今は「自分＝固定表示」の画面があります）、<b>自動アサインの「誰を入れるか」提案の強化</b>、本番用データベース・メール送信（確認コード）・本番公開の準備です。</p>
   </section>
 
-  <footer>ECS スタッフアサイン管理システム ／ 社内確認用ガイド ・ 2026年7月</footer>
+  <section id="history">
+    <h2>10. 更新履歴</h2>
+    <p class="why">機能が増えたり変わったときは、この表に1行足していきます。「前と動きが違う」と思ったときは、ここを見てください。</p>
+    <table>
+      <tr><th style="width:110px;">日付</th><th>変わったこと</th></tr>
+      <tr>
+        <td>2026-08-20</td>
+        <td><b>このガイドを本番用に作り直しました。</b>テスト環境を体験するための説明（テスト用ログインで4つの権限を試す手順・QRコード）をやめて、ふだんの業務でどう使うかの説明に入れ替えました。あわせて<b>画面ごとの使い方</b>と<b>この更新履歴</b>を新しく作りました。</td>
+      </tr>
+      <tr>
+        <td>2026-08-20</td>
+        <td>案件に「<b>イベント数に数える／数えない</b>」を持たせました（自動のときは体験会とEXPOを数えません）。</td>
+      </tr>
+      <tr>
+        <td>2026-08-20</td>
+        <td><b>スタッフへのお知らせ送信</b>を追加（自動では送らず、ボタンを押したときだけ送ります）。</td>
+      </tr>
+      <tr>
+        <td>2026-08-20</td>
+        <td><b>確定アサインの詳細</b>を追加。スタッフ公開ボードの「📣 スタッフに伝えること」に入れた<b>集合場所の詳細・服装・持ち物・当日の注意事項</b>が、本人の画面に出るようになりました。</td>
+      </tr>
+      <tr>
+        <td>2026-08-20</td>
+        <td><b>公開の入口をスタッフ公開ボードの「公開する」1つにしました。</b>これまでは案件を登録した時点でスタッフに見えてしまうことがありました。あわせて、スタッフの確定タブに出るのは「公開ON」かつ「自分のアサインが確定」だけになりました（調整中の「仮」は出ません）。</td>
+      </tr>
+      <tr>
+        <td>2026-08-20</td>
+        <td>稼働希望カレンダーが<b>当月表示</b>になりました。保存時の拠点チェックを全画面に入れ、公開のオン・オフも編集履歴に残るようにしました。</td>
+      </tr>
+      <tr>
+        <td>2026-08-18</td>
+        <td><b>案件の編集履歴</b>を追加（誰がいつ何を変えたか）。<b>案件の複製（⧉）</b>を追加。CSV取込が<b>Excelで保存し直したファイル（Shift_JIS）</b>も読めるようになりました。</td>
+      </tr>
+      <tr>
+        <td>2026-08-17</td>
+        <td>社員側のよく使う画面を<b>スマホ対応</b>にしました。「🖥 PC表示に切り替える」も追加。スタッフ画面に<b>便利リンク集</b>を追加しました。</td>
+      </tr>
+      <tr>
+        <td>2026-08-06</td>
+        <td><b>収支</b>（入力・一覧・未入力リマインド）を追加。D決めの保存を一本化し、アサイン表のCSVをそのまま取り込めるようにしました。</td>
+      </tr>
+      <tr>
+        <td>2026-07-31</td>
+        <td><b>拠点（オフィス）</b>に対応。案件に登録拠点を持たせ、一般社員は自拠点だけ・管理者以上は全拠点を切り替えて見られるようにしました。案件一覧に<b>💬 チャットワーク用に書き出し</b>を追加。</td>
+      </tr>
+      <tr>
+        <td>2026-07-27</td>
+        <td><b>集計ダッシュボード</b>を新設（社員のディレクター内訳・拠点別の切替・CSV出力）。</td>
+      </tr>
+      <tr>
+        <td>2026-07-17</td>
+        <td>このガイドの初版を作成。</td>
+      </tr>
+    </table>
+  </section>
+
+  <footer>ECS スタッフアサイン管理システム ／ 社員向け 使い方ガイド ・ 2026年8月20日版</footer>
 
 </div>
 </body>
