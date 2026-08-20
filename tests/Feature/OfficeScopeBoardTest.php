@@ -166,12 +166,16 @@ class OfficeScopeBoardTest extends TestCase
     /** スタッフ画面の募集中タブ＝自分の拠点の募集だけ。ただし応募済みの案件は残す。 */
     public function test_staff_portal_recruiting_tab_is_limited_to_my_office(): void
     {
+        // ※募集タブに出るのは「公開ボードで公開ON（staff_published）」の案件だけ。
+        //   応募済みの案件は非公開でも残す（取り消せなくなるため）＝ここは公開ONにしない。
         $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京']);
         $tokyoJob = ProjectFactory::new()->create([
             'office' => '東京', 'start_date' => $this->soon(), 'is_recruiting' => true,
+            'staff_published' => true,
         ]);
         $osakaJob = ProjectFactory::new()->create([
             'office' => '大阪', 'start_date' => $this->soon(4), 'is_recruiting' => true,
+            'staff_published' => true,
         ]);
         $osakaApplied = ProjectFactory::new()->create([
             'office' => '大阪', 'start_date' => $this->soon(5), 'is_recruiting' => true,

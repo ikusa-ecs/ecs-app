@@ -32,6 +32,13 @@ use Illuminate\Support\Facades\DB;
  */
 class StaffPortalController extends Controller
 {
+    /**
+     * 募集人数が未定（空欄・0）のときにスタッフ画面へ見せる既定の人数。
+     * 人数はセールスが案件登録で入れるのが正しいが、未定のまま公開されても
+     * 「満員＝エントリーできない」にならないようにするための保険（2026-08-20 baba 指示）。
+     */
+    private const DEFAULT_NEED = 5;
+
     public function index()
     {
         $today = Carbon::today();
@@ -39,27 +46,47 @@ class StaffPortalController extends Controller
         // ログイン本人（people名簿の1行）。本人の確定アサインだけを見せるために使う。
         $me = Auth::user();
 
-        // 本人のアサイン（キャンセル除外＝他画面と同じ絞り）を「案件ID → 行」で引く。
-        // 同一案件に複数役割の行があれば keyBy で後勝ち（1つに代表させる）。
+        // 本人の「確定」アサインだけを引く（仮＝まだ調整中はスタッフに見せない）。
+        // ⚠ ここを status!='キャンセル' にすると「仮」も本人の確定アサインとして出てしまう。
+        //   画面の説明文（調整中のものは出ません）と食い違うので、必ず '確定' で絞る。
+        // 1行＝案件×日なので、同じ案件で複数日ある人は日ごとに1件ずつ出る（2日目だけの担当も正しい日で出る）。
         $mine = $me
             ? Assignment::where('staff_id', $me->id)
-                ->where('status', '!=', 'キャンセル')
+                ->where('status', '確定')
+                ->orderBy('date')
                 ->get()
-                ->keyBy('project_id')
             : collect();
 
-        // 公開ON の案件だけを開催日の近い順に取り出す。
-        // このあと「本人がアサインされた案件だけ」に絞る＝スタッフ画面はあくまで
-        // 「あなたの確定アサイン」なので、公開中でも本人が入っていない案件は見せない
-        // （誰でも全案件が見えてしまうのを防ぎ、本人の担当だけを表示するため）。
-        $published = Project::where('staff_published', true)
-            ->orderBy('start_date')
-            ->get()
-            ->map(function (Project $p) use ($today, $mine) {
-                // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付計算に使う。
-                $off = $p->start_date
-                    ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400)
-                    : 0;
+        // 公開ON かつ「下書き・完了ではない」案件だけを取り出す（本人がアサインされた案件に限る）。
+        // 公開していない案件はスタッフに一切見せない＝公開ボードの「公開する」が唯一の入口。
+        $projects = $mine->isEmpty()
+            ? collect()
+            : Project::whereIn('id', $mine->pluck('project_id')->unique()->all())
+                ->where('staff_published', true)
+                ->whereNotIn('status', ['下書き', '完了'])
+                ->get()
+                ->keyBy('id');
+
+        $published = $mine
+            ->map(function (Assignment $a) use ($today, $projects) {
+                $p = $projects->get($a->project_id);
+                if (! $p) {
+                    return null;   // 未公開／下書き／完了の案件は出さない
+                }
+
+                // 手動アーカイブされた案件は出さない（案件一覧と同じ扱い）。
+                if ($p->is_archived === true) {
+                    return null;
+                }
+
+                // 表示する日＝そのアサインの日（無ければ案件の開催日）。
+                $date = $a->date ?: $p->start_date;
+                if (! $date) {
+                    return null;
+                }
+
+                // off ＝ 今日から何日後か（マイナス＝過去）。画面が日付計算に使う。
+                $off = intdiv($date->copy()->startOfDay()->timestamp - $today->timestamp, 86400);
 
                 return [
                     'id'        => $p->id,
@@ -71,15 +98,26 @@ class StaffPortalController extends Controller
                     'meet'      => $p->staff_meet_time ?? $p->start_time ?? '—',
                     'leave'     => $p->staff_leave_time ?? $p->end_time ?? '—',
                     'off'       => $off,
-                    // 本人がこの案件にアサインされているか／本人の担当ポジション（表示名）。
-                    // 役割コード→表示名は必ず AssignmentRole::label() を使う（日本語直書き禁止＝表記ゆれ防止）。
-                    'mine'      => $mine->has($p->id),
-                    'myRole'    => $mine->has($p->id) ? AssignmentRole::label(optional($mine->get($p->id))->role) : '',
+                    // 本人の担当ポジション（表示名）。役割コード→表示名は必ず AssignmentRole::label() を使う
+                    // （日本語直書き禁止＝表記ゆれ防止）。role2 は兼任。
+                    'mine'      => true,
+                    'myRole'    => AssignmentRole::label($a->role),
+                    'myRole2'   => AssignmentRole::label($a->role2),
+                    // 当日の詳細（スタッフ画面の詳細パネルで見せる）。
+                    'enter'     => $p->event_enter_time ?? '',
+                    'evStart'   => $p->event_start_time ?? '',
+                    'evEnd'     => $p->event_end_time ?? '',
+                    'lodging'   => $p->lodging ?? '',
+                    'outdoor'   => (bool) $p->is_outdoor,
+                    'belongings' => (string) ($p->staff_belongings ?? ''),
+                    'myNote'    => trim((string) ($a->remark ?? '')),
+                    'publishMemo' => (string) ($p->publish_memo ?? ''),
                 ];
             })
-            // 本人がアサインされた案件だけに絞る＝「公開ON かつ 自分がアサイン済み」だけが
-            // 本当の『あなたの確定アサイン』。
-            ->filter(fn ($c) => $c['mine'])
+            ->filter()
+            // 過去の日は出さない（募集タブと同じ扱い＝当日は出す）。
+            ->filter(fn ($c) => $c['off'] >= 0)
+            ->sortBy('off')
             ->values();
 
         // 稼働希望カレンダーの対象月。既定＝今日基準の当月（?period= があればそれを優先）。
@@ -88,6 +126,9 @@ class StaffPortalController extends Controller
         return view('staff_portal', [
             'published' => $published,
             'recruitJobs' => $this->recruitJobs($today, $me),
+            // DBに案件が1件でもあるか。true のときは見本データ（cases.js）に戻さない
+            // ＝本番で架空の案件がスタッフに見えるのを防ぐ（社員側 /entries・/pickup と同じ旗）。
+            'usingDb' => Project::exists(),
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
             'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
             'prefPeriod' => $prefPeriod,                     // 稼働希望カレンダーの対象月（当月）
@@ -392,8 +433,18 @@ class StaffPortalController extends Controller
         $office = OfficeScope::filter(request());
         $appliedIds = $myApps->keys()->all();
 
+        // ⚠ 公開ボードで「公開する」を押した案件だけを募集タブに出す（staff_published）。
+        //   ここを is_recruiting だけで判定すると、セールスが登録した瞬間（＝まだ調整中）に
+        //   クライアント名・会場までスタッフ全員に見えてしまう。公開の入口は公開ボードの1つだけにする。
+        //   ※すでに応募した案件は、非公開に戻されても残す（一覧から消えると取り消せなくなるため）。
         $projects = Project::where('is_recruiting', true)
             ->whereNotIn('status', ['完了', '下書き'])
+            ->where(function ($q) use ($appliedIds) {
+                $q->where('staff_published', true);
+                if ($appliedIds) {
+                    $q->orWhereIn('id', $appliedIds);
+                }
+            })
             ->when($office, fn ($q) => $q->where(function ($qq) use ($office, $appliedIds) {
                 OfficeScope::applyToProjects($qq, $office);
                 if ($appliedIds) {
@@ -452,7 +503,9 @@ class StaffPortalController extends Controller
                 'dayType' => $p->date_type ?? '本番',
                 'parentId' => $p->parent_project_id,
                 'off' => $off,
-                'need' => $p->required_count ?? 0,
+                // 募集人数は本来セールスが案件登録で入れる項目。まだ未定（空欄・0）のときは
+                // 画面が「満員」に見えてエントリーできなくなるので、既定 5名 として見せる（2026-08-20 baba）。
+                'need' => ((int) ($p->required_count ?? 0)) > 0 ? (int) $p->required_count : self::DEFAULT_NEED,
                 'filled' => $filledByProject->get($p->id, 0),
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',

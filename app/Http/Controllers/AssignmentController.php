@@ -210,6 +210,10 @@ class AssignmentController extends Controller
             'roleLabels' => AssignmentRole::positionLabels(),
             'roleReq' => $roleReq,
             'roleDetail' => $roleDetail,
+            // 枠が出せないとき（ポジション別人数が未登録）に見せる目標人数。
+            // 案件の運営人数が未入力なら既定5名（スタッフ画面の表示と同じ考え方・2026-08-20 baba）。
+            'needTotal' => ((int) ($project->required_count ?? 0)) > 0 ? (int) $project->required_count : 5,
+            'needIsDefault' => ((int) ($project->required_count ?? 0)) <= 0,
             'noteOptions' => $noteOptions,
             'roleAssigned' => $roleAssigned,
             'sameDay' => $sameDay,

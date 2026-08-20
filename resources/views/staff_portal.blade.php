@@ -539,8 +539,10 @@
   <script src="/ecs/data/cases.js"></script>
   <!-- DBから渡された「公開ON（staff_published=true）」の案件。確定アサイン表示の元データ。 -->
   <script>window.ECS_PUBLISHED = @json($published);</script>
-  <!-- 募集中タブの案件リスト（DB）。空のときは見本cases.jsにフォールバック。 -->
+  <!-- 募集中タブの案件リスト（DB）。 -->
   <script>window.ECS_RECRUIT_JOBS = @json($recruitJobs ?? []);</script>
+  <!-- DBに案件があるか。true なら見本cases.jsには絶対に戻さない（本番で架空案件を見せないため）。 -->
+  <script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
   <!-- 設定タブの初期値（本人のDB値）＋保存用のCSRFトークン。test/未ログインは null。 -->
   <script>
     window.ECS_MY_PROFILE = @json($myProfile ?? null);
@@ -569,10 +571,14 @@
     // ===== 募集案件（共通リスト data/cases.js から作る）=====
     // スタッフ画面には「募集する・過去でない・下書きでない」案件だけ出す。
     // 締切は開催日の4日前（見本フォールバック時の簡易ルール）。状態は 応募済み→エントリー中 / 満員→締切 / それ以外→募集中。
-    // DBの募集案件（ECS_RECRUIT_JOBS）があればそれを使い、空なら見本cases.jsにフォールバック。
+    // 募集案件はDB（ECS_RECRUIT_JOBS）から作る。
+    // ⚠ 「DBが0件なら見本cases.jsを出す」にすると、本番で条件に合う案件が無いときに
+    //    架空の案件19件がスタッフに見えてしまう。DBに案件が1件でもあれば（ECS_USINGDB=true）
+    //    見本には戻さず、素直に「0件」と出す。社員側 /entries・/pickup と同じ判定。
+    const usingDb = (window.ECS_USINGDB !== undefined && window.ECS_USINGDB !== null)
+      ? !!window.ECS_USINGDB : !!(window.ECS_RECRUIT_JOBS && window.ECS_RECRUIT_JOBS.length);
     // ※応募（エントリー）は本物保存です（DB=applicationsへ）。「エントリーする／取り消す」を押すと保存されます。
-    const _jobSrc = (window.ECS_RECRUIT_JOBS && window.ECS_RECRUIT_JOBS.length)
-      ? window.ECS_RECRUIT_JOBS : ECS_CASES;
+    const _jobSrc = usingDb ? (window.ECS_RECRUIT_JOBS || []) : ECS_CASES;
     const jobs = _jobSrc.filter(c => c.recruit && !c.archived && !c.draft).map(c => {
       const _dl = new Date(); _dl.setHours(0,0,0,0); _dl.setDate(_dl.getDate() + c.off - 4);
       return {
