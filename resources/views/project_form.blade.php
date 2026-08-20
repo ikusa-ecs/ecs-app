@@ -661,7 +661,31 @@
                   <option>空港</option>
                   <option>その他（備考に記載）</option>
                 </select>
-                <div class="hint">スタッフがどこに集合するか。詳細は備考へ。</div>
+                <div class="hint">スタッフがどこに集合するか。住所や目印は下の「集合場所の詳細」へ。</div>
+              </div>
+              <div class="form-row non-arena">
+                <label>集合場所の詳細</label>
+                <input type="text" name="assembly_detail" placeholder="例）東口改札を出て正面のバス停前／通用口（南ゲート）から入館">
+                <div class="hint">スタッフの「確定アサイン」にそのまま出ます。プルダウンで書けない住所・目印・ゲート名など。</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- スタッフ本人に伝えること（担当になった本人の「確定アサイン」にそのまま出る） -->
+          <div class="full">
+            <div class="triple">
+              <div class="form-row">
+                <label>持ち物（スタッフ向け）</label>
+                <textarea name="staff_belongings" rows="2" placeholder="例）黒スーツ、白シャツ、スニーカー、モバイルバッテリー"></textarea>
+                <div class="hint">改行して並べてOK。空欄なら本人の画面に「特になし」と出ます。</div>
+              </div>
+              <div class="form-row">
+                <label>服装（スタッフ向け）</label>
+                <input type="text" name="staff_dresscode" placeholder="例）上下黒（ジャケット不要）／私服可">
+              </div>
+              <div class="form-row">
+                <label>当日の注意事項（スタッフ向け）</label>
+                <textarea name="staff_notes" rows="2" placeholder="例）会場内は飲食禁止／終了後に片付けあり（+30分）"></textarea>
               </div>
             </div>
           </div>

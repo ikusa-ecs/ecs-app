@@ -109,9 +109,13 @@ class StaffPortalController extends Controller
                     'evEnd'     => $p->event_end_time ?? '',
                     'lodging'   => $p->lodging ?? '',
                     'outdoor'   => (bool) $p->is_outdoor,
+                    // 当日必要な情報（案件登録・公開ボードのどちらからでも入れられる）
+                    'meetDetail' => (string) ($p->assembly_detail ?? ''),
                     'belongings' => (string) ($p->staff_belongings ?? ''),
+                    'dresscode'  => (string) ($p->staff_dresscode ?? ''),
+                    'staffNotes' => (string) ($p->staff_notes ?? ''),
+                    // 担当がこの人だけに向けて書いた一言（assignments.remark）
                     'myNote'    => trim((string) ($a->remark ?? '')),
-                    'publishMemo' => (string) ($p->publish_memo ?? ''),
                 ];
             })
             ->filter()

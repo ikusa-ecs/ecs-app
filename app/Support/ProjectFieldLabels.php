@@ -52,7 +52,9 @@ class ProjectFieldLabels
         'site_category'      => '会場区分',
         // ── 当日の時間 ──
         'start_date'         => '開催日',
-        'assembly_type'      => '担当体制',
+        // 集合形式＝会場現地／駅 などのプルダウン。'担当体制' は staff_role（運営体制）の誤りだったので直した。
+        'assembly_type'      => '集合形式',
+        'assembly_detail'    => '集合場所の詳細',
         'start_time'         => '集合時間（スタッフ）',
         'end_time'           => '解散時間（スタッフ）',
         'staff_meeting_time' => '集合時間（メモ）',
@@ -91,6 +93,10 @@ class ProjectFieldLabels
         'prep_handover'      => '準備：引き継ぎ',
         'prep_script'        => '準備：台本',
         'note'               => 'メモ・連絡事項',
+        // ── スタッフ本人に伝えること（確定アサインの詳細に出る） ──
+        'staff_belongings'   => '持ち物',
+        'staff_dresscode'    => '服装',
+        'staff_notes'        => '当日の注意事項',
         // ── 状態 ──
         'status'             => 'アサイン状況',
         'staff_published'    => 'スタッフへの公開',

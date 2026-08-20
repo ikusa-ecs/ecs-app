@@ -247,6 +247,18 @@
     .assign-info .t { font-weight: 700; font-size: 14px; }
     .assign-info .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .assign-arrow { color: var(--muted); font-size: 20px; flex-shrink: 0; }
+    /* 確定アサインの詳細（タップで開く）。当日必要な情報＝持ち物・服装・注意事項・集合場所の詳細 */
+    .assign-detail { padding: 0 4px 12px; }
+    .ad-box { background: #faf6ee; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .ad-row { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+    .ad-row:last-of-type { border-bottom: none; }
+    .ad-l { flex: 0 0 108px; color: var(--muted); font-weight: 700; }
+    .ad-v { flex: 1; min-width: 0; word-break: break-word; }
+    .ad-note { margin-top: 8px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+    @media (max-width: 720px) {
+      .ad-row { flex-direction: column; gap: 2px; }
+      .ad-l { flex: none; }
+    }
 
     .empty-note { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
 
@@ -422,7 +434,7 @@
         <div class="assign-wrap">
           <div class="m-card">
             <h3>確定したアサイン</h3>
-            <p class="sub">担当が「<b>スタッフに公開</b>」した案件だけが表示されます（エントリーしただけ・調整中のものは出ません）。公開後にメンバーや内容が変わったときも、最新の内容が表示されます。</p>
+            <p class="sub">担当が「<b>スタッフに公開</b>」して、あなたのアサインを<b>確定</b>にした案件だけが表示されます（エントリーしただけ・調整中のものは出ません）。公開後にメンバーや内容が変わったときも、最新の内容が表示されます。<b>タップすると持ち物・服装・注意事項が見られます。</b></p>
 
             <!-- 公開スイッチがONの案件だけ、共通データから自動表示（集合時間は公開ボードの編集を反映） -->
             <div id="confirmList"></div>
@@ -750,7 +762,15 @@
     const commentState = {};
     // 応募済み案件は、DBに保存済みの一言コメント（myNote）を初期表示に復元する。
     jobs.forEach(j => { if (j.myNote) commentState[j.id] = { text: j.myNote, open: false }; });
-    function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+    // 画面に文字を差し込むときの共通エスケープ。案件名・会場名などはDBの自由入力なので
+    // < > も必ず落とす（以前は & と " だけで、案件名にタグを入れると本人画面でスクリプトが動いた）。
+    function escAttr(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    // 改行を <br> にして差し込む（持ち物・注意事項のように複数行の項目用）。
+    function escLines(s) { return escAttr(s).split(/[\r\n]+/).join('<br>'); }
     function saveComment(id, val) {
       commentState[id] = commentState[id] || { text: '', open: true };
       commentState[id].text = val;
@@ -829,17 +849,61 @@
         wrap.innerHTML = '<p class="empty-note" style="margin:6px 0 0;">あなたが確定アサインされた公開案件はまだありません。（担当があなたをアサインして「スタッフに公開」すると、ここにあなたの担当が出ます）</p>';
         return;
       }
-      wrap.innerHTML = pub.map(j => {
+      // ⚠ 案件名・会場・持ち物などはDBの自由入力なので、必ず escAttr / escLines を通してから差し込む。
+      wrap.innerHTML = pub.map((j, i) => {
         const d = addDays(today, j.off);
-        return `<div class="assign-item" onclick="openAssign('${escAttr(j.content + ' ' + j.client)}')">
+        const key = 'ad-' + i;
+        const roleText = j.myRole ? escAttr(j.myRole) + (j.myRole2 ? '（兼任：' + escAttr(j.myRole2) + '）' : '') : '';
+        return `<div class="assign-item" onclick="toggleAssignDetail('${key}')">
           <div class="assign-date"><div class="d">${(d.getMonth()+1)}/${d.getDate()}</div><div class="dow">${DOW_CIRCLE[d.getDay()]}</div></div>
           <div class="assign-info">
-            <div class="t">${j.content} ${j.client} <span style="font-size:11px;color:#15803d;font-weight:700;">★公開されました</span>${j.myRole ? ' ／ <span style="color:#b45309;font-weight:700;">あなたの担当：'+escAttr(j.myRole)+'</span>' : ''}</div>
-            <div class="meta">集合 ${j.meet}〜${j.leave}　／　${j.meetPlace}　／　${j.place}</div>
+            <div class="t">${escAttr(j.content)} ${escAttr(j.client)} <span style="font-size:11px;color:#15803d;font-weight:700;">★公開されました</span>${roleText ? ' ／ <span style="color:#b45309;font-weight:700;">あなたの担当：'+roleText+'</span>' : ''}</div>
+            <div class="meta">集合 ${escAttr(j.meet)}〜${escAttr(j.leave)}　／　${escAttr(j.meetPlace)}　／　${escAttr(j.place)}</div>
+            <div class="meta" style="color:#2563eb;font-weight:700;">タップすると持ち物・注意事項が見られます</div>
           </div>
           <div class="assign-arrow">›</div>
+        </div>
+        <div class="assign-detail" id="${key}" style="display:none;">
+          ${assignDetailHtml(j, d)}
         </div>`;
       }).join('');
+    }
+
+    // 確定アサインの詳細（開閉）。当日必要な情報をここにまとめて出す。
+    function toggleAssignDetail(key){
+      const el = document.getElementById(key);
+      if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? '' : 'none';
+    }
+
+    // 詳細の中身。空の項目は行ごと出さない（「—」ばかりにならないように）。
+    function assignDetailHtml(j, d){
+      const rows = [];
+      const add = (label, val, multiline) => {
+        const v = (val === null || val === undefined) ? '' : String(val).trim();
+        if (v === '' || v === '—') return;
+        rows.push('<div class="ad-row"><span class="ad-l">' + label + '</span><span class="ad-v">'
+          + (multiline ? escLines(v) : escAttr(v)) + '</span></div>');
+      };
+      const ymd = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日'
+        + '（' + '日月火水木金土'[d.getDay()] + '）';
+      add('日付', ymd);
+      add('あなたの担当', j.myRole ? (j.myRole + (j.myRole2 ? '（兼任：' + j.myRole2 + '）' : '')) : '');
+      add('集合〜解散', (j.meet || '—') + ' 〜 ' + (j.leave || '—'));
+      add('イベント', [j.enter && ('入場 ' + j.enter), j.evStart && ('開始 ' + j.evStart), j.evEnd && ('終了 ' + j.evEnd)].filter(Boolean).join('　'));
+      add('集合場所', j.meetPlace);
+      add('集合場所の詳細', j.meetDetail);
+      add('会場', j.place);
+      add('屋内 / 屋外', j.outdoor ? '屋外' : '');
+      add('宿泊', (j.lodging && j.lodging !== '無') ? j.lodging : '');
+      add('服装', j.dresscode);
+      // 持ち物は「特になし」と明示する（空欄だと「聞き忘れ」に見えるため）。
+      rows.push('<div class="ad-row"><span class="ad-l">持ち物</span><span class="ad-v">'
+        + (String(j.belongings || '').trim() !== '' ? escLines(j.belongings) : '特になし') + '</span></div>');
+      add('当日の注意事項', j.staffNotes, true);
+      add('担当からの連絡', j.myNote, true);
+      return '<div class="ad-box">' + rows.join('')
+        + '<div class="ad-note">当日の連絡・集合の合図は、これまでどおり LINE・チャットワークで行います。'
+        + '内容に変更があると、この画面の表示も自動で新しくなります。</div></div>';
     }
     renderConfirmed();
     // 公開や集合時間を切り替えたら、この画面に戻ったとき／別タブ更新時に反映
@@ -955,10 +1019,9 @@
       }
     }
 
-    // 確定アサインの案件をタップ → 案件の詳細ページへ（※遷移先は未定。決まったらここでURLを設定）
-    function openAssign(name) {
-      alert(name + '\nの詳細ページへ移動します（モックのためダミーです）。\n※遷移先（案件詳細／LINEグループ など）は決まったら設定します。');
-    }
+    // ※ 以前ここにあった openAssign()（「モックのためダミーです」のアラート）は撤去した。
+    //   確定アサインをタップすると、その場で詳細（持ち物・注意事項など）が開くようになったため
+    //   ＝ toggleAssignDetail / assignDetailHtml（この上の確定アサインの描画部分）。
 
     // 「この内容で希望を提出する」→ その月の希望をDB(shift_preferences)へ保存。
     // タップで変えられるセル（dataset.state を持つ日）だけを集める。イベント/エントリー日は対象外。

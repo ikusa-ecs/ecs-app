@@ -280,7 +280,10 @@
     return {
       id: c.id, name: c.name, client: c.client, cat: c.cat, category: c.category, need: c.need, off: c.off,
       added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published,
-      staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo
+      staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
+      // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
+      meetDetail: c.meetDetail || '', belongings: c.belongings || '',
+      dresscode: c.dresscode || '', staffNotes: c.staffNotes || ''
     };
   });
 
@@ -327,6 +330,34 @@
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); flash('nsaved-' + id); })
     .catch(() => { c.memo = prev; alert('備考の保存に失敗しました。通信を確認してもう一度お試しください。'); });
+  }
+
+  // ===== スタッフに伝えること（集合場所の詳細・持ち物・服装・注意事項／DB保存）=====
+  // 本人の「確定アサイン」の詳細にそのまま出る。案件登録でも入れられるが、
+  // 公開する直前にここで書き足せるようにしている。入力欄から離れたら保存する。
+  function saveStaffInfo(id){
+    const c = CASES.find(x => x.id === id);
+    if (!c) return;
+    const g = k => (document.getElementById('si-' + k + '-' + id) || {}).value || '';
+    const next = { meetDetail: g('detail'), belongings: g('bel'), dresscode: g('dress'), staffNotes: g('notes') };
+    if (next.meetDetail === c.meetDetail && next.belongings === c.belongings
+      && next.dresscode === c.dresscode && next.staffNotes === c.staffNotes) return;   // 変更なし
+    const prev = { meetDetail: c.meetDetail, belongings: c.belongings, dresscode: c.dresscode, staffNotes: c.staffNotes };
+    Object.assign(c, next);
+    fetch('/assign-publish/staff-info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({
+        id: id, detail: next.meetDetail, belongings: next.belongings,
+        dresscode: next.dresscode, notes: next.staffNotes
+      })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('sisaved-' + id); })
+    .catch(() => { Object.assign(c, prev); alert('スタッフに伝えることの保存に失敗しました。通信を確認してもう一度お試しください。'); });
+  }
+  function toggleStaffInfo(id){
+    const el = document.getElementById('sinfo-' + id);
+    if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? '' : 'none';
   }
 
   // ===== スタッフ集合・解散時間（DB保存）。既定は社員の時間と同じ =====
@@ -521,6 +552,7 @@
         <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します">${extra ? '追加解除' : '＋追加'}</button>
         <a class="detail-link" href="/project-assign?project=${c.id}">アサイン画面 →</a>
         <button class="note-btn" onclick="toggleNote('${c.id}')">💬 備考</button>
+        <button class="note-btn" onclick="toggleStaffInfo('${c.id}')" title="持ち物・服装・注意事項。スタッフ本人の確定アサインに出ます">📣 スタッフに伝えること</button>
       </td>`;
     tbody.appendChild(tr);
 
@@ -535,6 +567,31 @@
         <textarea placeholder="例）前泊あり。〇〇さんに声かけ済み。集合場所は南口。（入力欄から離れると自動で保存されます）" onblur="saveNote('${c.id}', this)">${escapeHtml(getNote(c.id))}</textarea>
       </td>`;
     tbody.appendChild(nr);
+
+    // スタッフに伝えること（折りたたみ行）。ここに書いた内容は本人の「確定アサイン」に出る。
+    const sr = document.createElement('tr');
+    sr.className = 'note-row';
+    sr.id = 'sinfo-' + c.id;
+    sr.style.display = 'none';
+    sr.innerHTML = `
+      <td colspan="8">
+        <label>📣 スタッフに伝えること（<b>本人の「確定アサイン」にそのまま出ます</b>／入力欄から離れると自動で保存されます）<span class="saved" id="sisaved-${c.id}">✓ 保存しました</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label style="font-weight:600;">集合場所の詳細
+            <input type="text" id="si-detail-${c.id}" value="${escapeHtml(c.meetDetail)}" onblur="saveStaffInfo('${c.id}')" placeholder="例）東口改札を出て正面のバス停前">
+          </label>
+          <label style="font-weight:600;">服装
+            <input type="text" id="si-dress-${c.id}" value="${escapeHtml(c.dresscode)}" onblur="saveStaffInfo('${c.id}')" placeholder="例）上下黒（ジャケット不要）">
+          </label>
+          <label style="font-weight:600;">持ち物
+            <textarea id="si-bel-${c.id}" onblur="saveStaffInfo('${c.id}')" placeholder="例）黒スーツ、白シャツ、スニーカー">${escapeHtml(c.belongings)}</textarea>
+          </label>
+          <label style="font-weight:600;">当日の注意事項
+            <textarea id="si-notes-${c.id}" onblur="saveStaffInfo('${c.id}')" placeholder="例）会場内は飲食禁止／終了後に片付けあり">${escapeHtml(c.staffNotes)}</textarea>
+          </label>
+        </div>
+      </td>`;
+    tbody.appendChild(sr);
   }
 
   // ===== 描画 =====

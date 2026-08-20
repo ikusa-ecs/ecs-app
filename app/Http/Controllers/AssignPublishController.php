@@ -59,6 +59,11 @@ class AssignPublishController extends Controller
                 'meetPlace' => $p->assembly_type ?? '',
                 'published' => (bool) $p->staff_published,      // 公開状態（DBの背骨）
                 'memo'      => $p->publish_memo ?? '',          // 公開ボードの担当メモ（DB保存・全員共有）
+                // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）
+                'meetDetail' => $p->assembly_detail ?? '',
+                'belongings' => $p->staff_belongings ?? '',
+                'dresscode'  => $p->staff_dresscode ?? '',
+                'staffNotes' => $p->staff_notes ?? '',
             ];
         })->values();
 
@@ -142,6 +147,33 @@ class AssignPublishController extends Controller
 
         $project = Project::findOrFail($data['id']);
         $project->publish_memo = trim((string) ($data['memo'] ?? '')) ?: null;
+        $project->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * スタッフ本人に伝えること（集合場所の詳細・持ち物・服装・注意事項）を保存する。
+     *
+     * 案件登録（セールス）でも入れられるが、公開する直前にアサイン担当が書き足せるよう
+     * 公開ボードからも直せるようにしている。保存先は projects なので編集履歴にも残る。
+     * 受け取り：id（案件ID）＋ detail / belongings / dresscode / notes（すべて空可）。
+     */
+    public function setStaffInfo(Request $request)
+    {
+        $data = $request->validate([
+            'id'         => ['required', 'string', 'exists:projects,id'],
+            'detail'     => ['nullable', 'string', 'max:200'],
+            'belongings' => ['nullable', 'string', 'max:2000'],
+            'dresscode'  => ['nullable', 'string', 'max:200'],
+            'notes'      => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $project = Project::findOrFail($data['id']);
+        $project->assembly_detail  = trim((string) ($data['detail'] ?? '')) ?: null;
+        $project->staff_belongings = trim((string) ($data['belongings'] ?? '')) ?: null;
+        $project->staff_dresscode  = trim((string) ($data['dresscode'] ?? '')) ?: null;
+        $project->staff_notes      = trim((string) ($data['notes'] ?? '')) ?: null;
         $project->save();
 
         return response()->json(['ok' => true]);

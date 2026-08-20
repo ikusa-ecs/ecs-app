@@ -266,6 +266,10 @@ class ProjectController extends Controller
                     'is_outdoor'       => $p->is_outdoor,   // true=屋外 / false=屋内 / null=未設定
                     'lodging'          => $p->lodging,
                     'assembly_type'    => $p->assembly_type,
+                    'assembly_detail'  => $p->assembly_detail,
+                    'staff_belongings' => $p->staff_belongings,
+                    'staff_dresscode'  => $p->staff_dresscode,
+                    'staff_notes'      => $p->staff_notes,
                     'staff_role'       => $p->staff_role,
                     'required_count'   => $p->required_count,
                     'count_tentative'  => (bool) $p->count_tentative,
@@ -497,6 +501,11 @@ class ProjectController extends Controller
             'is_outdoor' => $request->filled('outdoor') ? ($request->input('outdoor') === '屋外') : null,
             'lodging' => $request->input('lodging'),
             'assembly_type' => $request->input('assembly_type'),
+            'assembly_detail' => $request->input('assembly_detail'),
+            // スタッフ本人に伝えること（担当になった人の「確定アサイン」の詳細に出る）
+            'staff_belongings' => $request->input('staff_belongings'),
+            'staff_dresscode' => $request->input('staff_dresscode'),
+            'staff_notes' => $request->input('staff_notes'),
             'staff_role' => $request->input('staff_role'),
             'required_count' => $request->filled('required_count') ? (int) $request->input('required_count') : null,
             'count_tentative' => $request->has('count_tentative'),
