@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignmentRole;
+use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
@@ -202,11 +203,15 @@ class AssignDirectorController extends Controller
             'status' => ['nullable', 'in:仮,確定'],
         ]);
 
-        $status = $data['status'] ?? '仮';
+        // 状態（仮／確定）は「送られてきたときだけ」使う。
+        // ⚠ 既定を '仮' にして既存行にも書くと、確定済みのD・SD・FCがこの画面の保存で
+        //   「仮」へ落ちてしまう（＝確定が壊れる）。null＝既存行の状態は変えない、
+        //   新しく作る行だけ '仮' から始める、という扱いにする。
+        $status = $data['status'] ?? null;
+        $newStatus = $status ?? '仮';
         $dirs = $data['dir'] ?? [];
         $sds = $data['sd'] ?? [];
         $fcs = $data['fc'] ?? [];   // [案件ID => [社員ID, ...]]（FCは複数可）
-        $now = Carbon::now();
 
         // 対象になる案件IDを集める（D・SD・FC のいずれかが送られてきた案件）
         $projectIds = collect(array_keys($dirs))
@@ -222,7 +227,7 @@ class AssignDirectorController extends Controller
         $saved = 0;
         $skipped = [];
 
-        DB::transaction(function () use ($projectIds, $dirs, $sds, $fcs, $startDates, $status, $now, &$saved, &$skipped) {
+        DB::transaction(function () use ($projectIds, $dirs, $sds, $fcs, $startDates, $status, $newStatus, &$saved, &$skipped) {
             foreach ($projectIds as $pid) {
                 $start = $startDates[$pid] ?? null;
                 if (! $start) {
@@ -257,17 +262,19 @@ class AssignDirectorController extends Controller
                         ->whereDate('date', $date)
                         ->first();
                     if ($existing) {
-                        $existing->update(['role' => $role, 'status' => $status, 'assigned_at' => $now]);
+                        $existing->update(
+                            ['role' => $role]
+                            + ($status !== null ? ['status' => $status] : [])
+                            + AssignmentStamp::forUpdate($existing, $status)
+                        );
                     } else {
                         Assignment::create([
                             'project_id' => $pid,
                             'staff_id' => $staffId,
                             'date' => $date,
                             'role' => $role,
-                            'status' => $status,
-                            'assigned_by' => null,    // 認証導入後に操作者を入れる
-                            'assigned_at' => $now,
-                        ]);
+                            'status' => $newStatus,
+                        ] + AssignmentStamp::forCreate($newStatus));
                     }
                     $saved++;
                 }
@@ -301,17 +308,19 @@ class AssignDirectorController extends Controller
                         ->whereDate('date', $date)
                         ->first();
                     if ($existing) {
-                        $existing->update(['role' => AssignmentRole::FC, 'status' => $status, 'assigned_at' => $now]);
+                        $existing->update(
+                            ['role' => AssignmentRole::FC]
+                            + ($status !== null ? ['status' => $status] : [])
+                            + AssignmentStamp::forUpdate($existing, $status)
+                        );
                     } else {
                         Assignment::create([
                             'project_id' => $pid,
                             'staff_id' => $sid,
                             'date' => $date,
                             'role' => AssignmentRole::FC,
-                            'status' => $status,
-                            'assigned_by' => null,
-                            'assigned_at' => $now,
-                        ]);
+                            'status' => $newStatus,
+                        ] + AssignmentStamp::forCreate($newStatus));
                     }
                     $saved++;
                 }

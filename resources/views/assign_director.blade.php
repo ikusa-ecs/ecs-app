@@ -298,7 +298,12 @@
       <!-- 保存フォーム（JSが dir[案件ID]/sd[案件ID] の hidden を作って送る） -->
       <form id="dirSaveForm" method="POST" action="/assign-director/save" style="display:none;">
         @csrf
-        <input type="hidden" name="status" value="仮">
+        {{--
+          状態（仮／確定）はこの画面では送らない。
+          以前は「仮」を固定で送っていたため、確定済みのD・SD・FCがこの画面で保存し直すたびに
+          「仮」へ落ちていた（＝確定が壊れる経路）。送らなければ、既にある行は今の状態を保ち、
+          新しく決めた担当だけ「仮」から始まる（サーバー側 AssignDirectorController::save）。
+        --}}
         <div id="dirSaveInputs"></div>
       </form>
 @verbatim

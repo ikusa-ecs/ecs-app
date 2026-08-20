@@ -10,6 +10,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\AssignmentStamp;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -131,11 +132,24 @@ class AssignBoardController extends Controller
 
         $date = $project->start_date->format('Y-m-d');
         $members = $data['members'] ?? [];
-        $now = Carbon::now();
+        $memberIds = collect($members)->pluck('staff_id')->filter()->unique()->values()->all();
 
-        DB::transaction(function () use ($project, $date, $members, $now) {
+        DB::transaction(function () use ($project, $date, $members, $memberIds) {
             // 日付部分だけで照合して消す（date キャストの時刻付き保存対策。save()と同じ）。
-            Assignment::where('project_id', $project->id)->whereDate('date', $date)->delete();
+            //
+            // ⚠ 消すのは「この画面が扱う人」の行だけにする（手動アサイン画面と同じ案A・2026-08-06 確定）。
+            //    以前はその案件×その日を無条件で全部消していたため、D決め画面で決めた社員の行
+            //    （D/SD/FC）まで消えて「ピックアップを保存したらDが消える」事故になっていた。
+            //    ＝スタッフの行（＋今回送られてきた人の行）だけを消してから作り直す。
+            Assignment::where('project_id', $project->id)
+                ->whereDate('date', $date)
+                ->where(function ($q) use ($memberIds) {
+                    $q->whereIn('staff_id', Person::staff()->select('id'));
+                    if ($memberIds) {
+                        $q->orWhereIn('staff_id', $memberIds);
+                    }
+                })
+                ->delete();
 
             $seen = [];
             foreach ($members as $m) {
@@ -148,6 +162,7 @@ class AssignBoardController extends Controller
                 $note = trim((string) ($m['note'] ?? ''));
                 $patrolRaw = $m['patrol'] ?? null;
                 $remark = trim((string) ($m['remark'] ?? ''));
+                $status = ($m['status'] ?? '仮') === '確定' ? '確定' : '仮';
                 Assignment::create([
                     'project_id' => $project->id,
                     'staff_id' => $sid,
@@ -157,10 +172,8 @@ class AssignBoardController extends Controller
                     'note' => $note === '' ? null : mb_substr($note, 0, 100),
                     'patrol' => (is_numeric($patrolRaw) && (int) $patrolRaw >= 0) ? (int) $patrolRaw : null,
                     'remark' => $remark === '' ? null : mb_substr($remark, 0, 200),
-                    'status' => ($m['status'] ?? '仮') === '確定' ? '確定' : '仮',
-                    'assigned_by' => null,
-                    'assigned_at' => $now,
-                ]);
+                    'status' => $status,
+                ] + AssignmentStamp::forCreate($status));
             }
         });
 

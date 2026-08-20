@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
+use App\Support\AssignmentStamp;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -405,9 +406,8 @@ class AssignmentController extends Controller
                     'patrol' => $this->cleanPatrol($patrols[$sid] ?? null), // 巡回数（数値・空はnull）
                     'remark' => $this->cleanRemark($remarks[$sid] ?? null), // 備考（一言・自由記入）
                     'status' => $data['status'],
-                    'assigned_by' => null,        // 認証導入後に操作者を入れる
-                    'assigned_at' => $now,
-                ]);
+                    // 誰が・いつ（＋確定なら確定の記録）は AssignmentStamp の1か所で付ける。
+                ] + AssignmentStamp::forCreate($data['status']));
             }
         });
 
@@ -523,7 +523,8 @@ class AssignmentController extends Controller
                 if ($request->has('role2')) {
                     $update['role2'] = $role2;   // 兼任（空・無効は null＝解除）
                 }
-                $existing->update($update);
+                // 仮→確定に上げた（または確定→仮に戻した）ときだけ確定の記録を動かす。
+                $existing->update($update + AssignmentStamp::forUpdate($existing, $status));
             } else {
                 Assignment::create([
                     'project_id' => $project->id,
@@ -535,9 +536,7 @@ class AssignmentController extends Controller
                     'patrol' => $patrol,
                     'remark' => $remark,
                     'status' => $status,
-                    'assigned_by' => null,          // 認証導入後に操作者を入れる
-                    'assigned_at' => Carbon::now(),
-                ]);
+                ] + AssignmentStamp::forCreate($status));
             }
 
             return response()->json([

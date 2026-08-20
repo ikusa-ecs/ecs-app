@@ -148,7 +148,9 @@ class AssignDashboardController extends Controller
             ->map(fn ($rows) => [
                 'project_id'  => $rows->first()->project_id,
                 'headcount'   => $rows->pluck('staff_id')->unique()->count(),
-                'confirmedAt' => $rows->max('assigned_at'),
+                // 確定日時＝確定にした時刻（confirmed_at）。古い行は記録が無いので
+                // 従来どおり assigned_at で代用する（2026-08-20 に confirmed_at を追加）。
+                'confirmedAt' => $rows->max(fn ($r) => $r->confirmed_at ?? $r->assigned_at),
             ])
             ->sortByDesc('confirmedAt')
             ->take(6)

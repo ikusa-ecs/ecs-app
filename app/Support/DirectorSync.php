@@ -106,9 +106,7 @@ class DirectorSync
                     'date' => $date,
                     'role' => $role,
                     'status' => '仮',       // 新しく決めた担当は「仮」から始める（D決め画面と同じ）
-                    'assigned_by' => null,
-                    'assigned_at' => Carbon::now(),
-                ]);
+                ] + AssignmentStamp::forCreate('仮'));
             }
             $result['saved']++;
         }
