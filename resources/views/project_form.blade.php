@@ -347,6 +347,16 @@
               <label><input type="radio" name="scale" value="該当なし"> 該当なし</label>
             </div>
           </div>
+          <!-- イベント数として数えるか（先人の要件定義 先-2）。集計ダッシュボード /stats の件数に効く -->
+          <div class="form-row non-arena">
+            <label>イベント数に数える</label>
+            <div class="radio-row" style="flex-wrap:wrap;">
+              <label><input type="radio" name="count_as_event" value="auto" checked> 自動</label>
+              <label><input type="radio" name="count_as_event" value="yes"> 数える</label>
+              <label><input type="radio" name="count_as_event" value="no"> 数えない</label>
+            </div>
+            <div class="hint" id="countAsEventHint">社内の数え方にあわせて、<b>体験会</b>と<b>案件名にEXPOを含む案件</b>は「自動」だと数えません。それ以外は数えます。ここで <b>数える／数えない</b> を選ぶと自動より優先されます。</div>
+          </div>
           <div class="form-row">
             <label>営業担当<span class="req-mark red">必須</span></label>
             <select id="salesOwnerSel" name="sales_owner" data-need="req" onchange="onSalesChange()">
@@ -1349,6 +1359,7 @@
     setRadio('addtl', E.category);
     setRadio('yomi', E.yomi);
     setRadio('scale', E.scale);
+    setRadio('count_as_event', E.count_as_event || 'auto');   // 自動/数える/数えない（先-2）
     setRadio('broadcast', E.broadcast);
     setRadio('guestCount', E.guest_count_type);
     setRadio('multi', E.is_multi ? 'あり' : 'なし');

@@ -42,6 +42,8 @@ class Project extends Model
             'prep_script' => 'boolean',
             'staff_published' => 'boolean',
             'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）
+            // イベント数に数えるか（null=自動判定／true=数える／false=数えない・先-2）
+            'count_as_event' => 'boolean',
         ];
     }
 

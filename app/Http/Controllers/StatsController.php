@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectShare;
+use App\Support\EventCount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -66,6 +67,11 @@ class StatsController extends Controller
         $rows[] = [];
         $rows[] = ['■ イベント数'];
         $rows[] = ['合計', $data['totalEvents']];
+        // 数えなかった案件（体験会・EXPO など）＝画面の注記と同じ情報をCSVにも残す（先-2）
+        if ($data['excludedCount'] > 0) {
+            $rows[] = ['数えていない案件', $data['excludedCount'],
+                $data['excludedReasons']->map(fn ($n, $reason) => "{$reason} {$n}件")->implode(' / ')];
+        }
         $rows[] = ['リアル', $data['realEvents']];
         $rows[] = ['オンライン', $data['onlineEvents']];
         $rows[] = [];
@@ -131,15 +137,21 @@ class StatsController extends Controller
     private function aggregate(Request $request): array
     {
         // 集計対象のイベント＝開催日があり、下書き・中止でない案件（完了＝過去実績は含める）。
-        $projects = Project::whereNotNull('start_date')
+        $allProjects = Project::whereNotNull('start_date')
             ->whereNotIn('status', ['下書き', 'キャンセル', '中止'])
-            ->get(['id', 'start_date', 'format', 'base_locations', 'scale', 'office']);
+            ->get(['id', 'start_date', 'format', 'base_locations', 'scale', 'office',
+                'project_name', 'client', 'count_as_event']);
 
-        // 期間の選択肢を「月／四半期／年」それぞれで作る（案件のある期間だけ）。
+        // ⚠ さらに「イベント数として数える案件」だけに絞る（先-2・2026-08-20）。
+        //   社内の数え方では体験会・EXPO を数えないため、全部数えると社内の言い方とズレる。
+        //   数えるかどうかの正本は App\Support\EventCount の1か所（案件ごとに手動で上書きもできる）。
+        $projects = $allProjects->filter(fn (Project $p) => EventCount::counts($p))->values();
+
+        // 期間の選択肢は「数えない案件しか無い月」も選べるように、絞る前の一覧から作る。
         $spanKeys = [
-            'month'   => $this->periodOptions($projects, 'month'),
-            'quarter' => $this->periodOptions($projects, 'quarter'),
-            'year'    => $this->periodOptions($projects, 'year'),
+            'month'   => $this->periodOptions($allProjects, 'month'),
+            'quarter' => $this->periodOptions($allProjects, 'quarter'),
+            'year'    => $this->periodOptions($allProjects, 'year'),
         ];
 
         // 選ばれた粒度（既定＝月）。
@@ -175,6 +187,18 @@ class StatsController extends Controller
         if ($scopeOffice !== '') {
             $inPeriod = $inPeriod->filter(fn (Project $p) => $this->officeOf($p) === $scopeOffice)->values();
         }
+
+        // 「数えなかった案件」の件数＝画面の注記に出す（数字が合わない理由が分かるように）。
+        $excluded = $allProjects
+            ->filter(fn (Project $p) => $this->periodKey($p->start_date, $span) === $selected)
+            ->when($scopeOffice !== '', fn ($c) => $c->filter(fn (Project $p) => $this->officeOf($p) === $scopeOffice))
+            ->filter(fn (Project $p) => ! EventCount::counts($p));
+        $excludedCount = $excluded->count();
+        // 何で外れたかの内訳（例：['体験会' => 3, 'EXPO' => 1]）。
+        $excludedReasons = $excluded
+            ->groupBy(fn (Project $p) => $p->count_as_event === false ? '手動で「数えない」' : (EventCount::autoReason($p) ?? 'その他'))
+            ->map(fn ($rows) => $rows->count())
+            ->sortDesc();
 
         // ── イベント数の集計 ──
         $totalEvents = $inPeriod->count();
@@ -366,6 +390,15 @@ class StatsController extends Controller
             'offices'         => self::OFFICE_ORDER,
             'selectedLabel'   => collect($options)->firstWhere('value', $selected)['label'] ?? '',
             'totalEvents'     => $totalEvents,
+            // 数えなかった案件（体験会・EXPO など）＝画面の注記用
+            'excludedCount'   => $excludedCount,
+            'excludedReasons' => $excludedReasons,
+            // どの案件を数えなかったか（多いときは先頭10件だけ。残りは件数で示す）
+            'excludedList'    => $excluded->take(10)->map(fn (Project $p) => [
+                'date' => optional($p->start_date)->format('n/j'),
+                'name' => (string) $p->project_name,
+                'why'  => EventCount::label($p),
+            ])->values(),
             'realEvents'      => $realEvents,
             'onlineEvents'    => $onlineEvents,
             'byOffice'        => $byOffice,

@@ -266,6 +266,8 @@ class ProjectController extends Controller
                     'location'         => $p->location,
                     'is_outdoor'       => $p->is_outdoor,   // true=屋外 / false=屋内 / null=未設定
                     'lodging'          => $p->lodging,
+                    // 3択（自動/数える/数えない）は画面のラジオに合わせて文字で渡す。
+                    'count_as_event'   => $p->count_as_event === null ? 'auto' : ($p->count_as_event ? 'yes' : 'no'),
                     'assembly_type'    => $p->assembly_type,
                     'assembly_detail'  => $p->assembly_detail,
                     'staff_belongings' => $p->staff_belongings,
@@ -583,6 +585,13 @@ class ProjectController extends Controller
             'location' => $request->input('location'),
             'is_outdoor' => $request->filled('outdoor') ? ($request->input('outdoor') === '屋外') : null,
             'lodging' => $request->input('lodging'),
+            // イベント数として数えるか（先-2）。auto＝null／yes＝true／no＝false。
+            // 数え方の正本は App\Support\EventCount（自動のルールもそこに置く）。
+            'count_as_event' => match ((string) $request->input('count_as_event', 'auto')) {
+                'yes'   => true,
+                'no'    => false,
+                default => null,   // auto（未指定も自動あつかい）
+            },
             'assembly_type' => $request->input('assembly_type'),
             'assembly_detail' => $request->input('assembly_detail'),
             // スタッフ本人に伝えること（担当になった人の「確定アサイン」の詳細に出る）

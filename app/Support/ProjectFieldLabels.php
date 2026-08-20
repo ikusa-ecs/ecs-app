@@ -66,6 +66,7 @@ class ProjectFieldLabels
         // ── 人数 ──
         'staff_role'         => '運営体制',
         'required_count'     => '運営人数',
+        'count_as_event'     => 'イベント数に数える',
         'count_tentative'    => '運営人数は仮',
         'guest_count'        => 'お客様人数',
         'guest_count_type'   => 'お客様人数の区分',
@@ -127,6 +128,17 @@ class ProjectFieldLabels
         'is_archived'     => ['アーカイブ', '通常'],
     ];
 
+    /**
+     * 3通りある列 => [nullのときの言い方, trueのときの言い方, falseのときの言い方]。
+     * 真偽値（BOOLEAN_WORDS）と違い **null に意味がある**列に使う。
+     * 例：count_as_event の null＝「自動」で、空欄という意味ではない。
+     *
+     * @var array<string, array{0: string, 1: string, 2: string}>
+     */
+    private const TRISTATE_WORDS = [
+        'count_as_event' => ['自動', '数える', '数えない'],
+    ];
+
     /** 社員のIDで持っている列（表示は氏名に直す）。 */
     private const PERSON_FIELDS = ['director_id', 'sd_id', 'goods_owner_id'];
 
@@ -170,6 +182,16 @@ class ProjectFieldLabels
 
         if (in_array($field, self::CONTENT_FIELDS, true)) {
             return self::wrapEmpty(self::contentNames($value));
+        }
+
+        // null に意味がある列（自動/はい/いいえ）は「（空）」にしない。
+        if (isset(self::TRISTATE_WORDS[$field])) {
+            [$auto, $on, $off] = self::TRISTATE_WORDS[$field];
+            if ($value === null || $value === '') {
+                return $auto;
+            }
+
+            return (bool) $value ? $on : $off;
         }
 
         if (isset(self::BOOLEAN_WORDS[$field])) {

@@ -119,6 +119,13 @@
     .st-kpis { grid-template-columns: repeat(2, 1fr); }
     .st-grid { grid-template-columns: 1fr; }
   }
+  /* 数えなかった案件の注記（先-2）。既存の .st-note とは別のクラスにする（見た目を変えないため） */
+  .st-excluded { font-size: 12.5px; color: var(--muted); line-height: 1.8; background: #faf7f1;
+                 border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 16px; }
+  .st-excluded-list { list-style: none; margin: -10px 0 16px; padding: 0 12px 10px; background: #faf7f1;
+                      border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px; font-size: 12.5px; }
+  .st-excluded-list li { padding: 3px 0; border-top: 1px dashed var(--line); color: var(--ink); }
+  .st-excluded-list .why { color: var(--muted); font-size: 11.5px; }
 </style>
 @endpush
 
@@ -180,6 +187,23 @@
     <div class="k-num">{{ $totalAttendance }}<small>回</small></div>
   </div>
 </div>
+
+{{-- 数えなかった案件の注記（先-2）。社内の数え方＝体験会・EXPOはイベント数に入れない。
+     「案件はあるのに件数が少ない」理由がこの画面で分かるようにする。 --}}
+@if ($excludedCount > 0)
+  <p class="st-excluded">
+    この期間には、<b>イベント数に数えていない案件が {{ $excludedCount }} 件</b>あります（内訳：@foreach ($excludedReasons as $reason => $n){{ $reason }} {{ $n }}件@if (! $loop->last) ／ @endif @endforeach）。<br>
+    社内の数え方にあわせて<b>体験会・EXPO は数えません</b>。案件ごとに変えたいときは、案件登録の画面で「イベント数に数える」を <b>数える／数えない</b> に切り替えてください。
+  </p>
+  <ul class="st-excluded-list">
+    @foreach ($excludedList as $x)
+      <li>{{ $x['date'] }}　{{ $x['name'] }}　<span class="why">{{ $x['why'] }}</span></li>
+    @endforeach
+    @if ($excludedCount > $excludedList->count())
+      <li>…ほか {{ $excludedCount - $excludedList->count() }} 件</li>
+    @endif
+  </ul>
+@endif
 
 <div class="st-grid">
   {{-- 拠点（事務所）別イベント数。全拠点モードのみ表示（特定の拠点を選んだら他拠点は隠す・baba 2026-07-27）。 --}}
