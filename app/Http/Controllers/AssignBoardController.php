@@ -12,6 +12,7 @@ use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\OfficeScope;
+use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -125,6 +126,10 @@ class AssignBoardController extends Controller
         $project = Project::find($data['project_id']);
         if (! $project) {
             return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        // 拠点チェック（保存の入口で必ず通す）＝他拠点の案件をURL直打ちで書き換えられないようにする。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
         }
         if (! $project->start_date) {
             return response()->json(['ok' => false, 'message' => 'この案件は開催日が未設定です。先に案件登録で日付を入れてください。'], 422);

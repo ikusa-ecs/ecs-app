@@ -10,6 +10,7 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
 use App\Support\OfficeScope;
+use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -220,9 +221,16 @@ class AssignDirectorController extends Controller
             ->unique()
             ->values();
 
+        // 拠点チェック＝自分が書き換えてよい案件だけに絞る（他拠点の案件は黙って除外し、
+        // 件数だけ知らせる）。この画面は複数案件をまとめて保存するので、1件のせいで
+        // 全部が止まらないように「弾く」のではなく「外す」形にしている。
+        $targets = Project::whereIn('id', $projectIds)->get();
+        $allowed = $targets->filter(fn (Project $p) => ProjectAccess::canEdit($p));
+        $blocked = $targets->count() - $allowed->count();
+        $projectIds = $allowed->pluck('id')->values();
+
         // 開催日を引く（assignments は日付必須）。日付の無い案件はスキップ。
-        $startDates = Project::whereIn('id', $projectIds)
-            ->pluck('start_date', 'id');
+        $startDates = $allowed->pluck('start_date', 'id');
 
         $saved = 0;
         $skipped = [];
@@ -327,9 +335,15 @@ class AssignDirectorController extends Controller
             }
         });
 
-        $msg = "D／SD／FCの担当を {$saved} 件、「{$status}」で保存しました。";
+        // 状態を送っていないとき（＝既存の仮/確定をそのまま保つ）は文言も変える。
+        $msg = $status === null
+            ? "D／SD／FCの担当を {$saved} 件保存しました（すでに確定していた担当はそのまま確定のままです）。"
+            : "D／SD／FCの担当を {$saved} 件、「{$status}」で保存しました。";
         if (! empty($skipped)) {
             $msg .= '（開催日が未設定の案件 ' . count($skipped) . ' 件は保存できませんでした）';
+        }
+        if ($blocked > 0) {
+            $msg .= "（他の拠点の案件 {$blocked} 件は編集できないため保存していません）";
         }
 
         return redirect('/assign-director')->with('status', $msg);

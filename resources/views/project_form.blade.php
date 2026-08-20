@@ -297,7 +297,7 @@
             <label>開催日<span class="req-mark red">必須</span></label>
             <input type="date" id="startDate" name="start_date" data-need="req">
             <div class="tbd-row">
-              <input type="checkbox" id="dateTbd" class="tbd-check" data-tbd-for="startDate" data-memo="dateMemo">
+              <input type="checkbox" id="dateTbd" name="date_tbd" class="tbd-check" data-tbd-for="startDate" data-memo="dateMemo">
               <label for="dateTbd">日付未定（まだふわっとしている）</label>
             </div>
             <div class="form-row" id="dateMemo" style="display:none; margin-top:8px; margin-bottom:0;">
@@ -329,7 +329,7 @@
             </div>
             <div class="hint">複数のコンテンツを行う場合は続けて選べます。一覧にないものは入力して「＋追加」。選んだコンテンツが案件名になります。</div>
             <div class="tbd-row">
-              <input type="checkbox" id="contentTbd" class="tbd-check" data-tbd-for="contentBox">
+              <input type="checkbox" id="contentTbd" name="content_tbd" class="tbd-check" data-tbd-for="contentBox">
               <label for="contentTbd">コンテンツ未定（まだ決まっていない）</label>
             </div>
             <div class="auto-hint" id="catNote" style="display:none;"></div>
@@ -900,6 +900,9 @@
 <script>window.ECS_CONTENT_OPTIONS = @json($contentOptions ?? []);</script>
 {{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
 <script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
+{{-- 危険日（高負荷日）の判定に使う「開催日 → その日の案件たち」（DBの実案件）。
+     以前は凍結モック /ecs/data/cases.js を読んでいたため、実データでは警告が出なかった。 --}}
+<script>window.ECS_DAY_LOAD = @json($dayLoad ?? null);</script>
 <script src="/ecs/data/cases.js"></script>
 @verbatim
 <script>
@@ -1134,12 +1137,20 @@
     const need = parseInt(document.getElementById('requiredCount').value, 10) || 0;
     return { scale: scaleEl ? scaleEl.value : '', fmt: ECS_fmtCode(fmtText), need: need, name: 'この案件' };
   }
+  // 同じ日に開催される既存案件を返す。DBから渡された ECS_DAY_LOAD を使う。
+  // ⚠ 見本の ECS_casesOnDate（/ecs/data/cases.js＝凍結モック）は、DBのデータが
+  //   渡されていないときの保険としてだけ残す（本番では ECS_DAY_LOAD が入る）。
+  //   編集中の案件はサーバー側で除いてあるので、自分を二重に数えることはない。
+  function casesOnDate(iso) {
+    if (window.ECS_DAY_LOAD) return (window.ECS_DAY_LOAD[iso] || []);
+    return (typeof ECS_casesOnDate === 'function') ? ECS_casesOnDate(iso) : [];
+  }
   // 開催日に「既存案件＋この案件」を並べて危険判定する。日付未定なら null
   function dangerForForm() {
     const dateTbd = document.getElementById('dateTbd');
     const iso = document.getElementById('startDate').value;
     if (!iso || (dateTbd && dateTbd.checked)) return null;
-    const items = ECS_casesOnDate(iso).concat([currentCaseInput()]);
+    const items = casesOnDate(iso).concat([currentCaseInput()]);
     const res = ECS_dangerCheck(items);
     res.iso = iso; res.existing = items.length - 1;
     return res;

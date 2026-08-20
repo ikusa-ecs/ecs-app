@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Setting;
 use App\Support\OfficeScope;
+use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -87,8 +88,23 @@ class AssignPublishController extends Controller
             'publish' => ['required', 'boolean'],
         ]);
 
-        $updated = Project::whereIn('id', $data['ids'])
-            ->update(['staff_published' => $data['publish']]);
+        // ⚠ ここを Project::whereIn(...)->update(...) の一括更新で書くと、
+        //   モデルの保存イベントが動かないため公開ON/OFFだけ編集履歴に残らない
+        //   （時間・メモ・区分は $project->save() なので残っていた）。
+        //   公開は「スタッフに見えるかどうか」を切り替える一番大事な操作なので、
+        //   1件ずつ save() して ProjectHistoryRecorder に必ず記録させる。
+        $updated = 0;
+        foreach (Project::whereIn('id', $data['ids'])->get() as $project) {
+            if (! ProjectAccess::canEdit($project)) {
+                continue;   // 他拠点の案件は公開状態を変えられない
+            }
+            if ((bool) $project->staff_published === (bool) $data['publish']) {
+                continue;   // すでにその状態＝履歴を汚さない
+            }
+            $project->staff_published = $data['publish'];
+            $project->save();
+            $updated++;
+        }
 
         return response()->json(['ok' => true, 'updated' => $updated]);
     }
@@ -107,6 +123,10 @@ class AssignPublishController extends Controller
         ]);
 
         $project = Project::findOrFail($data['id']);
+        // 拠点チェック（他拠点の案件をURL直打ちで書き換えられないようにする）。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
         if ($request->has('staff_meet')) {
             $project->staff_meet_time = trim((string) $request->input('staff_meet')) ?: null;
         }
@@ -146,6 +166,10 @@ class AssignPublishController extends Controller
         ]);
 
         $project = Project::findOrFail($data['id']);
+        // 拠点チェック（他拠点の案件をURL直打ちで書き換えられないようにする）。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
         $project->publish_memo = trim((string) ($data['memo'] ?? '')) ?: null;
         $project->save();
 
@@ -170,6 +194,10 @@ class AssignPublishController extends Controller
         ]);
 
         $project = Project::findOrFail($data['id']);
+        // 拠点チェック（他拠点の案件をURL直打ちで書き換えられないようにする）。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
         $project->assembly_detail  = trim((string) ($data['detail'] ?? '')) ?: null;
         $project->staff_belongings = trim((string) ($data['belongings'] ?? '')) ?: null;
         $project->staff_dresscode  = trim((string) ($data['dresscode'] ?? '')) ?: null;
@@ -193,6 +221,10 @@ class AssignPublishController extends Controller
         ]);
 
         $project = Project::findOrFail($data['id']);
+        // 拠点チェック（他拠点の案件をURL直打ちで書き換えられないようにする）。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
         if ($data['is_extra']) {
             $project->category = '追加案件';
             // すでに公開日があればそのまま（付け直しで締切がずれないように）、無ければ今日を記録。
@@ -221,7 +253,9 @@ class AssignPublishController extends Controller
             'is_extra' => ['required', 'boolean'],
         ]);
 
-        $projects = Project::whereIn('id', $data['ids'])->get();
+        // 他拠点の案件は触らない（拠点チェック）。
+        $projects = Project::whereIn('id', $data['ids'])->get()
+            ->filter(fn (Project $p) => ProjectAccess::canEdit($p));
         foreach ($projects as $project) {
             if ($data['is_extra']) {
                 $project->category = '追加案件';

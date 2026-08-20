@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectHistory;
 use App\Support\CsvText;
 use App\Support\DirectorSync;
+use App\Support\ProjectAccess;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -362,8 +363,15 @@ class ProjectController extends Controller
             ? ProjectHistory::where('project_id', $projectId)->count()
             : 0;
 
+        // ── 危険日（高負荷日）の判定に使う「日ごとの負荷」＝DBの実案件から作る ──
+        // これまで画面は凍結モックの /ecs/data/cases.js を読んで同日の案件を数えていたため、
+        // 実データでは警告が出なかった（CLAUDE.md でモックは凍結＝参照元にしない方針）。
+        // 編集中の案件はここから外す（自分を二重に数えないため）。
+        $dayLoad = $this->dayLoad($projectId);
+
         return view('project_form', [
             'editProject'    => $editProject,
+            'dayLoad'        => $dayLoad,
             'histories'      => $histories,
             'historyTotal'   => $historyTotal,
             'historyLimit'   => self::FORM_HISTORY_LIMIT,
@@ -378,6 +386,57 @@ class ProjectController extends Controller
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
             'assignMtgDate'  => \App\Support\AssignMtg::current(),
         ]);
+    }
+
+    /**
+     * 危険日の判定に使う「開催日 → その日の案件たち」。
+     * 画面（危険日ヒント・保存前の確認）が cases.js のかわりに読む。
+     *
+     * 出す形＝['2026-09-20' => [['scale'=>'大型','fmt'=>'real','need'=>20,'name'=>'…'], ...]]
+     * 下書き・手動アーカイブ・過去の案件は数えない（モックの ECS_casesOnDate と同じ考え方）。
+     *
+     * @param  string|null  $excludeId  編集中の案件（自分を二重に数えないため外す）
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function dayLoad(?string $excludeId = null): array
+    {
+        $today = Carbon::today();
+
+        $rows = Project::whereNotNull('start_date')
+            ->whereDate('start_date', '>=', $today->format('Y-m-d'))
+            ->where('status', '!=', '下書き')
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->get(['id', 'project_name', 'start_date', 'scale', 'format', 'required_count', 'is_archived']);
+
+        $out = [];
+        foreach ($rows as $p) {
+            if ($p->is_archived === true) {
+                continue;
+            }
+            $key = $p->start_date->format('Y-m-d');
+            $out[$key][] = [
+                'scale' => (string) ($p->scale ?? ''),
+                // 実施形態 → 画面の判定コード（online / long / real）。cases.js の ECS_fmtCode と同じ基準。
+                'fmt'   => $this->formatCode((string) ($p->format ?? '')),
+                'need'  => (int) ($p->required_count ?? 0),
+                'name'  => (string) $p->project_name,
+            ];
+        }
+
+        return $out;
+    }
+
+    /** 実施形態の文字 → 判定コード（cases.js の ECS_fmtCode と同じ基準にそろえる）。 */
+    private function formatCode(string $format): string
+    {
+        if (mb_strpos($format, 'オンライン') !== false || mb_strpos($format, 'ヘルプのみ') !== false) {
+            return 'online';
+        }
+        if (mb_strpos($format, 'リアルロング') !== false) {
+            return 'long';
+        }
+
+        return 'real';
     }
 
     /**
@@ -400,6 +459,30 @@ class ProjectController extends Controller
         ]);
 
         $publish = $request->input('intent') === 'publish';
+
+        // ── 「確定」で保存するときの必須チェック（サーバー側）──
+        // これまでサーバー側は開催日の形式だけ見ており、画面のJSを通らない経路（直接POST・
+        // JSが動かないブラウザ）だと案件名も人数も空で登録できた。CSV一括取込は同じ3項目を
+        // サーバーで見ているので、フォームも同じ基準にそろえる。
+        // 「未定」にチェックが入っているものは、これまでどおり空でも通す（下書きも通す）。
+        if ($publish) {
+            $errors = [];
+            $hasContent = trim((string) $request->input('content_names')) !== ''
+                || trim((string) $request->input('oneoff_content_names')) !== '';
+            if (! $hasContent && ! $request->boolean('content_tbd')) {
+                $errors['content_names'] = '案件名（コンテンツ）を選ぶか、「コンテンツ未定」にチェックを入れてください。';
+            }
+            if (! $request->filled('start_date') && ! $request->boolean('date_tbd')) {
+                $errors['start_date'] = '開催日を入力するか、「日付未定」にチェックを入れてください。';
+            }
+            $count = (int) $request->input('required_count', 0);
+            if ($count < 1 && ! $request->boolean('count_tentative')) {
+                $errors['required_count'] = '運営人数を入力するか、「人数は仮（未定）」にチェックを入れてください。';
+            }
+            if ($errors) {
+                return back()->withInput()->withErrors($errors);
+            }
+        }
 
         // 編集モード：project_id が来ていれば、その案件を上書き更新する（無ければ新規）。
         $editing = $request->filled('project_id')
@@ -588,6 +671,10 @@ class ProjectController extends Controller
         ]);
 
         $project = Project::findOrFail($request->input('id'));
+        // 拠点チェック（保存の入口で必ず通す）＝他拠点の案件をURL直打ちで書き換えられないようにする。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
 
         // D／SD＝アサインの役割なので、保存先は assignments に一本化する（2026-08-05 baba確定）。
         // 古い列（director_id / sd_id）にも同じ値を「写し」で書く＝表示がまだ古い列を読む画面が壊れないため。
