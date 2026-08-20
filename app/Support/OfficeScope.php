@@ -18,6 +18,13 @@ use Illuminate\Support\Facades\Auth;
  */
 class OfficeScope
 {
+    /**
+     * 拠点が未設定の人・案件を、どの拠点あつかいにするか（既定）。
+     * これまで '東京' が3か所に直書きされていたので、正本をここ1つにする。
+     * ※ 実データ投入時に people.office を埋め直すまでの保険。
+     */
+    public const DEFAULT_OFFICE = '東京';
+
     /** 管理者以上か（＝全拠点を見られる・スイッチを出す対象か）。 */
     public static function canSeeAll(): bool
     {
@@ -39,7 +46,7 @@ class OfficeScope
             return $sel === '' ? null : $sel;
         }
 
-        return Auth::user()->office ?: '東京';
+        return Auth::user()->office ?: self::DEFAULT_OFFICE;
     }
 
     /** スイッチのハイライト用に「今選ばれている値」を返す（''＝全拠点）。管理者以上のみ意味を持つ。 */
@@ -84,7 +91,7 @@ class OfficeScope
     {
         return $query->when($office, fn ($q) => $q->where(function ($qq) use ($office, $keepIds) {
             $qq->where('office', $office);
-            if ($office === '東京') {
+            if ($office === self::DEFAULT_OFFICE) {
                 $qq->orWhereNull('office')->orWhere('office', '');
             }
             if ($keepIds) {
