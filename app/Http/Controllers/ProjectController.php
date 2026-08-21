@@ -125,6 +125,7 @@ class ProjectController extends Controller
                 'dayType'    => $p->date_type ?? '本番',
                 'parentId'   => $p->parent_project_id,
                 'recruit'    => (bool) $p->is_recruiting,
+                'published'  => (bool) $p->staff_published,   // スタッフ公開ボードで「公開する」を押したか
                 'status'     => $p->status ?? '未着手',
                 'tentative'  => (bool) $p->count_tentative,
                 'repeat'     => (bool) $p->is_repeat,      // 手で入れた「リピート案件」の印

@@ -136,6 +136,7 @@
     .recruit-badge.closed { background: #ece3d4; color: #7a6a58; }         /* 締切 */
     .recruit-badge.pre    { background: var(--warn-soft); color: #b45309; }/* 募集前 */
     .recruit-badge.draft  { background: #6b5544; color: #fff; }            /* 下書き＝準備中 */
+    .recruit-badge.unpub  { background: #f3ece4; color: #8a5a10; border: 1px solid #e6d8c8; } /* 未公開＝スタッフにまだ見えていない */
 
     /* 操作リンク */
     td.ops a { font-size: 12.5px; margin-right: 10px; white-space: nowrap; }
@@ -675,7 +676,7 @@
       category:c.category, yomi:c.yomi, format:c.format, sales:c.sales, director:c.dir,
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       guests:c.guests, teams:c.teams, goods:c.goods, transport:c.transport, sound:c.sound,
-      lodging:c.lodging, recruit:c.recruit, status:c.status,
+      lodging:c.lodging, recruit:c.recruit, published:!!c.published, status:c.status,
       evTbd:!!c.evTbd, repeat:!!c.repeat, lineSent:c.lineSent, lineMade:c.lineMade, lineDouble:c.lineDouble,
       handover:c.handover, script:c.script, opSheet:c.opSheet,
       offset:c.off, multi:(c.parentId != null) || isParent, tentative:!!c.tentative,
@@ -697,15 +698,21 @@
   const kbnClass    = { '予備日':'yobi', 'リハ':'reha' };
   const yomiMark    = { 'Aヨミ':{ t:'A', c:'a' }, 'Bヨミ':{ t:'B', c:'b' }, 'Cヨミ':{ t:'C', c:'c' } };
   const statusBadge = { '未着手':'amber', '調整中':'blue', '確定':'green' };
-  const rsClass     = { '募集中':'open', '締切':'closed', '募集前':'pre', '下書き':'draft' };
+  const rsClass     = { '募集中':'open', '締切':'closed', '募集前':'pre', '下書き':'draft', '未公開':'unpub' };
   const DOW = ['日','月','火','水','木','金','土'];
 
-  // 募集状態（モックの簡易ルール）：下書き＝準備中／募集しない案件＝なし／充足（確定）＝締切／予備日＝募集前／それ以外＝募集中
+  // 募集状態：下書き＝準備中／募集しない案件＝なし／予備日＝募集前／
+  //   スタッフ公開ボードで公開していない＝未公開（スタッフにはまだ見えていない）／
+  //   充足（確定）＝締切／それ以外＝募集中。
+  // ⚠「未公開」を入れた理由（2026-08-21 baba）：
+  //   以前は登録時の「募集する」だけを見ていたため、公開ボードで公開していない案件まで
+  //   「募集中」と出ていた。実際にはスタッフの画面に出ておらず、応募も来ない。
   function recruitStateOf(p) {
     if (p.draft)               return '下書き';
     if (!p.recruit)            return 'なし';
-    if (p.status === '確定')   return '締切';
     if (p.dayType === '予備日') return '募集前';
+    if (!p.published)          return '未公開';
+    if (p.status === '確定')   return '締切';
     return '募集中';
   }
 
