@@ -367,6 +367,9 @@
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
+      // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
+      //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
+      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode })),
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。

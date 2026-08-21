@@ -64,6 +64,8 @@
 
     /* この日の稼働希望バッジ（希望あり=強調・稼働可=緑・NG=赤・未定=グレー） */
     .wish { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+    /* エントリー（この案件に応募した人）＝一番の手がかりなので目立たせる */
+    .wish.entry { background: #fde68a; color: #7a4a00; }
     .wish.希望 { background: var(--brand-soft); color: var(--brand-dark); }
     .wish.稼働可 { background: var(--ok-soft); color: #15803d; }
     .wish.NG { background: var(--danger-soft); color: #b91c1c; }
@@ -265,13 +267,14 @@
               @php($ex = $existing[$s['id']] ?? null)
               @php($w = $s['wish'] ?? null)
               @php($isAvail = in_array($w, ['希望', '稼働可'], true))
-              <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-pos="{{ implode('|', $s['posCodes']) }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
+              <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-pos="{{ implode('|', $s['posCodes']) }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-entry="{{ !empty($s['entry']) ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
                 <td class="chk">
                   <input type="checkbox" name="staff_ids[]" value="{{ $s['id'] }}" {{ $ex ? 'checked' : '' }} onchange="updateCount()">
                 </td>
                 <td>
                   <strong>{{ $s['name'] }}</strong>
                   <span class="muted" style="font-size:11.5px;">{{ $s['id'] }}</span>
+                  @if (!empty($s['entry']))<span class="wish entry" title="この案件にエントリー（応募）しています@if(!empty($s['entryNote']))：{{ $s['entryNote'] }}@endif">★エントリー</span>@endif
                   @if ($w === '希望')<span class="wish 希望">希望</span>@elseif ($w === '稼働可')<span class="wish 稼働可">稼働可</span>@elseif ($w === 'NG')<span class="wish NG">NG</span>@endif
                   @if ($s['exclusive'])<span class="badge ok" style="font-size:10px;">専属</span>@endif
                   @if ($ex && $ex['status'] === '確定')<span class="badge ok" style="font-size:10px;">確定済</span>@endif

@@ -68,6 +68,13 @@ class AssignmentController extends Controller
             ])
             ->all();
 
+        // この案件に「エントリーする」を押した人（applications）。スタッフID => 本人の一言。
+        // 稼働希望（下の $wish）とは別物。エントリー＝この案件を名指しで希望している人なので、
+        // アサインするときに一番の手がかりになる（2026-08-21 baba指摘：この画面に出ていなかった）。
+        $entries = \App\Models\Application::where('project_id', $project->id)
+            ->pluck('note', 'staff_id')
+            ->all();
+
         // この案件の日について、各スタッフが出した稼働希望（希望/稼働可/NG/未定）。
         // shift_preferences にまだ入力が無ければ空配列＝全員「—」表示（画面は従来どおり動く）。
         $wish = [];
@@ -149,7 +156,7 @@ class AssignmentController extends Controller
             ->with(['roleEligibilities', 'ngRelations'])
             ->orderByDesc('experience_count')
             ->get()
-            ->map(function (Person $p) use ($wish, $scorer) {
+            ->map(function (Person $p) use ($wish, $entries, $scorer) {
                 $can = $p->roleEligibilities->pluck('position')->all();
                 // 「できる役割」バッジは D・MC・OP・軍師 だけ表示（FC・CK等は全員できるので出さない／baba 2026-07-17）。
                 $canShown = array_values(array_filter($can, fn ($k) => in_array($k, self::CAN_SHOWN, true)));
@@ -173,6 +180,9 @@ class AssignmentController extends Controller
                     'posCodes' => $can,   // 自動仮置きで「この役割ができる人か」を判定するため
                     'ng' => $p->ngRelations->pluck('partner_name')->all(),
                     'wish' => $wish[$p->id] ?? null,
+                    // この案件にエントリーしたか（＋本人の一言）。
+                    'entry' => array_key_exists($p->id, $entries),
+                    'entryNote' => (string) ($entries[$p->id] ?? ''),
                     'score' => $eval['score'],
                     'reasons' => $eval['reasons'],
                     'warnings' => $eval['warnings'],
