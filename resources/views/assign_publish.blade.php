@@ -37,12 +37,25 @@
     .bulk-info { font-size: 12.5px; color: var(--muted); }
     .bulk-info b { color: var(--ink); }
 
-    /* 表：ノートPCでもページ全体が横に伸びないよう、表だけを横スクロールさせる */
+    /* 表：ノートPCの画面に収まるようにする（2026-08-21 baba）。
+       ・横スクロールは「どうしても入りきらないとき」の保険。ふだんは出さない
+       ・そのために、見出しもセルも折り返しを許して幅を詰める */
     .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .tbl-scroll > table.tbl { width: 100%; min-width: 900px; }
-    /* 会場・集合場所は長くなりがちなので、折り返して幅を抑える */
-    table.tbl td.place-cell { max-width: 260px; white-space: normal; word-break: break-all; }
-    table.tbl th { white-space: nowrap; }
+    .tbl-scroll > table.tbl { width: 100%; table-layout: fixed; }
+    /* 会場・集合場所は長くなりがちなので折り返す */
+    table.tbl td.place-cell { white-space: normal; word-break: break-all; }
+    /* 見出しも折り返す（「会場（住所）／集合場所」のような長い見出しで幅が広がらないように） */
+    table.tbl th { white-space: normal; font-size: 12px; line-height: 1.35; }
+    table.tbl td { font-size: 13px; }
+    /* 列の幅を決め打ちして、合計が画面に収まるようにする */
+    table.tbl col.c-chk   { width: 30px; }
+    table.tbl col.c-date  { width: 86px; }
+    table.tbl col.c-proj  { width: auto; }
+    table.tbl col.c-place { width: 22%; }
+    table.tbl col.c-meet  { width: 132px; }
+    table.tbl col.c-need  { width: 74px; }
+    table.tbl col.c-pub   { width: 78px; }
+    table.tbl col.c-ops   { width: 150px; }
     table.tbl td { vertical-align: middle; }
     td.chk, th.chk { width: 34px; text-align: center; }
     table.tbl input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
@@ -62,28 +75,28 @@
     td.date-cell .dow { font-size: 11.5px; color: var(--muted); margin-left: 2px; }
     td.date-cell .dow.sun { color: var(--danger); } td.date-cell .dow.sat { color: var(--brand); }
 
-    td.proj-cell { min-width: 190px; }
+    td.proj-cell { min-width: 0; word-break: break-all; }
     td.proj-cell strong { font-size: 14px; }
     td.proj-cell .client { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
     td.proj-cell a.proj-link { color: var(--ink); text-decoration: none; }
     td.proj-cell a.proj-link:hover strong { color: var(--brand-dark); text-decoration: underline; }
 
     /* 会場（住所）／集合場所 */
-    td.place-cell { font-size: 12.5px; max-width: 260px; }
+    td.place-cell { font-size: 12px; }
     td.place-cell .mp { font-size: 11px; color: var(--muted); margin-top: 2px; }
     /* 集合〜解散 */
     td.meet-cell .leave { font-size: 12px; color: var(--muted); }
 
     /* 集合（社員／スタッフ）セル */
-    td.meet-cell { white-space: nowrap; }
+    td.meet-cell { white-space: normal; }
     td.meet-cell .emp { font-size: 12px; color: var(--muted); }
     td.meet-cell .emp b { color: var(--ink); font-weight: 600; }
     td.meet-cell .staff-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
     td.meet-cell .staff-row .lab { font-size: 11px; color: var(--muted); }
     td.meet-cell .staff-row .leave { color: var(--muted); }
     td.meet-cell input.smeet {
-      width: 52px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 4px;
-      font-family: inherit; font-size: 12.5px; text-align: center;
+      width: 46px; border: 1px solid var(--line); border-radius: 7px; padding: 3px 2px;
+      font-family: inherit; font-size: 12px; text-align: center;
     }
     td.meet-cell input.smeet:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
     td.meet-cell .diff { font-size: 10.5px; font-weight: 700; color: #b45309; background: var(--warn-soft); padding: 1px 6px; border-radius: 999px; }
@@ -95,19 +108,21 @@
     .pub-badge.off { background: var(--warn-soft); color: #b45309; } .pub-badge.off .dot { background: #d97706; }
 
     /* 操作セル */
-    td.need-cell { white-space: nowrap; }
-    .need-input { width: 52px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+    td.need-cell { white-space: nowrap; font-size: 12px; }
+    .need-input { width: 46px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
                   font-size: 13px; font-family: inherit; text-align: right; }
-    td.ops-cell { white-space: nowrap; }
-    .pub-toggle { border: none; border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    td.ops-cell { white-space: normal; }
+    /* 操作の各ボタンは折り返して縦に並ぶ＝横幅を取らない（2026-08-21 baba） */
+    td.ops-cell > * { margin: 2px 3px 2px 0 !important; }
+    .pub-toggle { border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
     .pub-toggle.go   { background: var(--brand); color: #fff; }
     .pub-toggle.go:hover { background: var(--brand-dark); }
     .pub-toggle.undo { background: #fff; color: #15803d; border: 1px solid #bbe3c6; }
     .pub-toggle.undo:hover { background: var(--ok-soft); }
-    td.ops-cell a.detail-link { font-size: 12px; margin-left: 8px; white-space: nowrap; }
-    td.ops-cell .note-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 9px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; color: var(--ink); }
+    td.ops-cell a.detail-link { font-size: 11.5px; white-space: nowrap; }
+    td.ops-cell .note-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 7px; font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink); }
     td.ops-cell .note-btn:hover { background: #f3ece0; }
-    td.ops-cell .cat-toggle { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 6px 9px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; color: var(--ink); }
+    td.ops-cell .cat-toggle { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 5px 7px; font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink); }
     td.ops-cell .cat-toggle:hover { background: #f3ece0; }
     td.ops-cell .cat-toggle.is-extra { background: #fde8e8; color: #b91c1c; border-color: var(--danger); font-weight: 700; }
 
@@ -246,6 +261,10 @@
              （2026-08-21 baba。ページ全体が横に伸びると操作しづらいため）。 -->
         <div class="tbl-scroll">
         <table class="tbl">
+          <colgroup>
+            <col class="c-chk"><col class="c-date"><col class="c-proj"><col class="c-place">
+            <col class="c-meet"><col class="c-need"><col class="c-pub"><col class="c-ops">
+          </colgroup>
           <thead>
             <tr>
               <th class="chk"><input type="checkbox" id="selAll" onclick="toggleAll(this.checked)" title="表示中をすべて選択"></th>
@@ -565,7 +584,7 @@
       <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
-        <div class="staff-row"><span class="lab">スタッフ</span>
+        <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
           <input class="smeet" type="text" value="${sm}" onchange="saveStaffTime('${c.id}', 'meet', this.value)" title="スタッフに見せる集合時間">
           <span class="leave">〜</span>
           <input class="smeet" type="text" value="${sl}" onchange="saveStaffTime('${c.id}', 'leave', this.value)" title="スタッフに見せる解散時間">
