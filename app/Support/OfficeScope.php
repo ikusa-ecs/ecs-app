@@ -49,6 +49,25 @@ class OfficeScope
         return Auth::user()->office ?: self::DEFAULT_OFFICE;
     }
 
+    /**
+     * 「必ずどこか1拠点」を返す（＝全拠点は無し）。
+     *
+     * 公開ボードのように、全拠点をまとめて操作すると事故になる画面で使う
+     * （2026-08-21 baba：全拠点表示のまま一括公開すると、他拠点の未公開案件まで
+     *  スタッフに出てしまう）。管理者以上はスイッチで拠点を選べるが「全拠点」は選べない。
+     */
+    public static function filterSingle(Request $request): string
+    {
+        if (self::canSeeAll()) {
+            $sel = trim((string) $request->query('office', ''));
+            if ($sel !== '' && in_array($sel, self::options(), true)) {
+                return $sel;
+            }
+        }
+
+        return trim((string) (Auth::user()->office ?? '')) ?: self::DEFAULT_OFFICE;
+    }
+
     /** スイッチのハイライト用に「今選ばれている値」を返す（''＝全拠点）。管理者以上のみ意味を持つ。 */
     public static function selected(Request $request): string
     {

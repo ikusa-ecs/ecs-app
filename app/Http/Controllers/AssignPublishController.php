@@ -27,9 +27,11 @@ class AssignPublishController extends Controller
     {
         $today = Carbon::today();
 
-        // 拠点の表示範囲（全拠点運用・2026-08-05 baba確定＝公開ボードは第2弾）。
-        // 管理者以上は既定で全拠点（スイッチで選択）、一般社員は自拠点固定。
-        $office = OfficeScope::filter($request);
+        // 拠点の表示範囲。この画面は**必ず1拠点ずつ**（2026-08-21 baba）。
+        // 理由＝全拠点をまとめて表示すると、一括公開で他拠点の未公開案件まで
+        // スタッフに出てしまう事故が起きるため。管理者以上はスイッチで拠点を選べるが、
+        // 「全拠点」は選べない。一般社員はこれまでどおり自拠点固定。
+        $office = OfficeScope::filterSingle($request);
 
         $cases = OfficeScope::applyToProjects(Project::query(), $office)
             ->orderBy('start_date')->get()->map(function (Project $p) use ($today) {
@@ -84,7 +86,11 @@ class AssignPublishController extends Controller
             'ids'     => ['required', 'array', 'min:1'],
             'ids.*'   => ['string'],
             'publish' => ['required', 'boolean'],
+            // 画面が見ていた拠点。違う拠点の案件は触らない＝取り違えの保険（2026-08-21 baba）。
+            'office'  => ['nullable', 'string'],
         ]);
+
+        $scope = trim((string) ($data['office'] ?? ''));
 
         // ⚠ ここを Project::whereIn(...)->update(...) の一括更新で書くと、
         //   モデルの保存イベントが動かないため公開ON/OFFだけ編集履歴に残らない
@@ -95,6 +101,9 @@ class AssignPublishController extends Controller
         foreach (Project::whereIn('id', $data['ids'])->get() as $project) {
             if (! ProjectAccess::canEdit($project)) {
                 continue;   // 他拠点の案件は公開状態を変えられない
+            }
+            if ($scope !== '' && (string) ($project->office ?? '') !== $scope) {
+                continue;   // 画面で見ていた拠点と違う＝まとめて公開する事故を防ぐ
             }
             if ((bool) $project->staff_published === (bool) $data['publish']) {
                 continue;   // すでにその状態＝履歴を汚さない

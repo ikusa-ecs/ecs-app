@@ -3,7 +3,12 @@
      選んだ拠点は ?office= を付けて開き直し、サーバー側で案件を絞る。 --}}
 @php
     $__osCanSwitch = \App\Support\OfficeScope::canSeeAll();
-    $__osSelected  = \App\Support\OfficeScope::selected(request());
+    // osNoAll＝「全拠点」を出さない画面（公開ボードのように、まとめて操作すると事故になるもの）。
+    // その画面では osActive に「いま見ている拠点」を渡してもらい、それを選択中として光らせる。
+    $__osNoAll     = $osNoAll ?? false;
+    $__osSelected  = $__osNoAll
+        ? (string) ($osActive ?? \App\Support\OfficeScope::DEFAULT_OFFICE)
+        : \App\Support\OfficeScope::selected(request());
     $__osOptions   = \App\Support\OfficeScope::options();
 @endphp
 @if ($__osCanSwitch)
@@ -25,8 +30,13 @@
 </style>
 <div class="office-switch">
   <span class="os-label">表示する拠点</span>
-  <a class="os-chip {{ $__osSelected === '' ? 'active' : '' }}"
-     href="{{ request()->fullUrlWithQuery(['office' => '']) }}">全拠点</a>
+  @if ($__osNoAll)
+    <span style="font-size:11.5px;color:var(--muted,#8a7a6b);">（この画面は<b>1拠点ずつ</b>。まとめて公開する事故を防ぐため「全拠点」はありません）</span>
+  @endif
+  @unless ($__osNoAll)
+    <a class="os-chip {{ $__osSelected === '' ? 'active' : '' }}"
+       href="{{ request()->fullUrlWithQuery(['office' => '']) }}">全拠点</a>
+  @endunless
   @foreach ($__osOptions as $__of)
     <a class="os-chip {{ $__osSelected === $__of ? 'active' : '' }}"
        href="{{ request()->fullUrlWithQuery(['office' => $__of]) }}">{{ $__of }}</a>

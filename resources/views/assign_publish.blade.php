@@ -184,7 +184,7 @@
 
 @section('content')
       {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
-      @include('partials.office_switch')
+      @include('partials.office_switch', ['osNoAll' => true, 'osActive' => $officeScope])
       @if ($officeScope)
         <p class="mock-note" style="background:#fbf6ef;">
           <b>{{ $officeScope }}</b>の案件だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
@@ -305,6 +305,8 @@
   window.ECS_STAFF_NOTICE = @json($notice);
   window.ECS_ENTRY_DEADLINE = @json($entryDeadline ?? '');
   window.ECS_CSRF = '{{ csrf_token() }}';
+  // いま見ている拠点。一括公開のときサーバーへ一緒に送り、違う拠点の案件は触らせない。
+  window.ECS_OFFICE_SCOPE = @json($officeScope ?? '');
 </script>
 @verbatim
 <script>
@@ -337,7 +339,7 @@
     fetch('/assign-publish/set', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
-      body: JSON.stringify({ ids: ids, publish: publish })
+      body: JSON.stringify({ ids: ids, publish: publish, office: (window.ECS_OFFICE_SCOPE || '') })
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); })
     .catch(() => {

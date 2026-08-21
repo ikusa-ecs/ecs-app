@@ -57,25 +57,71 @@ class OfficeScopeBoardTest extends TestCase
         }
     }
 
-    /** 管理者は既定で全拠点。?office= を付けたときだけ絞られる。 */
+    /** 管理者は既定で全拠点。?office= を付けたときだけ絞られる（日別ボード）。 */
     public function test_board_screens_let_manager_switch_office(): void
     {
         $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
         $tokyo = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
         $osaka = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon(4)]);
 
-        $all = $this->actingAsPerson($manager)->get('/assign-publish')
+        $all = $this->actingAsPerson($manager)->get('/assign')
             ->assertOk()->original->getData();
         $this->assertNull($all['officeScope']);
         $this->assertEqualsCanonicalizing(
             [$tokyo->id, $osaka->id],
-            collect($all['cases'])->pluck('id')->all()
+            collect($all['boardCases'])->pluck('id')->all()
         );
 
+        $only = $this->actingAsPerson($manager)->get('/assign?office=' . urlencode('大阪'))
+            ->assertOk()->original->getData();
+        $this->assertSame('大阪', $only['officeScope']);
+        $this->assertSame([$osaka->id], collect($only['boardCases'])->pluck('id')->all());
+    }
+
+    /**
+     * 公開ボードだけは「必ず1拠点」（2026-08-21 baba）。
+     * 全拠点をまとめて表示すると、一括公開で他拠点の未公開案件まで
+     * スタッフに出てしまう事故が起きるため、管理者でも「全拠点」にはならない。
+     */
+    public function test_publish_board_is_always_one_office(): void
+    {
+        $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
+        $tokyo = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        $osaka = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon(4)]);
+
+        // 指定なし＝自分の拠点だけ
+        $mine = $this->actingAsPerson($manager)->get('/assign-publish')
+            ->assertOk()->original->getData();
+        $this->assertSame('東京', $mine['officeScope']);
+        $this->assertSame([$tokyo->id], collect($mine['cases'])->pluck('id')->all());
+
+        // 空指定（?office=）でも全拠点にはしない
+        $blank = $this->actingAsPerson($manager)->get('/assign-publish?office=')
+            ->assertOk()->original->getData();
+        $this->assertSame('東京', $blank['officeScope']);
+
+        // 切り替えれば、その拠点だけ
         $only = $this->actingAsPerson($manager)->get('/assign-publish?office=' . urlencode('大阪'))
             ->assertOk()->original->getData();
         $this->assertSame('大阪', $only['officeScope']);
         $this->assertSame([$osaka->id], collect($only['cases'])->pluck('id')->all());
+    }
+
+    /** 一括公開は、画面で見ていた拠点の案件だけを公開する（取り違えの保険）。 */
+    public function test_bulk_publish_skips_other_offices(): void
+    {
+        $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
+        $tokyo = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        $osaka = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon(4)]);
+
+        $this->actingAsPerson($manager)->postJson('/assign-publish/set', [
+            'ids'     => [$tokyo->id, $osaka->id],
+            'publish' => true,
+            'office'  => '東京',
+        ])->assertOk();
+
+        $this->assertTrue((bool) $tokyo->fresh()->staff_published);
+        $this->assertFalse((bool) $osaka->fresh()->staff_published, '見ていない拠点の案件は公開しない');
     }
 
     /** ピックアップ：案件は絞るが、その案件のメンバー（他拠点のヘルプ）は残す。 */
