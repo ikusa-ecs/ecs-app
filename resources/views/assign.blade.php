@@ -155,6 +155,15 @@
     /* 案件名のリンク（押すと案件の詳細・編集へ）。色は見出しのまま、マウスを乗せたときだけ下線。 */
     .cc-name a { color: inherit; text-decoration: none; }
     .cc-name a:hover { text-decoration: underline; }
+    /* メンバーの「仮／確定」。押すと入れ替わる。仮＝橙で目立たせる（スタッフに見えないので気づきたい）。 */
+    .m-st { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+      white-space: nowrap; cursor: pointer; border: 1px solid transparent; }
+    .m-st.kari { background: #fdecd9; color: #b45309; border-color: #f0d5b0; }
+    .m-st.fix  { background: var(--ok-soft); color: #15803d; border-color: #cdeccf; }
+    .m-st:hover { filter: brightness(.96); text-decoration: underline; }
+    /* メンバー欄の見出しに出す「仮 ◯名」（仮の人はスタッフに見えない＝公開前に気づくため） */
+    .kari-warn { margin-left: 6px; font-size: 10px; font-weight: 700; color: #b45309;
+      background: #fdecd9; border-radius: 999px; padding: 1px 7px; cursor: help; }
     /* メンバー行の担当メモ・巡回（小さく控えめに） */
     .m-note  { font-size: 10.5px; font-weight: 700; color: #6d28d9; white-space: nowrap; }
     .m-patrol{ font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
@@ -348,6 +357,8 @@
   // 担当メモ（軍師・サポ等）の入力候補。datalist に流し込む。
   window.ECS_NOTE_OPTIONS = @json($noteOptions ?? []);
   window.ECS_QUICK_URL = '/entries/assign';
+  // 今この画面が見ている拠点（管理者が全拠点で見ているときは空）。公開のときに「違う拠点は触らない」保険として送る。
+  window.ECS_OFFICE_SCOPE = @json($officeScope ?? null);
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -692,20 +703,52 @@
     render();
   }
   // ===== ボード上で完結：確定・公開 =====
+  // ⚠ 2026-08-21 まで、この2つは「画面の色が変わるだけ」で何も保存していなかった（見せかけのまま残っていた）。
+  //   いまは本物：確定＝案件のアサイン状況を保存／公開＝スタッフ公開ボードと同じ処理を呼ぶ。
   function markFix(id){
     const c = cases.find(x => x.id === id);
     if (!c) return;
-    if (filledOf(c) < c.need && !confirm('必要人数（' + c.need + '名）に達していませんが、確定にしますか？')) return;
-    c.state = 'fix';
-    render();
+    if (filledOf(c) < c.need
+      && !confirm('必要人数（' + c.need + '名）に対して ' + filledOf(c) + '名です。\nこのまま確定にしますか？')) return;
+    if (!USING_DB){ c.state = 'fix'; render(); return; }   // 見本データのときは画面だけ
+    fetch('/projects/cells', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ id: id, status: '確定' })
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(() => { c.state = 'fix'; render(); })
+      .catch(e => alert('確定にできませんでした（' + e + '）。もう一度お試しください。'));
   }
   function markPub(id){
     const c = cases.find(x => x.id === id);
     if (!c) return;
-    if (!confirm('「' + c.name + '」をスタッフに公開します。\n（モックのため実際の通知は行いません）\n公開してよろしいですか？')) return;
-    c.state = 'pub';
-    render();
-    alert('📣 スタッフに公開しました（モック）。\nスタッフ画面の「確定アサイン」に表示される想定です。');
+    const kari = c.assigned.filter(m => m.status === '仮').length;
+    const short = filledOf(c) < c.need
+      ? '\n（必要 ' + c.need + '名に対して ' + filledOf(c) + '名です。人数が足りなくても公開できます）' : '';
+    if (!confirm('「' + c.name + '」をスタッフに公開します。' + short
+      + '\n\n公開すると、この案件が募集としてスタッフ画面に出ます。'
+      + '\nアサインした人の画面に出るのは「確定」の人だけです（「仮」は出ません）。'
+      + '\n公開してよろしいですか？')) return;
+    if (!USING_DB){ c.state = 'pub'; render(); return; }   // 見本データのときは画面だけ
+    // 公開の処理はスタッフ公開ボードと同じ入口を使う（staff_published を立てる＝編集履歴にも残る）。
+    const body = { ids: [id], publish: true };
+    if (window.ECS_OFFICE_SCOPE) body.office = window.ECS_OFFICE_SCOPE;
+    fetch('/assign-publish/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!res || !res.updated){ alert('公開できませんでした（他の拠点の案件か、すでに公開済みです）。'); return; }
+        c.state = 'pub';
+        render();
+        alert('📣 スタッフに公開しました。'
+          + (kari ? '\n\n⚠ このカードには「仮」の人が ' + kari + '名います。仮の人はスタッフの画面に出ません。'
+                  + '\nメンバー欄の「仮」を押すと確定にできます。' : ''));
+      })
+      .catch(e => alert('公開できませんでした（' + e + '）。もう一度お試しください。'));
   }
   // 社員を足す（人手不足時）
   function addEmployee(caseId){
@@ -869,6 +912,39 @@
     }
     const v = m.remark ? escHtml(m.remark) : '';
     return `<input class="m-remark-inp" placeholder="一言" value="${v}" title="備考（一言・入力すると保存されます）" onchange="changeMemberRemark('${c.id}','${m.id}', this.value)">`;
+  }
+
+  // メンバーの「仮／確定」。押すと入れ替わる（2026-08-21 baba要望）。
+  // なぜ要るか＝スタッフの画面に出るのは「確定」の人だけ。追加でアサインした人は「仮」で入るので、
+  // ここで確定にしないと本人に見えない。これまで日別ボードには仮か確定かの表示すら無かった。
+  function statusCellHtml(c, m){
+    const st = m.status || '確定';
+    // 見本データ・スタッフIDが無い行（派遣など）は押せないので、仮のときだけ印を出す。
+    if (!USING_DB || !m.id) return st === '仮' ? '<span class="m-st kari">仮</span>' : '';
+    const next = st === '仮' ? '確定' : '仮';
+    const cls  = st === '仮' ? 'kari' : 'fix';
+    const tip  = st === '仮'
+      ? 'いまは仮＝スタッフに見えません。押すと確定になります。'
+      : '確定です（公開済みならスタッフに見えています）。押すと仮に戻します。';
+    return `<span class="m-st ${cls}" title="${tip}" onclick="changeMemberStatus('${c.id}','${m.id}','${next}')">${st}</span>`;
+  }
+  function changeMemberStatus(caseId, staffId, next){
+    const c = cases.find(z => z.id === caseId);
+    const m = c && c.assigned.find(x => x.id === staffId);
+    if (!c || !m) return;
+    // 確定 → 仮 は「公開済みならスタッフの画面から消える」＝重い操作なので確認を挟む。
+    if (next === '仮' && !confirm(m.name + ' さんを「仮」に戻します。\n公開済みの案件では、スタッフの画面から消えます。\nよろしいですか？')) return;
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: caseId, staff_id: staffId, action: 'assign', status: next })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.ok){ m.status = res.status || next; render(); }
+        else { alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); }
+      })
+      .catch(() => alert('通信エラーで保存できませんでした。'));
   }
 
   // ポジション変更を assignments に保存（エントリー一覧と同じ quickToggle を再利用）。状態(仮/確定)は維持する。
@@ -1133,11 +1209,13 @@
         ? `<span class="renkin-badge ${dayN >= 4 ? 'hi' : ''}" title="連勤の内訳（この期間に ${dayN}日ぶん）：\n${renkinList}">連${dayN}日</span>`
         : '';
       const capb = m.type === 'staff' ? capBadge(m.name, amap) : '';
-      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
+      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
+    // 「仮」の人数（この人たちはスタッフの画面に出ないので、見出しで気づけるようにする・2026-08-21 baba）
+    const kariN = members.filter(m => m.status === '仮').length;
     const memCol =
       `<div class="cc-col">
-         <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span></div>
+         <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span>${kariN ? `<span class="kari-warn" title="「仮」の人はスタッフの画面に出ません。名前の横の「仮」を押すと確定にできます。">仮 ${kariN}名</span>` : ''}</div>
          <div class="col-list">${memRows || '<div class="mem-none">メンバー未割当</div>'}</div>
          ${editMode ? `<div class="add-row"><select class="mini-sel" title="名簿（社員・スタッフ）から選んで追加。LINEで入れると言われたスタッフもここから。" onchange="addRosterMember('${c.id}', this.value)">${rosterOptions(c)}</select><button class="mini" onclick="addHaken('${c.id}')">＋派遣</button></div>` : ''}
        </div>`;
@@ -1166,7 +1244,8 @@
     let stateBtn = '';
     if (c.state === 'todo' || c.state === 'adj') stateBtn = `<button class="edit-btn" onclick="markFix('${c.id}')">✓ 確定にする</button>`;
     else if (c.state === 'fix')                  stateBtn = `<button class="auto-btn" onclick="markPub('${c.id}')">📣 スタッフに公開</button>`;
-    else if (c.state === 'pub')                  stateBtn = `<span style="font-size:12px; font-weight:700; color:#15803d;">公開中 ✓</span>`;
+    // 公開をやめる操作は公開ボードに任せる（公開のON/OFFの入口を増やしすぎないため）。
+    else if (c.state === 'pub')                  stateBtn = `<span style="font-size:12px; font-weight:700; color:#15803d;">公開中 ✓</span><a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;
 
     card.innerHTML = `
       <div class="cc-head">

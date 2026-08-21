@@ -706,6 +706,9 @@ class ProjectController extends Controller
             'audio_equipment' => ['nullable', 'string', 'max:100'],
             // 備考（社員だけが見るメモ）。アサイン系の画面からもその場で直せるようにした（2026-08-21 baba）。
             'note'            => ['nullable', 'string', 'max:2000'],
+            // アサイン状況。日別ボードの「✓ 確定にする」から保存する（2026-08-21 baba）。
+            // 下書き・キャンセルはここでは扱わない（案件登録・削除の流れで決まるものなので混ぜない）。
+            'status'          => ['nullable', 'in:未着手,調整中,確定,完了'],
             // 制作・記録（案件一覧の詳細でその場保存）
             'pub_logo'       => ['nullable', 'string', 'max:20'],
             'pub_camera'     => ['nullable', 'string', 'max:20'],
@@ -761,6 +764,11 @@ class ProjectController extends Controller
         if ($request->has('note')) {
             $val = trim((string) $request->input('note'));
             $project->note = $val !== '' ? $val : null;
+        }
+
+        // アサイン状況（未着手／調整中／確定／完了）。日別ボードの「✓ 確定にする」がここへ来る。
+        if ($request->filled('status')) {
+            $project->status = $request->input('status');
         }
 
         // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ／引き継ぎ／台本）。
