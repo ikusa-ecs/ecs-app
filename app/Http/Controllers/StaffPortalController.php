@@ -171,14 +171,19 @@ class StaffPortalController extends Controller
      *
      * @return array{year:int,month:int,days:int,firstDow:int,label:string,deadline:string}
      */
+    /** 稼働希望カレンダーで先に進める月数（当月＋この数）。半年先まで出せる（2026-08-21 baba）。 */
+    private const PREF_MONTHS_AHEAD = 6;
+
     private function prefMeta(string $period): array
     {
         [$y, $m] = array_map('intval', array_pad(explode('-', $period), 2, 1));
         $first = Carbon::create($y, $m, 1)->startOfDay();
 
-        // 月を切り替えられる範囲＝当月から3か月先まで（過ぎた月の希望を出す意味がないため）。
+        // 月を切り替えられる範囲＝当月から半年先まで（2026-08-21 baba）。
+        // 大型案件は早くから日程が決まるので、先の月の希望も出しておけるようにする。
+        // 下限は当月（過ぎた月の希望を出す意味がないため）。
         $min = Carbon::now()->startOfMonth();
-        $max = $min->copy()->addMonthsNoOverflow(3);
+        $max = $min->copy()->addMonthsNoOverflow(self::PREF_MONTHS_AHEAD);
         $prev = $first->copy()->subMonthNoOverflow();
         $next = $first->copy()->addMonthNoOverflow();
 
@@ -188,14 +193,33 @@ class StaffPortalController extends Controller
             'days'     => $first->daysInMonth,
             'firstDow' => (int) $first->dayOfWeek,   // 0=日曜
             'label'    => $y . '年' . $m . '月',
+            // いま表示している月（YYYY-MM に揃えたもの）。プルダウンの選択中の判定に使う。
+            'value'    => $first->format('Y-m'),
             'deadline' => $first->copy()->subMonthNoOverflow()->day(25)->format('n月j日'),
             // 月の切り替え（2026-08-21 baba要望）。範囲外は null＝ボタンを出さない。
             'prev'      => $prev->gte($min) ? $prev->format('Y-m') : null,
             'next'      => $next->lte($max) ? $next->format('Y-m') : null,
             'prevLabel' => $prev->format('n月'),
             'nextLabel' => $next->format('n月'),
+            // 月を直接選べるプルダウン用（当月〜半年先）。押す回数を減らすため。
+            'months'    => $this->prefMonthOptions($min, $max),
             'isPast'    => $first->lt($min),   // 過ぎた月＝入力してもらう月ではない
         ];
+    }
+
+    /**
+     * 稼働希望カレンダーの月プルダウンの選択肢（当月〜半年先）。
+     *
+     * @return array<int, array{value:string,label:string}>
+     */
+    private function prefMonthOptions(Carbon $min, Carbon $max): array
+    {
+        $out = [];
+        for ($d = $min->copy(); $d->lte($max); $d->addMonthNoOverflow()) {
+            $out[] = ['value' => $d->format('Y-m'), 'label' => $d->format('Y年n月')];
+        }
+
+        return $out;
     }
 
     /** DBの availability → カレンダーの状態語（ok/ng/maybe）。「希望」も画面では〇(ok)扱い。 */

@@ -72,6 +72,10 @@
     .pref-month-nav .pm-btn:hover { background:#fdf3e2; }
     .pref-month-nav .pm-btn.off { color:#bbb; background:#f6f4f1; border-color:#eee; }
     .pref-month-nav .pm-now { font-size:15px; font-weight:800; }
+    .pref-month-nav .pm-sel {
+      font-size:15px; font-weight:800; padding:5px 10px; border-radius:8px;
+      border:1px solid #e6d8c8; background:#fff; font-family:inherit; color:#2c2018;
+    }
 
     .notice {
       background: var(--warn-soft); color: #92400e; border: 1px solid #f6d9a7;
@@ -431,7 +435,12 @@
             @else
               <span class="pm-btn off">‹ 前の月</span>
             @endif
-            <span class="pm-now">{{ $prefMeta['label'] }}</span>
+            <select class="pm-sel" onchange="if(this.value)location.href='/staff-portal?period='+this.value+'#tab-pref';"
+                    aria-label="表示する月">
+              @foreach ($prefMeta['months'] as $m)
+                <option value="{{ $m['value'] }}" @selected($m['value'] === $prefMeta['value'])>{{ $m['label'] }}</option>
+              @endforeach
+            </select>
             @if ($prefMeta['next'])
               <a class="pm-btn" href="/staff-portal?period={{ $prefMeta['next'] }}#tab-pref">{{ $prefMeta['nextLabel'] }} ›</a>
             @else

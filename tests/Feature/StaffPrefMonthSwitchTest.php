@@ -11,7 +11,7 @@ use Tests\TestCase;
  * 稼働希望カレンダーの月を切り替えられる（2026-08-21 baba要望）。
  *
  * これまでは当月しか出せず、翌月分の希望を出してもらえなかった。
- * 切り替えられる範囲＝当月〜3か月先（過ぎた月の希望を出す意味がないため）。
+ * 切り替えられる範囲＝当月〜半年先（大型案件は早くに日程が決まるため・2026-08-21 baba）。
  */
 class StaffPrefMonthSwitchTest extends TestCase
 {
@@ -44,15 +44,15 @@ class StaffPrefMonthSwitchTest extends TestCase
         $this->assertSame(Carbon::now()->format('Y-m'), $meta['prev'], '当月へ戻れる');
     }
 
-    /** 3か月先までしか進めない。 */
-    public function test_cannot_go_beyond_three_months(): void
+    /** 半年先までしか進めない。 */
+    public function test_cannot_go_beyond_six_months(): void
     {
         $staff = PersonFactory::new()->staff()->create();
-        $far = Carbon::now()->addMonthsNoOverflow(3);
+        $far = Carbon::now()->addMonthsNoOverflow(6);
 
         $meta = $this->actingAsPerson($staff)->get('/staff-portal?period=' . $far->format('Y-m'))
             ->assertOk()->original->getData()['prefMeta'];
 
-        $this->assertNull($meta['next'], '3か月先が上限');
+        $this->assertNull($meta['next'], '半年先が上限');
     }
 }
