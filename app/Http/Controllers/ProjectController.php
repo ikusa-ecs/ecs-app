@@ -347,6 +347,24 @@ class ProjectController extends Controller
             ->values()
             ->all();
 
+        // 運営場所の選択肢。
+        // 「○○依頼」（地方拠点に任せる）は拠点マスタから作る。以前は大阪・名古屋・福岡を
+        // 画面に直書きしていたため、拠点が増えても選べなかった（北海道が無い・2026-08-21 baba）。
+        // 自分の拠点あての「依頼」は出さない（自分の拠点で運営するなら「現地」等になるため）。
+        $ownOffice = $editProject['office'] ?? (Auth::user()->office ?? \App\Support\OfficeScope::DEFAULT_OFFICE);
+        $operationPlaceOptions = collect(['現地', '配信室(広宣)', '配信室横(広宣)', '芝生(広宣)'])
+            ->merge(
+                collect(\App\Support\OfficeScope::options())
+                    ->reject(fn ($name) => $name === $ownOffice)
+                    ->map(fn ($name) => $name . '依頼')
+            );
+        // 編集で開いたとき、保存済みの値が選択肢に無いと空になってしまうので足しておく
+        // （拠点名を変えた・古い言い方で保存されている場合の保険）。
+        if (! empty($editProject['operation_place']) && ! $operationPlaceOptions->contains($editProject['operation_place'])) {
+            $operationPlaceOptions->push($editProject['operation_place']);
+        }
+        $operationPlaceOptions = $operationPlaceOptions->values()->all();
+
         // 既定の拠点＝編集ならその案件の拠点／新規ならログイン中の社員の拠点（無ければ東京）。
         $defaultOffice = $editProject['office']
             ?? (Auth::user()->office ?? '東京');
@@ -384,6 +402,7 @@ class ProjectController extends Controller
             'offices'        => $offices,
             'defaultOffice'  => $defaultOffice,
             'contentOptions' => $contentOptions,
+            'operationPlaceOptions' => $operationPlaceOptions,
             // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
             'assignMtgDate'  => \App\Support\AssignMtg::current(),
@@ -460,7 +479,9 @@ class ProjectController extends Controller
             'start_date' => ['nullable', 'date'],
         ]);
 
-        $publish = $request->input('intent') === 'publish';
+        // intent: 'draft'＝下書き／'publish'＝確定／'next'＝確定して「同じ内容で次の日程」へ続ける。
+        $intent = (string) $request->input('intent');
+        $publish = in_array($intent, ['publish', 'next'], true);
 
         // ── 「確定」で保存するときの必須チェック（サーバー側）──
         // これまでサーバー側は開催日の形式だけ見ており、画面のJSを通らない経路（直接POST・
@@ -593,11 +614,10 @@ class ProjectController extends Controller
                 default => null,   // auto（未指定も自動あつかい）
             },
             'assembly_type' => $request->input('assembly_type'),
-            'assembly_detail' => $request->input('assembly_detail'),
-            // スタッフ本人に伝えること（担当になった人の「確定アサイン」の詳細に出る）
-            'staff_belongings' => $request->input('staff_belongings'),
-            'staff_dresscode' => $request->input('staff_dresscode'),
-            'staff_notes' => $request->input('staff_notes'),
+            // ⚠ 集合場所の詳細（assembly_detail）と、スタッフ本人に伝えること
+            //   （staff_belongings / staff_dresscode / staff_notes）はここでは触らない。
+            //   入力する場所をスタッフ公開ボードの「📣 スタッフに伝えること」1か所にまとめたため
+            //   （2026-08-21 baba）。ここで拾うと、案件を保存し直すたびに空で上書きしてしまう。
             'staff_role' => $request->input('staff_role'),
             'required_count' => $request->filled('required_count') ? (int) $request->input('required_count') : null,
             'count_tentative' => $request->has('count_tentative'),
@@ -631,6 +651,14 @@ class ProjectController extends Controller
             Project::create($attributes);
             $label = $publish ? '「募集中」で' : '下書きとして';
             $message = "案件「{$projectName}」を{$label}保存しました。（ID: {$id}）";
+        }
+
+        // 「同じ内容で次の日程を追加」＝保存したあと、同じ内容を入れた新規フォームをもう一度開く。
+        // 中身は複製（?copy=）と同じ仕組みで、開催日と運営シートURLだけ空になる
+        // （これまでは案件一覧に戻ってしまい、続けて登録できなかった・2026-08-21 baba）。
+        if ($intent === 'next') {
+            return redirect('/project-form?copy=' . urlencode($id))
+                ->with('status', $message . ' 続けて次の日程を登録できます（開催日を入れてください）。');
         }
 
         return redirect('/projects')->with('status', $message);

@@ -24,12 +24,12 @@
     }
 
     .m-head {
-      display: grid; grid-template-columns: 66px 1fr 110px 44px 58px 48px 178px; gap: 8px;
+      display: grid; grid-template-columns: 66px 1fr 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
       font-size: 11.5px; font-weight: 700; color: var(--muted); padding: 2px 4px 6px; align-items: end;
     }
     .m-head.off { grid-template-columns: 56px 1fr 96px 52px 150px; }
     .m-row {
-      display: grid; grid-template-columns: 66px 1fr 110px 44px 58px 48px 178px; gap: 8px;
+      display: grid; grid-template-columns: 66px 1fr 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
       align-items: center; padding: 6px 4px; border-top: 1px solid var(--line);
     }
     .m-row.off { grid-template-columns: 56px 1fr 96px 52px 150px; }
@@ -38,6 +38,9 @@
     .m-save-bar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 12px 4px 2px; }
     .m-save-bar .m-btn { padding: 9px 20px; font-size: 13px; }
     /* 上下の並び替えボタン */
+    /* 必要人数（規模別の合計）。一覧でそのまま読めるように小さめ・折り返さない。 */
+    .m-req { display: flex; align-items: center; font-size: 12px; color: #4b4540; white-space: nowrap; }
+    .m-req-none { color: var(--muted, #8a8178); }
     .m-move { display: flex; gap: 4px; justify-content: center; }
     .m-move button { padding: 4px 9px; font-size: 13px; line-height: 1; }
     .m-move button[disabled] { opacity: .35; cursor: default; }
@@ -92,7 +95,7 @@
     <form method="POST" action="/masters/contents/bulk">
       @csrf
       <div class="m-head">
-        <span>ID</span><span>コンテンツ名</span><span>分類</span><span>紙</span><span>枚/組</span><span>有効</span><span>操作</span>
+        <span>ID</span><span>コンテンツ名</span><span>分類</span><span>紙</span><span>枚/組</span><span>有効</span><span>必要人数</span><span>並び替え</span><span>操作</span>
       </div>
       @foreach ($contents as $c)
         <div class="m-row">
@@ -102,6 +105,18 @@
           <label class="m-chk"><input type="checkbox" name="rows[{{ $c->id }}][needs_paper]" value="1" @checked($c->needs_paper)></label>
           <input type="number" name="rows[{{ $c->id }}][sheets_per_team]" value="{{ $c->sheets_per_team ?? 1 }}" min="1" max="99" title="1チームあたりの必要枚数">
           <label class="m-chk"><input type="checkbox" name="rows[{{ $c->id }}][active]" value="1" @checked($c->active)></label>
+          {{-- 今その コンテンツに何人ぶん登録されているか（規模別の合計）。毎回「必要人数」画面を開かなくて済むように。 --}}
+          <div class="m-req">
+            @if (empty($reqTotals[$c->id]))
+              <span class="m-req-none" title="規模ごとの必要人数がまだ設定されていません">未設定</span>
+            @else
+              <span title="小型 {{ $reqTotals[$c->id]['小型'] ?? 0 }}人／中型 {{ $reqTotals[$c->id]['中型'] ?? 0 }}人／大型 {{ $reqTotals[$c->id]['大型'] ?? 0 }}人">小{{ $reqTotals[$c->id]['小型'] ?? 0 }}・中{{ $reqTotals[$c->id]['中型'] ?? 0 }}・大{{ $reqTotals[$c->id]['大型'] ?? 0 }}</span>
+            @endif
+          </div>
+          <div class="m-move">
+            <button type="submit" class="m-btn" formaction="/masters/contents/{{ $c->id }}/up/move" formnovalidate title="上へ" @disabled($loop->first)>▲</button>
+            <button type="submit" class="m-btn" formaction="/masters/contents/{{ $c->id }}/down/move" formnovalidate title="下へ" @disabled($loop->last)>▼</button>
+          </div>
           <div class="m-acts">
             <a class="m-btn" href="/masters/contents/{{ $c->id }}/requirements" title="規模ごとの必要人数を設定">必要人数</a>
             {{-- 削除は Administrator のみ（サーバー側も tier:admin で保護）。他の役割にはボタンを出さない（注釈は画面上部にまとめて記載）。 --}}
@@ -126,6 +141,8 @@
       <label class="m-chk"><input type="checkbox" name="needs_paper" value="1"></label>
       <input type="number" name="sheets_per_team" value="1" min="1" max="99" title="1チームあたりの必要枚数">
       <label class="m-chk"><input type="checkbox" name="active" value="1" checked></label>
+      <div class="m-req"><span class="m-req-none">追加後に設定</span></div>
+      <div class="m-move" style="color:var(--muted); font-size:11px; align-items:center;">末尾に追加</div>
       <div class="m-acts"><button type="submit" class="m-btn primary">＋ 追加</button></div>
     </form>
   </div>

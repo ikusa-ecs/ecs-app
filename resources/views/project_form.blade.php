@@ -138,6 +138,11 @@
       background: var(--brand-soft); border: 1px solid var(--line); color: var(--muted); }
     .danger-hint.warn { background: #fde8e8; border-color: var(--danger); color: #b91c1c; font-weight: 600; }
     .danger-hint .dh-reasons { margin: 4px 0 0; padding-left: 18px; font-weight: 600; }
+    /* 開催日の曜日（日付の右）。土＝青・日＝赤で、平日と一目で区別できるようにする。 */
+    .dow-badge { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+                 background: #f1f0ee; color: #4b4540; white-space: nowrap; }
+    .dow-badge.sat { background: #e6f0fb; color: #1d4ed8; }
+    .dow-badge.sun { background: #fdeaea; color: #b91c1c; }
 
     /* ===== スマホ（狭い画面）で案件を登録できるようにする =====
        この画面はPC前提で作ってあり、入力欄が横2列・短い欄はさらに横3〜4列に
@@ -271,8 +276,9 @@
           <div class="form-row">
             <label>確度（ヨミ）</label>
             <div class="radio-row" style="flex-wrap:wrap;">
-              <label><input type="radio" name="yomi" value="確定" onchange="toggleYomi()"> 確定</label>
-              <label><input type="radio" name="yomi" value="Aヨミ" checked onchange="toggleYomi()"> Aヨミ</label>
+              {{-- 初期は「確定」。ほとんどの案件は確定してから登録するため（2026-08-21 baba）。 --}}
+              <label><input type="radio" name="yomi" value="確定" checked onchange="toggleYomi()"> 確定</label>
+              <label><input type="radio" name="yomi" value="Aヨミ" onchange="toggleYomi()"> Aヨミ</label>
               <label><input type="radio" name="yomi" value="Bヨミ" onchange="toggleYomi()"> Bヨミ</label>
               <label><input type="radio" name="yomi" value="Cヨミ" onchange="toggleYomi()"> Cヨミ</label>
             </div>
@@ -295,7 +301,11 @@
           <!-- 3. 開催日 ｜ 宿泊 -->
           <div class="form-row">
             <label>開催日<span class="req-mark red">必須</span></label>
-            <input type="date" id="startDate" name="start_date" data-need="req">
+            {{-- 曜日は日付の右に出す。土日かどうかで動き方が変わるため、選んだ瞬間に分かるように（2026-08-21 baba）。 --}}
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <input type="date" id="startDate" name="start_date" data-need="req">
+              <span id="startDateDow" class="dow-badge" style="display:none;"></span>
+            </div>
             <div class="tbd-row">
               <input type="checkbox" id="dateTbd" name="date_tbd" class="tbd-check" data-tbd-for="startDate" data-memo="dateMemo">
               <label for="dateTbd">日付未定（まだふわっとしている）</label>
@@ -309,9 +319,10 @@
           </div>
           <div class="form-row non-arena">
             <label>宿泊<span class="req-mark yellow">必須</span></label>
+            {{-- 初期は「無」。宿泊ありは少数のため、毎回選び直さなくてよいように（2026-08-21 baba）。 --}}
             <select name="lodging" data-need="later">
-              <option value="" selected>未定</option>
-              <option>無</option>
+              <option value="">未定</option>
+              <option selected>無</option>
               <option>前泊有</option>
               <option>一部前泊有</option>
               <option>後泊あり</option>
@@ -527,14 +538,11 @@
           <!-- 9. 運営場所 -->
           <div class="form-row full non-arena">
             <label>運営場所</label>
+            {{-- 「○○依頼」は拠点マスタから作る（拠点を足せばここにも出る・2026-08-21 baba） --}}
             <select name="operation_place">
-              <option>現地</option>
-              <option>配信室(広宣)</option>
-              <option>配信室横(広宣)</option>
-              <option>芝生(広宣)</option>
-              <option>大阪依頼</option>
-              <option>名古屋依頼</option>
-              <option>福岡依頼</option>
+              @foreach ($operationPlaceOptions as $opt)
+                <option>{{ $opt }}</option>
+              @endforeach
             </select>
             <div class="hint">どこで運営／配信するか。オンライン時は配信場所（配信室など）、地方拠点に任せる場合は「○○依頼」。</div>
           </div>
@@ -671,31 +679,8 @@
                   <option>空港</option>
                   <option>その他（備考に記載）</option>
                 </select>
-                <div class="hint">スタッフがどこに集合するか。住所や目印は下の「集合場所の詳細」へ。</div>
-              </div>
-              <div class="form-row non-arena">
-                <label>集合場所の詳細</label>
-                <input type="text" name="assembly_detail" placeholder="例）東口改札を出て正面のバス停前／通用口（南ゲート）から入館">
-                <div class="hint">スタッフの「確定アサイン」にそのまま出ます。プルダウンで書けない住所・目印・ゲート名など。</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- スタッフ本人に伝えること（担当になった本人の「確定アサイン」にそのまま出る） -->
-          <div class="full">
-            <div class="triple">
-              <div class="form-row">
-                <label>持ち物（スタッフ向け）</label>
-                <textarea name="staff_belongings" rows="2" placeholder="例）黒スーツ、白シャツ、スニーカー、モバイルバッテリー"></textarea>
-                <div class="hint">改行して並べてOK。空欄なら本人の画面に「特になし」と出ます。</div>
-              </div>
-              <div class="form-row">
-                <label>服装（スタッフ向け）</label>
-                <input type="text" name="staff_dresscode" placeholder="例）上下黒（ジャケット不要）／私服可">
-              </div>
-              <div class="form-row">
-                <label>当日の注意事項（スタッフ向け）</label>
-                <textarea name="staff_notes" rows="2" placeholder="例）会場内は飲食禁止／終了後に片付けあり（+30分）"></textarea>
+                <div class="hint">スタッフがどこに集合するか。集合場所の詳細・持ち物・服装・当日の注意事項は
+                  <a href="/assign-publish">スタッフ公開ボード</a>の「📣 スタッフに伝えること」で入力します（2026-08-21 baba）。</div>
               </div>
             </div>
           </div>
@@ -1124,8 +1109,9 @@
       localStorage.setItem('ecs_csv_done', JSON.stringify(done));
     } catch (e) {}
   }
-  // 第1段では「次の日程を追加」も通常の保存として扱う（連続登録は次の段で対応）
-  function saveAndNext() { submitForm('publish'); }
+  // 「同じ内容で次の日程を追加」＝保存したあと、同じ内容の新規フォームがもう一度開く
+  // （開催日だけ空。サーバー側 store() が ?copy= 付きで開き直す・2026-08-21 baba）
+  function saveAndNext() { submitForm('next'); }
   function saveDraft() { submitForm('draft'); }
   function savePublish() {
     if (!check()) return;
@@ -1229,19 +1215,44 @@
     alert('✓ サンプルを入力しました。\nこの日は既存の大型案件と重なる「危険日」です。\n開催日の下の赤い表示と、保存時の警告を確認してみてください。');
     document.getElementById('startDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  // 足りない項目は「1つずつ」ではなく「まとめて」出す（2026-08-21 baba要望）。
+  // 1つ直すたびに押し直して次を言われる、を繰り返さずに済むようにするため。
+  // サーバー側（ProjectController::store）は元々まとめて返している＝出し方をそろえた。
   function check() {
     const date = document.getElementById('startDate').value;
     const count = parseInt(document.getElementById('requiredCount').value) || 0;
+    const missing = [];   // 足りないものの文章
+    let firstEl = null;   // 最初に直してほしい欄（あとでそこへ移動する）
+
+    function add(message, el) {
+      missing.push(message);
+      if (!firstEl) firstEl = el;
+    }
+
     if (selectedContents.length === 0 && !document.getElementById('contentTbd').checked) {
-      alert('案件名（コンテンツ）を選ぶか、「コンテンツ未定」にチェックを入れてください。'); return false;
+      add('案件名（コンテンツ）を選ぶか、「コンテンツ未定」にチェックを入れてください。', document.getElementById('contentBox'));
     }
     if (!date && !document.getElementById('dateTbd').checked) {
-      alert('開催日を入力するか、「日付未定」にチェックを入れてください。'); return false;
+      add('開催日を入力するか、「日付未定」にチェックを入れてください。', document.getElementById('startDate'));
     }
     if (count < 1 && !document.getElementById('countTentative').checked) {
-      alert('運営人数を入力するか、「人数は仮（未定）」にチェックを入れてください。'); return false;
+      add('運営人数を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('requiredCount'));
     }
-    return true;
+
+    if (missing.length === 0) return true;
+
+    const head = missing.length === 1
+      ? '次の項目が足りません。'
+      : '次の ' + missing.length + ' 件が足りません。';
+    alert(head + '\n\n' + missing.map(function (m) { return '・' + m; }).join('\n'));
+
+    // 赤い枠を付け直して、最初の欄まで画面を動かす（どこを直すか探さなくていいように）
+    if (typeof refreshAllNeed === 'function') refreshAllNeed();
+    if (firstEl && firstEl.scrollIntoView) {
+      firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (firstEl.focus) { try { firstEl.focus({ preventScroll: true }); } catch (e) { firstEl.focus(); } }
+    }
+    return false;
   }
 
   // ===== M-2 入力欄の3段階色分け（赤＝必須が空／黄＝後で必要が空・未定／白＝入力済み）=====
@@ -1287,11 +1298,34 @@
   });
   refreshAllNeed(); // 初期表示
 
+  // ===== 開催日の曜日表示（日付の右）=====
+  // 日付だけだと土日か平日か分からず、集合時間や人数の判断がしづらいため（2026-08-21 baba）。
+  function updateDow() {
+    const el    = document.getElementById('startDate');
+    const badge = document.getElementById('startDateDow');
+    if (!el || !badge) return;
+    const iso = el.value;
+    if (!iso) { badge.style.display = 'none'; badge.textContent = ''; return; }
+    const parts = iso.split('-');
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if (isNaN(d.getTime())) { badge.style.display = 'none'; return; }
+    const names = ['日', '月', '火', '水', '木', '金', '土'];
+    const w = d.getDay();
+    badge.textContent = names[w] + '曜日';
+    badge.className = 'dow-badge' + (w === 0 ? ' sun' : (w === 6 ? ' sat' : ''));
+    badge.style.display = '';
+  }
+
   // ===== M-7 危険日ヒントの更新タイミング（開催日・規模・実施形態・運営人数の変更時）=====
   ['startDate', 'dateTbd', 'format', 'requiredCount'].forEach(function (id) {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', updateDangerHint);
   });
+  ['change', 'input'].forEach(function (ev) {
+    const el = document.getElementById('startDate');
+    if (el) el.addEventListener(ev, updateDow);
+  });
+  updateDow(); // 初期表示（編集・複製で開いたとき用）
   document.querySelectorAll('input[name="scale"]').forEach(function (r) {
     r.addEventListener('change', updateDangerHint);
   });
@@ -1530,6 +1564,7 @@
   })();
 
   applyEdit(); // 編集モードなら値を流し込む（新規は素通り）
+  updateDow(); // 流し込んだ開催日の曜日を出す（編集・複製で開いたとき）
   if (window._checkClientRepeat) window._checkClientRepeat(); // 編集で既存クライアントが入っていれば履歴を表示
 
   // CSV取込のエラー行から来たときの案内を表示（applyEdit で値を入れたあと）。

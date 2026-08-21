@@ -20,12 +20,32 @@ class MasterController extends Controller
 {
     public function index()
     {
+        // 並びは「並び順（▲▼で決めたもの）→ ID」。拠点と同じ考え方。
+        $contents = Content::orderBy('sort_order')->orderBy('id')->get();
+
         return view('masters', [
-            'contents' => Content::orderBy('id')->get(),
+            'contents' => $contents,
             'offices' => Office::orderBy('sort_order')->orderBy('id')->get(),
             // 役割は正本のコード→ラベル。編集不可（表示のみ）。
             'positions' => AssignmentRole::LABELS,
+            // コンテンツごとの必要人数の合計（規模別）。一覧で「今何人で登録されているか」が
+            // すぐ分かるように渡す（毎回「必要人数」画面を開かなくてよいように・2026-08-21 baba）。
+            'reqTotals' => $this->requirementTotals(),
         ]);
+    }
+
+    /**
+     * コンテンツID => ['小型'=>人数, '中型'=>人数, '大型'=>人数] の合計。
+     * 設定が1件も無いコンテンツはキーごと入らない（画面では「未設定」と出す）。
+     */
+    private function requirementTotals(): array
+    {
+        $totals = [];
+        foreach (ContentRoleRequirement::all() as $r) {
+            $totals[$r->content_id][$r->scale] = ($totals[$r->content_id][$r->scale] ?? 0) + (int) $r->count;
+        }
+
+        return $totals;
     }
 
     // ── コンテンツ ──────────────────────────────────────────
@@ -53,6 +73,10 @@ class MasterController extends Controller
         $content->needs_paper = $request->boolean('needs_paper');
         $content->sheets_per_team = max(1, (int) ($data['sheets_per_team'] ?? 1));
         $content->active = $request->boolean('active');
+        // 新規は末尾に足す（拠点と同じ）。並べ替えたいときは▲▼で動かす。
+        if (! $content->exists) {
+            $content->sort_order = (int) (Content::max('sort_order') ?? 0) + 10;
+        }
         $content->save();
 
         return redirect('/masters#contents')
@@ -61,6 +85,14 @@ class MasterController extends Controller
 
     /** コンテンツを一括保存（既存の全行をまとめて更新）。物品(is_physical)は触らない＝画面から廃止。 */
     public function contentBulkStore(Request $request)
+    {
+        $n = $this->saveContentRows($request);
+
+        return redirect('/masters#contents')->with('status', "コンテンツを{$n}件まとめて保存しました。");
+    }
+
+    /** 画面の各行（名前・分類・紙・枚数・有効）を保存する。保存できた件数を返す。 */
+    private function saveContentRows(Request $request): int
     {
         $rows = $request->input('rows', []);
         $n = 0;
@@ -78,7 +110,28 @@ class MasterController extends Controller
             $n++;
         }
 
-        return redirect('/masters#contents')->with('status', "コンテンツを{$n}件まとめて保存しました。");
+        return $n;
+    }
+
+    /** コンテンツの並び順を1つ上下に入れ替える（編集中の内容も先に保存する）。拠点と同じ作り。 */
+    public function contentMove(Request $request, string $id, string $dir)
+    {
+        $this->saveContentRows($request);   // 編集中の内容を先に保存
+
+        $ordered = Content::orderBy('sort_order')->orderBy('id')->get();
+        $pos = $ordered->search(fn ($c) => $c->id === $id);
+        if ($pos !== false) {
+            $swapWith = $dir === 'up' ? $pos - 1 : $pos + 1;
+            if ($swapWith >= 0 && $swapWith < $ordered->count()) {
+                $a = $ordered[$pos];
+                $b = $ordered[$swapWith];
+                [$a->sort_order, $b->sort_order] = [$b->sort_order, $a->sort_order];
+                $a->save();
+                $b->save();
+            }
+        }
+
+        return redirect('/masters#contents');
     }
 
     public function contentDestroy(string $id)

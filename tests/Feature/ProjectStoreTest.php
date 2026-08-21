@@ -83,6 +83,58 @@ class ProjectStoreTest extends TestCase
         $this->assertSame(0, Project::count());
     }
 
+    /**
+     * 「同じ内容で次の日程を追加」＝保存したあと、同じ内容の新規フォームへ戻る（2026-08-21 baba）。
+     * これまでは案件一覧に飛ばされてしまい、続けて登録できなかった。
+     */
+    public function test_save_and_next_returns_to_the_form_with_the_same_content(): void
+    {
+        $employee = PersonFactory::new()->create();
+
+        $res = $this->actingAsPerson($employee)->post('/project-form', [
+            'content_names'  => '水合戦',
+            'start_date'     => '2026-09-01',
+            'required_count' => '10',
+            'intent'         => 'next',
+        ]);
+
+        $project = Project::where('project_name', '水合戦')->first();
+
+        $this->assertNotNull($project, '案件は保存される');
+        $res->assertRedirect('/project-form?copy=' . urlencode($project->id));
+    }
+
+    /**
+     * 案件を保存し直しても、スタッフ公開ボードで入れた「スタッフに伝えること」は消えない。
+     * 入力する場所を公開ボード1か所にまとめたため、案件フォームはこれらの列を触らない（2026-08-21）。
+     */
+    public function test_saving_a_project_does_not_wipe_staff_info(): void
+    {
+        $employee = PersonFactory::new()->create();
+        $project  = \Database\Factories\ProjectFactory::new()->create([
+            'project_name'     => '水合戦',
+            'assembly_detail'  => '東口改札を出て正面のバス停前',
+            'staff_belongings' => '黒スーツ、スニーカー',
+            'staff_dresscode'  => '上下黒',
+            'staff_notes'      => '会場内は飲食禁止',
+        ]);
+
+        $this->actingAsPerson($employee)->post('/project-form', [
+            'project_id'     => $project->id,
+            'content_names'  => '水合戦',
+            'start_date'     => '2026-09-01',
+            'required_count' => '10',
+            'intent'         => 'publish',
+        ]);
+
+        $project->refresh();
+
+        $this->assertSame('東口改札を出て正面のバス停前', $project->assembly_detail);
+        $this->assertSame('黒スーツ、スニーカー', $project->staff_belongings);
+        $this->assertSame('上下黒', $project->staff_dresscode);
+        $this->assertSame('会場内は飲食禁止', $project->staff_notes);
+    }
+
     /** 権限：スタッフは案件登録画面に入れず、自分のスタッフ画面へ戻される。 */
     public function test_staff_cannot_register_a_project(): void
     {
