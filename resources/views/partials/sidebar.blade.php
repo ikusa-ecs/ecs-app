@@ -42,6 +42,7 @@
         <a class="{{ ($active ?? '') === 'pickup' ? 'active' : '' }}" href="/pickup"><span class="nav-icon">📌</span> ピックアップ</a>
         <a class="{{ ($active ?? '') === 'assign_director' ? 'active' : '' }}" href="/assign-director"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
         <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>
+        <a class="{{ ($active ?? '') === 'entry_feed' ? 'active' : '' }}" href="/entry-feed"><span class="nav-icon">🆕</span> エントリー新着（来た順）</a>
         <a href="#" onclick="window.open('/assign-wishlist','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">📊</span> スタッフ集計</a>
       </div>
     </div>

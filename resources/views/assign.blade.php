@@ -1009,38 +1009,49 @@
       const dy   = date.getDay();
       const dowC = dy === 0 ? 'sun' : (dy === 6 ? 'sat' : '');
 
-      // その日のプール（稼働可・割当済・残り）。割当済＝その日の全案件の割当メンバー合計。
-      // DBボードなら、その日に稼働可/希望を出したスタッフ数（ECS_BOARD_AVAIL）。見本なら従来のdayAvail。
-      const avail    = ECS_BOARD
-        ? (((window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[off]) || []).length)
-        : (dayAvail[off] || 0);
-      const assigned = dayCases.reduce((s,c) => s + filledOf(c), 0);
-      const remain   = avail - assigned;
+      // その日に複数案件でかぶっている人（＝ほんとうの重複）。ヘッダーの注意にも使う。
+      const nameCount = {};
+      dayCases.forEach(dc => dc.assigned.forEach(m => { nameCount[m.name] = (nameCount[m.name] || 0) + 1; }));
+      const dupNames = new Set(Object.keys(nameCount).filter(n => nameCount[n] >= 2));
+
+      // その日の数字（2026-08-21 baba指摘で作り直し）。
+      //  ・必要   ＝その日の全案件の運営人数の合計（Dも含む）
+      //  ・割当済 ＝その日の全案件に入っている人の合計
+      //  ・あと   ＝必要−割当済（マイナスなら「超過」）
+      //  ・候補   ＝稼働希望〇＋その日の案件へのエントリー（すでに入っている人は除く）
+      // 以前は「稼働可−割当済」を『残り』と出していたため、希望カレンダーが空の日は
+      // 必ず「残り −1名／稼働可を超過（重複の可能性）」と出て、意味が分からなかった。
+      const needTotal = dayCases.reduce((s,c) => s + (c.need || 0), 0);
+      const assigned  = dayCases.reduce((s,c) => s + filledOf(c), 0);
+      const remain    = needTotal - assigned;
+      const assignedNames = new Set();
+      dayCases.forEach(dc => dc.assigned.forEach(m => assignedNames.add(m.name)));
+      const candNames = new Set();
+      if (ECS_BOARD) {
+        dayPeople(off, dayCases).forEach(p => { if (!assignedNames.has(p.name)) candNames.add(p.name); });
+      }
+      const cand = ECS_BOARD ? candNames.size : (dayAvail[off] || 0);
 
       const block = document.createElement('div');
       block.className = 'day-block';
 
-      const warnHtml = remain < 0
-        ? `<span class="d-warn">⚠ 稼働可を ${Math.abs(remain)}名 超過（重複の可能性）</span>`
+      const warnHtml = dupNames.size > 0
+        ? `<span class="d-warn">⚠ 同じ人が2件以上に入っています（${Array.from(dupNames).join('・')}）</span>`
         : '';
 
       block.innerHTML = `
         <div class="day-head">
           <span class="d-date">${date.getMonth()+1}/${date.getDate()}<span class="${dowC}">（${DOW[dy]}）</span></span>
           <span class="d-pool">
-            <span>稼働可 <b>${avail}</b>名</span>
+            <span>必要 <b>${needTotal}</b>名</span>
             <span>割当済 <b>${assigned}</b>名</span>
-            <span class="remain ${remain < 0 ? 'bad' : 'ok'}">残り <b>${remain}</b>名</span>
+            <span class="remain ${remain > 0 ? 'bad' : 'ok'}">${remain >= 0 ? 'あと' : '超過'} <b>${Math.abs(remain)}</b>名</span>
+            <span title="稼働希望で〇を出した人＋この日の案件にエントリーした人（すでに入っている人は除く）">候補 <b>${cand}</b>名</span>
           </span>
           ${warnHtml}
         </div>
         <div class="case-row" id="row-${off}"></div>`;
       body.appendChild(block);
-
-      // その日に複数案件でかぶっている人の名前（赤文字にする）
-      const nameCount = {};
-      dayCases.forEach(dc => dc.assigned.forEach(m => { nameCount[m.name] = (nameCount[m.name] || 0) + 1; }));
-      const dupNames = new Set(Object.keys(nameCount).filter(n => nameCount[n] >= 2));
 
       const amap = assignmentMap();   // 名前→出ている案件id（メンバーに「他にどこに出ているか」を出す）
       const row = block.querySelector('.case-row');
