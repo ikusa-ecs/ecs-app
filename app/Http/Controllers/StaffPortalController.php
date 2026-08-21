@@ -135,6 +135,9 @@ class StaffPortalController extends Controller
             // ＝本番で架空の案件がスタッフに見えるのを防ぐ（社員側 /entries・/pickup と同じ旗）。
             'usingDb' => Project::exists(),
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
+            // 体験用（見本）アカウントか。true のときは応募・希望が保存されないので、
+            // 画面の上に注意を出す（2026-08-21 baba：保存されないのに応募できたように見えた）。
+            'mockOnly' => (! $me || TestAccounts::isMockOnly($me)),
             'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
             'prefPeriod' => $prefPeriod,                     // 稼働希望カレンダーの対象月（当月）
             'prefMeta' => $this->prefMeta($prefPeriod),      // その月の見出し・締切・日数・1日の曜日

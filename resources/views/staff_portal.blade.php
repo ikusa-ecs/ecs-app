@@ -367,6 +367,13 @@
 
       <!-- ===== タブ1：募集中の案件（エントリーできる） ===== -->
       <div class="tab-panel active" id="tab-jobs">
+        {{-- 体験用アカウントのときの注意。応募・希望が保存されないので、押す前に分かるようにする。 --}}
+        @if (!empty($mockOnly))
+          <div class="notice" style="background:#fdeaea;border-color:#f0b9b9;">
+            ⚠ <b>これは体験用のアカウントです。</b>エントリー（応募）や稼働希望を押しても<b>保存されません</b>（見本）。
+            実際に試すときは、発行されたスタッフのアカウントでログインしてください。
+          </div>
+        @endif
         {{-- お知らせ文は DB（settings.staff_notice）から。担当が公開ボードで保存すると全スタッフに反映される。空なら既定文。 --}}
         <div class="notice" id="staffNotice">
           📣 @if(!empty($notice)){{ $notice }}@else<b>7月分</b>の募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）@endif
@@ -827,7 +834,16 @@
       })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(res => {
-        if (!res || !res.ok) { j.state = before; renderJobs(); alert('保存できませんでした。もう一度お試しください。'); }
+        if (!res || !res.ok) { j.state = before; renderJobs(); alert('保存できませんでした。もう一度お試しください。'); return; }
+        // ⚠ 体験用（見本）アカウントは保存されない。これまでは画面だけ「エントリー済み」に
+        //   変わってしまい、担当の画面には出ないので「エントリーしたのに出ない」と見えた
+        //   （2026-08-21 baba指摘）。保存されていないことをはっきり知らせて元に戻す。
+        if (res.saved === false) {
+          j.state = before;
+          renderJobs();
+          if (typeof refreshEntryDay === 'function') refreshEntryDay(j, false);
+          alert(res.message || 'このアカウントは体験用のため、エントリーは保存されません（見本）。実際に試すときは、発行されたスタッフのアカウントでログインしてください。');
+        }
       })
       .catch(err => { j.state = before; renderJobs(); alert('保存に失敗しました（' + err + '）。'); });
     }
