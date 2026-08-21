@@ -77,6 +77,7 @@
   <div class="m-nav">
     <a href="#contents">コンテンツ</a>
     <a href="#offices">拠点（事務所）</a>
+    <a href="#office-options">拠点ごとの選択肢</a>
     <a href="#positions">ポジション（役割）</a>
     <a href="/settings">← 設定に戻る</a>
   </div>
@@ -188,6 +189,44 @@
       <div class="m-move" style="color:var(--muted); font-size:11px; align-items:center;">末尾に追加</div>
       <label class="m-chk"><input type="checkbox" name="active" value="1" checked></label>
       <div class="m-acts"><button type="submit" class="m-btn primary">＋ 追加</button></div>
+    </form>
+  </div>
+
+  {{-- ── 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）── --}}
+  <div class="panel m-wrap" id="office-options" style="margin-top:16px;">
+    <div class="panel-head"><h2>拠点ごとの選択肢</h2></div>
+    <p class="m-intro">
+      案件登録の<b>集合形式・音響機材・移動車両・運営場所</b>で選べるものを、<b>拠点ごとに</b>決められます。<br>
+      東京にしか無いもの（大住・広宣・IKUSAカー など）が、他の拠点で出ないようにするための設定です。<br>
+      <b>1行に1つ</b>書いてください。並べた順にプルダウンへ出ます。<b>まだ設定していない拠点は、東京と同じ内容（既定）が出ます。</b>
+    </p>
+
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <span style="font-size:13px; font-weight:700;">編集する拠点</span>
+      @foreach ($optionOffices as $o)
+        <a class="m-btn {{ $o === $optionOffice ? 'primary' : '' }}"
+           href="/masters?office={{ urlencode($o) }}#office-options">{{ $o }}</a>
+      @endforeach
+    </div>
+
+    <form method="POST" action="/masters/office-options">
+      @csrf
+      <input type="hidden" name="office" value="{{ $optionOffice }}">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        @foreach ($optionKinds as $kind => $label)
+          <div>
+            <label style="display:block; font-size:13px; font-weight:700; margin-bottom:4px;">{{ $label }}</label>
+            <textarea name="kinds[{{ $kind }}]" rows="9"
+                      style="width:100%; font-family:inherit; font-size:13px; padding:8px; border:1px solid var(--line); border-radius:8px;">{{ $optionTexts[$kind] }}</textarea>
+          </div>
+        @endforeach
+      </div>
+      <div class="m-save-bar">
+        <span class="m-note" style="margin:0;">
+          <b>{{ $optionOffice }}</b> の選択肢を保存します。※「運営場所」には、ほかの拠点への<b>「○○依頼」</b>が自動で足されます（ここに書く必要はありません）。
+        </span>
+        <button type="submit" class="m-btn primary">保存</button>
+      </div>
     </form>
   </div>
 

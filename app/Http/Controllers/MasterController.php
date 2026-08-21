@@ -7,6 +7,7 @@ use App\Models\ContentRoleRequirement;
 use App\Models\Office;
 use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * マスタ管理（/masters）。設定画面の「管理する」から開く。
@@ -18,16 +19,33 @@ use Illuminate\Http\Request;
  */
 class MasterController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         // 並びは「並び順（▲▼で決めたもの）→ ID」。拠点と同じ考え方。
         $contents = Content::orderBy('sort_order')->orderBy('id')->get();
+
+        // 「拠点ごとの選択肢」で編集中の拠点（既定＝拠点マスタの先頭＝ふつうは東京）。
+        $offices = \App\Support\OfficeScope::options();
+        $optionOffice = (string) $request->query('office', '');
+        if (! in_array($optionOffice, $offices, true)) {
+            $optionOffice = $offices[0] ?? \App\Support\OfficeScope::DEFAULT_OFFICE;
+        }
+        $optionTexts = [];
+        foreach (array_keys(\App\Support\OfficeOptions::KINDS) as $kind) {
+            $optionTexts[$kind] = \App\Support\OfficeOptions::text($optionOffice, $kind);
+        }
 
         return view('masters', [
             'contents' => $contents,
             'offices' => Office::orderBy('sort_order')->orderBy('id')->get(),
             // 役割は正本のコード→ラベル。編集不可（表示のみ）。
             'positions' => AssignmentRole::LABELS,
+            // 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）。
+            // どの拠点を編集中かは ?office= で切り替える（既定＝拠点マスタの先頭）。
+            'optionOffices' => \App\Support\OfficeScope::options(),
+            'optionOffice'  => $optionOffice,
+            'optionKinds'   => \App\Support\OfficeOptions::KINDS,
+            'optionTexts'   => $optionTexts,
             // コンテンツごとの必要人数の合計（規模別）。一覧で「今何人で登録されているか」が
             // すぐ分かるように渡す（毎回「必要人数」画面を開かなくてよいように・2026-08-21 baba）。
             'reqTotals' => $this->requirementTotals(),
@@ -210,6 +228,31 @@ class MasterController extends Controller
         $n = ($max ?? 0) + 1;
 
         return 'CT-' . str_pad((string) $n, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * 拠点ごとの選択肢を保存する（2026-08-21 baba）。
+     * 1行1項目のテキストで受け取る＝非エンジニアでも書き足し・削除がしやすいため。
+     * 既定（App\Support\OfficeOptions::DEFAULTS）と同じ内容なら「設定なし」に戻る。
+     */
+    public function officeOptionsSave(Request $request)
+    {
+        $offices = \App\Support\OfficeScope::options();
+
+        $data = $request->validate([
+            'office' => ['required', 'string', Rule::in($offices)],
+        ]);
+
+        foreach (array_keys(\App\Support\OfficeOptions::KINDS) as $kind) {
+            \App\Support\OfficeOptions::put(
+                $data['office'],
+                $kind,
+                (string) $request->input('kinds.' . $kind, '')
+            );
+        }
+
+        return redirect('/masters?office=' . urlencode($data['office']) . '#office-options')
+            ->with('status', $data['office'] . 'の選択肢を保存しました。');
     }
 
     // ── 拠点（事務所）──────────────────────────────────────

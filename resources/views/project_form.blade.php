@@ -679,16 +679,8 @@
               </div>
               <div class="form-row non-arena">
                 <label>集合形式<span class="req-mark yellow">必須</span></label>
-                <select name="assembly_type" data-need="later">
-                  <option value="" selected>未定</option>
-                  <option>会場現地</option>
-                  <option>大住</option>
-                  <option>広宣</option>
-                  <option>事務所+会場現地</option>
-                  <option>駅</option>
-                  <option>空港</option>
-                  <option>その他（備考に記載）</option>
-                </select>
+<!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる＝ここは Blade を解釈しない区間のため。 -->
+                <select id="assemblyTypeSel" name="assembly_type" data-need="later"></select>
                 <div class="hint">スタッフがどこに集合するか。集合場所の詳細・持ち物・服装・当日の注意事項は
                   <a href="/assign-publish">スタッフ公開ボード</a>の「📣 スタッフに伝えること」で入力します（2026-08-21 baba）。</div>
               </div>
@@ -721,32 +713,13 @@
           <!-- 音響機材 ｜ 移動・車両（横並び・2026-08-18 baba要望） -->
           <div class="form-row non-arena">
             <label>音響機材</label>
-            <select name="audio_equipment">
-              <option>会場音響</option>
-              <option>クラシックプロ大</option>
-              <option>クラシックプロ中</option>
-              <option>クラシックプロ小</option>
-              <option>CUBE</option>
-              <option>SANWA</option>
-              <option>TOA</option>
-              <option>不要</option>
-            </select>
+<!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる。 -->
+            <select id="audioSel" name="audio_equipment"></select>
           </div>
           <div class="form-row non-arena">
             <label>移動・車両</label>
-            <select name="transport">
-              <option>ー</option>
-              <option>IKUSAカー</option>
-              <option>IKUSAカー2台</option>
-              <option>IKUSAカー3台</option>
-              <option>電車</option>
-              <option>レンタカー</option>
-              <option>IKUSAカー+レンタカー</option>
-              <option>電車+IKUSAカー</option>
-              <option>電車+レンタカー</option>
-              <option>飛行機</option>
-              <option>飛行機+レンタカー</option>
-            </select>
+<!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる。 -->
+            <select id="transportSel" name="transport"></select>
           </div>
 
           <!-- ロゴ ｜ カメラ ｜ 事例記事 ｜ 動画（横4列） -->
@@ -903,8 +876,9 @@
 </script>
 {{-- 案件名（コンテンツ）の候補＝コンテンツ台帳（有効なもの）。空ならJS側のベタ書きにフォールバック。 --}}
 <script>window.ECS_CONTENT_OPTIONS = @json($contentOptions ?? []);</script>
-{{-- 運営場所の選択肢（現地・配信室…＋拠点マスタから作った「○○依頼」）。 --}}
-<script>window.ECS_OPERATION_PLACES = @json($operationPlaceOptions ?? ['現地']);</script>
+{{-- 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）。正本＝App\Support\OfficeOptions。
+     「登録拠点」を選び直すと、その拠点の内容にプルダウンを入れ替える。 --}}
+<script>window.ECS_OFFICE_OPTIONS = @json($officeOptionMap ?? new stdClass);</script>
 {{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
 <script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
 {{-- 危険日（高負荷日）の判定に使う「開催日 → その日の案件たち」（DBの実案件）。
@@ -1544,20 +1518,53 @@
     if (init && window.ECS_OFFICES.indexOf(init) !== -1) {
       sel.value = init;
     }
+    // 拠点を変えたら、その拠点の選択肢に入れ替える
+    sel.addEventListener('change', function () { fillOfficeOptions(sel.value); });
+    fillOfficeOptions(sel.value);
   })();
 
-  // 運営場所プルダウン：選択肢をJSで入れる（この欄は Blade を解釈しない区間にあるため）。
-  // 編集で開いたときは applyEdit の setByName が値を入れるので、ここでは並べるだけでよい。
-  (function buildOperationPlaceOptions() {
-    const sel = document.getElementById('operationPlaceSel');
-    if (!sel || !Array.isArray(window.ECS_OPERATION_PLACES)) return;
-    sel.innerHTML = '';
-    window.ECS_OPERATION_PLACES.forEach(function (name) {
-      const opt = document.createElement('option');
-      opt.value = name; opt.textContent = name;
-      sel.appendChild(opt);
+  // 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）をプルダウンに入れる。
+  // ここは Blade を解釈しない区間なので、中身は JS で入れる（window.ECS_OFFICE_OPTIONS）。
+  // 「登録拠点」を選び直すと、その拠点の内容に入れ替える（東京にしか無い「大住」「広宣」
+  //  「IKUSAカー」が他拠点で出ないようにするため・2026-08-21 baba）。
+  function fillOfficeOptions(office) {
+    // 対象のプルダウン。blank＝先頭に置く「未定」等（空文字なら置かない）。
+    const targets = [
+      { id: 'assemblyTypeSel',   kind: 'assembly_type',   blank: '未定' },
+      { id: 'audioSel',          kind: 'audio_equipment', blank: '' },
+      { id: 'transportSel',      kind: 'transport',       blank: 'ー' },
+      { id: 'operationPlaceSel', kind: 'operation_place', blank: '' },
+    ];
+    const all = window.ECS_OFFICE_OPTIONS || {};
+    const set = all[office] || all[window.ECS_DEFAULT_OFFICE] || {};
+    const E   = window.ECS_EDIT || {};
+
+    targets.forEach(function (t) {
+      const sel = document.getElementById(t.id);
+      if (!sel) return;
+      // いま選んでいる値／編集で開いた案件の保存値は、その拠点の一覧に無くても残す
+      // （過去の案件を開いたときに値が消えないようにするため）。
+      const keep = sel.value || (E[t.kind] || '');
+      const list = Array.isArray(set[t.kind]) ? set[t.kind] : [];
+      sel.innerHTML = '';
+      if (t.blank !== '') {
+        const o = document.createElement('option');
+        o.value = ''; o.textContent = t.blank;
+        sel.appendChild(o);
+      }
+      list.forEach(function (name) {
+        const o = document.createElement('option');
+        o.value = name; o.textContent = name;
+        sel.appendChild(o);
+      });
+      if (keep && list.indexOf(keep) === -1) {
+        const o = document.createElement('option');
+        o.value = keep; o.textContent = keep + '（この拠点の一覧にはありません）';
+        sel.appendChild(o);
+      }
+      if (keep) sel.value = keep;
     });
-  })();
+  }
 
   // ===== リピート（常連）クライアントの照会 =====
   // クライアント欄の入力／フォーカスアウトで /clients/lookup を呼び、常連なら過去案件を控えめに出す。

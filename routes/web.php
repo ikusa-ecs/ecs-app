@@ -272,6 +272,7 @@ Route::get('/masters/contents/{id}/requirements', [MasterController::class, 'con
 Route::post('/masters/contents/{id}/requirements', [MasterController::class, 'contentReqsSave']);
 Route::post('/masters/contents/{id}/{dir}/move', [MasterController::class, 'contentMove'])->where('dir', 'up|down'); // 上下並び替え
 Route::post('/masters/contents/{id}/delete', [MasterController::class, 'contentDestroy'])->middleware('tier:admin'); // 削除はAdministratorのみ
+Route::post('/masters/office-options', [MasterController::class, 'officeOptionsSave']);   // 拠点ごとの選択肢（集合形式・音響・移動・運営場所）
 Route::post('/masters/offices', [MasterController::class, 'officeStore']);               // 新規追加
 Route::post('/masters/offices/bulk', [MasterController::class, 'officeBulkStore']);      // まとめて保存
 Route::post('/masters/offices/{id}/{dir}/move', [MasterController::class, 'officeMove'])->where('dir', 'up|down'); // 上下並び替え

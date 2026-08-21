@@ -353,23 +353,12 @@ class ProjectController extends Controller
             ->values()
             ->all();
 
-        // 運営場所の選択肢。
-        // 「○○依頼」（地方拠点に任せる）は拠点マスタから作る。以前は大阪・名古屋・福岡を
-        // 画面に直書きしていたため、拠点が増えても選べなかった（北海道が無い・2026-08-21 baba）。
-        // 自分の拠点あての「依頼」は出さない（自分の拠点で運営するなら「現地」等になるため）。
-        $ownOffice = $editProject['office'] ?? (Auth::user()->office ?? \App\Support\OfficeScope::DEFAULT_OFFICE);
-        $operationPlaceOptions = collect(['現地', '配信室(広宣)', '配信室横(広宣)', '芝生(広宣)'])
-            ->merge(
-                collect(\App\Support\OfficeScope::options())
-                    ->reject(fn ($name) => $name === $ownOffice)
-                    ->map(fn ($name) => $name . '依頼')
-            );
-        // 編集で開いたとき、保存済みの値が選択肢に無いと空になってしまうので足しておく
-        // （拠点名を変えた・古い言い方で保存されている場合の保険）。
-        if (! empty($editProject['operation_place']) && ! $operationPlaceOptions->contains($editProject['operation_place'])) {
-            $operationPlaceOptions->push($editProject['operation_place']);
-        }
-        $operationPlaceOptions = $operationPlaceOptions->values()->all();
+        // 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）。
+        // 正本＝App\Support\OfficeOptions（マスタ管理で拠点ごとに書き換えられる）。
+        // 画面には全拠点ぶん渡す＝「登録拠点」を選び直した瞬間にプルダウンの中身を入れ替えるため。
+        // ※ 以前は画面に直書きで、東京にしか無い「大住」「広宣」「IKUSAカー」が
+        //   他拠点でも出ていた（2026-08-21 baba）。
+        $officeOptionMap = \App\Support\OfficeOptions::mapForAll(\App\Support\OfficeScope::options());
 
         // 既定の拠点＝編集ならその案件の拠点／新規ならログイン中の社員の拠点（無ければ東京）。
         $defaultOffice = $editProject['office']
@@ -408,7 +397,7 @@ class ProjectController extends Controller
             'offices'        => $offices,
             'defaultOffice'  => $defaultOffice,
             'contentOptions' => $contentOptions,
-            'operationPlaceOptions' => $operationPlaceOptions,
+            'officeOptionMap' => $officeOptionMap,
             // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
             'assignMtgDate'  => \App\Support\AssignMtg::current(),
