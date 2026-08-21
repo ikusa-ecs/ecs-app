@@ -63,6 +63,16 @@
     .tab-panel.active { display: block; }
 
     /* お知らせバナー */
+    /* 稼働希望の月切り替え */
+    .pref-month-nav { display:flex; align-items:center; justify-content:center; gap:10px; margin:10px 0 6px; }
+    .pref-month-nav .pm-btn {
+      display:inline-block; padding:6px 14px; border-radius:999px; text-decoration:none;
+      font-size:13px; font-weight:700; color:#7a4a00; background:#fff; border:1px solid #e6d8c8;
+    }
+    .pref-month-nav .pm-btn:hover { background:#fdf3e2; }
+    .pref-month-nav .pm-btn.off { color:#bbb; background:#f6f4f1; border-color:#eee; }
+    .pref-month-nav .pm-now { font-size:15px; font-weight:800; }
+
     .notice {
       background: var(--warn-soft); color: #92400e; border: 1px solid #f6d9a7;
       border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
@@ -413,6 +423,26 @@
         <div class="pref-wrap">
           {{-- 見出しと締切は対象月から計算（当月）。以前は2026年7月が直書きで、保存対象月とズレていた。 --}}
           <div class="notice"><b>{{ $prefMeta['label'] }}分</b>の希望を入力中　／　締切：<b>{{ $prefMeta['deadline'] }}</b>まで</div>
+
+          {{-- 月の切り替え（2026-08-21 baba要望）。当月〜3か月先を行き来できる。 --}}
+          <div class="pref-month-nav">
+            @if ($prefMeta['prev'])
+              <a class="pm-btn" href="/staff-portal?period={{ $prefMeta['prev'] }}#tab-pref">‹ {{ $prefMeta['prevLabel'] }}</a>
+            @else
+              <span class="pm-btn off">‹ 前の月</span>
+            @endif
+            <span class="pm-now">{{ $prefMeta['label'] }}</span>
+            @if ($prefMeta['next'])
+              <a class="pm-btn" href="/staff-portal?period={{ $prefMeta['next'] }}#tab-pref">{{ $prefMeta['nextLabel'] }} ›</a>
+            @else
+              <span class="pm-btn off">次の月 ›</span>
+            @endif
+          </div>
+          @if (!empty($prefMeta['isPast']))
+            <div class="notice" style="background:#fdeaea;border-color:#f0b9b9;">
+              ⚠ これは<b>過ぎた月</b>です。入力しても募集には反映されません（見るだけにしてください）。
+            </div>
+          @endif
 
           <div class="m-card">
             <h3>稼働できる日を選んでください</h3>
@@ -1086,7 +1116,16 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById(btn.dataset.tab).classList.add('active');
+      // URLの末尾にタブ名を残す＝月を切り替えて開き直しても同じタブに戻れる（2026-08-21）。
+      try { history.replaceState(null, '', '#' + btn.dataset.tab); } catch (e) {}
     }
+    // 開いたとき、URLの末尾（#tab-pref など）で指定されたタブを開く。
+    (function openTabFromHash(){
+      const h = (location.hash || '').replace('#', '');
+      if (!h) return;
+      const btn = document.querySelector('.s-tabs button[data-tab="' + h + '"]');
+      if (btn) switchTab(btn);
+    })();
 
     // ===== 設定タブ：DB保存の共通処理 =====
     // 入力内容を本物のDB（people）へ保存する。localStorage はやめてサーバに送る。

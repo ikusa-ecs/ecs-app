@@ -176,6 +176,12 @@ class StaffPortalController extends Controller
         [$y, $m] = array_map('intval', array_pad(explode('-', $period), 2, 1));
         $first = Carbon::create($y, $m, 1)->startOfDay();
 
+        // 月を切り替えられる範囲＝当月から3か月先まで（過ぎた月の希望を出す意味がないため）。
+        $min = Carbon::now()->startOfMonth();
+        $max = $min->copy()->addMonthsNoOverflow(3);
+        $prev = $first->copy()->subMonthNoOverflow();
+        $next = $first->copy()->addMonthNoOverflow();
+
         return [
             'year'     => $y,
             'month'    => $m,
@@ -183,6 +189,12 @@ class StaffPortalController extends Controller
             'firstDow' => (int) $first->dayOfWeek,   // 0=日曜
             'label'    => $y . '年' . $m . '月',
             'deadline' => $first->copy()->subMonthNoOverflow()->day(25)->format('n月j日'),
+            // 月の切り替え（2026-08-21 baba要望）。範囲外は null＝ボタンを出さない。
+            'prev'      => $prev->gte($min) ? $prev->format('Y-m') : null,
+            'next'      => $next->lte($max) ? $next->format('Y-m') : null,
+            'prevLabel' => $prev->format('n月'),
+            'nextLabel' => $next->format('n月'),
+            'isPast'    => $first->lt($min),   // 過ぎた月＝入力してもらう月ではない
         ];
     }
 
