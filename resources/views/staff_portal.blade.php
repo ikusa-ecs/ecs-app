@@ -893,15 +893,14 @@
         ? '本番時間未定（決まりしだいお知らせします）'
         : [j.enter && ('入場 ' + j.enter), j.evStart && ('開始 ' + j.evStart), j.evEnd && ('終了 ' + j.evEnd)].filter(Boolean).join('　'));
       add('集合場所', j.meetPlace);
-      add('集合場所の詳細', j.meetDetail);
       add('会場', j.place);
       add('屋内 / 屋外', j.outdoor ? '屋外' : '');
       add('宿泊', (j.lodging && j.lodging !== '無') ? j.lodging : '');
-      add('服装', j.dresscode);
-      // 持ち物は「特になし」と明示する（空欄だと「聞き忘れ」に見えるため）。
-      rows.push('<div class="ad-row"><span class="ad-l">持ち物</span><span class="ad-v">'
-        + (String(j.belongings || '').trim() !== '' ? escLines(j.belongings) : '特になし') + '</span></div>');
-      add('当日の注意事項', j.staffNotes, true);
+      // スタッフに伝えること＝集合場所の詳細・服装・持ち物・注意事項をまとめた1欄
+      // （2026-08-21 baba。書く側が備考のように自由に書けるようにしたため）。
+      // 空欄でも「特になし」と出す＝聞き忘れに見えないようにする。
+      rows.push('<div class="ad-row"><span class="ad-l">スタッフに伝えること</span><span class="ad-v">'
+        + (String(j.staffNotes || '').trim() !== '' ? escLines(j.staffNotes) : '特になし') + '</span></div>');
       add('担当からの連絡', j.myNote, true);
       return '<div class="ad-box">' + rows.join('')
         + '<div class="ad-note">当日の連絡・集合の合図は、これまでどおり LINE・チャットワークで行います。'

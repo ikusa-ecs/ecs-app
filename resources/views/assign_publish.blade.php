@@ -37,7 +37,11 @@
     .bulk-info { font-size: 12.5px; color: var(--muted); }
     .bulk-info b { color: var(--ink); }
 
-    /* 表 */
+    /* 表：ノートPCでもページ全体が横に伸びないよう、表だけを横スクロールさせる */
+    .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tbl-scroll > table.tbl { width: 100%; min-width: 900px; }
+    /* 会場・集合場所は長くなりがちなので、折り返して幅を抑える */
+    table.tbl td.place-cell { max-width: 260px; white-space: normal; word-break: break-all; }
     table.tbl th { white-space: nowrap; }
     table.tbl td { vertical-align: middle; }
     td.chk, th.chk { width: 34px; text-align: center; }
@@ -235,6 +239,9 @@
 
       <!-- 表 -->
       <div class="panel">
+        <!-- ノートPCの画面幅からはみ出さないように、表だけを横スクロールできる箱に入れる
+             （2026-08-21 baba。ページ全体が横に伸びると操作しづらいため）。 -->
+        <div class="tbl-scroll">
         <table class="tbl">
           <thead>
             <tr>
@@ -250,6 +257,7 @@
           </thead>
           <tbody id="pubBody"></tbody>
         </table>
+        </div>
         <div class="empty-note" id="pubEmpty" style="display:none;">条件に合う案件がありません。</div>
       </div>
 
@@ -335,25 +343,22 @@
   // ===== スタッフに伝えること（集合場所の詳細・持ち物・服装・注意事項／DB保存）=====
   // 本人の「確定アサイン」の詳細にそのまま出る。案件登録でも入れられるが、
   // 公開する直前にここで書き足せるようにしている。入力欄から離れたら保存する。
+  // スタッフに伝えること＝備考のような自由記入の1欄（2026-08-21 baba。以前は4欄に分かれていた）。
   function saveStaffInfo(id){
     const c = CASES.find(x => x.id === id);
     if (!c) return;
-    const g = k => (document.getElementById('si-' + k + '-' + id) || {}).value || '';
-    const next = { meetDetail: g('detail'), belongings: g('bel'), dresscode: g('dress'), staffNotes: g('notes') };
-    if (next.meetDetail === c.meetDetail && next.belongings === c.belongings
-      && next.dresscode === c.dresscode && next.staffNotes === c.staffNotes) return;   // 変更なし
-    const prev = { meetDetail: c.meetDetail, belongings: c.belongings, dresscode: c.dresscode, staffNotes: c.staffNotes };
-    Object.assign(c, next);
+    const el = document.getElementById('si-notes-' + id);
+    const next = el ? el.value : '';
+    if (next === c.staffNotes) return;   // 変更なし
+    const prev = c.staffNotes;
+    c.staffNotes = next;
     fetch('/assign-publish/staff-info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
-      body: JSON.stringify({
-        id: id, detail: next.meetDetail, belongings: next.belongings,
-        dresscode: next.dresscode, notes: next.staffNotes
-      })
+      body: JSON.stringify({ id: id, notes: next })
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); flash('sisaved-' + id); })
-    .catch(() => { Object.assign(c, prev); alert('スタッフに伝えることの保存に失敗しました。通信を確認してもう一度お試しください。'); });
+    .catch(() => { c.staffNotes = prev; alert('スタッフに伝えることの保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
   function toggleStaffInfo(id){
     const el = document.getElementById('sinfo-' + id);
@@ -576,20 +581,8 @@
     sr.innerHTML = `
       <td colspan="8">
         <label>📣 スタッフに伝えること（<b>本人の「確定アサイン」にそのまま出ます</b>／入力欄から離れると自動で保存されます）<span class="saved" id="sisaved-${c.id}">✓ 保存しました</span></label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <label style="font-weight:600;">集合場所の詳細
-            <input type="text" id="si-detail-${c.id}" value="${escapeHtml(c.meetDetail)}" onblur="saveStaffInfo('${c.id}')" placeholder="例）東口改札を出て正面のバス停前">
-          </label>
-          <label style="font-weight:600;">服装
-            <input type="text" id="si-dress-${c.id}" value="${escapeHtml(c.dresscode)}" onblur="saveStaffInfo('${c.id}')" placeholder="例）上下黒（ジャケット不要）">
-          </label>
-          <label style="font-weight:600;">持ち物
-            <textarea id="si-bel-${c.id}" onblur="saveStaffInfo('${c.id}')" placeholder="例）黒スーツ、白シャツ、スニーカー">${escapeHtml(c.belongings)}</textarea>
-          </label>
-          <label style="font-weight:600;">当日の注意事項
-            <textarea id="si-notes-${c.id}" onblur="saveStaffInfo('${c.id}')" placeholder="例）会場内は飲食禁止／終了後に片付けあり">${escapeHtml(c.staffNotes)}</textarea>
-          </label>
-        </div>
+        <textarea id="si-notes-${c.id}" rows="4" style="width:100%;" onblur="saveStaffInfo('${c.id}')"
+          placeholder="例）集合は東口改札を出て正面のバス停前／服装は上下黒（ジャケット不要）／持ち物は黒スーツ・スニーカー・モバイルバッテリー／会場内は飲食禁止">${escapeHtml(c.staffNotes)}</textarea>
       </td>`;
     tbody.appendChild(sr);
   }

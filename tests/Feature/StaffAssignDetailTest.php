@@ -45,9 +45,8 @@ class StaffAssignDetailTest extends TestCase
         )->firstWhere('id', $p->id);
 
         $this->assertNotNull($row);
-        $this->assertSame('東口改札を出て正面のバス停前', $row['meetDetail']);
-        $this->assertSame("黒スーツ\n白シャツ", $row['belongings']);
-        $this->assertSame('上下黒', $row['dresscode']);
+        // 2026-08-21：4欄（集合場所の詳細／服装／持ち物／注意事項）を1欄にまとめたので、
+        // 本人の画面に届くのは staff_notes（スタッフに伝えること）だけになった。
         $this->assertSame('会場内は飲食禁止', $row['staffNotes']);
         $this->assertSame('受付の締めをお願いします', $row['myNote'], '担当が本人向けに書いた一言も届く');
         // 兼任（role2）も表示名で届く。表示名の正本は AssignmentRole なのでそこから引いて比べる。
@@ -63,20 +62,13 @@ class StaffAssignDetailTest extends TestCase
 
         $this->actingAsPerson($emp)
             ->postJson('/assign-publish/staff-info', [
-                'id'         => $p->id,
-                'detail'     => '南ゲートから入館',
-                'belongings' => 'スニーカー',
-                'dresscode'  => '私服可',
-                'notes'      => '雨天決行',
+                'id'    => $p->id,
+                'notes' => "南ゲートから入館\n服装は私服可／雨天決行",
             ])
             ->assertOk()
             ->assertJson(['ok' => true]);
 
-        $p = Project::find($p->id);
-        $this->assertSame('南ゲートから入館', $p->assembly_detail);
-        $this->assertSame('スニーカー', $p->staff_belongings);
-        $this->assertSame('私服可', $p->staff_dresscode);
-        $this->assertSame('雨天決行', $p->staff_notes);
+        $this->assertSame("南ゲートから入館\n服装は私服可／雨天決行", Project::find($p->id)->staff_notes);
     }
 
     /** 空文字で送ったら「未入力」に戻る（null）。 */
@@ -84,14 +76,14 @@ class StaffAssignDetailTest extends TestCase
     {
         $emp = PersonFactory::new()->create(['permission' => 'manager']);
         $p = ProjectFactory::new()->create([
-            'start_date' => Carbon::today()->addDays(3)->format('Y-m-d'),
-            'staff_belongings' => '黒スーツ',
+            'start_date'  => Carbon::today()->addDays(3)->format('Y-m-d'),
+            'staff_notes' => '黒スーツ',
         ]);
 
         $this->actingAsPerson($emp)
-            ->postJson('/assign-publish/staff-info', ['id' => $p->id, 'belongings' => '  '])
+            ->postJson('/assign-publish/staff-info', ['id' => $p->id, 'notes' => '  '])
             ->assertOk();
 
-        $this->assertNull(Project::find($p->id)->staff_belongings);
+        $this->assertNull(Project::find($p->id)->staff_notes);
     }
 }

@@ -61,10 +61,7 @@ class AssignPublishController extends Controller
                 'published' => (bool) $p->staff_published,      // 公開状態（DBの背骨）
                 'memo'      => $p->publish_memo ?? '',          // 公開ボードの担当メモ（DB保存・全員共有）
                 // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）
-                'meetDetail' => $p->assembly_detail ?? '',
-                'belongings' => $p->staff_belongings ?? '',
-                'dresscode'  => $p->staff_dresscode ?? '',
-                'staffNotes' => $p->staff_notes ?? '',
+                'staffNotes' => $p->staff_notes ?? '',   // スタッフに伝えること（1欄・備考のような自由記入）
             ];
         })->values();
 
@@ -177,20 +174,18 @@ class AssignPublishController extends Controller
     }
 
     /**
-     * スタッフ本人に伝えること（集合場所の詳細・持ち物・服装・注意事項）を保存する。
+     * スタッフ本人に伝えること（備考のように自由に書く1欄）を保存する。
      *
-     * 案件登録（セールス）でも入れられるが、公開する直前にアサイン担当が書き足せるよう
-     * 公開ボードからも直せるようにしている。保存先は projects なので編集履歴にも残る。
-     * 受け取り：id（案件ID）＋ detail / belongings / dresscode / notes（すべて空可）。
+     * 2026-08-21 baba：集合場所の詳細／服装／持ち物／注意事項の4欄をやめ、1欄にまとめた
+     * （実際は備考のように書きたいだけで、欄が分かれていると入力が面倒だったため）。
+     * 保存先は projects.staff_notes なので編集履歴にも残る。
+     * 受け取り：id（案件ID）＋ notes（空可）。
      */
     public function setStaffInfo(Request $request)
     {
         $data = $request->validate([
-            'id'         => ['required', 'string', 'exists:projects,id'],
-            'detail'     => ['nullable', 'string', 'max:200'],
-            'belongings' => ['nullable', 'string', 'max:2000'],
-            'dresscode'  => ['nullable', 'string', 'max:200'],
-            'notes'      => ['nullable', 'string', 'max:2000'],
+            'id'    => ['required', 'string', 'exists:projects,id'],
+            'notes' => ['nullable', 'string', 'max:4000'],
         ]);
 
         $project = Project::findOrFail($data['id']);
@@ -198,10 +193,7 @@ class AssignPublishController extends Controller
         if ($deny = ProjectAccess::denyJson($project)) {
             return $deny;
         }
-        $project->assembly_detail  = trim((string) ($data['detail'] ?? '')) ?: null;
-        $project->staff_belongings = trim((string) ($data['belongings'] ?? '')) ?: null;
-        $project->staff_dresscode  = trim((string) ($data['dresscode'] ?? '')) ?: null;
-        $project->staff_notes      = trim((string) ($data['notes'] ?? '')) ?: null;
+        $project->staff_notes = trim((string) ($data['notes'] ?? '')) ?: null;
         $project->save();
 
         return response()->json(['ok' => true]);
