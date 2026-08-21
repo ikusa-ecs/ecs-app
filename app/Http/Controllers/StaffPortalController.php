@@ -543,6 +543,9 @@ class StaffPortalController extends Controller
                 'evStart' => $p->event_start_time ?? '—',
                 'evEnd' => $p->event_end_time ?? '—',
                 'evTbd' => (bool) $p->event_time_tbd,   // 本番時間未定（案件登録のチェック）
+                // スタッフに伝えること。応募するかの判断に要るので、確定後だけでなく
+                // 募集中のカードにも「備考」として出す（2026-08-21 baba）。
+                'staffNotes' => (string) ($p->staff_notes ?? ''),
                 'category' => $p->category ?? '通常案件',
                 'deadline' => $this->deadlineLabel($p, $bulkDeadline),
                 'recruit' => true,

@@ -630,8 +630,8 @@
       <td colspan="8">
         <label>📣 スタッフに伝えること（<b>本人の「確定アサイン」にそのまま出ます</b>／入力欄から離れると自動で保存されます）<span class="saved" id="sisaved-${c.id}">✓ 保存しました</span></label>
         <div style="font-size:11.5px;color:var(--muted);margin:0 0 5px;">
-          応募・参加の判断に必要なこと（<b>いつもと違う集合時間・前日設営・終了が遅い・案件の規模</b>など）を書きます。
-          持ち物・服装・当日の細かい連絡は<b>LINEグループ</b>で送るぶんは、ここに書かなくて大丈夫です。
+          ここに書いた内容は、<b>募集中（案件カードの備考）</b>と<b>確定後（確定アサインの詳細）</b>の
+          どちらでも<b>スタッフの画面に表示されます</b>。
         </div>
         <textarea id="si-notes-${c.id}" rows="4" style="width:100%;" onblur="saveStaffInfo('${c.id}')"
           placeholder="例）前日設営があるため、8/29(土)15時集合です。帰宅予定は21時ごろです。大型の運動会です。">${escapeHtml(c.staffNotes)}</textarea>

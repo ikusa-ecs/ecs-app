@@ -159,6 +159,12 @@
     .jr-meta .ic { color: var(--muted); margin-right: 2px; }
     .jr-meta .ev { color: var(--muted); }
 
+    /* 担当からの伝達（募集カードの備考）。応募の判断に要る情報なので目に留まる色にする。 */
+    .jr-note { display: flex; gap: 6px; align-items: flex-start; margin-top: 6px; padding: 7px 10px;
+               background: var(--warn-soft, #fdf3e2); border: 1px solid #ecd9b6; border-radius: 8px;
+               font-size: 12px; line-height: 1.6; color: #6b4e17; overflow-wrap: anywhere; }
+    .jr-note .ic { flex: none; }
+
     /* 締切・残り人数のチップ */
     .jr-sub { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
@@ -601,6 +607,7 @@
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
         need:c.need, filled:c.filled, meet:c.meet, leave:c.leave,
         enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, evTbd:!!c.evTbd, offset:c.off,
+        staffNotes:(c.staffNotes || ''),
         // 自分が応募済みなら「エントリー中」を最優先で表示（そうすれば取り消しもできる）。
         // 未応募なら満員→締切／調整中→エントリー中／それ以外→募集中。
         state:(c.applied ? 'applied' : (c.filled >= c.need ? 'closed' : (c.state === 'adj' ? 'applied' : 'open'))),
@@ -742,6 +749,8 @@
             <span><span class="ic">🚩</span>集合 ${j.meetPlace}</span>
             <span><span class="ic">⏰</span>${staffMeetOf(j.id, j.meet)}〜${j.leave}<span class="ev">${j.evTbd ? '（本番時間未定）' : `（入場${j.enter}/開始${j.evStart}/終了${j.evEnd}）`}</span></span>
           </div>
+          ${String(j.staffNotes || '').trim() !== ''
+            ? `<div class="jr-note"><span class="ic">📣</span><span>${escLines(j.staffNotes)}</span></div>` : ''}
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
           <div class="jr-foot">
             <button class="cmt-toggle${cmt.open ? ' on' : ''}" onclick="toggleComment(this, '${j.id}')">💬 コメント</button>
