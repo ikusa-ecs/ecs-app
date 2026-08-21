@@ -198,6 +198,15 @@
     .cmt-toggle.on { color: var(--brand-dark); border-color: #e6cdb8; background: var(--brand-soft); }
     .jr-foot .apply-btn-sm { margin-left: auto; }
     .jr-comment-wrap { margin-top: 1px; }
+    .jr-comment-row { display: flex; gap: 6px; align-items: center; }
+    .jr-cmt-save {
+      flex: none; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 700; background: #a15c2e; color: #fff;
+    }
+    .jr-cmt-save:hover { background: #8a4d24; }
+    .jr-cmt-ok { flex: none; font-size: 12px; font-weight: 700; color: #15803d; opacity: 0; transition: opacity .2s; }
+    .jr-cmt-ok.show { opacity: 1; }
+    .jr-cmt-hint { font-size: 11px; color: #8a7a6b; margin-top: 4px; }
     .jr-comment {
       width: 100%; padding: 7px 10px; border: 1px solid var(--line);
       border-radius: 8px; font-size: 12.5px; font-family: inherit; background: #fff;
@@ -803,7 +812,14 @@
             ${btn}
           </div>
           <div class="jr-comment-wrap" style="display:${cmt.open ? 'block' : 'none'};">
-            <input class="jr-comment" type="text" placeholder="担当へ伝えたいこと（任意）" value="${escAttr(cmt.text)}" oninput="saveComment('${j.id}', this.value)">
+            <div class="jr-comment-row">
+              <input class="jr-comment" type="text" placeholder="担当へ伝えたいこと（任意）" value="${escAttr(cmt.text)}"
+                     oninput="saveComment('${j.id}', this.value)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();sendComment('${j.id}');}">
+              <button type="button" class="jr-cmt-save" onclick="sendComment('${j.id}')">保存</button>
+              <span class="jr-cmt-ok" id="cmtok-${j.id}">✓ 保存しました</span>
+            </div>
+            <div class="jr-cmt-hint">担当（アサインする人）の画面に表示されます。エントリーしたあとでも直せます。</div>
           </div>`;
         grid.appendChild(row);
       });
@@ -829,6 +845,42 @@
     function saveComment(id, val) {
       commentState[id] = commentState[id] || { text: '', open: true };
       commentState[id].text = val;
+    }
+
+    // コメントを保存する（2026-08-21 baba要望）。
+    // ⚠ これまではコメントを「エントリーする」を押したときにだけ送っていたため、
+    //   エントリーしたあとに書いたコメントは**どこにも保存されていなかった**。
+    //   保存ボタンで、その場でDB（applications.note）へ入れる。
+    function sendComment(id) {
+      const j = jobs.find(x => x.id === id);
+      if (!j) return;
+      if (j.state !== 'applied') {
+        alert('先に「エントリーする」を押してください。エントリーした案件にだけコメントを残せます。');
+        return;
+      }
+      const note = (commentState[id] && commentState[id].text) || '';
+      const body = new URLSearchParams();
+      body.append('project_id', id);
+      body.append('action', 'apply');     // 応募のまま、コメントだけ書き換える
+      body.append('intent', '希望');
+      body.append('note', note);
+
+      fetch('/staff-portal/entry', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!res || !res.ok) { alert('保存できませんでした。もう一度お試しください。'); return; }
+        if (res.saved === false) {
+          alert(res.message || 'このアカウントは体験用のため、コメントは保存されません（見本）。');
+          return;
+        }
+        const ok = document.getElementById('cmtok-' + id);
+        if (ok) { ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 2000); }
+      })
+      .catch(err => alert('保存に失敗しました（' + err + '）。'));
     }
 
     // コメント欄の開け閉め（ふだんは隠し、押したら開いて入力できる）

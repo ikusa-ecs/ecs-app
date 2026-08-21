@@ -228,8 +228,8 @@ class AssignBoardController extends Controller
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id', 'role', 'role2', 'status', 'note', 'patrol', 'remark']);
 
-        // この案件群への応募（applications）＝希望者カラムの元。
-        $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
+        // この案件群への応募（applications）＝希望者カラムの元。note＝本人が応募時に書いた一言。
+        $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id', 'note']);
 
         // 関係する人（名前・区分・できる役割）をまとめて引く。
         $people = $this->peopleWithPos(
@@ -273,8 +273,9 @@ class AssignBoardController extends Controller
 
             // 応募者（applications → 希望者カラム用 {name, lv, pos}）。cal は画面側で当日の稼働可と突合。
             $applicants = ($appsByProject->get($p->id) ?? collect())
-                ->pluck('staff_id')->unique()->values()
-                ->map(function ($sid) use ($people) {
+                ->unique('staff_id')->values()
+                ->map(function ($a) use ($people) {
+                    $sid = $a->staff_id;
                     $person = $people->get($sid);
 
                     return [
@@ -283,6 +284,8 @@ class AssignBoardController extends Controller
                         'lv' => $this->lvCode(optional($person)->skill_level),
                         'pos' => $this->primaryPos($person),
                         'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
+                        // 本人が応募時に書いた一言。アサインする人に見えないと意味がないので渡す（2026-08-21 baba）。
+                        'note' => (string) ($a->note ?? ''),
                     ];
                 })->all();
 

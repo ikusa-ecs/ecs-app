@@ -223,6 +223,8 @@
     .cand-row.multi-apply { background: #fdecd9; border-radius: 6px; padding: 2px 4px; }  /* 同じ日の複数案件に希望＝取り合い */
     .cand-row.multi-cal   { background: #efe6f6; border-radius: 6px; padding: 2px 4px; }  /* カレンダー〇が複数 */
     .cand-row.cal-one     { background: #e3edf7; border-radius: 6px; padding: 2px 4px; }  /* カレンダー〇 */
+    /* 本人からの一言（エントリー時のコメント）。行の下に小さく出す。 */
+    .cand-row .cand-note { flex-basis: 100%; font-size: 11px; color: #6b5544; margin-top: 2px; line-height: 1.5; overflow-wrap: anywhere; }
     .cstat { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
     .cstat.apply2 { background: var(--danger-soft); color: #b91c1c; }
     .cstat.cal2   { background: #efe6f6; color: #6d28d9; }
@@ -369,7 +371,7 @@
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
       // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
       //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
-      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode })),
+      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, note:a.note })),
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。
@@ -485,13 +487,15 @@
     if (ECS_BOARD) {
       const byName = {};
       dayCases.forEach(c => (c.applicants || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;                 // id を取りこぼさない（DB保存に必要）
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
         if (!e.applied.includes(c.id)) e.applied.push(c.id);
+        if (!e.notes) e.notes = {};
+        if (a.note) e.notes[c.id] = a.note;             // 本人が応募時に書いた一言（案件ごと）
       }));
       ((window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[off]) || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
         e.cal = true;
@@ -1135,7 +1139,10 @@
       const statTag = picked ? '<span class="cstat done">✓ アサイン済み</span>' : st.tag;
       const rowCls  = picked ? 'picked' : st.cls;
       const addBtn = (editMode && !picked) ? `<span class="c-add" title="メンバーに入れる" onclick="addCandidate('${c.id}','${p.id||''}','${encodeURIComponent(p.name)}','${p.lv}','${encodeURIComponent(p.pos||'')}','${p.roleCode||''}')">＋</span>` : '';
-      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${statTag}${addBtn}</div>`;
+      // 本人が応募時に書いた一言。アサインの判断材料なので必ず見せる（2026-08-21 baba）。
+      const cmt = (p.notes && p.notes[c.id]) ? p.notes[c.id] : '';
+      const cmtHtml = cmt ? `<div class="cand-note" title="本人からの一言">💬 ${escHtml(cmt)}</div>` : '';
+      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${statTag}${addBtn}${cmtHtml}</div>`;
     }).join('');
     const candCol =
       `<div class="cc-col">
