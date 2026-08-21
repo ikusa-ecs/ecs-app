@@ -24,7 +24,6 @@
         <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
         <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>
         <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
-        <a class="{{ ($active ?? '') === 'staff_notify' ? 'active' : '' }}" href="/assign-notify"><span class="nav-icon">✉️</span> お知らせ送信</a>
         {{-- 編集履歴＝「誰がいつ何を変えたか」。複数人で同じ案件を触るときの言った言わないを防ぐ。 --}}
         <a class="{{ ($active ?? '') === 'project_history' ? 'active' : '' }}" href="/project-history"><span class="nav-icon">🕘</span> 編集履歴</a>
         <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">⏰</span> 人数確定リマインド</a>

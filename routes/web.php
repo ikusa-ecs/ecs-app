@@ -32,7 +32,6 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectHistoryController;
 use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\StaffNotifyController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StaffStatusController;
 use App\Http\Controllers\OnboardingController;
@@ -207,9 +206,6 @@ Route::post('/assign-publish/staff-info', [AssignPublishController::class, 'setS
 Route::post('/assign-publish/category', [AssignPublishController::class, 'setCategory']);
 Route::post('/assign-publish/category-bulk', [AssignPublishController::class, 'setCategoryBulk']);
 Route::post('/assign-publish/deadline', [AssignPublishController::class, 'setDeadline']);
-// スタッフへのお知らせ送信（アサイン確定／募集開始）。⚠自動送信はしない＝画面のボタンで送る。
-Route::get('/assign-notify', [StaffNotifyController::class, 'index']);
-Route::post('/assign-notify/send', [StaffNotifyController::class, 'send']);
 // 仮データの名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
 Route::get('/entries', [AssignBoardController::class, 'entries']);
 // エントリー一覧「月ごと」の表からの1人ぶんアサイン切替（A案）。assignments に追加/削除する。
