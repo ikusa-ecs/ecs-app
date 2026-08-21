@@ -174,6 +174,33 @@ class AssignPublishController extends Controller
     }
 
     /**
+     * 必要人数（運営人数）を保存する（2026-08-21 baba）。
+     *
+     * 募集をかける直前に人数を直したい場面が多いので、公開ボードからも変えられるようにした。
+     * 保存先は projects.required_count＝案件登録・アサイン表と同じ列（食い違いが起きない）。
+     * 空で送れば「未定」に戻る（スタッフ画面では既定5名として見せる）。
+     */
+    public function setCount(Request $request)
+    {
+        $data = $request->validate([
+            'id'    => ['required', 'string', 'exists:projects,id'],
+            'count' => ['nullable', 'integer', 'min:0', 'max:999'],
+        ]);
+
+        $project = Project::findOrFail($data['id']);
+        // 拠点チェック（他拠点の案件をURL直打ちで書き換えられないようにする）。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+        $project->required_count = $data['count'] !== null && $data['count'] !== ''
+            ? (int) $data['count']
+            : null;
+        $project->save();
+
+        return response()->json(['ok' => true, 'count' => $project->required_count]);
+    }
+
+    /**
      * スタッフ本人に伝えること（備考のように自由に書く1欄）を保存する。
      *
      * 2026-08-21 baba：集合場所の詳細／服装／持ち物／注意事項の4欄をやめ、1欄にまとめた

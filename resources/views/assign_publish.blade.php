@@ -95,6 +95,9 @@
     .pub-badge.off { background: var(--warn-soft); color: #b45309; } .pub-badge.off .dot { background: #d97706; }
 
     /* 操作セル */
+    td.need-cell { white-space: nowrap; }
+    .need-input { width: 52px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+                  font-size: 13px; font-family: inherit; text-align: right; }
     td.ops-cell { white-space: nowrap; }
     .pub-toggle { border: none; border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
     .pub-toggle.go   { background: var(--brand); color: #fff; }
@@ -266,6 +269,7 @@
         ※「集合〜解散（スタッフ）」は、スタッフに見せる集合・解散時間です。社員と違うときは入力して直せます（直すと「別」マークが付き、スタッフ画面にも反映されます）。<br>
         ※「詳細 →」で案件詳細（アサイン画面）に飛びます。時間・場所など細かい変更はそちらでもできます。<br>
         ※ 公開状態はDB（projects の staff_published）に保存され、案件詳細（アサイン画面）とも同じ列で連動します。<br>
+        ※ <b>必要人数</b>はここで直せます（運営人数＝<b>Dを含む</b>人数。案件登録・アサイン表と同じ数字です）。<br>
         ※ 備考は担当用メモです（<b>DB保存され、全員に共有されます</b>。入力欄から離れると自動で保存されます。スタッフ画面には出ません）。
       </p>
 @endverbatim
@@ -343,6 +347,27 @@
   // ===== スタッフに伝えること（集合場所の詳細・持ち物・服装・注意事項／DB保存）=====
   // 本人の「確定アサイン」の詳細にそのまま出る。案件登録でも入れられるが、
   // 公開する直前にここで書き足せるようにしている。入力欄から離れたら保存する。
+  // 必要人数（運営人数）。募集をかける直前に直したい場面が多いので公開ボードでも直せる（2026-08-21 baba）。
+  // 保存先は案件登録・アサイン表と同じ projects.required_count（食い違いが起きない）。
+  function saveNeed(id){
+    const c = CASES.find(x => x.id === id);
+    const el = document.getElementById('need-' + id);
+    if (!c || !el) return;
+    const raw = el.value.trim();
+    const next = raw === '' ? '—' : String(parseInt(raw, 10) || 0);
+    if (next === String(c.need)) return;   // 変更なし
+    const prev = c.need;
+    c.need = next;
+    fetch('/assign-publish/count', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ id: id, count: raw === '' ? null : parseInt(raw, 10) })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('needsaved-' + id); })
+    .catch(() => { c.need = prev; el.value = (prev === '—' ? '' : prev);
+                   alert('必要人数の保存に失敗しました。もう一度お試しください。'); });
+  }
+
   // スタッフに伝えること＝備考のような自由記入の1欄（2026-08-21 baba。以前は4欄に分かれていた）。
   function saveStaffInfo(id){
     const c = CASES.find(x => x.id === id);
@@ -548,7 +573,11 @@
         </div>
         <div class="emp">社員 <b>${c.meet}</b> 〜 <b>${c.leave}</b></div>
       </td>
-      <td>${c.need}名</td>
+      <td class="need-cell">
+        <input type="number" min="0" max="999" class="need-input" id="need-${c.id}" value="${c.need === '—' ? '' : c.need}"
+               onblur="saveNeed('${c.id}')" onkeydown="if(event.key==='Enter'){this.blur();}" placeholder="—" title="運営人数（Dも含む）">名
+        <span class="saved" id="needsaved-${c.id}">✓</span>
+      </td>
       <td>${pub ? '<span class="pub-badge on"><span class="dot"></span>公開中</span>' : '<span class="pub-badge off"><span class="dot"></span>非公開</span>'}</td>
       <td class="ops-cell">
         ${pub

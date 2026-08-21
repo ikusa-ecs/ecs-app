@@ -201,6 +201,7 @@ Route::post('/assign-publish/notice', [AssignPublishController::class, 'setNotic
 // 公開ボードの案件ごとの「💬備考」（担当メモ）を projects.publish_memo へ保存。
 Route::post('/assign-publish/memo', [AssignPublishController::class, 'setMemo']);
 // スタッフ本人に伝えること（集合場所の詳細・持ち物・服装・注意事項）を projects へ保存。
+Route::post('/assign-publish/count', [AssignPublishController::class, 'setCount']);        // 必要人数（運営人数）
 Route::post('/assign-publish/staff-info', [AssignPublishController::class, 'setStaffInfo']);
 // 追加案件バッジの手動オン/オフ・通常案件の一斉締切日も DB に保存する。
 Route::post('/assign-publish/category', [AssignPublishController::class, 'setCategory']);
