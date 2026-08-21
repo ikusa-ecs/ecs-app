@@ -681,8 +681,8 @@
                 <label>集合形式<span class="req-mark yellow">必須</span></label>
 <!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる＝ここは Blade を解釈しない区間のため。 -->
                 <select id="assemblyTypeSel" name="assembly_type" data-need="later"></select>
-                <div class="hint">スタッフがどこに集合するか。集合場所の詳細・持ち物・服装・当日の注意事項は
-                  <a href="/assign-publish">スタッフ公開ボード</a>の「📣 スタッフに伝えること」で入力します（2026-08-21 baba）。</div>
+                <div class="hint">スタッフがどこに集合するか。スタッフ本人へ伝えたいこと（いつもと違う集合時間・前日設営など）は
+                  <a href="/assign-publish">スタッフ公開ボード</a>の「📣 スタッフに伝えること」に書きます。</div>
               </div>
             </div>
           </div>
