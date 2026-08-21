@@ -36,6 +36,13 @@ class AccountController extends Controller
     {
         $isAdmin = optional(Auth::user())->permission === 'admin';
 
+        // スタッフの権限は必ず「スタッフ」。画面でも自動でそう選ばれるが、
+        // グレーアウトした欄はブラウザが送信しないため、届かないことがある（2026-08-21 の不具合）。
+        // 画面側は直したが、届かなかったときにここで補っておく（同じ事故を二度起こさないため）。
+        if ($request->input('role') === 'staff' && ! $request->filled('permission')) {
+            $request->merge(['permission' => 'staff']);
+        }
+
         // 付与できる権限（Administrator は admin まで／管理者は manager まで）
         $allowedPerms = $isAdmin
             ? ['staff', 'employee', 'manager', 'admin']

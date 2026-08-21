@@ -122,13 +122,35 @@
       }
     }
 
+    // ⚠ 罠：グレーアウト（disabled）にした入力欄は、ブラウザが送信しない。
+    //   スタッフを選ぶと権限欄をグレーにしていたため、画面に「スタッフ」と出ているのに
+    //   サーバーには権限が空で届き、「権限は必ず入力してください」で弾かれていた（2026-08-21 修正）。
+    //   見た目はグレーのまま残したいので、同じ値を見えない欄（hidden）で一緒に送る。
+    function setPermFallback(value){
+      var holder = document.getElementById('permHiddenHolder');
+      if (!holder){
+        holder = document.createElement('span');
+        holder.id = 'permHiddenHolder';
+        sel.parentNode.appendChild(holder);
+      }
+      holder.innerHTML = '';
+      if (value !== null){
+        var h = document.createElement('input');
+        h.type  = 'hidden';
+        h.name  = 'permission';
+        h.value = value;
+        holder.appendChild(h);
+      }
+    }
+
     if (role === 'staff'){
       setHidden('staff', false);
       setHidden('employee', true);
       setHidden('manager', true);
       setHidden('admin', true);
       sel.value = 'staff';
-      sel.disabled = true;               // スタッフは権限=スタッフ固定
+      sel.disabled = true;               // スタッフは権限=スタッフ固定（見た目だけ）
+      setPermFallback('staff');          // 実際に送られるのはこちら
       hint.textContent = 'スタッフの権限は「スタッフ」になります。';
     } else if (role === 'employee'){
       setHidden('staff', true);
@@ -136,12 +158,14 @@
       setHidden('manager', false);
       setHidden('admin', !window.ECS_CAN_GRANT_ADMIN);
       sel.disabled = false;
+      setPermFallback(null);             // 選択欄そのものが送られるので、hidden は外す
       if (sel.value === 'staff' || sel.value === '') sel.value = 'employee';
       hint.textContent = window.ECS_CAN_GRANT_ADMIN
         ? '社員のうち、アサイン担当は「管理者」、全権は「Administrator」を選びます。'
         : 'Administrator権限の付与は Administrator だけができます。';
     } else {
       sel.disabled = false;
+      setPermFallback(null);
       hint.textContent = '';
     }
   }
