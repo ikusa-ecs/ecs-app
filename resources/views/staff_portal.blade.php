@@ -600,7 +600,7 @@
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。見本cases.jsのときは従来の簡易計算にフォールバック。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
         need:c.need, filled:c.filled, meet:c.meet, leave:c.leave,
-        enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, offset:c.off,
+        enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, evTbd:!!c.evTbd, offset:c.off,
         // 自分が応募済みなら「エントリー中」を最優先で表示（そうすれば取り消しもできる）。
         // 未応募なら満員→締切／調整中→エントリー中／それ以外→募集中。
         state:(c.applied ? 'applied' : (c.filled >= c.need ? 'closed' : (c.state === 'adj' ? 'applied' : 'open'))),
@@ -740,7 +740,7 @@
           <div class="jr-meta">
             <span><span class="ic">📍</span>${j.place}</span>
             <span><span class="ic">🚩</span>集合 ${j.meetPlace}</span>
-            <span><span class="ic">⏰</span>${staffMeetOf(j.id, j.meet)}〜${j.leave}<span class="ev">（入場${j.enter}/開始${j.evStart}/終了${j.evEnd}）</span></span>
+            <span><span class="ic">⏰</span>${staffMeetOf(j.id, j.meet)}〜${j.leave}<span class="ev">${j.evTbd ? '（本番時間未定）' : `（入場${j.enter}/開始${j.evStart}/終了${j.evEnd}）`}</span></span>
           </div>
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
           <div class="jr-foot">
@@ -889,7 +889,9 @@
       add('日付', ymd);
       add('あなたの担当', j.myRole ? (j.myRole + (j.myRole2 ? '（兼任：' + j.myRole2 + '）' : '')) : '');
       add('集合〜解散', (j.meet || '—') + ' 〜 ' + (j.leave || '—'));
-      add('イベント', [j.enter && ('入場 ' + j.enter), j.evStart && ('開始 ' + j.evStart), j.evEnd && ('終了 ' + j.evEnd)].filter(Boolean).join('　'));
+      add('イベント', j.evTbd
+        ? '本番時間未定（決まりしだいお知らせします）'
+        : [j.enter && ('入場 ' + j.enter), j.evStart && ('開始 ' + j.evStart), j.evEnd && ('終了 ' + j.evEnd)].filter(Boolean).join('　'));
       add('集合場所', j.meetPlace);
       add('集合場所の詳細', j.meetDetail);
       add('会場', j.place);

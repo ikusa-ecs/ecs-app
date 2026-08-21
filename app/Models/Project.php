@@ -37,6 +37,7 @@ class Project extends Model
             'team_tentative' => 'boolean',
             'is_repeat' => 'boolean',
             'alcohol' => 'boolean',
+            'event_time_tbd' => 'boolean',
             'prep_line_sent' => 'boolean',
             'prep_line_created' => 'boolean',
             'prep_line_double_check' => 'boolean',

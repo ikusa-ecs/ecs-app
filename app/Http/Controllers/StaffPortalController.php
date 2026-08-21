@@ -107,6 +107,7 @@ class StaffPortalController extends Controller
                     'enter'     => $p->event_enter_time ?? '',
                     'evStart'   => $p->event_start_time ?? '',
                     'evEnd'     => $p->event_end_time ?? '',
+                    'evTbd'     => (bool) $p->event_time_tbd,   // 本番時間未定（案件登録のチェック）
                     'lodging'   => $p->lodging ?? '',
                     'outdoor'   => (bool) $p->is_outdoor,
                     // 当日必要な情報（案件登録・公開ボードのどちらからでも入れられる）
@@ -541,6 +542,7 @@ class StaffPortalController extends Controller
                 'enter' => $p->event_enter_time ?? '—',
                 'evStart' => $p->event_start_time ?? '—',
                 'evEnd' => $p->event_end_time ?? '—',
+                'evTbd' => (bool) $p->event_time_tbd,   // 本番時間未定（案件登録のチェック）
                 'category' => $p->category ?? '通常案件',
                 'deadline' => $this->deadlineLabel($p, $bulkDeadline),
                 'recruit' => true,

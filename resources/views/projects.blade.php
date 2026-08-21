@@ -111,6 +111,8 @@
     /* 集合・解散時間（＋下に小さく 入場/開始/終了） */
     td.time-cell { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 13px; }
     td.time-cell .ev { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+    /* 本番時間未定＝「入れ忘れ」ではなく「まだ決まっていない」ことが分かるように色を付ける */
+    td.time-cell .ev.tbd { color: #8a5a10; font-weight: 700; }
 
     /* 参加者 / チーム数 */
     td.pt-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -674,7 +676,7 @@
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       guests:c.guests, teams:c.teams, goods:c.goods, transport:c.transport, sound:c.sound,
       lodging:c.lodging, recruit:c.recruit, status:c.status,
-      repeat:!!c.repeat, lineSent:c.lineSent, lineMade:c.lineMade, lineDouble:c.lineDouble,
+      evTbd:!!c.evTbd, repeat:!!c.repeat, lineSent:c.lineSent, lineMade:c.lineMade, lineDouble:c.lineDouble,
       handover:c.handover, script:c.script, opSheet:c.opSheet,
       offset:c.off, multi:(c.parentId != null) || isParent, tentative:!!c.tentative,
       area:c.area, catering:c.catering, agency:c.agency,
@@ -946,8 +948,10 @@
       const noteFlag = hasNote ? '<span class="note-flag" title="備考あり（クリックで開く）">📝</span>' : '';
 
       // 集合・解散の下の入場/開始/終了（無いものは出さない）
-      const evHtml = (p.enter && p.enter !== '—')
-        ? `<div class="ev">${p.enter}/${p.evStart}/${p.evEnd}</div>` : '';
+      const evHtml = p.evTbd
+        ? '<div class="ev tbd">本番時間未定</div>'
+        : ((p.enter && p.enter !== '—')
+            ? `<div class="ev">${p.enter}/${p.evStart}/${p.evEnd}</div>` : '');
 
       // 募集状態
       const rs = recruitStateOf(p);

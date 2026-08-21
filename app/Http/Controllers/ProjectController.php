@@ -116,6 +116,7 @@ class ProjectController extends Controller
                 'enter'      => $p->event_enter_time ?? '—',
                 'evStart'    => $p->event_start_time ?? '—',
                 'evEnd'      => $p->event_end_time ?? '—',
+                'evTbd'      => (bool) $p->event_time_tbd,   // 本番時間未定
                 'guests'     => $p->guest_count ?? '—',
                 'teams'      => $p->team_count ?? '—',
                 'transport'  => $p->transport ?? 'ー',
@@ -266,6 +267,7 @@ class ProjectController extends Controller
                     'event_enter_time' => $p->event_enter_time,
                     'event_start_time' => $p->event_start_time,
                     'event_end_time'   => $p->event_end_time,
+                    'event_time_tbd'   => (bool) $p->event_time_tbd,
                     'location'         => $p->location,
                     'is_outdoor'       => $p->is_outdoor,   // true=屋外 / false=屋内 / null=未設定
                     'lodging'          => $p->lodging,
@@ -608,6 +610,8 @@ class ProjectController extends Controller
             'event_enter_time' => $request->input('event_enter_time'),
             'event_start_time' => $request->input('event_start_time'),
             'event_end_time' => $request->input('event_end_time'),
+            // イベント時間（入場・開始・終了）がまだ決まっていない＝画面に「本番時間未定」と出す
+            'event_time_tbd' => $request->has('event_time_tbd'),
             'location' => $request->input('location'),
             'is_outdoor' => $request->filled('outdoor') ? ($request->input('outdoor') === '屋外') : null,
             'lodging' => $request->input('lodging'),

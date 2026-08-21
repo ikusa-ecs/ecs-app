@@ -276,7 +276,7 @@
           <div class="form-row">
             <label>確度（ヨミ）</label>
             <div class="radio-row" style="flex-wrap:wrap;">
-              {{-- 初期は「確定」。ほとんどの案件は確定してから登録するため（2026-08-21 baba）。 --}}
+              <!-- 初期は「確定」。ほとんどの案件は確定してから登録するため（2026-08-21 baba）。 -->
               <label><input type="radio" name="yomi" value="確定" checked onchange="toggleYomi()"> 確定</label>
               <label><input type="radio" name="yomi" value="Aヨミ" onchange="toggleYomi()"> Aヨミ</label>
               <label><input type="radio" name="yomi" value="Bヨミ" onchange="toggleYomi()"> Bヨミ</label>
@@ -301,7 +301,7 @@
           <!-- 3. 開催日 ｜ 宿泊 -->
           <div class="form-row">
             <label>開催日<span class="req-mark red">必須</span></label>
-            {{-- 曜日は日付の右に出す。土日かどうかで動き方が変わるため、選んだ瞬間に分かるように（2026-08-21 baba）。 --}}
+            <!-- 曜日は日付の右に出す。土日かどうかで動き方が変わるため、選んだ瞬間に分かるように（2026-08-21 baba）。 -->
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <input type="date" id="startDate" name="start_date" data-need="req">
               <span id="startDateDow" class="dow-badge" style="display:none;"></span>
@@ -319,7 +319,7 @@
           </div>
           <div class="form-row non-arena">
             <label>宿泊<span class="req-mark yellow">必須</span></label>
-            {{-- 初期は「無」。宿泊ありは少数のため、毎回選び直さなくてよいように（2026-08-21 baba）。 --}}
+            <!-- 初期は「無」。宿泊ありは少数のため、毎回選び直さなくてよいように（2026-08-21 baba）。 -->
             <select name="lodging" data-need="later">
               <option value="">未定</option>
               <option selected>無</option>
@@ -479,9 +479,9 @@
           <!-- 7. クライアント ｜ 代理店名 -->
           <div class="form-row">
             <label>クライアント（正式名称）<span class="req-mark yellow">必須</span></label>
-            {{-- 欄の右に「様」を固定で出す（入力する値には入らない）。
+            <!-- 欄の右に「様」を固定で出す（入力する値には入らない）。
                  「様」付きと無しが混ざると、システムは別のお客様として数えてしまい、
-                 リピート判定や過去の履歴が分かれてしまうため（2026-08-21 baba）。 --}}
+                 リピート判定や過去の履歴が分かれてしまうため（2026-08-21 baba）。 -->
             <div style="display:flex; align-items:center; gap:6px;">
               <input type="text" id="client" name="client" data-need="later" placeholder="例）〇〇株式会社" style="flex:1; min-width:0;">
               <span style="font-size:14px; font-weight:700; color:var(--muted,#8a7a6b); white-space:nowrap;">様</span>
@@ -544,7 +544,7 @@
           <!-- 9. 運営場所 -->
           <div class="form-row full non-arena">
             <label>運営場所</label>
-            {{-- 「○○依頼」は拠点マスタから作る（拠点を足せばここにも出る・2026-08-21 baba） --}}
+            <!-- 「○○依頼」は拠点マスタから作る（拠点を足せばここにも出る・2026-08-21 baba） -->
             <select name="operation_place">
               @foreach ($operationPlaceOptions as $opt)
                 <option>{{ $opt }}</option>
@@ -616,6 +616,13 @@
                 <label>イベント終了</label>
                 <input type="time" name="event_end_time" data-need="later">
               </div>
+            </div>
+            <!-- イベント時間がまだ決まっていないとき（2026-08-21 baba）。
+                 チェックを入れると案件一覧・スタッフ画面に「本番時間未定」と出る＝
+                 「入れ忘れ」ではなく「まだ決まっていない」ことが伝わる。 -->
+            <div class="tbd-row" style="margin-top:6px;">
+              <input type="checkbox" id="eventTimeTbd" name="event_time_tbd" class="tbd-check" onchange="onEventTimeTbd(this)">
+              <label for="eventTimeTbd">イベント時間未定（入場・開始・終了がまだ決まっていない）</label>
             </div>
           </div>
 
@@ -1294,6 +1301,19 @@
     refreshNeed(f);
   }
 
+  // イベント時間未定：入場・開始・終了の3つをまとめて「未定」にする（2026-08-21 baba）。
+  // 未定のあいだは3つの欄を空にして触れないようにし、黄色（後で必要）の色付けもそろえる。
+  function onEventTimeTbd(cb) {
+    ['event_enter_time', 'event_start_time', 'event_end_time'].forEach(function (name) {
+      const el = document.querySelector('[name="' + name + '"]');
+      if (!el) return;
+      if (cb.checked) el.value = '';
+      el.disabled = cb.checked;
+      el.dataset.tbd = cb.checked ? '1' : '';
+      if (typeof refreshNeed === 'function') refreshNeed(el);
+    });
+  }
+
   // 入力・選択のたびに色を更新
   document.querySelectorAll('[data-need]').forEach(function (f) {
     const ev = (f.tagName === 'SELECT') ? 'change' : 'input';
@@ -1315,9 +1335,10 @@
     const parts = iso.split('-');
     const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     if (isNaN(d.getTime())) { badge.style.display = 'none'; return; }
+    // 表示は案件一覧と同じ「2026/8/21（金）」の形にそろえる（2026-08-21 baba）。
     const names = ['日', '月', '火', '水', '木', '金', '土'];
     const w = d.getDay();
-    badge.textContent = names[w] + '曜日';
+    badge.textContent = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + '（' + names[w] + '）';
     badge.className = 'dow-badge' + (w === 0 ? ' sun' : (w === 6 ? ' sat' : ''));
     badge.style.display = '';
   }
@@ -1426,6 +1447,10 @@
     setCheck('countTentative', E.count_tentative);
     setCheck('teamTentative', E.team_tentative);
     setCheck('isRepeat', E.is_repeat);
+    setCheck('eventTimeTbd', E.event_time_tbd);
+    // チェックの見た目（3つの欄を触れなくする）も合わせる
+    const evTbd = document.getElementById('eventTimeTbd');
+    if (evTbd && evTbd.checked) onEventTimeTbd(evTbd);
 
     // --- 対象拠点（複数チェック）---
     if (Array.isArray(E.base_locations)) {
