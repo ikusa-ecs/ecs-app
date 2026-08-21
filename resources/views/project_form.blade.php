@@ -479,8 +479,14 @@
           <!-- 7. クライアント ｜ 代理店名 -->
           <div class="form-row">
             <label>クライアント（正式名称）<span class="req-mark yellow">必須</span></label>
-            <input type="text" id="client" name="client" data-need="later" placeholder="例）〇〇株式会社">
-            <div class="hint">正式名称で記載ください。</div>
+            {{-- 欄の右に「様」を固定で出す（入力する値には入らない）。
+                 「様」付きと無しが混ざると、システムは別のお客様として数えてしまい、
+                 リピート判定や過去の履歴が分かれてしまうため（2026-08-21 baba）。 --}}
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="text" id="client" name="client" data-need="later" placeholder="例）〇〇株式会社" style="flex:1; min-width:0;">
+              <span style="font-size:14px; font-weight:700; color:var(--muted,#8a7a6b); white-space:nowrap;">様</span>
+            </div>
+            <div class="hint">正式名称で記載ください。<b>「様」は入力しないでください</b>（画面側で付けています）。</div>
             <!-- リピート（常連）のお客様なら、ここに過去案件の履歴を控えめに出す（入力/フォーカスアウトで自動照会）。 -->
             <div class="hint repeat-note" id="clientRepeatNote" style="display:none;"></div>
           </div>

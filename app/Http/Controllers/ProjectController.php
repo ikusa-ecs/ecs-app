@@ -126,7 +126,10 @@ class ProjectController extends Controller
                 'recruit'    => (bool) $p->is_recruiting,
                 'status'     => $p->status ?? '未着手',
                 'tentative'  => (bool) $p->count_tentative,
+                'repeat'     => (bool) $p->is_repeat,      // 手で入れた「リピート案件」の印
                 'lineSent'   => (bool) $p->prep_line_sent,
+                'lineMade'   => (bool) $p->prep_line_created,
+                'lineDouble' => (bool) $p->prep_line_double_check,
                 'handover'   => (bool) $p->prep_handover,
                 'script'     => (bool) $p->prep_script,
                 'opSheet'    => $p->ops_sheet_url ?? '',
@@ -596,7 +599,9 @@ class ProjectController extends Controller
             'broadcast' => $request->input('broadcast'),
             'operation_place' => $request->input('operation_place'),
             'arena_options' => $arenaOptions,
-            'client' => $request->input('client'),
+            // クライアント名は書き方をそろえて保存する（末尾の「様」「御中」と前後の空白を落とす）。
+            // 混ざると同じお客様が別々に数えられ、リピート判定と履歴が分かれるため。
+            'client' => \App\Support\ClientName::normalize($request->input('client')),
             'start_date' => $request->input('start_date'),
             'start_time' => $request->input('start_time'),
             'end_time' => $request->input('end_time'),
@@ -705,6 +710,17 @@ class ProjectController extends Controller
             'goods_owner_id' => ['nullable', 'string'],
             'transport'      => ['nullable', 'string', 'max:100'],
             'audio_equipment' => ['nullable', 'string', 'max:100'],
+            // 制作・記録（案件一覧の詳細でその場保存）
+            'pub_logo'       => ['nullable', 'string', 'max:20'],
+            'pub_camera'     => ['nullable', 'string', 'max:20'],
+            'pub_article'    => ['nullable', 'string', 'max:20'],
+            'pub_video'      => ['nullable', 'string', 'max:20'],
+            // 準備チェック（案件一覧の詳細で付け外し・その場保存）
+            'prep_line_created'      => ['nullable', 'boolean'],
+            'prep_line_sent'         => ['nullable', 'boolean'],
+            'prep_line_double_check' => ['nullable', 'boolean'],
+            'prep_handover'          => ['nullable', 'boolean'],
+            'prep_script'            => ['nullable', 'boolean'],
         ]);
 
         $project = Project::findOrFail($request->input('id'));
@@ -736,10 +752,18 @@ class ProjectController extends Controller
         }
 
         // 移動・音響：送られたキーだけ更新。空文字は null（未設定）に。
-        foreach (['transport', 'audio_equipment'] as $key) {
+        foreach (['transport', 'audio_equipment', 'pub_logo', 'pub_camera', 'pub_article', 'pub_video'] as $key) {
             if ($request->has($key)) {
                 $val = trim((string) $request->input($key));
                 $project->{$key} = $val !== '' ? $val : null;
+            }
+        }
+
+        // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ／引き継ぎ／台本）。
+        // 送られたキーだけ更新＝チェック1つ押すたびに、その1つだけを保存する（2026-08-21 baba）。
+        foreach (['prep_line_created', 'prep_line_sent', 'prep_line_double_check', 'prep_handover', 'prep_script'] as $key) {
+            if ($request->has($key)) {
+                $project->{$key} = $request->boolean($key);
             }
         }
 
@@ -905,7 +929,7 @@ class ProjectController extends Controller
                 'format' => $get($row, '実施形態') ?: null,
                 'broadcast' => $get($row, '配信種別') ?: null,
                 'operation_place' => $get($row, '運営場所') ?: null,
-                'client' => $get($row, 'クライアント') ?: null,
+                'client' => \App\Support\ClientName::normalize($get($row, 'クライアント')),
                 'agency' => $get($row, '代理店名') ?: null,
                 'staff_role' => $get($row, '担当体制') ?: null,
                 'start_date' => $date,

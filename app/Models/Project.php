@@ -38,6 +38,8 @@ class Project extends Model
             'is_repeat' => 'boolean',
             'alcohol' => 'boolean',
             'prep_line_sent' => 'boolean',
+            'prep_line_created' => 'boolean',
+            'prep_line_double_check' => 'boolean',
             'prep_handover' => 'boolean',
             'prep_script' => 'boolean',
             'staff_published' => 'boolean',

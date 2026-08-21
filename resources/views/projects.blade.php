@@ -416,7 +416,7 @@
   .ops .copy-ctl select { font-size: 11px; padding: 1px 4px; }
 </style>
 @verbatim
-      <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<b>リピート（常連）のクライアントは、クライアント名を押すと過去のアサインをさかのぼれます。</b><br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（ディレクター・SD・物品担当・移動・音響）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>その場で保存されます</b>（読み込み直しても残ります）。準備チェックだけは次の工程で対応予定です。</div>
+      <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<b>リピート（常連）のクライアントは、クライアント名を押すと過去のアサインをさかのぼれます。</b><br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（ディレクター・SD・物品担当・移動・音響）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>その場で保存されます</b>（読み込み直しても残ります）。<b>準備チェック（LINE作成・LINE概要送付・LINEダブチェ・引き継ぎ・台本）も、その場で保存されます。</b></div>
 
       <!-- 絞り込みバー -->
       <div class="panel">
@@ -465,6 +465,14 @@
               <option value="">すべて</option>
               <option value="あり">あり</option>
               <option value="なし">なし</option>
+            </select>
+          </div>
+          <div class="f-item">
+            <label>LINE作成</label>
+            <select id="linemade" onchange="applyFilter()">
+              <option value="">すべて</option>
+              <option value="1">済（チェックあり）</option>
+              <option value="0">未（チェックなし）</option>
             </select>
           </div>
           <div class="f-item">
@@ -650,6 +658,8 @@
                       'IKUSAカー+レンタカー', '電車+IKUSAカー', '電車+レンタカー', '飛行機', '飛行機+レンタカー'];
   const SOUND = ['会場音響', 'クラシックプロ大', 'クラシックプロ中', 'クラシックプロ小', 'CUBE', 'SANWA', 'TOA', '不要'];
   // ケータリングの選択肢（案件登録フォームと同じ並び）。詳細で選べる。
+  // 制作・記録（ロゴ／カメラ／事例記事／動画）の選択肢。案件登録画面と同じ並び。
+  const PUB_OPTS = ['不要', 'ほしい', 'OK', 'NG'];
   const CATERING_OPTS = ['無', 'ケータリング', 'オードブル', 'お弁当', 'キッチンカー', 'BBQ', 'LH発注あり（格付け）', 'LH発注あり（ゴチ）', 'その他'];
   // ケータリングが「あり」（＝無・空・なし系ではない）か
   function isCateringOn(v) { return !!v && !['', '-', '−', '無', '無し', 'なし'].includes(String(v).trim()); }
@@ -664,7 +674,8 @@
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       guests:c.guests, teams:c.teams, goods:c.goods, transport:c.transport, sound:c.sound,
       lodging:c.lodging, recruit:c.recruit, status:c.status,
-      lineSent:c.lineSent, handover:c.handover, script:c.script, opSheet:c.opSheet,
+      repeat:!!c.repeat, lineSent:c.lineSent, lineMade:c.lineMade, lineDouble:c.lineDouble,
+      handover:c.handover, script:c.script, opSheet:c.opSheet,
       offset:c.off, multi:(c.parentId != null) || isParent, tentative:!!c.tentative,
       area:c.area, catering:c.catering, agency:c.agency,
       logo:c.logo, camera:c.camera, article:c.article, video:c.video,
@@ -803,6 +814,28 @@
     .catch(() => alert('保存に失敗しました。もう一度お試しください。'));
   }
 
+  // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ／引き継ぎ／台本）。
+  // 押した瞬間にDBへ保存する（2026-08-21 baba。以前は見るだけで押せなかった）。
+  // 行そのものをクリックすると詳細が閉じてしまうので、チェックの上では stopPropagation する。
+  const PREP_KEYS = {
+    prep_line_created: 'lineMade', prep_line_sent: 'lineSent', prep_line_double_check: 'lineDouble',
+    prep_handover: 'handover', prep_script: 'script'
+  };
+  function prepCheckHtml(idx, id, field, label, on) {
+    return `<label onclick="event.stopPropagation()"><input type="checkbox" ${on ? 'checked' : ''}`
+         + ` onchange="onPrepToggle(${idx}, '${id}', '${field}', this)"> ${label}</label>`;
+  }
+  function onPrepToggle(idx, id, field, cb) {
+    saveCell(id, field, cb.checked);
+    const key = PREP_KEYS[field];
+    if (key && projects[idx]) projects[idx][key] = cb.checked;   // 絞り込みが次に効くように手元の値も更新
+    if (field === 'prep_line_created') {
+      // 「LINE作成」は絞り込みに使うので、行が持っている印もその場で書き換える
+      const row = document.querySelector('#projBody tr.main-row[data-idx="' + idx + '"]');
+      if (row) row.dataset.linemade = cb.checked ? '1' : '0';
+    }
+  }
+
   // 担当（D／SD／物品）を選んだとき：DB保存＋画面表示・集計を更新。
   function onCellSaveEmployee(idx, id, field, sel) {
     const val = sel.value;                       // 社員ID or ''（担当なし）
@@ -827,6 +860,11 @@
     saveCell(id, field, val);
     if (field === 'transport')       projects[idx].transport = val || 'ー';
     if (field === 'audio_equipment') projects[idx].sound = val;
+    // 制作・記録は画面の手元の値も更新（開き直したときに選んだ内容が残るように）
+    if (field === 'pub_logo')    projects[idx].logo    = val || '-';
+    if (field === 'pub_camera')  projects[idx].camera  = val || '-';
+    if (field === 'pub_article') projects[idx].article = val || '-';
+    if (field === 'pub_video')   projects[idx].video   = val || '-';
   }
 
   // ===== ケータリング（選択＋メモ）をDBに保存 =====
@@ -958,6 +996,7 @@
       tr.dataset.office  = p.office || '';        // 拠点での絞り込み用
       tr.dataset.date    = isoOf(p.date);         // 開催日（2026-08-01の形）＝日付での絞り込み用
       tr.dataset.catering = isCateringOn(p.catering) ? 'あり' : 'なし';
+      tr.dataset.linemade = p.lineMade ? '1' : '0';   // 「LINE作成」の済／未での絞り込み用
       tr.dataset.draft  = p.draft ? '1' : '0';
       tr.dataset.archived = p.archived ? '1' : '0';
       tr.setAttribute('onclick', `toggleDetail(${p._i})`);
@@ -968,7 +1007,9 @@
       const clientNameHtml = isRepeatClient
         ? `<a href="/assign-history?client=${encodeURIComponent(clientTrim)}" onclick="event.stopPropagation()">${p.client}</a>`
         : (p.client || '');
-      const repeatBadge = isRepeatClient ? '<span class="tag-mini repeat">リピート</span>' : '';
+      // リピートの印は「同じ企業名の案件が2件以上ある」か「登録時にリピートへチェックした」かのどちらか。
+      // 以前は企業名だけで判定しており、チェックを入れてもバッジが出ず食い違っていた（2026-08-21 baba）。
+      const repeatBadge = (isRepeatClient || p.repeat) ? '<span class="tag-mini repeat">リピート</span>' : '';
       const clientLine = (p.agency ? `${clientNameHtml}（${p.agency}）` : clientNameHtml) + repeatBadge;
 
       tr.innerHTML = `
@@ -1004,13 +1045,19 @@
       dr.style.display = 'none';
       // 第1弾：詳細に条件表示する項目を組み立てる
       // 制作・記録（ロゴ/カメラ/事例記事/動画）を横並びで出す。
-      const PUB = [['ロゴ', p.logo], ['カメラ', p.camera], ['事例記事', p.article], ['動画', p.video]];
-      const inlineItems = PUB
-        .filter(([k, v]) => v && !['', '-', '−'].includes(v))
-        .map(([k, v]) => `<span class="pub-item"><span class="pub-k">${k}</span><b>${v}</b></span>`);
-      const pubInline = inlineItems.length
-        ? inlineItems.join('')
-        : '<span style="color:var(--muted);font-size:12px;">（指定なし）</span>';
+      // 制作・記録は「見るだけ」ではなく、その場で選んで保存できる（2026-08-21 baba）。
+      // 指定なし（-）のものも必ず出す＝あとから決まったときに押せるようにするため。
+      const PUB = [
+        ['ロゴ', 'pub_logo', p.logo], ['カメラ', 'pub_camera', p.camera],
+        ['事例記事', 'pub_article', p.article], ['動画', 'pub_video', p.video],
+      ];
+      const pubInline = PUB
+        .map(([k, field, v]) => {
+          const cur = (v && v !== '-' && v !== '−') ? v : '';   // 「-」＝指定なし
+          return `<span class="pub-item"><span class="pub-k">${k}</span>`
+               + `${textSelectHtml(p._i, p.id, field, PUB_OPTS, cur, '-')}</span>`;
+        })
+        .join('');
       // ケータリングは動画の横に「選べるプルダウン」で出す。「無」以外を選ぶとメモ欄が現れる。変更はDB保存。
       const catCur = (p.catering && p.catering !== '−' && p.catering !== '-') ? p.catering : '無';
       const catOpts = CATERING_OPTS.map(o => `<option${o === catCur ? ' selected' : ''}>${o}</option>`).join('');
@@ -1053,9 +1100,11 @@
               <span class="d-label">準備チェック・制作記録</span>
               <div class="prep-pub">
                 <div class="checks">
-                  <span>${p.lineSent ? '✅' : '⬜'} LINE概要送付</span>
-                  <span>${p.handover ? '✅' : '⬜'} 引き継ぎ</span>
-                  <span>${p.script ? '✅' : '⬜'} 台本</span>
+                  ${prepCheckHtml(p._i, p.id, 'prep_line_created', 'LINE作成', p.lineMade)}
+                  ${prepCheckHtml(p._i, p.id, 'prep_line_sent', 'LINE概要送付', p.lineSent)}
+                  ${prepCheckHtml(p._i, p.id, 'prep_line_double_check', 'LINEダブチェ', p.lineDouble)}
+                  ${prepCheckHtml(p._i, p.id, 'prep_handover', '引き継ぎ', p.handover)}
+                  ${prepCheckHtml(p._i, p.id, 'prep_script', '台本', p.script)}
                 </div>
                 <div class="pub-inline"><span class="pub-cap">制作・記録</span>${pubInline}${cateringCtl}</div>
               </div>
@@ -1071,7 +1120,7 @@
                 : `<a class="sheet-link" href="/project-form?project=${encodeURIComponent(p.id)}" onclick="event.stopPropagation()" style="color:var(--muted);">＋ 編集画面でURLを登録</a>`}
             </div>
             <div class="d-item" style="flex-basis:100%;">
-              <span style="font-size:11.5px;color:var(--muted);">※ <b>ディレクター・SD・物品担当・移動・音響・ケータリング</b>は、この詳細で選ぶ／入力するとその場で保存されます（自動保存）。準備チェックの保存は次の工程で対応します。案件の他の内容を直すときは上の「編集」からどうぞ。</span>
+              <span style="font-size:11.5px;color:var(--muted);">※ <b>ディレクター・SD・物品担当・移動・音響・ケータリング</b>は、この詳細で選ぶ／入力するとその場で保存されます（自動保存）。<b>準備チェックのチェックボックス</b>も、押した時点で保存されます。案件の他の内容を直すときは上の「編集」からどうぞ。</span>
             </div>
           </div>
         </td>`;
@@ -1161,6 +1210,7 @@
     const format  = document.getElementById('format').value;
     const toc      = document.getElementById('toc').value;         // ''=すべて / 'toc' / 'tob'
     const catering = document.getElementById('catering').value;    // ''=すべて / 'あり' / 'なし'
+    const linemade = document.getElementById('linemade').value;    // ''=すべて / '1'=済 / '0'=未
     const kbn     = document.getElementById('kbn').value;
     const office  = officeFilterValue();                           // ''=すべての拠点
     const dFrom   = document.getElementById('dFrom').value;        // ''か '2026-08-01'
@@ -1188,12 +1238,13 @@
       const okFmt = formatMatches(tr.dataset.format, format);
       const okToc = !toc    || (toc === 'toc' ? tr.dataset.toc === '1' : tr.dataset.toc === '0');
       const okCat = !catering || tr.dataset.catering === catering;
+      const okLine = !linemade || tr.dataset.linemade === linemade;
       const okKbn = !kbn     || tr.dataset.kbn === kbn;
       const okOf  = !office  || tr.dataset.office === office;
       // 開催日は "2026-08-01" の形なので、文字列のまま大小を比べれば日付の前後になる。
       const okDate = (!dFrom || tr.dataset.date >= dFrom) && (!dTo || tr.dataset.date <= dTo);
       // 絞り込みに一致するか（matched）と、その月が畳まれているか（collapsed）は別。
-      const matched = okTab && okKw && okYo && okFmt && okToc && okCat && okKbn && okOf && okDate;
+      const matched = okTab && okKw && okYo && okFmt && okToc && okCat && okLine && okKbn && okOf && okDate;
       // チャットワーク用の書き出しは「月を畳んでいても、絞り込みに一致した案件」を対象にする。
       tr.dataset.matched = matched ? '1' : '0';
       const collapsed = collapsedMonths.has(tr.dataset.group);
