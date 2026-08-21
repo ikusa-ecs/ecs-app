@@ -60,6 +60,9 @@ class AssignPublishController extends Controller
                 'meetPlace' => $p->assembly_type ?? '',
                 'published' => (bool) $p->staff_published,      // 公開状態（DBの背骨）
                 'memo'      => $p->publish_memo ?? '',          // 公開ボードの担当メモ（DB保存・全員共有）
+                // 案件登録で書いた備考（projects.note）。公開ボードの「備考」とは別の項目なので、
+                // 見えないと『書いたのに出ない』と混乱する。読むだけ（直すのは案件登録）で出す（2026-08-21 baba）。
+                'projNote'  => $p->note ?? '',
                 // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）
                 'staffNotes' => $p->staff_notes ?? '',   // スタッフに伝えること（1欄・備考のような自由記入）
             ];
