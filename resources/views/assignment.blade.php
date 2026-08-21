@@ -12,12 +12,10 @@
     .asg-head .pname { font-size: 18px; font-weight: 700; }
     .asg-head .meta { display: flex; gap: 20px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-top: 6px; }
     .asg-head .meta b { color: var(--ink); font-weight: 600; }
-    /* 案件の備考（見落とすと事故るので薄い黄色の帯で目立たせる） */
-    .asg-note-band { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px;
-      background: #fdf6d8; border: 1px solid #e8dca0; border-radius: 8px; padding: 8px 12px;
-      font-size: 13px; color: var(--ink); line-height: 1.6; }
-    .asg-note-band .lbl { font-weight: 700; white-space: nowrap; color: #8a6d1a; }
-    .asg-note-band .bd { word-break: break-word; }
+    /* 案件の備考の見た目は共通部品（partials/project_note）に移した＝ここには置かない。 */
+    /* 案件名のリンク（押すと案件の詳細・編集へ） */
+    .asg-head .pname a { color: inherit; text-decoration: none; }
+    .asg-head .pname a:hover { text-decoration: underline; }
 
     /* 操作バー（選択数・検索） */
     .asg-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; }
@@ -146,6 +144,9 @@
 
 @section('content')
 
+  {{-- 案件の備考（表示＋その場編集）の共通部品 --}}
+  @include('partials.project_note')
+
   {{-- 保存結果などのお知らせ --}}
   @if (session('status'))
     <div class="alert ok" style="margin-bottom:14px;"><span class="ico">✓</span><div>{{ session('status') }}</div></div>
@@ -157,7 +158,10 @@
   <div class="panel">
     <div class="asg-head">
       <div>
-        <div class="pname">{{ $project->project_name }}</div>
+        {{-- 案件名を押したら案件の詳細（編集画面）へ。アサイン中に中身を確認できる（2026-08-21 baba） --}}
+        <div class="pname">
+          <a href="/project-form?project={{ urlencode($project->id) }}" title="案件の詳細・編集を開く">{{ $project->project_name }}</a>
+        </div>
         <div class="meta">
           <span>コンテンツ：<b>{{ $contentName }}</b></span>
           <span>日程：<b>{{ $date ? $date->format('Y/n/j') . '（' . ['日','月','火','水','木','金','土'][$date->dayOfWeek] . '）' : '未設定' }}</b></span>
@@ -167,13 +171,8 @@
           <span>D：<b>{{ $project->director->name ?? '未定' }}</b></span>
           <span>状況：<b>{{ $project->status ?? '未着手' }}</b></span>
         </div>
-        {{-- 案件の備考：担当が見落とすと事故るので、メタ情報の下に帯で目立たせる --}}
-        @if (trim((string) $project->note) !== '')
-          <div class="asg-note-band">
-            <span class="lbl">📌 案件の備考</span>
-            <span class="bd">{!! nl2br(e($project->note)) !!}</span>
-          </div>
-        @endif
+        {{-- 案件の備考：担当が見落とすと事故るので必ず出す。この帯からその場で直せる（2026-08-21 baba） --}}
+        <div class="pnote-slot" data-id="{{ $project->id }}" data-note="{{ $project->note }}"></div>
       </div>
     </div>
   </div>

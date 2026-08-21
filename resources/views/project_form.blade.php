@@ -785,7 +785,7 @@
         <!-- コンテンツに「運動会」が含まれるときだけ出す注意（種目を備考に書いてもらう） -->
         <div id="undokaiNote" class="undokai-note" style="display:none;">⚠ 運動会が選ばれています。<u>種目を備考に入力してください。</u></div>
         <div class="form-row full" style="margin-bottom:0;">
-          <label>メモ・連絡事項（任意）</label>
+          <label>備考（任意・社員だけが見ます）</label>
           <textarea rows="3" name="note" placeholder="例）持ち物：着替え・タオル　／　雨天時は△△へ変更"></textarea>
         </div>
       </div>

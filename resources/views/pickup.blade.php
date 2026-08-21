@@ -136,12 +136,10 @@
     .pk-mem-patrol { width:54px; }
     .pk-mem-remark { width:130px; }
 
-    /* 案件の備考（見落とし防止で目立たせる・折り返しOK） */
-    .pk-case-note {
-      background:#fff6e6; border:1px solid #f0dcae; color:#8a6a20;
-      border-radius:8px; padding:6px 10px; margin:6px 0 2px; font-size:12.5px;
-      white-space:pre-wrap; word-break:break-word; line-height:1.5;
-    }
+    /* 案件の備考の見た目は共通部品（partials/project_note）に移した＝ここには置かない。 */
+    /* 案件名のリンク（押すと案件の詳細・編集へ） */
+    .pk-case-name a { color:inherit; text-decoration:none; }
+    .pk-case-name a:hover { text-decoration:underline; }
 
     /* 保存ボタン行（この案件をDBへ保存） */
     .pk-save-row {
@@ -156,6 +154,8 @@
 @endpush
 
 @section('content')
+      {{-- 案件の備考（表示＋その場編集）の共通部品 --}}
+      @include('partials.project_note')
       {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
       @include('partials.office_switch')
       @if ($officeScope)
@@ -288,6 +288,12 @@
     : !!(window.ECS_PICKUP_CASES && window.ECS_PICKUP_CASES.length);
   const ALL = USING_DB ? (window.ECS_PICKUP_CASES || []) : (window.ECS_CASES || []);
   function getCase(id){ return ALL.find(c => c.id === id) || null; }
+
+  // 備考をこの画面で直したときは、持っているデータにも書き戻す（再描画で古い備考に戻らないように）。
+  window.ecsNoteApplied = function (id, note) {
+    const c = getCase(id);
+    if (c) c.note = note;
+  };
 
   // 子案件（前日設営・リハ・予備日）の「本番はいつか」
   // ※複数日（連続日程の本番）は下の seriesBadge で「◯日目/全◯日」を表示する
@@ -620,9 +626,8 @@
 
       const guests = (c.guests && c.guests !== '—') ? `<span>参加者 <b>${c.guests}</b>名</span>` : '';
       const teams  = (c.teams  && c.teams  !== '—') ? `<span>チーム <b>${c.teams}</b></span>` : '';
-      // 案件の備考＝空でなければ目立つ帯で出す（見落とし防止）。
-      const noteHtml = (c.note && String(c.note).trim() !== '')
-        ? `<div class="pk-case-note">📌 備考：${esc(c.note)}</div>` : '';
+      // 案件の備考＝必ず出す（見落とし防止）。この帯からその場で直せる（2026-08-21 baba）。
+      const noteHtml = window.ecsNoteHtml(c.id, c.note, USING_DB);
       // 開催日が無い案件は保存できない（バックエンドが422で弾く）ので、その場で理由を出す。
       const saveHint = c.date ? '' : ' disabled title="開催日が未設定のため保存できません"';
 
@@ -630,7 +635,9 @@
         <div class="pk-case">
           <div class="pk-case-head">
             <span class="pk-case-date">${dateLabel(c.off)}</span>
-            <span class="pk-case-name">${c.content || c.name}</span>
+            <span class="pk-case-name">${USING_DB
+              ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く">${esc(c.content || c.name)}</a>`
+              : esc(c.content || c.name)}</span>
             <span class="pk-case-client">${c.client || ''}</span>
             ${dt}${seriesBadge(c)}
           </div>

@@ -151,9 +151,10 @@
 
     .empty-note { text-align: center; color: var(--muted); font-size: 13px; padding: 26px 0; }
 
-    /* 案件の備考（見落とすと事故るので目立つ色で。長文は折り返す） */
-    .cc-note { font-size: 12px; font-weight: 600; color: #b45309; background: var(--warn-soft);
-      border-radius: 8px; padding: 5px 9px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+    /* 案件の備考の見た目は共通部品（partials/project_note）に移した＝ここには置かない。 */
+    /* 案件名のリンク（押すと案件の詳細・編集へ）。色は見出しのまま、マウスを乗せたときだけ下線。 */
+    .cc-name a { color: inherit; text-decoration: none; }
+    .cc-name a:hover { text-decoration: underline; }
     /* メンバー行の担当メモ・巡回（小さく控えめに） */
     .m-note  { font-size: 10.5px; font-weight: 700; color: #6d28d9; white-space: nowrap; }
     .m-patrol{ font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
@@ -263,6 +264,8 @@
 @endpush
 
 @section('content')
+      {{-- 案件の備考（表示＋その場編集）の共通部品。見た目と保存先はこの1か所にまとめている --}}
+      @include('partials.project_note')
       {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
       @include('partials.office_switch')
       @if ($officeScope)
@@ -377,6 +380,12 @@
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。
       assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, roleCode2:m.roleCode2, status:m.status, note:m.note, patrol:m.patrol, remark:m.remark }))
     }));
+
+  // 備考をこの画面で直したときは、持っているデータにも書き戻す（再描画で古い備考に戻らないように）。
+  window.ecsNoteApplied = function (id, note) {
+    const c = cases.find(z => z.id === id);
+    if (c) c.note = note;
+  };
 
   // 各日の「稼働可スタッフ数」（仮）。off → その日に稼働可と出している人数。
   // ※off12は「運動会3日目＋水合戦＋縁日」で割当済が稼働可を超える＝重複警告が出る例。
@@ -798,7 +807,11 @@
   function titleBlockHtml(c){
     const name = c.name || '';
     const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツがマスタに未登録です。案件名で仮表示しています。">⚠未登録</span> ' : '';
-    return `<div class="cc-name" title="${name}">${badge}${name}</div>`;
+    // 案件名を押したら案件の詳細（編集画面）へ。アサインしながら中身を確認できる（2026-08-21 baba）。
+    const inner = USING_DB
+      ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く">${badge}${name}</a>`
+      : `${badge}${name}`;
+    return `<div class="cc-name" title="${name}">${inner}</div>`;
   }
 
   // メンバーのポジション欄。手動編集中でスタッフIDがあればプルダウン（選ぶとDB保存）、それ以外は表示のみ。
@@ -1093,10 +1106,9 @@
       return `<span class="ctag ${cls}">${t}</span>`;
     }).join('');
 
-    // 案件の備考（あれば目立つ帯で表示。担当者の見落とし＝事故を防ぐ）
-    const noteHtml = (c.note && String(c.note).trim())
-      ? `<div class="cc-note">📌 備考：${escHtml(String(c.note).trim())}</div>`
-      : '';
+    // 案件の備考（見落とし＝事故を防ぐため必ず出す）。この帯からその場で直せる（2026-08-21 baba）。
+    // 未記入でも「📌 備考 未記入 ✎直す」を出す＝ここが入力の入口になる。
+    const noteHtml = window.ecsNoteHtml(c.id, c.note, USING_DB);
 
     // 割当メンバー（スタッフ＋社員＋派遣）。同じ日にかぶる人は赤文字。
     // 各メンバーの右に「他にどの案件に出ているか」を小タグで表示（同日=赤／別日=緑＝連続起用OK）。

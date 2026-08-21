@@ -109,7 +109,7 @@ class AssignSheetController extends Controller
             ? collect()
             : Assignment::whereIn('project_id', $projectIds)
                 ->where('status', '!=', 'キャンセル')
-                ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol']);
+                ->get(['project_id', 'staff_id', 'role', 'status', 'note', 'patrol', 'remark']);
 
         // 関係する人の名前・区分・拠点をまとめて引く（毎回引かない）。拠点はヘルプ表示に使う。
         $people = Person::whereIn('id', $assignments->pluck('staff_id')->unique()->all())
@@ -152,6 +152,7 @@ class AssignSheetController extends Controller
                         'pos' => self::POS_LABELS[$a->role] ?? ($a->role ?: '—'),
                         'note' => $a->note ?? '',   // 担当メモ（軍師/サポ 等）
                         'patrol' => $a->patrol,     // 巡回数（数値/null）
+                        'remark' => $a->remark ?? '',   // 備考（一言・自由記述）。他のアサイン画面と同じ欄（2026-08-21 baba）
                         'status' => $a->status,   // 仮/確定
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
                         'office' => $person->office ?? '',   // 本人の拠点（ヘルプ表示に使う）
@@ -170,6 +171,7 @@ class AssignSheetController extends Controller
                     'pos' => 'D',
                     'note' => '',
                     'patrol' => null,
+                    'remark' => '',
                     'status' => null,
                     'type' => 'emp',
                     'office' => '',

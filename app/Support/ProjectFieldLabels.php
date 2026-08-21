@@ -96,7 +96,7 @@ class ProjectFieldLabels
         'prep_line_double_check' => '準備：LINEダブチェ',
         'prep_handover'      => '準備：引き継ぎ',
         'prep_script'        => '準備：台本',
-        'note'               => 'メモ・連絡事項',
+        'note'               => '備考',
         // ── スタッフ本人に伝えること（確定アサインの詳細に出る） ──
         'staff_belongings'   => '持ち物',
         'staff_dresscode'    => '服装',

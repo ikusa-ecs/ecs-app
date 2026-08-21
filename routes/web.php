@@ -118,7 +118,8 @@ Route::get('/project-form', [ProjectController::class, 'form']);
 Route::post('/project-form', [ProjectController::class, 'store']);
 // 案件一覧の詳細から、ケータリングの種類・メモだけを保存する（公開ボードの時間保存と同じ方式）。
 Route::post('/projects/catering', [ProjectController::class, 'saveCatering']);
-// 案件一覧の詳細セル（D/SD/物品/移動/音響）を保存する。
+// 案件一覧の詳細セル（D/SD/物品/移動/音響/準備チェック/備考）を保存する。
+// 備考はアサイン系の画面（日別ボード・案件別アサイン・ピックアップ）からもここへ保存する（入口を1か所に寄せている）。
 Route::post('/projects/cells', [ProjectController::class, 'saveCells']);
 // 手動アーカイブ（隠す／戻す）を保存する。
 Route::post('/projects/archive', [ProjectController::class, 'setArchive']);

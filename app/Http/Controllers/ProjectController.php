@@ -704,6 +704,8 @@ class ProjectController extends Controller
             'goods_owner_id' => ['nullable', 'string'],
             'transport'      => ['nullable', 'string', 'max:100'],
             'audio_equipment' => ['nullable', 'string', 'max:100'],
+            // 備考（社員だけが見るメモ）。アサイン系の画面からもその場で直せるようにした（2026-08-21 baba）。
+            'note'            => ['nullable', 'string', 'max:2000'],
             // 制作・記録（案件一覧の詳細でその場保存）
             'pub_logo'       => ['nullable', 'string', 'max:20'],
             'pub_camera'     => ['nullable', 'string', 'max:20'],
@@ -751,6 +753,14 @@ class ProjectController extends Controller
                 $val = trim((string) $request->input($key));
                 $project->{$key} = $val !== '' ? $val : null;
             }
+        }
+
+        // 備考。アサイン系の画面（日別ボード・案件別アサイン・ピックアップ）からもここへ保存する。
+        // 保存の入口をこの1か所に寄せている＝拠点チェックと編集履歴（ProjectHistoryRecorder）が自動で効く。
+        // 改行はそのまま残す（前後の空白だけ落とす）。空にしたら null＝未記入に戻す。
+        if ($request->has('note')) {
+            $val = trim((string) $request->input('note'));
+            $project->note = $val !== '' ? $val : null;
         }
 
         // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ／引き継ぎ／台本）。

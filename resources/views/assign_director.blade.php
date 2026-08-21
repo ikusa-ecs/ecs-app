@@ -166,7 +166,9 @@
     .c-count.has-undecided { background: var(--warn); }   /* D未定の案件がある日＝橙で注意 */
     /* 件数ふきだし */
     .day-tip {
-      display: none; position: absolute; top: 100%; right: 0; z-index: 70; width: 244px; margin-top: 4px;
+      /* 件数バッジとの間に余白を入れない＝ふきだしの中の案件名リンクまでカーソルを動かせるようにする
+         （4pxでも空くと途中で hover が切れて、ふきだしが消えてしまう・2026-08-21）。 */
+      display: none; position: absolute; top: 100%; right: 0; z-index: 70; width: 244px; margin-top: 0;
       background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(60,40,20,.18);
       padding: 8px 10px; font-size: 11px; line-height: 1.5; color: var(--ink); text-align: left;
     }
@@ -269,9 +271,9 @@
       <!-- 操作バー -->
       <div class="dir-controls">
         <div class="month-nav">
-          <button type="button" onclick="alert('モックのため、月の切替はしません。')">◀</button>
+          <button type="button" onclick="shiftMonth(-1)" title="前の月へ">◀</button>
           <span class="mon" id="monLabel">2026年 7月</span>
-          <button type="button" onclick="alert('モックのため、月の切替はしません。')">▶</button>
+          <button type="button" onclick="shiftMonth(1)" title="次の月へ">▶</button>
         </div>
         <div class="spacer"></div>
         <label class="chk"><input type="checkbox" id="showAllEmp" onchange="render()"> ＋全社員を表示（セールス・クリエイティブも）</label>
@@ -412,8 +414,22 @@
     const [y, m] = best.split('-').map(Number);
     return { y, m };
   }
-  const TARGET = pickTargetMonth();
-  document.getElementById('monLabel').textContent = TARGET.y + '年 ' + (TARGET.m + 1) + '月';
+  // 最初に出す月＝案件が一番多い月。◀▶ で前後の月に移せる（2026-08-21 baba要望。
+  // これまでは「モックのため切替はしません」と出るだけで、他の月のD決めができなかった）。
+  let TARGET = pickTargetMonth();
+  function monthLabel(){
+    const n = cases.filter(inTarget).length;
+    document.getElementById('monLabel').textContent =
+      TARGET.y + '年 ' + (TARGET.m + 1) + '月' + (n ? '（' + n + '件）' : '（案件なし）');
+  }
+  // 前後の月へ。案件は全期間ぶん読み込んであるので、通信せずその場で切り替わる。
+  function shiftMonth(n){
+    const d = new Date(TARGET.y, TARGET.m + n, 1);
+    TARGET = { y: d.getFullYear(), m: d.getMonth() };
+    monthLabel();
+    render();       // カレンダー（中で renderAgg も呼ばれる）
+    renderPick();   // 下の「案件を選ぶ」パネル
+  }
 
   // この月の案件だけ対象にしているか
   function inTarget(c){ const d = addDays(c.off); return d.getFullYear() === TARGET.y && d.getMonth() === TARGET.m; }
@@ -455,7 +471,11 @@
       const dTxt = c.dirId ? ('D: ' + empName(c.dirId)) : '<span style="color:#b45309">D未定</span>';
       const sTxt = c.sdId ? ('｜SD: ' + empName(c.sdId)) : '';
       const meta = ['🎯' + c.content, c.client, t].filter(Boolean).join(' / ');
-      return `<div class="dt-row"><div class="dt-name">${c.scale==='大型'?'⭐':''}${c.name}</div>`
+      // 案件名を押したら案件の詳細（編集画面）へ。見本データのときは飛べる先が無いのでそのまま（2026-08-21 baba）。
+      const nameHtml = USING_DB
+        ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く" style="color:inherit;">${c.name}</a>`
+        : c.name;
+      return `<div class="dt-row"><div class="dt-name">${c.scale==='大型'?'⭐':''}${nameHtml}</div>`
            + `<div class="dt-meta">${meta}</div><div class="dt-dir">${dTxt}${sTxt}</div></div>`;
     }).join('');
     return `<div class="day-tip">${rows}</div>`;
@@ -653,6 +673,7 @@
   }
 
   // 初期描画
+  monthLabel();
   render();
 </script>
 @endverbatim

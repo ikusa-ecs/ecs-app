@@ -119,6 +119,14 @@
     border-radius: 5px; font-family: inherit; margin-left: 4px; }
   .mrow .m-patrol { width: 34px; font-size: 10px; padding: 1px 3px; border: 1px solid var(--line);
     border-radius: 5px; font-family: inherit; margin-left: 3px; }
+  /* メンバーごとの備考（一言・自由記述）。保存先は assignments.remark＝他のアサイン画面の「備考（一言）」と同じもの。
+     名前の下に1行使う（役割・担当・巡回の横に入れるとカードからはみ出すため）。 */
+  .mrow .m-remark-tag { display: block; font-size: 9.5px; color: #6b5544; line-height: 1.45;
+    overflow-wrap: anywhere; }
+  .acard.editing .mrow .m-remark-tag { display: none; }
+  .mrow .m-remark { width: 100%; margin-top: 3px; font-size: 10px; padding: 1px 4px;
+    border: 1px solid var(--line); border-radius: 5px; font-family: inherit; }
+  .acard.editing .mrow .m-remark { display: block; }
 
   /* ▼ 案件項目（時間・人数・備考）の編集。編集モードで読み取り表示を入力欄に差し替える。 */
   .pe-edit { display: none; }
@@ -200,6 +208,7 @@
     .acard.editing .pe-in,
     .acard.editing .m-role,
     .acard.editing .m-note,
+    .acard.editing .m-remark,
     .acard.editing .m-patrol { font-size: 16px; padding: 4px 6px; }
     .acard.editing .pe-in { width: 100%; }
     .acard.editing .pe-in.num { width: 72px; }
@@ -391,7 +400,8 @@
         {{-- コンテンツ（見出し・常に出す）。見出しはコンテンツ名優先で表示、編集は案件名（project_name）を直す。 --}}
         <div class="arow hl first">
           <span class="lbl">案件</span>
-          <span class="val pe-read">{{ $c['content'] }}</span>
+          {{-- 案件名を押したら案件の詳細（編集画面）へ（2026-08-21 baba） --}}
+          <span class="val pe-read"><a href="/project-form?project={{ urlencode($c['id']) }}" title="案件の詳細・編集を開く" style="color:inherit;">{{ $c['content'] }}</a></span>
           <span class="val pe-edit"><input class="pe-in wide" type="text" value="{{ $c['projectName'] }}" placeholder="案件名" title="案件名（入れると保存）" onchange="ecsSheetSaveProject(this,'project_name',this.value)"></span>
         </div>
         </div>{{-- /acard-sticky（ここまでが上に貼り付く部分） --}}
@@ -471,6 +481,10 @@
                 @if ($m['note'] !== '' || $m['patrol'] !== null)<span class="m-tag">· {{ $m['note'] }}@if ($m['patrol'] !== null) 巡回{{ $m['patrol'] }}@endif</span>@endif
                 <input class="m-edit m-note" list="sheetNoteOpts" placeholder="担当" value="{{ $m['note'] }}" title="担当メモ（軍師/サポ等・入力で保存）" onchange="ecsSheetSave(this,'note',this.value)">
                 <input class="m-edit m-patrol" type="number" min="0" placeholder="巡" value="{{ $m['patrol'] ?? '' }}" title="巡回数（入力で保存）" onchange="ecsSheetSave(this,'patrol',this.value)">
+                {{-- この人ひとりへの備考（自由記述・2026-08-21 baba）。保存先は assignments.remark＝
+                     日別ボード／ピックアップ／エントリー一覧の「備考（一言）」と同じ欄なので、どこで書いても同期する。 --}}
+                @if ($m['remark'] !== '')<span class="m-remark-tag">💬 {{ $m['remark'] }}</span>@endif
+                <input class="m-edit m-remark" type="text" placeholder="備考（自由に記入）" value="{{ $m['remark'] }}" title="この人への備考（入力すると保存されます）" onchange="ecsSheetSave(this,'remark',this.value)">
               </span>
               @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
             </div>
