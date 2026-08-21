@@ -59,10 +59,8 @@ class AssignPublishController extends Controller
                 'place'     => $p->location ?? '',
                 'meetPlace' => $p->assembly_type ?? '',
                 'published' => (bool) $p->staff_published,      // 公開状態（DBの背骨）
-                'memo'      => $p->publish_memo ?? '',          // 公開ボードの担当メモ（DB保存・全員共有）
-                // 案件登録で書いた備考（projects.note）。公開ボードの「備考」とは別の項目なので、
-                // 見えないと『書いたのに出ない』と混乱する。読むだけ（直すのは案件登録）で出す（2026-08-21 baba）。
-                'projNote'  => $p->note ?? '',
+                // 備考＝案件登録と同じ欄（projects.note）。2026-08-21 に担当メモと1つにまとめた。
+                'memo'      => $p->note ?? '',
                 // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）
                 'staffNotes' => $p->staff_notes ?? '',   // スタッフに伝えること（1欄・備考のような自由記入）
             ];
@@ -153,10 +151,12 @@ class AssignPublishController extends Controller
     }
 
     /**
-     * 案件ごとの「💬備考（担当メモ）」を DB に保存する。
-     * これまではブラウザ（localStorage）にだけ残していたが、projects.publish_memo に
-     * 保存して全員で共有できるようにする。空文字は「未入力」に戻す（null）。
-     * 受け取り：id（案件ID）＋ memo（メモ本文／空可）。
+     * 案件ごとの「💬備考」を DB に保存する。
+     *
+     * 2026-08-21 baba：案件登録の備考と公開ボードの担当メモを1つにまとめた。
+     * 保存先は projects.note＝案件登録・案件一覧と同じ欄なので、どこで書いても同じ備考になる。
+     * （旧 publish_memo には書かない。既存の中身はマイグレーションで note に足してある）
+     * 空文字は「未入力」に戻す（null）。受け取り：id（案件ID）＋ memo（本文／空可）。
      */
     public function setMemo(Request $request)
     {
@@ -170,7 +170,7 @@ class AssignPublishController extends Controller
         if ($deny = ProjectAccess::denyJson($project)) {
             return $deny;
         }
-        $project->publish_memo = trim((string) ($data['memo'] ?? '')) ?: null;
+        $project->note = trim((string) ($data['memo'] ?? '')) ?: null;
         $project->save();
 
         return response()->json(['ok' => true]);

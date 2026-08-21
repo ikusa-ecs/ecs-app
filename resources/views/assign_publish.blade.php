@@ -126,13 +126,6 @@
     td.ops-cell .cat-toggle:hover { background: #f3ece0; }
     td.ops-cell .cat-toggle.is-extra { background: #fde8e8; color: #b91c1c; border-color: var(--danger); font-weight: 700; }
 
-    /* 案件登録の備考（読むだけ）。公開ボードの担当メモとは別物と分かるよう見た目を変える。 */
-    .proj-note { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding: 8px 10px;
-                 background: #fff; border: 1px solid var(--line); border-radius: 8px;
-                 font-size: 12.5px; line-height: 1.6; overflow-wrap: anywhere; }
-    .proj-note .pn-lab { flex: none; font-size: 11px; font-weight: 700; color: var(--muted); }
-    .proj-note .pn-edit { flex: none; margin-left: auto; font-size: 11.5px; }
-
     /* 備考（折りたたみ行） */
     tr.note-row > td { background: #faf6ee; padding: 10px 16px 12px; border-bottom: 1px solid var(--line); }
     tr.note-row label { font-size: 11.5px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 5px; }
@@ -296,8 +289,8 @@
         ※「詳細 →」で案件詳細（アサイン画面）に飛びます。時間・場所など細かい変更はそちらでもできます。<br>
         ※ 公開状態はDB（projects の staff_published）に保存され、案件詳細（アサイン画面）とも同じ列で連動します。<br>
         ※ <b>必要人数</b>はここで直せます（運営人数＝<b>Dを含む</b>人数。案件登録・アサイン表と同じ数字です）。<br>
-        ※ 「💬 備考」を開くと、<b>案件登録で書いた備考</b>（読むだけ・直すときは「直す」から案件登録へ）も見られます。<br>
-        ※ 備考は担当用メモです（<b>DB保存され、全員に共有されます</b>。入力欄から離れると自動で保存されます。スタッフ画面には出ません）。
+        ※ 「💬 備考」は<b>案件登録の備考と同じ欄</b>です（どちらで直しても同じ内容になります）。<b>社員だけが見ます</b>＝スタッフ画面には出ません。<br>
+        ※ <b>スタッフに見せたいこと</b>は「📣 スタッフに伝えること」に書いてください。
       </p>
 @endverbatim
 @endsection
@@ -352,7 +345,8 @@
   }
 
   // ===== 備考（担当メモ・DB保存＝全員で共有）=====
-  // サーバから渡された memo を初期表示に使い、変更はサーバ（DB）の projects.publish_memo へ保存する。
+  // サーバから渡された memo を初期表示に使い、変更はサーバ（DB）の projects.note へ保存する
+  // （案件登録の備考と同じ欄・2026-08-21 baba）。
   function getNote(id){ const c = CASES.find(x => x.id === id); return c ? (c.memo || '') : ''; }
   // 入力欄からフォーカスが外れたら（onblur）保存する。連打を避けるためボタン連打ではなく1回で送る。
   function saveNote(id, el){
@@ -624,12 +618,7 @@
     nr.style.display = 'none';
     nr.innerHTML = `
       <td colspan="8">
-        ${String(c.projNote || '').trim() !== ''
-          ? `<div class="proj-note"><span class="pn-lab">案件登録の備考</span><span>${escapeHtml(c.projNote).replace(/?
-/g, '<br>')}</span>
-               <a class="pn-edit" href="/project-form?project=${encodeURIComponent(c.id)}">直す</a></div>`
-          : ''}
-        <label>備考（担当メモ・スタッフ画面には出ません／DB保存され、全員に共有されます）<span class="saved" id="nsaved-${c.id}">✓ 保存しました</span></label>
+        <label>備考（<b>案件登録の備考と同じ欄</b>です・社員だけが見ます／入力欄から離れると自動で保存されます）<span class="saved" id="nsaved-${c.id}">✓ 保存しました</span></label>
         <textarea placeholder="例）前泊あり。〇〇さんに声かけ済み。集合場所は南口。（入力欄から離れると自動で保存されます）" onblur="saveNote('${c.id}', this)">${escapeHtml(getNote(c.id))}</textarea>
       </td>`;
     tbody.appendChild(nr);
