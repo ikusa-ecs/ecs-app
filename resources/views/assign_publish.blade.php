@@ -122,6 +122,9 @@
     td.ops-cell a.detail-link { font-size: 11.5px; white-space: nowrap; }
     td.ops-cell .note-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 7px; font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink); }
     td.ops-cell .note-btn:hover { background: #f3ece0; }
+    /* 記載があるボタンはひと目で分かるようにする（2026-08-21 baba。案件一覧の📝と同じ考え方） */
+    td.ops-cell .note-btn.has { background: var(--warn-soft, #fdf3e2); border-color: #e6c98f; font-weight: 700; }
+    td.ops-cell .note-btn .dot-mark { color: var(--brand); margin-left: 3px; font-size: 10px; vertical-align: 1px; }
     td.ops-cell .cat-toggle { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 5px 7px; font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink); }
     td.ops-cell .cat-toggle:hover { background: #f3ece0; }
     td.ops-cell .cat-toggle.is-extra { background: #fde8e8; color: #b91c1c; border-color: var(--danger); font-weight: 700; }
@@ -348,6 +351,18 @@
   // サーバから渡された memo を初期表示に使い、変更はサーバ（DB）の projects.note へ保存する
   // （案件登録の備考と同じ欄・2026-08-21 baba）。
   function getNote(id){ const c = CASES.find(x => x.id === id); return c ? (c.memo || '') : ''; }
+  // 「記載あり」の印を付け直す（保存した直後に、開き直さなくても分かるように）。
+  function refreshNoteMark(id){
+    const c = CASES.find(x => x.id === id);
+    if (!c) return;
+    [['notebtn-', c.memo, '💬 備考'], ['sibtn-', c.staffNotes, '📣 スタッフに伝えること']].forEach(function (pair) {
+      const btn = document.getElementById(pair[0] + id);
+      if (!btn) return;
+      const has = String(pair[1] || '').trim() !== '';
+      btn.classList.toggle('has', has);
+      btn.innerHTML = pair[2] + (has ? '<span class="dot-mark">●</span>' : '');
+    });
+  }
   // 入力欄からフォーカスが外れたら（onblur）保存する。連打を避けるためボタン連打ではなく1回で送る。
   function saveNote(id, el){
     const c = CASES.find(x => x.id === id);
@@ -361,8 +376,8 @@
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
       body: JSON.stringify({ id: id, memo: val })
     })
-    .then(r => { if (!r.ok) throw new Error('save failed'); flash('nsaved-' + id); })
-    .catch(() => { c.memo = prev; alert('備考の保存に失敗しました。通信を確認してもう一度お試しください。'); });
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('nsaved-' + id); refreshNoteMark(id); })
+    .catch(() => { c.memo = prev; refreshNoteMark(id); alert('備考の保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
 
   // ===== スタッフに伝えること（集合場所の詳細・持ち物・服装・注意事項／DB保存）=====
@@ -403,8 +418,8 @@
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
       body: JSON.stringify({ id: id, notes: next })
     })
-    .then(r => { if (!r.ok) throw new Error('save failed'); flash('sisaved-' + id); })
-    .catch(() => { c.staffNotes = prev; alert('スタッフに伝えることの保存に失敗しました。通信を確認してもう一度お試しください。'); });
+    .then(r => { if (!r.ok) throw new Error('save failed'); flash('sisaved-' + id); refreshNoteMark(id); })
+    .catch(() => { c.staffNotes = prev; refreshNoteMark(id); alert('スタッフに伝えることの保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
   function toggleStaffInfo(id){
     const el = document.getElementById('sinfo-' + id);
@@ -606,8 +621,12 @@
           : `<button class="pub-toggle go" onclick="toggle('${c.id}')">公開する</button>`}
         <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します">${extra ? '追加解除' : '＋追加'}</button>
         <a class="detail-link" href="/project-assign?project=${c.id}">アサイン画面 →</a>
-        <button class="note-btn" onclick="toggleNote('${c.id}')">💬 備考</button>
-        <button class="note-btn" onclick="toggleStaffInfo('${c.id}')" title="持ち物・服装・注意事項。スタッフ本人の確定アサインに出ます">📣 スタッフに伝えること</button>
+        <button class="note-btn${String(c.memo || '').trim() !== '' ? ' has' : ''}" id="notebtn-${c.id}"
+                onclick="toggleNote('${c.id}')"
+                title="社員用の備考（案件登録の備考と同じ欄）">💬 備考${String(c.memo || '').trim() !== '' ? '<span class="dot-mark">●</span>' : ''}</button>
+        <button class="note-btn${String(c.staffNotes || '').trim() !== '' ? ' has' : ''}" id="sibtn-${c.id}"
+                onclick="toggleStaffInfo('${c.id}')"
+                title="スタッフ本人に見える欄（募集中の備考＋確定アサインの詳細）">📣 スタッフに伝えること${String(c.staffNotes || '').trim() !== '' ? '<span class="dot-mark">●</span>' : ''}</button>
       </td>`;
     tbody.appendChild(tr);
 
