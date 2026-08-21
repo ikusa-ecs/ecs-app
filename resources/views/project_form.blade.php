@@ -544,12 +544,9 @@
           <!-- 9. 運営場所 -->
           <div class="form-row full non-arena">
             <label>運営場所</label>
-            <!-- 「○○依頼」は拠点マスタから作る（拠点を足せばここにも出る・2026-08-21 baba） -->
-            <select name="operation_place">
-              @foreach ($operationPlaceOptions as $opt)
-                <option>{{ $opt }}</option>
-              @endforeach
-            </select>
+            <!-- 「○○依頼」は拠点マスタから作る（拠点を足せばここにも出る・2026-08-21 baba）。
+                 ここは Blade を解釈しない区間なので、選択肢は JS で入れる（window.ECS_OPERATION_PLACES）。 -->
+            <select id="operationPlaceSel" name="operation_place"></select>
             <div class="hint">どこで運営／配信するか。オンライン時は配信場所（配信室など）、地方拠点に任せる場合は「○○依頼」。</div>
           </div>
 
@@ -906,6 +903,8 @@
 </script>
 {{-- 案件名（コンテンツ）の候補＝コンテンツ台帳（有効なもの）。空ならJS側のベタ書きにフォールバック。 --}}
 <script>window.ECS_CONTENT_OPTIONS = @json($contentOptions ?? []);</script>
+{{-- 運営場所の選択肢（現地・配信室…＋拠点マスタから作った「○○依頼」）。 --}}
+<script>window.ECS_OPERATION_PLACES = @json($operationPlaceOptions ?? ['現地']);</script>
 {{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
 <script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
 {{-- 危険日（高負荷日）の判定に使う「開催日 → その日の案件たち」（DBの実案件）。
@@ -1545,6 +1544,19 @@
     if (init && window.ECS_OFFICES.indexOf(init) !== -1) {
       sel.value = init;
     }
+  })();
+
+  // 運営場所プルダウン：選択肢をJSで入れる（この欄は Blade を解釈しない区間にあるため）。
+  // 編集で開いたときは applyEdit の setByName が値を入れるので、ここでは並べるだけでよい。
+  (function buildOperationPlaceOptions() {
+    const sel = document.getElementById('operationPlaceSel');
+    if (!sel || !Array.isArray(window.ECS_OPERATION_PLACES)) return;
+    sel.innerHTML = '';
+    window.ECS_OPERATION_PLACES.forEach(function (name) {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
   })();
 
   // ===== リピート（常連）クライアントの照会 =====
