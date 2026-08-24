@@ -19,8 +19,12 @@ class PaperStockController extends Controller
     {
         $data = (new PaperStockService())->compute();
 
-        // コンテンツID→名前（ダッシュボードの見出し用）
-        $names = Content::where('needs_paper', true)->pluck('content_name', 'id');
+        // コンテンツID→名前（ダッシュボードの見出し用）。
+        // 並びはマスタ管理の台帳と同じ（並び順→ID順）＝画面によって並びが変わらないように。
+        $names = Content::where('needs_paper', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->pluck('content_name', 'id');
 
         return view('paper_stock', [
             'stock' => $data['stock'],

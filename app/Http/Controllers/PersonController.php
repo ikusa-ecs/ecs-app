@@ -65,9 +65,12 @@ class PersonController extends Controller
             })
             ->values();
 
-        // 経験コンテンツ編集のプルダウン候補＝コンテンツ台帳（有効なもの・名前順）。
+        // 経験コンテンツ編集のプルダウン候補＝コンテンツ台帳（有効なもの）。
+        // 並びはマスタ管理の台帳と同じ（並び順→ID順）。案件登録の候補とも同じ順にそろえる
+        // ＝画面によって並びが違うと探しにくいため（baba要望 2026-08-24）。
         $contentOptions = Content::where('active', true)
-            ->orderBy('content_name')
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->pluck('content_name')
             ->filter()
             ->unique()
