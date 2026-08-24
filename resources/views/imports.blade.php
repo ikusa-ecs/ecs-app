@@ -44,6 +44,13 @@
       <p>イベント案件をまとめて登録します。案件名・日付・拠点・実施形態など。</p>
       <a class="btn primary" href="/project-import">開く</a>
     </div>
+
+    <div class="im-card">
+      <div class="im-icon">🗂</div>
+      <h2>過去案件（アサイン込み）</h2>
+      <p><b>終わった案件</b>を、アサイン（D・MC・OP・スタッフ）ごと登録します。案件は「確定・公開済み」、アサインは「確定」で入ります。</p>
+      <a class="btn primary" href="/past-import">開く</a>
+    </div>
   </div>
 
   <p class="im-lead" style="margin-top:18px;">

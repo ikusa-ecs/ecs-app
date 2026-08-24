@@ -27,6 +27,7 @@ use App\Http\Controllers\PaperStockController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PersonController;
+use App\Http\Controllers\PastProjectImportController;
 use App\Http\Controllers\PersonImportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -140,6 +141,10 @@ Route::post('/person-import', [PersonImportController::class, 'import'])->middle
 Route::get('/imports', [MasterImportController::class, 'hub'])->middleware('tier:manager');
 Route::get('/content-import', [MasterImportController::class, 'showContent'])->middleware('tier:manager');
 Route::post('/content-import', [MasterImportController::class, 'importContent'])->middleware('tier:manager');
+// 過去案件の取込（2026-08-24 baba要望）。これからの案件を入れる /project-import とは別画面。
+// 違い＝D／MC／OP／スタッフの列からアサインも「確定」で入れ、案件は確定・公開済みにする。
+Route::get('/past-import', [PastProjectImportController::class, 'show'])->middleware('tier:manager');
+Route::post('/past-import', [PastProjectImportController::class, 'import'])->middleware('tier:manager');
 // アカウント発行（1人ずつ）。最初はCSV一括、以降はここで発行。作成＝管理者以上。
 Route::get('/account-new', [AccountController::class, 'create'])->middleware('tier:manager');
 Route::post('/account-new', [AccountController::class, 'store'])->middleware('tier:manager');
