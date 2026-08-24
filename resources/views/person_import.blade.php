@@ -166,18 +166,25 @@
   // ===== 名簿CSV取込：テンプレDL・プレビュー・検証（サーバーの基準と同じ）=====
   var PI_HEADERS = ['種別', '氏名', 'ふりがな', 'メール', 'チャットワークID', '事務所', '所属', '入社日', '通算経験回数', 'できるポジション'];
 
+  // 行の配列 → CSVの文字列。テンプレートと仮パスワード一覧の2か所で使う（処理は1つだけ持つ）。
+  function piToCsv(rows) {
+    var CR = String.fromCharCode(13), LF = String.fromCharCode(10);
+    var needQuote = new RegExp('[",' + LF + CR + ']');
+    return rows.map(function (r) {
+      return r.map(function (v) {
+        v = (v == null) ? '' : String(v);
+        return needQuote.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(',');
+    }).join(CR + LF);
+  }
+
   function piDownloadTemplate() {
     var rows = [
       PI_HEADERS,
       ['スタッフ', '山田花子', 'やまだ はなこ', 'hanako@example.com', '', '東京', '', '2025-04-01', '12', 'OP,MC,軍師'],
       ['社員', '鈴木一郎', 'すずき いちろう', 'ichiro@example.com', '1234567', '大阪', 'イベプラ／ARENA', '2020-04-01', '', ''],
     ];
-    var csv = rows.map(function (r) {
-      return r.map(function (v) {
-        v = (v == null) ? '' : String(v);
-        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
-      }).join(',');
-    }).join('\r\n');
+    var csv = piToCsv(rows);
     // BOMを付けてExcelの文字化けを防ぐ
     var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
@@ -193,14 +200,7 @@
     if (!list.length) { alert('発行した一覧がありません。'); return; }
     var rows = [['社員/スタッフ番号', '氏名', 'メール（ログインID）', '仮パスワード']];
     list.forEach(function (r) { rows.push([r.id, r.name, r.email, r.password]); });
-    var csv = rows.map(function (r) {
-      return r.map(function (v) {
-        v = (v == null) ? '' : String(v);
-        return /[",
-]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
-      }).join(',');
-    }).join('
-');
+    var csv = piToCsv(rows);
     // BOMを付けてExcelの文字化けを防ぐ
     var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
@@ -319,9 +319,10 @@
     var makeAccounts = !!(mk && mk.checked);
     var msg = makeAccounts
       ? 'OKの行を名簿に登録し、ログインアカウント（仮パスワード）も発行します。よろしいですか？'
-      : 'OKの行を名簿に登録します。
-
-※ ログインアカウントは作りません（名簿に載るだけでログインはできません）。よろしいですか？';
+      : ['OKの行を名簿に登録します。',
+         '',
+         '※ ログインアカウントは作りません（名簿に載るだけでログインはできません）。',
+         'よろしいですか？'].join(String.fromCharCode(10));
     if (!confirm(msg)) return;
     document.getElementById('piToken').value = window.ECS_CSRF || '';
     // チェックの状態をサーバーへ送る（フォームに隠し欄で入れる）。
