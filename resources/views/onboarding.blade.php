@@ -119,7 +119,7 @@
             <input type="text" name="height" value="{{ old('height', $me->height) }}" placeholder="例）170（cm）">
           </div>
           <div class="field">
-            <label>靴のサイズ</label>
+            <label>靴（足袋）のサイズ</label>
             <input type="text" name="shoe_size" value="{{ old('shoe_size', $me->shoe_size) }}" placeholder="例）26.5cm">
           </div>
           <div class="field">

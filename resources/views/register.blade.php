@@ -100,7 +100,7 @@
         <p class="sub">当日のユニフォーム準備などの参考にします（任意・あとから変更できます）。</p>
         <div class="field-row3">
           <div class="field"><label>身長</label><input type="number" inputmode="numeric" id="pfHeight" placeholder="cm"></div>
-          <div class="field"><label>靴のサイズ</label><input type="number" inputmode="decimal" id="pfShoe" placeholder="cm"></div>
+          <div class="field"><label>靴（足袋）のサイズ</label><input type="number" inputmode="decimal" id="pfShoe" placeholder="cm"></div>
           <div class="field"><label>服のサイズ</label>
             <select id="pfWear">
               <option value="">選択</option>

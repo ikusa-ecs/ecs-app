@@ -76,7 +76,7 @@
           </div>
 
           <div class="form-row">
-            <label>靴のサイズ</label>
+            <label>靴（足袋）のサイズ</label>
             <input type="text" name="shoe_size" value="{{ $me->shoe_size }}" placeholder="例）26.5cm">
           </div>
 

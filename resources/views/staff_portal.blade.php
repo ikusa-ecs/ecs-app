@@ -542,7 +542,7 @@
             <p class="sub">あなたの基本情報です。担当が当日の準備やメンバー決めの参考にします。</p>
             <div class="field-row3">
               <div class="field"><label>身長</label><input id="pfHeight" type="number" inputmode="numeric" placeholder="cm"></div>
-              <div class="field"><label>靴のサイズ</label><input id="pfShoe" type="number" inputmode="decimal" placeholder="cm"></div>
+              <div class="field"><label>靴（足袋）のサイズ</label><input id="pfShoe" type="number" inputmode="decimal" placeholder="cm"></div>
               <div class="field"><label>服のサイズ</label>
                 <select id="pfWear">
                   <option value="">選択</option>
