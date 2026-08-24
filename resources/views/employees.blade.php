@@ -9,7 +9,13 @@
   window.ECS_EMPLOYEES = @json($employees);
   window.ECS_CONTENT_OPTIONS = @json($contentOptions ?? []);   // 経験コンテンツ編集のプルダウン候補
   window.ECS_CSRF = '{{ csrf_token() }}';                      // 保存に使う合言葉
+  {{-- 所属の絞り込み候補（コード→グループ名）。正本は App\Support\Departments。 --}}
+  window.ECS_DEPT_OPTIONS = @json(\App\Support\Departments::groupOptions());
 </script>
+{{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
+<style>
+    {!! \App\Support\Departments::badgeCss('.dept') !!}
+</style>
 @verbatim
 <style>
     /* 社員名簿モック専用スタイル（staff.html を土台に作成） */
@@ -27,11 +33,8 @@
     .fresh-badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; font-weight: 600; white-space: nowrap;
       background: var(--brand-soft); color: var(--brand-dark); margin-left: 6px; }
 
-    /* 区分バッジ（イベプラ／セールス／クリエイティブ） */
+    /* 所属バッジ。色は上の <style> で正本（App\Support\Departments）から作っている。 */
     .dept { font-size: 11.5px; padding: 1px 9px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
-    .dept.plan     { background: #e0f2fe; color: #0369a1; }   /* イベプラ */
-    .dept.sales    { background: var(--ok-soft); color: #15803d; } /* セールス */
-    .dept.creative { background: #f3e8ff; color: #7c3aed; }   /* クリエイティブ */
 
     /* 経験コンテンツのタグ（詳細パネル内のみ） */
     .contags { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -71,12 +74,10 @@
 
       <div class="panel">
         <div class="filterbar">
-          <input type="text" id="kw" placeholder="氏名で検索" oninput="applyFilter()">
+          <input type="text" id="kw" placeholder="氏名・ふりがなで検索" oninput="applyFilter()">
+          <!-- 所属の選択肢は正本（App\Support\Departments）から作る。ここに部署名を書き足さない。 -->
           <select id="fDept" onchange="applyFilter()">
-            <option value="">区分：すべて</option>
-            <option value="plan">イベプラ</option>
-            <option value="sales">セールス</option>
-            <option value="creative">クリエイティブ</option>
+            <option value="">所属：すべて</option>
           </select>
           <select id="fFresh" onchange="applyFilter()">
             <option value="">新人：すべて</option>
@@ -92,7 +93,7 @@
           <thead>
             <tr>
               <th>氏名</th>
-              <th>区分</th>
+              <th>所属</th>
               <th>事務所</th>
               <th>服 / 靴</th>
               <th class="right"></th>
@@ -112,7 +113,7 @@
 @verbatim
 <script>
   // ===== 社員名簿の仮データ =====
-  // dept: 区分（plan=イベプラ / sales=セールス / creative=クリエイティブ）
+  // dept: 所属の色コード（plan/sales/creative/other/none）・deptName: 実際の所属名
   // joinedMonths: 入社からの経過月数（6以下＝新人バッジを氏名の横に表示）
   // exp:  経験のあるコンテンツ（詳細パネル内のみ表示）
   // dexp: そのうち「D（ディレクター）として」経験のあるコンテンツ
@@ -120,7 +121,24 @@
   // window.ECS_EMPLOYEES に入れて渡す。これまでの直書き配列の代わり。
   const employees = window.ECS_EMPLOYEES || [];
 
-  const deptLabel = { plan:'イベプラ', sales:'セールス', creative:'クリエイティブ' };
+  // 所属の「コード→グループ名」。正本（App\Support\Departments）から受け取る。
+  // イベプラ／セールス／クリエイティブ以外は「その他」にまとめてある（色分け・絞り込みの単位）。
+  const deptLabel = window.ECS_DEPT_OPTIONS || {};
+
+  // 絞り込みプルダウンの中身を作る（部署名を画面に直書きしないため）。
+  (function buildDeptFilter(){
+    const sel = document.getElementById('fDept');
+    if (!sel) return;
+    Object.keys(deptLabel).forEach(function(code){
+      const o = document.createElement('option');
+      o.value = code; o.textContent = deptLabel[code];
+      sel.appendChild(o);
+    });
+    // 所属が空の人も探せるように（誰が未入力か見つける用）。
+    const o = document.createElement('option');
+    o.value = 'none'; o.textContent = '未設定';
+    sel.appendChild(o);
+  })();
 
   // 入社半年以内＝新人
   function isFresh(m){ return m <= 6; }
@@ -140,7 +158,7 @@
             <br><span class="muted" style="font-size:11.5px;">${p.kana
               ? p.kana
               : '<span style="color:#b5673a;">ふりがな未入力</span>'}</span></td>
-        <td><span class="dept ${p.dept}">${deptLabel[p.dept]}</span></td>
+        <td><span class="dept ${p.dept}">${p.deptName}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.office || '—'}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.wear || '—'} / ${p.shoe || '—'}</span></td>
         <td class="right"><span class="row-toggle" onclick="toggleDetail(${idx}, this)">詳細 ▾</span></td>`;

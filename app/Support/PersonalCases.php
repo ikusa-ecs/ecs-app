@@ -48,7 +48,9 @@ class PersonalCases
             'id' => $me->id ?? null,
             'name' => $me->name ?? 'baba',
             'email' => $me->email ?? 'baba@ikusa.co.jp',
-            'dept' => $me->department ?? 'イベプラ',
+            // 所属は入っている値をそのまま。未設定なら空（架空の所属を見せない）。
+            'dept' => $me->department ?? '',
+            'deptCode' => Departments::code($me->department ?? null),
         ];
     }
 

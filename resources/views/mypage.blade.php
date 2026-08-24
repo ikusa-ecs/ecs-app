@@ -22,6 +22,8 @@
     .dept.plan { background: #e3edff; color: #2456b8; }
     .dept.sales { background: #e1f3e4; color: #2e7d32; }
     .dept.creative { background: #efe6fb; color: #7a3fb8; }
+    .dept.other { background: #f0ebe3; color: #6e5b49; }   /* イベプラ/セールス/クリエイティブ以外 */
+    .dept.none { background: #faf6ee; color: #a3968a; }    /* 所属が未設定 */
 
     /* 月絞り込みバー */
     .mp-filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -283,7 +285,7 @@
         <div class="prof-card">
           <div class="prof-avatar" id="profAvatar">馬</div>
           <div class="prof-main">
-            <div class="prof-name"><span id="profName">baba</span> さん <span class="dept plan" id="profDept">イベプラ</span></div>
+            <div class="prof-name"><span id="profName">—</span> さん <span class="dept none" id="profDept">未設定</span></div>
             <div class="prof-sub"><span id="profEmail">baba@ikusa.co.jp</span></div>
           </div>
           <button class="line-btn" onclick="location.href='/mypage-finance'">💰 収支を入力する</button>
@@ -803,10 +805,13 @@
   // ログイン中の社員（ECS_ME）を画面に反映。認証前は MyPageController が固定した「自分」。
   function fillProfile() {
     const me = window.ECS_ME || {};
-    const nm = me.name || 'baba';
+    const nm = me.name || '';
     const setText = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.textContent = v; };
     setText('profName', nm);
+    // 所属＝DBの値。未設定なら「未設定」のまま。色クラスもサーバー（Departments）の判定に合わせる。
     setText('profDept', me.dept);
+    const dEl = document.getElementById('profDept');
+    if (dEl) dEl.className = 'dept ' + (me.deptCode || 'none');
     setText('profEmail', me.email);
     setText('acctEmail', me.email);
     const av = document.getElementById('profAvatar');

@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
+use App\Support\Departments;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
@@ -94,8 +95,9 @@ class AssignDirectorController extends Controller
                 'id' => $p->id,
                 'name' => $p->name,
                 'surname' => $this->surname($p->name),       // 例: '田中 健一' → '田中'
-                'department' => $p->department,               // イベプラ / セールス / クリエイティブ
-                'planner' => $p->department === 'イベプラ',   // 既定表示の対象
+                'department' => $p->department,               // 実際の所属名（10種類）
+                'deptCode' => Departments::code($p->department), // 色分け用（3つ以外は other）
+                'planner' => $p->department === Departments::PLANNER,   // 既定表示の対象
                 'newbie' => $p->skill_level === '新人',       // 在籍1年未満＝既定表示の対象
             ])
             ->values();

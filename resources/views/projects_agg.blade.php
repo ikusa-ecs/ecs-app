@@ -25,6 +25,8 @@
     table.tbl td.nm.dep-plan     { color: #c2410c; }   /* イベプラ＝オレンジ */
     table.tbl td.nm.dep-sales    { color: #4338ca; }   /* セールス＝藍 */
     table.tbl td.nm.dep-creative { color: #16a34a; }   /* クリエイティブ＝緑 */
+    table.tbl td.nm.dep-other    { color: #6e5b49; }   /* その他＝茶（イベプラ/セールス/クリエイティブ以外をまとめた色） */
+    table.tbl td.nm.dep-none     { color: #a3968a; }   /* 所属が未設定 */
     tr.agg-total td { font-weight: 700; background: var(--brand-soft); color: var(--brand-dark); }
   </style>
   @endverbatim

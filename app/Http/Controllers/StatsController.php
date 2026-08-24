@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Person;
+use App\Support\Departments;
 use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\EventCount;
@@ -49,7 +50,7 @@ class StatsController extends Controller
         if ($data['scopeOffice'] !== '') {
             $groupCol = '部署';
             $groupKey = 'dept';
-            $order = ['イベプラ', 'セールス', 'クリエイティブ'];
+            $order = Departments::GROUPS;   // イベプラ／セールス／クリエイティブ／その他
         } else {
             $groupCol = '拠点';
             $groupKey = 'office';
@@ -357,7 +358,8 @@ class StatsController extends Controller
         $totalAttendance = $countByStaff->sum();
 
         // 部署ごとの社員数（＝平均の分母。所属が設定された社員だけ）。
-        $deptDefs = ['イベプラ', 'セールス', 'クリエイティブ'];
+        // 集計の単位は4グループ（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
+        $deptDefs = Departments::GROUPS;
         $headByDept = Person::where('role', 'employee')
             ->whereIn('department', $deptDefs)
             ->get(['id', 'department'])

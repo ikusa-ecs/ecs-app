@@ -199,6 +199,8 @@
     .emp-chip.dep-plan     .e-nm { color: #c2410c; }   /* イベプラ＝オレンジ */
     .emp-chip.dep-sales    .e-nm { color: #4338ca; }   /* セールス＝藍 */
     .emp-chip.dep-creative .e-nm { color: #16a34a; }   /* クリエイティブ＝緑 */
+    .emp-chip.dep-other    .e-nm { color: #6e5b49; }   /* その他＝茶（3つ以外をまとめた色） */
+    .emp-chip.dep-none     .e-nm { color: #a3968a; }   /* 所属が未設定 */
 
     /* 凡例バー（色とマークの意味を常時表示） */
     .dir-legend {
@@ -263,7 +265,7 @@
           日付の横の<b>●件数</b>にカーソルを当てると、その日の案件一覧が出ます。
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
           <span style="color:#15803d; font-weight:700;">緑＝D/SD担当</span>／<span style="color:#2c6ca0; font-weight:700;">青＝FC等で稼働</span>／<span style="color:#9c8f80; font-weight:700;">グレー＝未アサイン</span>／<span style="color:#92600a; font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:#7a6a58; font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:#6d28d9; font-weight:700;">新＝新人</span>。
-          名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>）。
+          名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>・<span style="color:#6e5b49;font-weight:700;">茶＝その他</span>）。
           右上の<b>「＋全社員を表示」</b>でセールス等も選べます。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。
         </div>
       </details>
@@ -527,9 +529,9 @@
           const multi = info.count >= 2 ? `<span class="e-multi">掛${info.count}</span>` : '';
           const newb = e.newbie ? '<span class="e-newbie">新</span>' : '';
           // 名前の文字色＝部署（イベプラ/セールス/クリエイティブ）
-          const depCls = e.department === 'イベプラ' ? 'dep-plan'
-                       : e.department === 'セールス' ? 'dep-sales'
-                       : e.department === 'クリエイティブ' ? 'dep-creative' : '';
+          // 色分けのコードはサーバー（App\Support\Departments）が付ける。
+          // イベプラ／セールス／クリエイティブ以外は 'other' にまとまる。ここに部署名を書かない。
+          const depCls = 'dep-' + (e.deptCode || 'none');
           return `<div class="emp-chip ${cls} ${depCls}" onclick="openPick(event,'${e.id}','${key}')">`
                + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}</div>`;
         }).join('') + '</div>';

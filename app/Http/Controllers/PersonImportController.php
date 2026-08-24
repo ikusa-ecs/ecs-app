@@ -145,7 +145,9 @@ class PersonImportController extends Controller
                 'active' => true,
             ];
             if ($role === 'employee') {
-                $attrs['department'] = $dept ?: null;        // 所属（イベプラ/セールス/クリエイティブ）
+                // 所属（実際の部署名をそのまま保存）。選択肢の正本＝App\Support\Departments::ALL。
+                // 色分け・集計はイベプラ/セールス/クリエイティブ以外を「その他」にまとめて扱う。
+                $attrs['department'] = $dept ?: null;
             } else {
                 $attrs['experience_count'] = $expc !== '' ? (int) $expc : null;
             }

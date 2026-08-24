@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Departments;
+
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
@@ -155,14 +157,12 @@ class ProjectsAggController extends Controller
         ]);
     }
 
-    /** 部署 → 名前の色クラス（D決め画面と同じ：イベプラ=橙/セールス=藍/クリエイティブ=緑）。 */
+    /**
+     * 部署 → 名前の色クラス。色分けの単位は4グループ
+     * （イベプラ／セールス／クリエイティブ／その他）。正本＝App\Support\Departments。
+     */
     private function deptClass(string $dept): string
     {
-        return match ($dept) {
-            'イベプラ' => 'dep-plan',
-            'セールス' => 'dep-sales',
-            'クリエイティブ' => 'dep-creative',
-            default => '',
-        };
+        return 'dep-' . Departments::code($dept);
     }
 }

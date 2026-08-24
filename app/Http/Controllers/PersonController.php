@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\StaffRelation;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
+use App\Support\Departments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -22,15 +23,16 @@ class PersonController extends Controller
     {
         $today = Carbon::today();
 
-        // 画面側の区分コード（CSS・絞り込み用）← DB は日本語ラベルで保存している
-        $deptCode = ['イベプラ' => 'plan', 'セールス' => 'sales', 'クリエイティブ' => 'creative'];
+        // 所属の色コード・表示名の正本は App\Support\Departments（所属が増えたらそこだけ直す）。
+        // ⚠ 以前はここに3つだけ直書きし、既定を 'plan' にしていたため、
+        //   経営管理・ARENA などの人が「イベプラ」と誤表示されていた（2026-08-24 修正）。
 
         // 画面（employees.blade.php）が読む形に詰め替える。表示JSはそのまま使う。
         // 並びは社歴順（入社日の古い人が上）。入社日が未入力の人は末尾。
         $employees = Person::employees()
             ->bySeniority()
             ->get()
-            ->map(function (Person $p) use ($today, $deptCode) {
+            ->map(function (Person $p) use ($today) {
                 // joinedMonths ＝ 入社からの経過月数（6以下で「新人」バッジが付く）
                 $months = $p->hire_date
                     ? (int) floor($p->hire_date->copy()->startOfDay()->diffInMonths($today))
@@ -40,7 +42,8 @@ class PersonController extends Controller
                     'id'           => $p->id,
                     'name'         => $p->name,
                     'kana'         => $p->name_kana ?? '',   // ふりがな（五十音順の並び・未入力の人を見つける用）
-                    'dept'         => $deptCode[$p->department] ?? 'plan',
+                    'dept'         => Departments::code($p->department),   // 色・絞り込み用のコード
+                    'deptName'     => Departments::label($p->department),  // 画面に出す文字（未設定は「未設定」）
                     'office'       => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,
                     'exp'          => $p->experienced_contents ?? [],

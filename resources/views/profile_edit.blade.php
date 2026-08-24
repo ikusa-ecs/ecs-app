@@ -98,7 +98,7 @@
               <label>所属</label>
               <select name="department">
                 <option value="">選択してください</option>
-                @foreach (['イベプラ','セールス','クリエイティブ'] as $opt)
+                @foreach (\App\Support\Departments::ALL as $opt)
                   <option value="{{ $opt }}" @selected($me->department === $opt)>{{ $opt }}</option>
                 @endforeach
               </select>
