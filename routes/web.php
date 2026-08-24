@@ -146,6 +146,11 @@ Route::post('/account-new', [AccountController::class, 'store'])->middleware('ti
 // Administrator専用コンソール（権限変更などを集約）。全権のみ＝tier:admin。
 Route::get('/admin-console', [AdminConsoleController::class, 'index'])->middleware('tier:admin');
 Route::post('/admin-console/permission', [AdminConsoleController::class, 'updatePermission'])->middleware('tier:admin');
+// 人の「退職にする／在籍に戻す」と「削除」。どちらも Administrator のみ（権限4段階の決まり）。
+// ⚠ 辞めた人は「退職にする」（在籍を外す）。削除は間違い登録・テストで作った人の片づけ用で、
+//   アサイン等の記録が残っている人はサーバー側で拒否する（過去の案件が追えなくなるため）。
+Route::post('/people/{id}/active', [PersonController::class, 'setActive'])->middleware('tier:admin');
+Route::post('/people/{id}/delete', [PersonController::class, 'destroyPerson'])->middleware('tier:admin');
 // 別ウィンドウで開くポップアップ画面（Blade化済み）
 // 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。
 Route::get('/projects-agg', [ProjectsAggController::class, 'index']);

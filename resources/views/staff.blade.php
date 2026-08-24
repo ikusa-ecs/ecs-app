@@ -9,6 +9,9 @@
      提供していたものをここで定義する。表示JS本体はそのまま動く。 --}}
 <script>
   window.ECS_PEOPLE = @json($people);
+  {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
+  window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
+  window.ECS_MY_ID = @json($myId ?? null);
   window.ECS_LV_LABEL = { new: '新人', mid: '中堅', vet: 'ベテラン' };
   window.ECS_yearsSince = function (joinDate) {
     if (!joinDate) return 0;
@@ -406,7 +409,74 @@
           <button class="btn sm" onclick="rosterToggle(${idx})">閉じる</button>
           <span class="save-status muted" style="font-size:12px;"></span>
         </div>
+        ${personAdminHtml(p)}
       </div>`;
+  }
+
+  // Administrator だけに出す「退職にする／在籍に戻す」「削除」（社員名簿と同じ作り）。
+  // 辞めた方は削除ではなく退職（在籍を外す）＝過去の案件の記録を残すため。
+  function personAdminHtml(p){
+    if (!window.ECS_CAN_MANAGE_PEOPLE) return '';
+    if (p.id === window.ECS_MY_ID) {
+      return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px;">
+        <span class="muted" style="font-size:12px;">※ ご自身の退職・削除はできません。</span></div>`;
+    }
+    const isActive = p.active !== false;
+    const actLabel = isActive ? '退職にする（在籍を外す）' : '在籍に戻す';
+    // onclick に名前やIDを埋めると引用符でこわれやすいので data- で持たせる。
+    return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px; flex-wrap:wrap;">
+        <button class="btn sm" data-act-id="${p.id}" data-act-next="${isActive ? 'false' : 'true'}">${actLabel}</button>
+        <button class="btn sm" style="color:#b91c1c; border-color:#f0c2c2;"
+                data-del-id="${p.id}" data-del-name="${String(p.name).replace(/"/g, '&quot;')}">🗑 名簿から削除</button>
+        <span class="muted" style="font-size:12px;">辞められた方は<b>「退職にする」</b>を選んでください（名簿に残り、アサインの候補には出なくなります）。<b>削除</b>は、間違えて登録した人・テストで作った人の片づけ用です。アサインやエントリーの記録がある人は削除できません。</span>
+      </div>`;
+  }
+
+  // クリックの受け取りは1か所にまとめる（行はJSで作り直されるため）。
+  document.addEventListener('click', function (e) {
+    const act = e.target.closest('[data-act-id]');
+    if (act) { setPersonActive(act.dataset.actId, act.dataset.actNext === 'true'); return; }
+    const del = e.target.closest('[data-del-id]');
+    if (del) { deletePerson(del.dataset.delId, del.dataset.delName); }
+  });
+
+  function setPersonActive(id, active){
+    const msg = active
+      ? 'この方を「在籍」に戻します。よろしいですか？'
+      : ['この方を「退職（在籍なし）」にします。',
+         '名簿には残りますが、アサインの候補には出なくなります。',
+         '',
+         'よろしいですか？'].join('\n');
+    if (!confirm(msg)) return;
+    fetch('/people/' + encodeURIComponent(id) + '/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' },
+      body: JSON.stringify({ active: active })
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert(j.message || (ok ? '変更しました。' : '変更できませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
+  }
+
+  function deletePerson(id, name){
+    const msg = ['「' + name + '」さんを名簿から削除します。',
+                 '',
+                 '⚠ 元に戻せません。',
+                 '辞められた方の場合は、削除ではなく「退職にする」を選んでください。',
+                 '',
+                 '本当に削除しますか？'].join('\n');
+    if (!confirm(msg)) return;
+    fetch('/people/' + encodeURIComponent(id) + '/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' }
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert(j.message || (ok ? '削除しました。' : '削除できませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
   }
 
   function toggleDetail(idx, el){

@@ -11,6 +11,9 @@
   window.ECS_CSRF = '{{ csrf_token() }}';                      // 保存に使う合言葉
   {{-- 所属の絞り込み候補（コード→グループ名）。正本は App\Support\Departments。 --}}
   window.ECS_DEPT_OPTIONS = @json(\App\Support\Departments::groupOptions());
+  {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
+  window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
+  window.ECS_MY_ID = @json($myId ?? null);
 </script>
 {{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
 <style>
@@ -164,7 +167,7 @@
       tr.className = 'main-row';
       tr.dataset.idx = idx;
       tr.innerHTML = `
-        <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}
+        <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}${p.active === false ? '<span class="dept none" style="margin-left:6px;">退職</span>' : ''}
             <br><span class="muted" style="font-size:11.5px;">${p.id}</span>
             <br><span class="muted" style="font-size:11.5px;">${p.kana
               ? p.kana
@@ -223,7 +226,75 @@
           <button class="btn sm" onclick="toggleDetail(${idx})">閉じる</button>
           <span class="muted" style="font-size:12px;">※「経験コンテンツ」「Dの経験コンテンツ」「サイズ」の変更は保存されます。社員はエントリーしません（この名簿はアサインとは別管理）。</span>
         </div>
+        ${personAdminHtml(p)}
       </div>`;
+  }
+
+  // Administrator だけに出す「退職にする／在籍に戻す」「削除」。
+  // 辞めた人は削除ではなく退職（在籍を外す）＝過去の案件の記録を残すため。
+  function personAdminHtml(p){
+    if (!window.ECS_CAN_MANAGE_PEOPLE) return '';
+    if (p.id === window.ECS_MY_ID) {
+      return '<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px;">'
+        + '<span class="muted" style="font-size:12px;">※ ご自身の退職・削除はできません。</span></div>';
+    }
+    const actLabel = p.active ? '退職にする（在籍を外す）' : '在籍に戻す';
+    const next = p.active ? 'false' : 'true';
+    // onclick の中に名前やIDを埋めると引用符でこわれやすいので、data- で持たせて
+    // クリック時に読み取る（氏名に「'」が入っても壊れない）。
+    return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px;">
+        <button class="btn sm" data-act-id="${p.id}" data-act-next="${next}">${actLabel}</button>
+        <button class="btn sm" style="color:#b91c1c; border-color:#f0c2c2;"
+                data-del-id="${p.id}" data-del-name="${String(p.name).replace(/"/g, '&quot;')}">🗑 名簿から削除</button>
+        <span class="muted" style="font-size:12px;">辞められた方は<b>「退職にする」</b>を選んでください（名簿に残り、アサインの候補には出なくなります）。<b>削除</b>は、間違えて登録した人・テストで作った人の片づけ用です。アサイン等の記録がある人は削除できません。</span>
+      </div>`;
+  }
+
+  // クリックの受け取りは1か所にまとめる（行はJSで作り直されるので、都度つけ直さない形にする）。
+  document.addEventListener('click', function (e) {
+    const act = e.target.closest('[data-act-id]');
+    if (act) { setPersonActive(act.dataset.actId, act.dataset.actNext === 'true'); return; }
+    const del = e.target.closest('[data-del-id]');
+    if (del) { deletePerson(del.dataset.delId, del.dataset.delName); }
+  });
+
+  function setPersonActive(id, active){
+    const msg = active
+      ? 'この方を「在籍」に戻します。よろしいですか？'
+      : ['この方を「退職（在籍なし）」にします。',
+         '名簿には残りますが、アサインの候補には出なくなります。',
+         '',
+         'よろしいですか？'].join('\n');
+    if (!confirm(msg)) return;
+    fetch('/people/' + encodeURIComponent(id) + '/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' },
+      body: JSON.stringify({ active: active })
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert(j.message || (ok ? '変更しました。' : '変更できませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
+  }
+
+  function deletePerson(id, name){
+    const msg = ['「' + name + '」さんを名簿から削除します。',
+                 '',
+                 '⚠ 元に戻せません。',
+                 '辞められた方の場合は、削除ではなく「退職にする」を選んでください。',
+                 '',
+                 '本当に削除しますか？'].join('\n');
+    if (!confirm(msg)) return;
+    fetch('/people/' + encodeURIComponent(id) + '/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' }
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert(j.message || (ok ? '削除しました。' : '削除できませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
   }
 
   function toggleDetail(idx, el){

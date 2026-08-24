@@ -10,6 +10,7 @@ use App\Support\AssignmentRole;
 use App\Support\Departments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -49,6 +50,7 @@ class PersonController extends Controller
                         ->map(fn ($d) => ['name' => $d, 'code' => Departments::code($d)])
                         ->values(),
                     'cwid'         => $p->chatwork_id ?? '',   // チャットワークID（未登録を見つける用）
+                    'active'       => (bool) $p->active,      // 在籍中か（false＝退職）
                     'office'       => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,
                     'exp'          => $p->experienced_contents ?? [],
@@ -74,6 +76,10 @@ class PersonController extends Controller
         return view('employees', [
             'employees'      => $employees,
             'contentOptions' => $contentOptions,
+            // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
+            'canManagePeople' => optional(Auth::user())->permission === 'admin',
+            // 自分自身には出さない（自分を消す・退職にするのは止めている）。
+            'myId'            => optional(Auth::user())->id,
         ]);
     }
 
@@ -217,6 +223,8 @@ class PersonController extends Controller
                     'id'        => $p->id,
                     'role'      => 'staff',
                     'name'      => $p->name,
+                    'kana'      => $p->name_kana ?? '',
+                    'active'    => (bool) $p->active,   // 在籍中か（false＝退職）
                     'office'    => $p->office ?? '',   // 事務所（地域オフィス）
                     // joinDate ＝ 区分（新人/中堅/ベテラン）計算の元。people.js と同じく文字列で渡す。
                     'joinDate'  => $p->hire_date?->format('Y-m-d'),
@@ -259,7 +267,13 @@ class PersonController extends Controller
         // 「稼働状況」タブぶんのデータ。計算は StaffStatusController に一本化して再利用する。
         $status = app(StaffStatusController::class)->buildStatus();
 
-        return view('staff', ['people' => $people, 'status' => $status]);
+        return view('staff', [
+            'people' => $people,
+            'status' => $status,
+            // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
+            'canManagePeople' => optional(Auth::user())->permission === 'admin',
+            'myId' => optional(Auth::user())->id,
+        ]);
     }
 
     /**
@@ -347,5 +361,119 @@ class PersonController extends Controller
         }
 
         return redirect('/staff')->with('status', $message);
+    }
+
+    /**
+     * 在籍の切り替え（退職にする／在籍に戻す）。POST /people/{id}/active
+     * Administrator のみ（権限4段階の決まり）。
+     *
+     * なぜ削除と分けるか＝辞めた人を「消す」と、その人が入った案件の記録
+     * （アサイン・出勤数・収支）まで辿れなくなる。辞めた＝在籍を外す（active=false）が正しい。
+     * 消すのは「間違えて登録した人」「テストで作った人」だけ。
+     */
+    public function setActive(Request $request, string $id)
+    {
+        $person = Person::find($id);
+        if (! $person) {
+            return response()->json(['ok' => false, 'message' => 'その人が見つかりませんでした。'], 404);
+        }
+
+        $active = $request->boolean('active');
+
+        // 自分自身を退職にすると自分が入れなくなるので止める。
+        if (! $active && $person->id === optional(Auth::user())->id) {
+            return response()->json(['ok' => false, 'message' => '自分自身を退職にはできません。'], 422);
+        }
+
+        $person->active = $active;
+        $person->save();
+
+        return response()->json([
+            'ok' => true,
+            'active' => $active,
+            'message' => $person->name . ' さんを' . ($active ? '在籍に戻しました。' : '退職（在籍なし）にしました。'),
+        ]);
+    }
+
+    /**
+     * 人を名簿から削除する。POST /people/{id}/delete
+     * Administrator のみ（権限4段階の決まり）。
+     *
+     * ⚠ 実績（アサイン・エントリー・案件の担当）がある人は削除しない。
+     *   消すと過去の案件から「誰が入ったか」が消え、出勤数や収支の集計も追えなくなるため。
+     *   その場合は「退職にする」（在籍を外す）を案内する。
+     *   ＝削除は「間違えて登録した人」「テストで作った人」を片づけるための機能。
+     *
+     * 消すときは、その人だけに付いている情報（できるポジション・NGペア・希望・経験・スキル）も
+     * 一緒に片づける。編集履歴（誰がいつ何を変えたか）は記録なので消さない。
+     */
+    public function destroyPerson(string $id)
+    {
+        $person = Person::find($id);
+        if (! $person) {
+            return response()->json(['ok' => false, 'message' => 'その人が見つかりませんでした。'], 404);
+        }
+
+        // 自分自身は消せない。
+        if ($person->id === optional(Auth::user())->id) {
+            return response()->json(['ok' => false, 'message' => '自分自身は削除できません。'], 422);
+        }
+
+        // 最後の Administrator を消すと、誰も権限を直せなくなる。
+        if ($person->permission === 'admin'
+            && Person::where('permission', 'admin')->count() <= 1) {
+            return response()->json([
+                'ok' => false,
+                'message' => '最後のAdministratorは削除できません（権限を管理できる人がいなくなります）。',
+            ], 422);
+        }
+
+        // 実績があるかを数える。1つでもあれば削除しない。
+        $blockers = [];
+        $counts = [
+            'アサイン' => DB::table('assignments')->where('staff_id', $person->id)->count(),
+            'エントリー（応募）' => DB::table('applications')->where('staff_id', $person->id)->count(),
+            '案件の担当（D/SD/物品）' => DB::table('projects')
+                ->where('director_id', $person->id)
+                ->orWhere('sd_id', $person->id)
+                ->orWhere('goods_owner_id', $person->id)
+                ->count(),
+        ];
+        foreach ($counts as $label => $n) {
+            if ($n > 0) {
+                $blockers[] = $label . ' ' . $n . '件';
+            }
+        }
+        if ($blockers) {
+            return response()->json([
+                'ok' => false,
+                'message' => $person->name . ' さんには記録が残っているため削除できません（'
+                    . implode('・', $blockers) . '）。'
+                    . '辞められた方の場合は「退職にする」を押してください。'
+                    . '名簿には残りますが、アサインの候補には出なくなります。',
+            ], 422);
+        }
+
+        $name = $person->name;
+
+        // その人だけに付いている情報を片づけてから本人を消す。
+        DB::transaction(function () use ($person) {
+            foreach ([
+                'staff_role_eligibility',
+                'staff_relations',
+                'shift_preferences',
+                'staff_content_experience',
+                'staff_role_experience',
+                'staff_skills',
+            ] as $table) {
+                DB::table($table)->where('staff_id', $person->id)->delete();
+            }
+            // NGペアの相手側に自分が入っている行も消す（片方だけ残らないように）。
+            DB::table('staff_relations')->where('partner_id', $person->id)->delete();
+
+            $person->delete();
+        });
+
+        return response()->json(['ok' => true, 'message' => $name . ' さんを名簿から削除しました。']);
     }
 }
