@@ -397,9 +397,13 @@
             実際に試すときは、発行されたスタッフのアカウントでログインしてください。
           </div>
         @endif
-        {{-- お知らせ文は DB（settings.staff_notice）から。担当が公開ボードで保存すると全スタッフに反映される。空なら既定文。 --}}
+        {{-- お知らせ文は DB（settings.staff_notice）から。担当が公開ボードで保存すると全スタッフに反映される。
+             空のときの既定文は、募集が0件のときに「募集が出ています」と出ないように出し分ける
+             （2026-08-24＝案件を登録する前に開くと嘘になるため）。 --}}
         <div class="notice" id="staffNotice">
-          📣 @if(!empty($notice)){{ $notice }}@else募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）@endif
+          📣 @if(!empty($notice)){{ $notice }}
+          @elseif (!empty($recruitJobs) && count($recruitJobs))募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）
+          @else いまは募集中の案件はありません。募集が始まると、ここに案件が並びます。@endif
         </div>
 
         <div class="notice extra-notice" id="extraNotice" style="display:none;"></div>
@@ -607,14 +611,23 @@
     </div>
   </div>
 
-  <!-- 共通の案件データ（募集タブ用・見本データ）。確定アサインはこの下のDBデータを使う。 -->
-  <script src="/ecs/data/cases.js"></script>
+  {{-- 凍結モック /ecs/data/cases.js の読み込みはやめた（2026-08-24）。
+       案件が0件のとき、架空の案件19件がスタッフ全員に見えてしまっていた。
+       スタッフに配るアカウントを増やすので、見本に戻る道をなくす（baba要望）。
+       この画面が使っていたのは日付計算の関数だけなので、下で定義する。 --}}
+  <script>
+    // 今日から off 日後の日付。凍結モックにあった ECS_caseDate と同じ動き。
+    window.ECS_caseDate = function (off) {
+      var x = new Date();
+      x.setHours(0, 0, 0, 0);
+      x.setDate(x.getDate() + (off || 0));
+      return x;
+    };
+  </script>
   <!-- DBから渡された「公開ON（staff_published=true）」の案件。確定アサイン表示の元データ。 -->
   <script>window.ECS_PUBLISHED = @json($published);</script>
   <!-- 募集中タブの案件リスト（DB）。 -->
   <script>window.ECS_RECRUIT_JOBS = @json($recruitJobs ?? []);</script>
-  <!-- DBに案件があるか。true なら見本cases.jsには絶対に戻さない（本番で架空案件を見せないため）。 -->
-  <script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
   <!-- 設定タブの初期値（本人のDB値）＋保存用のCSRFトークン。test/未ログインは null。 -->
   <script>
     window.ECS_MY_PROFILE = @json($myProfile ?? null);
@@ -626,39 +639,24 @@
   </script>
   @verbatim
   <script>
-    // ===== 募集中の案件（共通リスト data/cases.js から作る） =====
-    // offset … 今日から何日後か（モックがいつ開いても未来日に見えるよう相対指定）
-    // format … 'real'(リアル) / 'long'(リアルロング) / 'online'(オンライン)
-    // size   … '大型' のときだけタグ表示（小型・中型は空でOK）
-    // repeat … リピート案件なら true
-    // place  … 会場（住所まで）  meetPlace … 集合場所
-    // meet/leave … 集合・解散（スタッフ）  enter/evStart/evEnd … 入場/開始/終了
-    // lodging … 宿泊（無/前泊有/一部前泊有/後泊あり/前後泊あり）。無以外はタグ表示
-    // dayType … 本番/予備日/リハ。予備日・リハは parentId で本番に紐づけ、本番の直下に並べる
-    // deadline … エントリー締切（案件ごと）  need … 募集人数  filled … 充足済み（残り＝need-filled）
-    // state … open / applied / closed
-    const _jobsSample = [   // ※未使用（参考用）。募集案件は下の共通データから作る。
-      { id:1, content:'社内懇親会 受付ヘルプ', client:'◆◆株式会社', place:'東京都港区六本木6-1-1 ◆◆ホール',     meetPlace:'会場現地', area:'東京', format:'real', size:'',     repeat:false, lodging:'無',   dayType:'本番', deadline:'6/20', need:4,  filled:2,  meet:'16:00', leave:'21:00', enter:'17:00', evStart:'18:00', evEnd:'20:30', offset:10, state:'open', extra:true },
-    ];
-
-    // ===== 募集案件（共通リスト data/cases.js から作る）=====
+    // ===== 募集中の案件 =====
+    // 中身はDB（ECS_RECRUIT_JOBS＝StaffPortalController の recruitJobs）がすべて。
     // スタッフ画面には「募集する・過去でない・下書きでない」案件だけ出す。
-    // 締切は開催日の4日前（見本フォールバック時の簡易ルール）。状態は 応募済み→エントリー中 / 満員→締切 / それ以外→募集中。
-    // 募集案件はDB（ECS_RECRUIT_JOBS）から作る。
-    // ⚠ 「DBが0件なら見本cases.jsを出す」にすると、本番で条件に合う案件が無いときに
-    //    架空の案件19件がスタッフに見えてしまう。DBに案件が1件でもあれば（ECS_USINGDB=true）
-    //    見本には戻さず、素直に「0件」と出す。社員側 /entries・/pickup と同じ判定。
-    const usingDb = (window.ECS_USINGDB !== undefined && window.ECS_USINGDB !== null)
-      ? !!window.ECS_USINGDB : !!(window.ECS_RECRUIT_JOBS && window.ECS_RECRUIT_JOBS.length);
+    // 0件なら0件のまま出す。
+    // ⚠ 以前は「案件が1件も無ければ見本 /ecs/data/cases.js を出す」作りで、案件を登録する前は
+    //   架空の案件19件がスタッフ全員に見えていた（2026-08-24 baba指摘で撤去）。
+    //   スタッフにアカウントを配るので、見本に戻る道は残さない。
+    //   以前ここにあった見本の配列（_jobsSample）と列の説明も一緒に消した。
     // ※応募（エントリー）は本物保存です（DB=applicationsへ）。「エントリーする／取り消す」を押すと保存されます。
-    const _jobSrc = usingDb ? (window.ECS_RECRUIT_JOBS || []) : ECS_CASES;
+    const _jobSrc = window.ECS_RECRUIT_JOBS || [];
     const jobs = _jobSrc.filter(c => c.recruit && !c.archived && !c.draft).map(c => {
       const _dl = new Date(); _dl.setHours(0,0,0,0); _dl.setDate(_dl.getDate() + c.off - 4);
       return {
         id:c.id, content:c.content, client:c.client, place:c.place, meetPlace:c.meetPlace,
         area:c.area, format:c.fmt, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
-        // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。見本cases.jsのときは従来の簡易計算にフォールバック。
+        // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
+        // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
         need:c.need, filled:c.filled, meet:c.meet, leave:c.leave,
         enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, evTbd:!!c.evTbd, offset:c.off,

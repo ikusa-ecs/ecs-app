@@ -131,9 +131,6 @@ class StaffPortalController extends Controller
         return view('staff_portal', [
             'published' => $published,
             'recruitJobs' => $this->recruitJobs($today, $me),
-            // DBに案件が1件でもあるか。true のときは見本データ（cases.js）に戻さない
-            // ＝本番で架空の案件がスタッフに見えるのを防ぐ（社員側 /entries・/pickup と同じ旗）。
-            'usingDb' => Project::exists(),
             'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
             // 体験用（見本）アカウントか。true のときは応募・希望が保存されないので、
             // 画面の上に注意を出す（2026-08-21 baba：保存されないのに応募できたように見えた）。
