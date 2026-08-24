@@ -39,7 +39,12 @@ class PastProjectImportController extends Controller
     /** 取込画面。 */
     public function show()
     {
-        return view('past_import');
+        return view('past_import', [
+            // 名簿の氏名。画面でCSVを選んだ瞬間に「この人は名簿にいる／いない」を見せるために渡す
+            // （登録してから初めて分かる、では直すのに時間がかかるため）。
+            // 同姓同名も分かるよう、そのまま重複ありで渡す。
+            'rosterNames' => \App\Models\Person::pluck('name')->filter()->values(),
+        ]);
     }
 
     /** CSVを読んで、過去案件とそのアサインを登録する。 */

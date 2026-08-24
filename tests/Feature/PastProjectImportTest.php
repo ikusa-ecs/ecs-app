@@ -257,4 +257,30 @@ class PastProjectImportTest extends TestCase
             ->post('/past-import', ['csv' => $this->csv([$this->row()])])
             ->assertStatus(403);
     }
+
+    /**
+     * 取込画面が「ファイルを選んだらその場で中身が出る」形になっている。
+     *
+     * ⚠ 最初は「ボタンを押す」形にしていたため、他の取込画面と見た目が同じなのに
+     *   ファイルを選んでも何も起きず、壊れていると誤解された（baba指摘 2026-08-24）。
+     */
+    public function test_screen_previews_on_file_pick(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $html = $this->actingAsPerson($me)->get('/past-import')->assertOk()->getContent();
+
+        // ファイルを選んだら読み込む仕掛けがある。
+        $this->assertStringContainsString("getElementById('pjFile').addEventListener('change'", $html);
+        // 文字コードを見分ける共通処理を使っている（Excel保存のShift_JIS対応）。
+        $this->assertStringContainsString('ECS_readCsvFile', $html);
+        // 確認の表と取り込みボタンがある。
+        $this->assertStringContainsString('id="pjResult"', $html);
+        $this->assertStringContainsString('id="pjBtn"', $html);
+        // 名簿の氏名を渡している＝その場で「名簿にいる／いない」を出せる。
+        $this->assertStringContainsString('ECS_ROSTER_NAMES', $html);
+        // 画面へは @json で渡るので、日本語はエスケープされた形になる。その形で確かめる。
+        $this->assertStringContainsString(json_encode('鈴木 彩', JSON_UNESCAPED_SLASHES), $html);
+    }
 }
