@@ -93,7 +93,8 @@
             <option value="gobusata">並び：ご無沙汰が長い順</option>
           </select>
           <div class="spacer"></div>
-          <button class="btn" onclick="alert('モックのため、CSV出力は行いません。')">CSV出力</button>
+          <a class="btn" href="/staff/export.csv"
+             title="スタッフ名簿をCSVで出力します（Excelでそのまま開けます）">CSV出力</a>
         </div>
 
         <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>

@@ -289,7 +289,7 @@
             <div class="prof-sub"><span id="profEmail">baba@ikusa.co.jp</span></div>
           </div>
           <button class="line-btn" onclick="location.href='/mypage-finance'">💰 収支を入力する</button>
-          <button class="line-btn" onclick="alert('プロフィール編集の画面を開きます（モックのためダミーです）。氏名・拠点・区分は社員名簿と連動する想定です。')">プロフィールを編集</button>
+          <a class="line-btn" href="/profile" style="text-decoration:none; display:inline-block;">プロフィールを編集</a>
         </div>
       </div>
 
@@ -441,7 +441,7 @@
             <span class="set-label">パスワード</span>
             <span class="set-note">定期的な変更をおすすめします。</span>
           </div>
-          <div><button class="line-btn" onclick="alert('パスワード変更の画面を開きます（モックのためダミーです）。')">パスワードを変更する</button></div>
+          <div><a class="line-btn" href="/password" style="text-decoration:none; display:inline-block;">パスワードを変更する</a></div>
         </div>
 
         <div class="set-row">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Support\Departments;
+use App\Support\TempPassword;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\CsvText;
@@ -37,7 +38,17 @@ class PersonImportController extends Controller
     {
         $request->validate([
             'csv' => ['required', 'file', 'mimes:csv,txt'],
+            // 「ログインアカウントも一緒に作る」チェック（任意）。
+            'make_accounts' => ['nullable'],
         ]);
+
+        // アカウントも作るか。作る場合は仮パスワードを自動生成し、初回ログインで
+        // 本人にパスワード変更＋ふりがな・入社年月日を入れてもらう（must_onboard=true）。
+        // ⚠ 取込だけだとパスワードが無く、名簿に載るのにログインできない状態になる
+        //   （初回設定にも入らないので、ふりがな・入社日を本人に入れてもらえない）。
+        $makeAccounts = $request->boolean('make_accounts');
+        $issued = [];        // 発行できた人（画面に一覧＋CSVで渡す）
+        $noEmail = [];       // メールが無くて発行できなかった人
 
         // CSV を行配列にする（BOM除去・文字コードをUTF-8にそろえる・CRLF対応）。
         $raw = (string) file_get_contents($request->file('csv')->getRealPath());
@@ -164,7 +175,28 @@ class PersonImportController extends Controller
                 $attrs['experience_count'] = $expc !== '' ? (int) $expc : null;
             }
 
+            // ログインアカウントも作る場合＝仮パスワードを付けて、初回設定へ誘導する。
+            // メールが無い人はログインできないので、アカウントは作らずに知らせる。
+            if ($makeAccounts) {
+                if ($email !== '') {
+                    $tempPassword = TempPassword::make();
+                    $attrs['password'] = $tempPassword;      // モデルのキャストで自動ハッシュ化
+                    $attrs['must_onboard'] = true;           // 初回ログインで初期設定へ
+                } else {
+                    $noEmail[] = $name;
+                }
+            }
+
             $person = Person::create($attrs);
+
+            if ($makeAccounts && $email !== '') {
+                $issued[] = [
+                    'id' => $person->id,
+                    'name' => $name,
+                    'email' => $email,
+                    'password' => $tempPassword,
+                ];
+            }
 
             // できるポジション（任意・スタッフのみ）：セルの各トークンを正規コードに直して入れ直す。
             if ($role === 'staff' && $posColName !== null) {
@@ -196,11 +228,22 @@ class PersonImportController extends Controller
         }
 
         $msg = "CSVから{$okCount}名を名簿に登録しました。";
+        if ($makeAccounts) {
+            $msg .= ' そのうち' . count($issued) . '名にログインアカウント（仮パスワード）を発行しました。';
+        }
+        if ($noEmail) {
+            $msg .= ' メール未記入のため発行できなかった方：' . implode('・', $noEmail)
+                . '（名簿には登録済みです。メールを入れてから「アカウント発行」で個別に発行してください）';
+        }
         if ($errors) {
             $msg .= ' エラー' . count($errors) . '件は登録しませんでした：' . implode(' / ', $errors);
         }
 
-        return redirect('/person-import')->with('status', $msg);
+        return redirect('/person-import')
+            ->with('status', $msg)
+            // 発行一覧は「その場で1回だけ見せる」もの（サーバーには残さない）。
+            // 平文の仮パスワードなので、配り終わったら閉じてもらう前提。
+            ->with('issued', $issued);
     }
 
     /** 指定プレフィックス（E-/S-）の既存IDの最大番号。無ければ0。 */

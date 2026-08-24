@@ -130,7 +130,8 @@
             <option value="SP">軍師・サポーター</option>
           </select>
           <div class="spacer"></div>
-          <button class="btn primary" onclick="alert('モックのため、招待は行いません。')">＋ スタッフを招待</button>
+          <a class="btn primary" href="/account-new?role=staff"
+             title="アカウント発行画面が開きます。スタッフのログインアカウントはそこで発行します。">＋ スタッフを招待</a>
         </div>
 
         <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>

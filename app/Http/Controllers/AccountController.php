@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Support\Departments;
+use App\Support\TempPassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -25,10 +26,15 @@ use Illuminate\Validation\ValidationException;
 class AccountController extends Controller
 {
     /** 発行フォームを表示。 */
-    public function create()
+    public function create(Request $request)
     {
+        // 名簿の「＋社員を追加」「＋スタッフを招待」から来たときは、種別を最初から選んでおく
+        // （どちらの名簿から来たかで決まるので、選び直させない）。
+        $role = $request->query('role');
+
         return view('account_new', [
             'canGrantAdmin' => optional(Auth::user())->permission === 'admin',
+            'defaultRole' => in_array($role, ['employee', 'staff'], true) ? $role : '',
         ]);
     }
 
@@ -94,7 +100,7 @@ class AccountController extends Controller
         }
 
         // 仮パスワード（未入力なら自動生成）※任意項目は $validated にキーが無いことがある
-        $tempPassword = ($validated['temp_password'] ?? null) ?: $this->generateTempPassword();
+        $tempPassword = ($validated['temp_password'] ?? null) ?: TempPassword::make();
 
         // 社員番号（E-###）／スタッフ番号（S-###）を自動採番
         $prefix = $validated['role'] === 'employee' ? 'E-' : 'S-';
@@ -140,17 +146,4 @@ class AccountController extends Controller
             ->max() ?? 0);
     }
 
-    /** 読み間違えにくい仮パスワードを作る（紛らわしい 0/O/1/l/I を除外）。 */
-    private function generateTempPassword(int $length = 8): string
-    {
-        $chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        $max = strlen($chars) - 1;
-        $out = '';
-        for ($i = 0; $i < $length; $i++) {
-            // random_int は暗号的に安全（Math.random 相当のブレは不要）
-            $out .= $chars[random_int(0, $max)];
-        }
-
-        return $out;
-    }
 }

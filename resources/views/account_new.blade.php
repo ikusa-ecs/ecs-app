@@ -41,8 +41,8 @@
             <label>種別<span class="req">必須</span></label>
             <select name="role" id="roleSel" required onchange="ECSonRole()">
               <option value="">選択してください</option>
-              <option value="employee" @selected(old('role') === 'employee')>社員</option>
-              <option value="staff" @selected(old('role') === 'staff')>スタッフ</option>
+              <option value="employee" @selected(old('role', $defaultRole ?? '') === 'employee')>社員</option>
+              <option value="staff" @selected(old('role', $defaultRole ?? '') === 'staff')>スタッフ</option>
             </select>
           </div>
 
@@ -180,6 +180,13 @@
         holder.appendChild(h);
       }
     }
+
+    // 所属はスタッフには無い概念なので、スタッフのときは所属の欄を隠す。
+    var deptRow = document.getElementById('deptRow');
+    var deptsRow = document.getElementById('deptsRow');
+    var showDept = (role === 'employee');
+    if (deptRow)  deptRow.style.display  = showDept ? '' : 'none';
+    if (deptsRow) deptsRow.style.display = showDept ? '' : 'none';
 
     if (role === 'staff'){
       setHidden('staff', false);

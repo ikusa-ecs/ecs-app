@@ -42,6 +42,41 @@
     <div class="pi-flash err">{{ session('import_error') }}</div>
   @endif
 
+  {{-- 発行できたアカウントの一覧。ページを離れると消える（サーバーには残していない）。 --}}
+  @if (session('issued'))
+    <div class="pi-card" style="border-color:#bfe6d2; background:#f6fbf8;">
+      <h2>発行したログインアカウント（{{ count(session('issued')) }}名）</h2>
+      <p style="font-size:12.5px; color:#6b5c49; margin:0 0 10px;">
+        <b>この一覧は、いま1回だけ表示されます。</b>画面を移動すると消えます（仮パスワードは保存していません）。
+        必要な方は下のボタンでCSVに落としてください。<br>
+        <b>⚠ 仮パスワードがそのまま書かれたファイルになります。</b>本人に配り終わったら削除してください。<br>
+        本人は初回ログインで、パスワードの変更とふりがな・入社年月日の入力を行います。
+      </p>
+      <div class="pi-scroll">
+        <table class="pi-table">
+          <thead><tr><th>番号</th><th>氏名</th><th>メール（ログインID）</th><th>仮パスワード</th></tr></thead>
+          <tbody>
+            @foreach (session('issued') as $row)
+              <tr>
+                <td>{{ $row['id'] }}</td>
+                <td>{{ $row['name'] }}</td>
+                <td>{{ $row['email'] }}</td>
+                <td><code style="font-size:13px; font-weight:700;">{{ $row['password'] }}</code></td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+      <div class="pi-actions">
+        <button type="button" class="btn primary" onclick="piDownloadIssued()">⬇ 仮パスワード一覧をCSVでダウンロード</button>
+      </div>
+    </div>
+    <script>
+      // 一覧はこのページの中だけに持つ（サーバーにファイルを作らない＝置き忘れを防ぐ）。
+      window.ECS_ISSUED = @json(session('issued'));
+    </script>
+  @endif
+
   <div class="pi-card">
     <h2>使い方</h2>
     <ol class="pi-steps">
@@ -59,7 +94,10 @@
       できるポジション（任意・スタッフのみ）<br>
       <b>できるポジションの書き方：</b> できる役割を「OP,MC,軍師」のように区切って書きます（区切りはカンマ／スラッシュ／読点のどれでもOK）。
       使える言葉＝D／OP（音響）／MC（司会進行）／FC（巡回ファシリ）／CK（チェッカー）／軍師（＝サポーター）／受付。コードでも日本語でも書けます。空欄なら何も登録しません。<br>
-      <b>自動で入る：</b> 社員番号（E-/S-を自動採番）・権限（社員/スタッフを種別から）・在籍（有効）。パスワードは入れません（アカウント発行は別作業）。
+      <b>自動で入る：</b> 社員番号（E-/S-を自動採番）・権限（社員/スタッフを種別から）・在籍（有効）。<br>
+      <b>ログインアカウント：</b> 下の「③」のところにある<b>「ログインアカウントも一緒に作る」</b>にチェックを入れると、
+      仮パスワードを自動で作って、登録後に<b>一覧を表示・CSVでダウンロード</b>できます。
+      チェックを入れないと<b>名簿に載るだけでログインはできません</b>（あとで「アカウント発行」から1人ずつ発行することになります）。
     </div>
   </div>
 
@@ -73,6 +111,8 @@
     {{-- 実登録はこのフォームでCSVファイルそのものをPOSTし、サーバーが再検証して登録する。 --}}
     <form id="piForm" method="POST" action="/person-import" enctype="multipart/form-data">
       <input type="hidden" name="_token" id="piToken">
+      {{-- 「ログインアカウントも一緒に作る」の状態。チェック欄はフォームの外にあるのでここで渡す。 --}}
+      <input type="hidden" name="make_accounts" id="piMakeAccountsHidden" value="">
       <div id="piDrop" class="pi-drop">
         ここにCSVをドラッグ＆ドロップ、または<br>
         <input type="file" name="csv" id="piFile" accept=".csv,text/csv" style="margin-top:8px;">
@@ -93,6 +133,20 @@
           </thead>
           <tbody id="piBody"></tbody>
         </table>
+      </div>
+      {{-- ログインアカウントも作るか。取込だけだとパスワードが無くログインできないため、
+           まとめて発行できるようにした（2026-08-24 baba）。 --}}
+      <div class="pi-actions" style="border-top:1px dashed var(--line); padding-top:12px; margin-top:12px;">
+        <label style="display:inline-flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:700;">
+          <input type="checkbox" id="piMakeAccounts" checked style="width:auto; margin-top:3px;">
+          <span>ログインアカウントも一緒に作る
+            <span style="display:block; font-weight:400; font-size:12px; color:#8a7a66; margin-top:2px;">
+              仮パスワードを自動で作ります。登録後に一覧が出るので、そのままCSVでダウンロードできます。<br>
+              本人は初回ログインで、パスワード変更とふりがな・入社年月日の入力を行います。<br>
+              ※ <b>メールが空の行はアカウントを作りません</b>（ログインに使うため）。名簿への登録はされます。
+            </span>
+          </span>
+        </label>
       </div>
       <div class="pi-actions">
         <button type="button" class="btn primary" id="piImportBtn" onclick="piImport()">③ この内容で登録</button>
@@ -129,6 +183,29 @@
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = '名簿取込テンプレート.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // 発行した仮パスワードの一覧をCSVにして落とす（サーバーにファイルを作らない）。
+  function piDownloadIssued() {
+    var list = window.ECS_ISSUED || [];
+    if (!list.length) { alert('発行した一覧がありません。'); return; }
+    var rows = [['社員/スタッフ番号', '氏名', 'メール（ログインID）', '仮パスワード']];
+    list.forEach(function (r) { rows.push([r.id, r.name, r.email, r.password]); });
+    var csv = rows.map(function (r) {
+      return r.map(function (v) {
+        v = (v == null) ? '' : String(v);
+        return /[",
+]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(',');
+    }).join('
+');
+    // BOMを付けてExcelの文字化けを防ぐ
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '仮パスワード一覧.csv';
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -238,8 +315,17 @@
   function piImport() {
     var f = document.getElementById('piFile').files[0];
     if (!f) { alert('先にCSVファイルを選んでください。'); return; }
-    if (!confirm('OKの行を名簿に登録します。よろしいですか？')) return;
+    var mk = document.getElementById('piMakeAccounts');
+    var makeAccounts = !!(mk && mk.checked);
+    var msg = makeAccounts
+      ? 'OKの行を名簿に登録し、ログインアカウント（仮パスワード）も発行します。よろしいですか？'
+      : 'OKの行を名簿に登録します。
+
+※ ログインアカウントは作りません（名簿に載るだけでログインはできません）。よろしいですか？';
+    if (!confirm(msg)) return;
     document.getElementById('piToken').value = window.ECS_CSRF || '';
+    // チェックの状態をサーバーへ送る（フォームに隠し欄で入れる）。
+    document.getElementById('piMakeAccountsHidden').value = makeAccounts ? '1' : '';
     document.getElementById('piForm').submit();
   }
 
