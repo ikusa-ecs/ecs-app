@@ -345,10 +345,14 @@ class ProjectController extends Controller
         // 登録拠点プルダウン用：拠点マスタ（有効なもの・並び順）。全拠点運用の土台（設計書19.2）。
         $offices = Office::where('active', true)->orderBy('sort_order')->pluck('name')->all();
 
-        // 案件名（コンテンツ）の候補＝コンテンツ台帳（有効なもの・名前順）。
+        // 案件名（コンテンツ）の候補＝コンテンツ台帳（有効なもの）。
         // 以前は画面に12件ベタ書きで、台帳にあるコンテンツの多くが候補に出なかった（社内FBで指摘あり）。
+        // 並びは「マスタ管理のコンテンツ台帳と同じ上からの順番」（並び順→ID順）。
+        // ⚠ 以前はコンテンツ名の文字コード順だったため、台帳の見た目と並びが違っていた
+        //   （baba指摘 2026-08-24。台帳の上＝CT-001 から出したい）。
         $contentOptions = Content::where('active', true)
-            ->orderBy('content_name')
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->pluck('content_name')
             ->filter()
             ->unique()
