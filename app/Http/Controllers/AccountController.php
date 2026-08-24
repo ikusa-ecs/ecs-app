@@ -54,6 +54,8 @@ class AccountController extends Controller
             'email'         => ['required', 'email', Rule::unique('people', 'email')],
             'permission'    => ['required', Rule::in($allowedPerms)],
             'office'        => ['nullable', 'string'],
+            // 入社日は発行画面では聞かない（本人が初回ログインの初期設定で入れる・2026-08-24 baba）。
+            // 名簿CSV取込など他の入口から届くことはあるので、受け取れる形は残しておく。
             'hire_date'     => ['nullable', 'date'],
             'temp_password' => ['nullable', 'string', 'min:6'],
         ], [

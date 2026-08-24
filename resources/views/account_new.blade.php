@@ -80,11 +80,8 @@
             </select>
           </div>
 
-          <div class="form-row">
-            <label>入社日／登録日</label>
-            <input type="date" name="hire_date" value="{{ old('hire_date') }}">
-            <span class="hint">区分（新人／中堅／ベテラン）の計算に使います。</span>
-          </div>
+          {{-- 入社日はここでは聞かない。発行する側には分からないことが多いため、
+               本人が初回ログインの初期設定で入れる方式にした（2026-08-24 baba）。 --}}
 
           <div class="form-row">
             <label>仮パスワード</label>

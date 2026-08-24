@@ -22,7 +22,8 @@ class AdminConsoleController extends Controller
     public function index()
     {
         return view('admin_console', [
-            'employees'      => Person::employees()->orderBy('id')->get(),
+            // 並びは社員名簿と同じ社歴順（入社日の古い人が上・未入力は末尾）。
+            'employees'      => Person::employees()->bySeniority()->get(),
             'staffCount'     => Person::staff()->count(),
             'adminCount'     => Person::where('permission', 'admin')->count(),
             // 表示用ラベル・色はビューの @php に頼らずコントローラから渡す（Blade の @php 挙動に依存しない）

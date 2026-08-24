@@ -30,14 +30,18 @@ class OnboardingController extends Controller
         $user = Auth::user();
 
         // 入力チェック（氏名必須・新パスワードは8文字以上＋確認一致）
+        // 入社年月日は本人に入れてもらう（発行する管理者には分からないため・2026-08-24 baba）。
+        // 社員は必須（名簿を社歴順に並べるため）。スタッフは分からないこともあるので任意。
         $request->validate([
-            'name'     => ['required'],
-            'email'    => ['nullable', 'email'],
-            'password' => ['required', 'min:8', 'confirmed'],
+            'name'      => ['required'],
+            'email'     => ['nullable', 'email'],
+            'password'  => ['required', 'min:8', 'confirmed'],
+            'hire_date' => [$user->role === 'employee' ? 'required' : 'nullable', 'date'],
         ], [], [
-            'name'     => '氏名',
-            'email'    => 'メールアドレス',
-            'password' => '新しいパスワード',
+            'name'      => '氏名',
+            'email'     => 'メールアドレス',
+            'password'  => '新しいパスワード',
+            'hire_date' => $user->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日',
         ]);
 
         // テスト用アカウントはDBに実体が無い → セッションで「設定済み」にしてデモを先へ進める。
@@ -60,6 +64,8 @@ class OnboardingController extends Controller
         $user->shirt_size      = $request->input('shirt_size');
         $user->prefecture      = $request->input('prefecture');
         $user->nearest_station = $request->input('nearest_station');
+        // 入社年月日（未入力なら今まで入っていた値をそのまま残す）。
+        $user->hire_date       = $request->input('hire_date') ?: $user->hire_date;
 
         // スタッフの一言アピール（任意）
         if ($user->role === 'staff') {

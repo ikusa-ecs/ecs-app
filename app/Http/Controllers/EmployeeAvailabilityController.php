@@ -53,9 +53,10 @@ class EmployeeAvailabilityController extends Controller
         $me = PersonalCases::meModel();
 
         // 本物の社員一覧（people.role='employee'）。画面の「全社員の一覧」タブの行になる。
-        // 画面は先頭行を「自分」として扱うので、自分を先頭に並べ替える。
+        // 並びは社歴順（入社日の古い人が上）。画面は先頭行を「自分」として扱うので、
+        // そのあとで自分だけを先頭に持ち上げる。
         $employees = Person::employees()
-            ->orderBy('id')
+            ->bySeniority()
             ->get(['id', 'name'])
             ->map(fn (Person $p) => ['id' => $p->id, 'name' => $p->name])
             ->sortBy(fn (array $e) => ($me && $e['id'] === $me->id) ? 0 : 1)

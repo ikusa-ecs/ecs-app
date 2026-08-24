@@ -26,8 +26,9 @@ class PersonController extends Controller
         $deptCode = ['イベプラ' => 'plan', 'セールス' => 'sales', 'クリエイティブ' => 'creative'];
 
         // 画面（employees.blade.php）が読む形に詰め替える。表示JSはそのまま使う。
+        // 並びは社歴順（入社日の古い人が上）。入社日が未入力の人は末尾。
         $employees = Person::employees()
-            ->orderBy('id')
+            ->bySeniority()
             ->get()
             ->map(function (Person $p) use ($today, $deptCode) {
                 // joinedMonths ＝ 入社からの経過月数（6以下で「新人」バッジが付く）

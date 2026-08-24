@@ -94,6 +94,18 @@
           <span class="hint">ログインにも使うアドレスです。</span>
         </div>
 
+        {{-- 入社年月日は本人に入れてもらう（発行する管理者には分からないため・2026-08-24 baba）。
+             名簿と権限一覧の並び順（社歴順＝古い人が上）にも使う。 --}}
+        <div class="field">
+          <label>
+            {{ $me->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日' }}
+            @if ($me->role !== 'staff')<span class="req">必須</span>@endif
+          </label>
+          <input type="date" name="hire_date" value="{{ old('hire_date', $me->hire_date?->format('Y-m-d')) }}"
+                 @if ($me->role !== 'staff') required @endif>
+          <span class="hint">名簿の並び順（社歴の長い人が上）と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日で構いません。</span>
+        </div>
+
         <div class="field-row3">
           <div class="field">
             <label>身長</label>

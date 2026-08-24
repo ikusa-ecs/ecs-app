@@ -84,6 +84,26 @@ class Person extends Model implements AuthenticatableContract
     }
 
     /**
+     * 社歴順（入社日の古い人が先）に並べるクエリスコープ。
+     *
+     * なぜ＝名簿の並びを「社歴の長い人が上」にしたい（2026-08-24 baba）。
+     * 社員番号（E-001…）は登録した順に振られるだけで社歴とは関係がないため、
+     * 番号を付け替えるのではなく並び順で解決する（番号は他のデータが人を指す名札なので変えない）。
+     *
+     * 入社日が未入力の人は末尾へ。入社日が同じ人は社員番号順。
+     * ※ 「hire_date is null」は SQLite でも MySQL でも 0/1 を返すので、
+     *    昇順に並べると「入っている人（0）→ 空の人（1）」の順になる。
+     *    ローカル(SQLite)と本番(MySQL)で並びが変わらないよう、この書き方にしている。
+     */
+    public function scopeBySeniority($query)
+    {
+        return $query
+            ->orderByRaw('hire_date is null')
+            ->orderBy('hire_date')
+            ->orderBy('id');
+    }
+
+    /**
      * 区分（新人/中堅/ベテラン）。保存せず hire_date からの在籍年数で都度計算する。
      * 新人＝在籍1年未満／中堅＝1年以上3年未満／ベテラン＝3年以上（設計書19.1の確定方針）。
      * 入社日が無い場合は null を返す。
