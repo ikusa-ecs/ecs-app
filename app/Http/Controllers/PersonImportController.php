@@ -137,6 +137,13 @@ class PersonImportController extends Controller
             if ($cwid !== '' && ! ctype_digit($cwid)) {
                 $rowErrors[] = 'チャットワークIDは数字で入力してください';
             }
+            // テンプレートの見本行が消し忘れたまま取り込まれる事故を防ぐ（2026-08-24 実際に発生）。
+            // 見本のメールは example.com。本物の連絡先で example.com は使わないので、これで弾ける。
+            // ⚠ 実際に起きたこと：見本行を消さずに取り込み、社長のふりがなが
+            //   見本の「やまだ はなこ」になった（本人以外は直せない状態だった）。
+            if ($email !== '' && preg_match('/@example\.(com|org|net)$/i', $email)) {
+                $rowErrors[] = 'メールが見本のまま（@example.com）です。テンプレートの見本行を消してから取り込んでください';
+            }
             if ($rowErrors) {
                 $errors[] = "{$lineNo}行目（{$name}）：" . implode('／', $rowErrors);
                 continue;

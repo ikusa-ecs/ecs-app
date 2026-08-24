@@ -46,14 +46,14 @@ class PersonImportAccountsTest extends TestCase
     {
         $res = $this->actingAsPerson($this->admin())->post('/person-import', [
             'csv' => $this->csv([
-                ['社員', '田中太郎', 'たなか たろう', 'tanaka@example.com', '', '東京', 'イベプラ', '2020-04-01', '', ''],
+                ['社員', '田中太郎', 'たなか たろう', 'tanaka@ikusa.co.jp', '', '東京', 'イベプラ', '2020-04-01', '', ''],
             ]),
             'make_accounts' => '1',
         ]);
 
         $res->assertRedirect('/person-import');
 
-        $p = Person::where('email', 'tanaka@example.com')->firstOrFail();
+        $p = Person::where('email', 'tanaka@ikusa.co.jp')->firstOrFail();
         $this->assertNotNull($p->password, '仮パスワードが入っていること');
         $this->assertTrue((bool) $p->must_onboard, '初回設定へ誘導されること');
 
@@ -61,7 +61,7 @@ class PersonImportAccountsTest extends TestCase
         $issued = session('issued');
         $this->assertIsArray($issued);
         $this->assertCount(1, $issued);
-        $this->assertSame('tanaka@example.com', $issued[0]['email']);
+        $this->assertSame('tanaka@ikusa.co.jp', $issued[0]['email']);
         $this->assertNotEmpty($issued[0]['password']);
         // 平文はDBに入れない（保存時にハッシュ化される）。
         $this->assertNotSame($issued[0]['password'], $p->password);
@@ -73,11 +73,11 @@ class PersonImportAccountsTest extends TestCase
     {
         $this->actingAsPerson($this->admin())->post('/person-import', [
             'csv' => $this->csv([
-                ['社員', '佐藤花子', 'さとう はなこ', 'sato@example.com', '', '東京', 'セールス', '2021-04-01', '', ''],
+                ['社員', '佐藤花子', 'さとう はなこ', 'sato@ikusa.co.jp', '', '東京', 'セールス', '2021-04-01', '', ''],
             ]),
         ])->assertRedirect('/person-import');
 
-        $p = Person::where('email', 'sato@example.com')->firstOrFail();
+        $p = Person::where('email', 'sato@ikusa.co.jp')->firstOrFail();
         $this->assertNull($p->password);
         $this->assertFalse((bool) $p->must_onboard);
         $this->assertNull(session('issued') ? (session('issued')[0] ?? null) : null);
@@ -89,7 +89,7 @@ class PersonImportAccountsTest extends TestCase
         $this->actingAsPerson($this->admin())->post('/person-import', [
             'csv' => $this->csv([
                 ['スタッフ', 'メール無し', 'めーるなし', '', '', '東京', '', '', '5', 'OP'],
-                ['スタッフ', 'メール有り', 'めーるあり', 'ari@example.com', '', '東京', '', '', '3', 'MC'],
+                ['スタッフ', 'メール有り', 'めーるあり', 'ari@ikusa.co.jp', '', '東京', '', '', '3', 'MC'],
             ]),
             'make_accounts' => '1',
         ])->assertRedirect('/person-import');
@@ -104,7 +104,7 @@ class PersonImportAccountsTest extends TestCase
         // 一覧に出るのはメールがある人だけ。
         $issued = session('issued');
         $this->assertCount(1, $issued);
-        $this->assertSame('ari@example.com', $issued[0]['email']);
+        $this->assertSame('ari@ikusa.co.jp', $issued[0]['email']);
 
         // 発行できなかった人は、メッセージで知らせる。
         $this->assertStringContainsString('メール未記入', session('status'));
@@ -115,15 +115,38 @@ class PersonImportAccountsTest extends TestCase
     {
         $this->actingAsPerson($this->admin())->post('/person-import', [
             'csv' => $this->csv([
-                ['社員', '兼務太郎', 'けんむ たろう', 'kenmu@example.com', '7654321', '東京', 'ARENA／イベプラ', '2019-04-01', '', ''],
+                ['社員', '兼務太郎', 'けんむ たろう', 'kenmu@ikusa.co.jp', '7654321', '東京', 'ARENA／イベプラ', '2019-04-01', '', ''],
             ]),
             'make_accounts' => '1',
         ])->assertRedirect('/person-import');
 
-        $p = Person::where('email', 'kenmu@example.com')->firstOrFail();
+        $p = Person::where('email', 'kenmu@ikusa.co.jp')->firstOrFail();
         $this->assertSame('けんむ たろう', $p->name_kana);
         $this->assertSame('7654321', $p->chatwork_id);
         $this->assertSame('ARENA', $p->department, '先頭が主な所属');
         $this->assertSame(['ARENA', 'イベプラ'], $p->departments);
+    }
+
+    /** テンプレートの見本行（メールが @example.com）は取り込まない。 */
+    public function test_sample_rows_are_rejected(): void
+    {
+        $res = $this->actingAsPerson($this->admin())->post('/person-import', [
+            'csv' => $this->csv([
+                // テンプレートの見本そのまま（消し忘れ）
+                ['スタッフ', '山田花子', 'やまだ はなこ', 'hanako@example.com', '', '東京', '', '2025-04-01', '12', 'OP'],
+                // 本物の行
+                ['社員', '本物の人', 'ほんもののひと', 'honmono@ikusa.co.jp', '', '東京', 'イベプラ', '2020-04-01', '', ''],
+            ]),
+            'make_accounts' => '1',
+        ]);
+
+        $res->assertRedirect('/person-import');
+
+        // 見本行は登録されない。
+        $this->assertDatabaseMissing('people', ['name' => '山田花子']);
+        // 本物の行は登録される。
+        $this->assertDatabaseHas('people', ['name' => '本物の人']);
+        // 何が悪かったか分かるメッセージが出る。
+        $this->assertStringContainsString('見本', session('status'));
     }
 }

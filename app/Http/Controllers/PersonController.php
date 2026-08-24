@@ -51,6 +51,7 @@ class PersonController extends Controller
                         ->values(),
                     'cwid'         => $p->chatwork_id ?? '',   // チャットワークID（未登録を見つける用）
                     'active'       => (bool) $p->active,      // 在籍中か（false＝退職）
+                    'deptMain'     => $p->department ?? '',   // 主な所属（編集欄の初期値）
                     'office'       => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,
                     'exp'          => $p->experienced_contents ?? [],
@@ -114,9 +115,16 @@ class PersonController extends Controller
     }
 
     /**
-     * 社員のサイズ（身長・靴・服）を保存する（POST /employees/{id}/profile）。
+     * 社員の情報（氏名・ふりがな・所属・サイズ）を保存する（POST /employees/{id}/profile）。
      * 社員名簿の詳細パネルからAJAXで呼ばれる。来た項目だけを people に上書きする。
      * ※ 社員の新規作成はここでは行わない（アカウント発行は /account-new に集約）。
+     *
+     * 氏名・ふりがな・所属を直せるようにした理由（2026-08-24 baba要望）：
+     * 名簿CSVの見本行（山田花子／やまだ はなこ）を消し忘れて取り込んでしまい、
+     * 本人以外は直せない状態になった（本人がログインするまで間違ったふりがなが残る）。
+     * ⚠ 他人の氏名・ふりがな・所属を書き換えるのは Administrator だけ。
+     *   ルートではなくここで項目ごとに見る（ルートに tier:admin を付けると、
+     *   今まで管理者以上ができていたサイズ編集まで止まってしまうため）。
      */
     public function saveEmployeeProfile(Request $request, string $id)
     {
@@ -130,6 +138,15 @@ class PersonController extends Controller
             'height'     => ['nullable', 'string', 'max:20'],  // 身長（cm）
             'shoe_size'  => ['nullable', 'string', 'max:20'],  // 靴のサイズ
             'shirt_size' => ['nullable', 'string', 'max:20'],  // 服のサイズ
+            'name'       => ['sometimes', 'required', 'string', 'max:255'],
+            'name_kana'  => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:50'],
+            'departments' => ['nullable', 'array'],
+            'departments.*' => ['string', 'max:50'],
+        ], [], [
+            'name' => '氏名',
+            'name_kana' => 'ふりがな',
+            'department' => '主な所属',
         ]);
 
         // 送られてきた項目だけ更新（空文字は「クリア」として保存する）。
@@ -142,6 +159,31 @@ class PersonController extends Controller
         if ($request->has('shirt_size')) {
             $person->shirt_size = $data['shirt_size'] ?? null;
         }
+
+        // ここから下は他人の氏名・ふりがな・所属の書き換え＝Administrator だけ。
+        $wantsIdentityChange = $request->hasAny(['name', 'name_kana', 'department', 'departments']);
+        if ($wantsIdentityChange && optional(Auth::user())->permission !== 'admin') {
+            return response()->json([
+                'ok' => false,
+                'message' => '氏名・ふりがな・所属を直せるのは Administrator だけです。',
+            ], 403);
+        }
+
+        if ($request->has('name')) {
+            $person->name = $data['name'];
+        }
+        if ($request->has('name_kana')) {
+            $person->name_kana = ($data['name_kana'] ?? null) ?: null;
+        }
+        if ($request->has('department')) {
+            $person->department = ($data['department'] ?? null) ?: null;
+            // 兼務は主な所属を必ず含める形にそろえる（正本＝Departments::normalize）。
+            $person->departments = Departments::normalize(
+                $data['department'] ?? null,
+                (array) ($data['departments'] ?? [])
+            );
+        }
+
         $person->save();
 
         return response()->json(['ok' => true]);

@@ -14,6 +14,8 @@
   {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
   window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
   window.ECS_MY_ID = @json($myId ?? null);
+  {{-- 所属の選択肢（実際の10種類）。氏名・ふりがな・所属を直す欄で使う。 --}}
+  window.ECS_DEPT_ALL = @json(\App\Support\Departments::ALL);
 </script>
 {{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
 <style>
@@ -206,6 +208,7 @@
             </div>
           </div>
           <div>
+            ${identityEditorHtml(p, idx)}
             <h4>サイズ（当日の衣装・ユニフォーム準備の参考）</h4>
             <div class="size-row">
               <label class="size-item">身長(cm)：<input type="text" class="size-input" id="height-${idx}" value="${p.height || ''}" placeholder="例：170"></label>
@@ -228,6 +231,76 @@
         </div>
         ${personAdminHtml(p)}
       </div>`;
+  }
+
+  // Administrator だけに出す「氏名・ふりがな・所属を直す」欄。
+  // なぜ要るか＝名簿CSVの見本行（山田花子／やまだ はなこ）を消し忘れて取り込むと、
+  // 本人がログインするまで間違ったふりがなが残ってしまう（2026-08-24 実際に発生）。
+  function identityEditorHtml(p, idx){
+    if (!window.ECS_CAN_MANAGE_PEOPLE) return '';
+    const deptOpts = (window.ECS_DEPT_ALL || []).map(function(d){
+      return '<option value="' + d + '"' + (p.deptMain === d ? ' selected' : '') + '>' + d + '</option>';
+    }).join('');
+    const deptChecks = (window.ECS_DEPT_ALL || []).map(function(d){
+      const on = Array.isArray(p.depts) && p.depts.some(function(x){ return x.name === d; });
+      return '<label style="display:inline-flex; align-items:center; gap:5px; font-size:12px; margin-right:12px;">'
+        + '<input type="checkbox" class="idn-dept-' + idx + '" value="' + d + '"' + (on ? ' checked' : '') + ' style="width:auto;"> ' + d + '</label>';
+    }).join('');
+    return `<h4>氏名・ふりがな・所属を直す</h4>
+      <div class="size-row" style="gap:10px;">
+        <label class="size-item">氏名：<input type="text" class="size-input" style="width:150px;" id="idn-name-${idx}" value="${escAttr(p.name)}"></label>
+        <label class="size-item">ふりがな：<input type="text" class="size-input" style="width:170px;" id="idn-kana-${idx}" value="${escAttr(p.kana)}" placeholder="例：やまだ たろう"></label>
+      </div>
+      <div class="size-row" style="margin-top:8px;">
+        <label class="size-item">主な所属：
+          <select class="size-input" style="width:150px;" id="idn-dept-${idx}"><option value="">未設定</option>${deptOpts}</select>
+        </label>
+      </div>
+      <div style="margin-top:6px;">
+        <span class="muted" style="font-size:12px; display:block; margin-bottom:4px;">兼務している所属</span>
+        ${deptChecks}
+      </div>
+      <div class="save-row" style="margin-top:10px;">
+        <button class="btn primary sm" onclick="saveIdentity(${idx}, this)">氏名・ふりがな・所属を保存</button>
+        <span class="save-ok" id="idnSaved-${idx}" style="display:none;">✓ 保存しました</span>
+        <span class="muted" style="font-size:12px;">※ CSVの見本行を消し忘れたときなど、本人以外が直す必要があるときに使います。</span>
+      </div>
+      <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+  }
+
+  // 属性値に入れる文字をエスケープする（氏名に " や < が入っても壊れないように）。
+  function escAttr(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+    });
+  }
+
+  function saveIdentity(idx, btn){
+    const p = employees[idx];
+    const name = (document.getElementById('idn-name-' + idx) || {}).value || '';
+    const kana = (document.getElementById('idn-kana-' + idx) || {}).value || '';
+    const dept = (document.getElementById('idn-dept-' + idx) || {}).value || '';
+    if (!name.trim()) { alert('氏名は空にできません。'); return; }
+    const body = new URLSearchParams();
+    body.append('name', name.trim());
+    body.append('name_kana', kana.trim());
+    body.append('department', dept);
+    document.querySelectorAll('.idn-dept-' + idx + ':checked').forEach(function(el){
+      body.append('departments[]', el.value);
+    });
+    if (btn) btn.disabled = true;
+    fetch('/employees/' + encodeURIComponent(p.id) + '/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: body.toString()
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      if (!ok) { alert((j && j.message) || '保存できませんでした。'); if (btn) btn.disabled = false; return; }
+      // 並び順（社歴順・五十音順）も変わるので読み込み直す。
+      location.reload();
+    })
+    .catch(() => { alert('通信に失敗しました。もう一度お試しください。'); if (btn) btn.disabled = false; });
   }
 
   // Administrator だけに出す「退職にする／在籍に戻す」「削除」。

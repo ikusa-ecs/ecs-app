@@ -58,7 +58,7 @@ class CsvImportEncodingTest extends TestCase
         $before = Person::count();
 
         $csv = "種別,氏名,メール,事務所,所属,入社日,通算経験回数,できるポジション\n"
-             . "社員,山田 太郎,taro-yamada@example.com,大阪,イベプラ,2023-04-01,,\n";
+             . "社員,山田 太郎,taro-yamada@ikusa.co.jp,大阪,イベプラ,2023-04-01,,\n";
 
         $file = UploadedFile::fake()->createWithContent('people.csv', $this->toShiftJis($csv));
 
@@ -66,7 +66,7 @@ class CsvImportEncodingTest extends TestCase
             ->post('/person-import', ['csv' => $file])
             ->assertRedirect('/person-import');
 
-        $added = Person::where('email', 'taro-yamada@example.com')->first();
+        $added = Person::where('email', 'taro-yamada@ikusa.co.jp')->first();
         $this->assertNotNull($added, 'Shift_JISの名簿CSVが取り込めていない');
         $this->assertSame('山田 太郎', $added->name);
         // 事務所（拠点）が化けずに入っていること＝ここが空だと自動で「東京」扱いになる。
