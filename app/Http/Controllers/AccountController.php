@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\Departments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -56,6 +57,12 @@ class AccountController extends Controller
             'email'         => ['required', 'email', Rule::unique('people', 'email')],
             'permission'    => ['required', Rule::in($allowedPerms)],
             'office'        => ['nullable', 'string'],
+            // 所属（社員のみ意味がある）。主な所属1つ＋兼務。
+            'department'     => ['nullable', 'string', 'max:50'],
+            'departments'    => ['nullable', 'array'],
+            'departments.*'  => ['string', 'max:50'],
+            // チャットワークID＝リマインドの宛先。数字だけ。
+            'chatwork_id'    => ['nullable', 'string', 'max:32', 'regex:/^[0-9]+$/'],
             // 入社日は発行画面では聞かない（本人が初回ログインの初期設定で入れる・2026-08-24 baba）。
             // 名簿CSV取込など他の入口から届くことはあるので、受け取れる形は残しておく。
             'hire_date'     => ['nullable', 'date'],
@@ -63,6 +70,7 @@ class AccountController extends Controller
         ], [
             'permission.in' => 'その権限を付与する権限がありません（Administrator権限を付けられるのはAdministratorだけです）。',
             'email.unique'  => 'このメールアドレスは既に使われています。',
+            'chatwork_id.regex' => 'チャットワークIDは数字だけで入れてください。',
         ], [
             'role'          => '種別',
             'name'          => '氏名',
@@ -70,6 +78,9 @@ class AccountController extends Controller
             'email'         => 'メールアドレス',
             'permission'    => '権限',
             'office'        => '事務所',
+            'department'    => '主な所属',
+            'departments'   => '兼務している所属',
+            'chatwork_id'   => 'チャットワークID',
             'hire_date'     => '入社日',
             'temp_password' => '仮パスワード',
         ]);
@@ -98,6 +109,14 @@ class AccountController extends Controller
             'email'        => $validated['email'],
             'permission'   => $validated['permission'],
             'office'       => ($validated['office'] ?? null) ?: null,
+            'chatwork_id'  => ($validated['chatwork_id'] ?? null) ?: null,
+            // 所属は社員のときだけ入れる（スタッフに部署の概念は無い）。
+            'department'   => $validated['role'] === 'employee'
+                ? (($validated['department'] ?? null) ?: null)
+                : null,
+            'departments'  => $validated['role'] === 'employee'
+                ? Departments::normalize($validated['department'] ?? null, $validated['departments'] ?? [])
+                : null,
             'hire_date'    => ($validated['hire_date'] ?? null) ?: null,
             'password'     => $tempPassword,   // モデルのキャストで自動ハッシュ化
             'must_onboard' => true,            // 初回ログインで初期設定へ誘導

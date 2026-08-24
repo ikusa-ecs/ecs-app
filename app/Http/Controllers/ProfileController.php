@@ -41,16 +41,25 @@ class ProfileController extends Controller
             'name'      => ['required'],
             'name_kana' => ['nullable', 'string', 'max:255'],
             'email'     => ['nullable', 'email'],
-        ], [], [
+            // チャットワークID＝リマインドの宛先。数字のみ（桁が多いので文字列で持つ）。
+            'chatwork_id' => ['nullable', 'string', 'max:32', 'regex:/^[0-9]+$/'],
+            'departments' => ['nullable', 'array'],
+            'departments.*' => ['string', 'max:50'],
+        ], [
+            'chatwork_id.regex' => 'チャットワークIDは数字だけで入れてください。',
+        ], [
             'name'      => '氏名',
             'name_kana' => 'ふりがな',
             'email'     => 'メールアドレス',
+            'chatwork_id' => 'チャットワークID',
+            'departments' => '兼務している所属',
         ]);
 
         // 4. 共通項目（社員・スタッフ両方）
         $user->name      = $request->input('name');
         $user->name_kana = $request->input('name_kana');   // 五十音順の並びに使う
         $user->email     = $request->input('email');
+        $user->chatwork_id = $request->input('chatwork_id') ?: null;   // リマインドの宛先
         $user->office = $request->input('office');
         // 身長・靴/服（衣装）サイズ・都道府県・最寄り駅（旧・新規登録の基本情報。当日準備の参考）
         $user->height          = $request->input('height');
@@ -63,6 +72,11 @@ class ProfileController extends Controller
         if ($user->role === 'employee') {
             // 社員だけの項目
             $user->department = $request->input('department');
+            // 兼務を含めた所属すべて。主な所属は必ず含める（チェックを外していても入れる）。
+            $user->departments = \App\Support\Departments::normalize(
+                $request->input('department'),
+                (array) $request->input('departments', [])
+            );
         } elseif ($user->role === 'staff') {
             // スタッフだけの項目
             $user->appeal            = $request->input('appeal');
@@ -80,4 +94,5 @@ class ProfileController extends Controller
 
         return back()->with('status', 'プロフィールを保存しました。');
     }
+
 }

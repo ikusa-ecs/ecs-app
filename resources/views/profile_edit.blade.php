@@ -46,6 +46,17 @@
             <span class="hint">ログインにも使うアドレスです。</span>
           </div>
 
+          {{-- チャットワークID＝リマインドを確実に本人へ届けるために使う。
+               いまは氏名とチャットワークの表示名を突き合わせているので、表記ゆれで外れることがある。 --}}
+          <div class="form-row">
+            <label>チャットワークID</label>
+            <input type="text" name="chatwork_id" value="{{ $me->chatwork_id }}" placeholder="例）1234567">
+            <span class="hint">
+              チャットワークからのリマインド（人数確定・収支の締切など）を、あなた宛に確実に届けるために使います。<br>
+              調べ方＝チャットワークの「マイチャット」右上のプロフィール、または自分のアカウント画面に出ている数字です。
+            </span>
+          </div>
+
           <div class="form-row">
             <label>事務所</label>
             <select name="office">
@@ -95,14 +106,30 @@
             <h2 style="margin-top:24px;">所属（社員）</h2>
 
             <div class="form-row">
-              <label>所属</label>
+              <label>主な所属</label>
               <select name="department">
                 <option value="">選択してください</option>
                 @foreach (\App\Support\Departments::ALL as $opt)
                   <option value="{{ $opt }}" @selected($me->department === $opt)>{{ $opt }}</option>
                 @endforeach
               </select>
-              <span class="hint">あなたの主な担当を選んでください。</span>
+              <span class="hint">いちばん主な所属を1つ選んでください。部署別の集計は、この所属で1回だけ数えます。</span>
+            </div>
+
+            {{-- 兼務＝所属を兼ねている人がいる（2026-08-24 baba）。集計の二重計上を避けるため、
+                 「主な所属」1つと「兼務を含む所属すべて」を分けて持つ。 --}}
+            <div class="form-row">
+              <label>兼務している所属</label>
+              <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
+                @foreach (\App\Support\Departments::ALL as $opt)
+                  <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">
+                    <input type="checkbox" name="departments[]" value="{{ $opt }}"
+                           style="width:auto;" @checked(in_array($opt, $me->departmentList(), true))>
+                    {{ $opt }}
+                  </label>
+                @endforeach
+              </div>
+              <span class="hint">兼務がある方は、兼ねている所属もチェックしてください（主な所属は自動で入ります）。兼務が無ければ何もしなくて大丈夫です。</span>
             </div>
           @endif
 

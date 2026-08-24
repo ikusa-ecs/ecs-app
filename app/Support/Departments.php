@@ -103,6 +103,35 @@ final class Departments
         return $name === '' ? self::UNSET_LABEL : $name;
     }
 
+    /**
+     * 保存する「兼務を含めた所属の配列」を作る（主な所属を先頭に・重複と空を落とす）。
+     *
+     * なぜ1か所にまとめるか＝マイプロフィール／アカウント発行／名簿CSV取込の3つの入口が
+     * それぞれ違う整え方をすると、集計（主な所属で数える）と表示（兼務も出す）が食い違う。
+     *
+     * ・主な所属は必ず含める（チェックを外して保存されても入れる）。
+     * ・一覧に無い名前は捨てる（タイポや古い部署名が混ざらないように）。
+     * ・1つも残らなければ null（＝未設定）。
+     */
+    public static function normalize(?string $main, array $others = []): ?array
+    {
+        $list = [];
+        $main = trim((string) $main);
+        if ($main !== '') {
+            $list[] = $main;
+        }
+        foreach ($others as $d) {
+            $d = trim((string) $d);
+            if ($d !== '') {
+                $list[] = $d;
+            }
+        }
+
+        $list = array_values(array_unique(array_filter($list, [self::class, 'isKnown'])));
+
+        return $list ?: null;
+    }
+
     /** その名前が一覧にあるか（CSV取込の警告などに使う）。 */
     public static function isKnown(?string $name): bool
     {

@@ -42,6 +42,7 @@ class Person extends Model implements AuthenticatableContract
             'active' => 'boolean',
             'experienced_contents' => 'array',
             'director_contents' => 'array',
+            'departments' => 'array',   // 兼務も含めた所属すべて（主な所属＝department）
             'is_admin' => 'boolean',
             'must_onboard' => 'boolean',   // 初回ログインの初期設定が必要か
             'is_exclusive' => 'boolean',
@@ -69,6 +70,35 @@ class Person extends Model implements AuthenticatableContract
     public function ngRelations(): HasMany
     {
         return $this->hasMany(StaffRelation::class, 'staff_id');
+    }
+
+    /**
+     * 兼務を含めた所属の一覧（主な所属が先頭）。
+     *
+     * なぜ＝所属を兼ねている人がいる（2026-08-24 baba）。
+     * departments が入っていればそれ、無ければ主な所属（department）1つだけ。
+     * 主な所属は必ず先頭に来るようにそろえる（画面の1つめのバッジ＝主な所属）。
+     */
+    public function departmentList(): array
+    {
+        $main = trim((string) ($this->department ?? ''));
+        $all = array_values(array_filter(array_map(
+            fn ($d) => trim((string) $d),
+            is_array($this->departments) ? $this->departments : []
+        ), fn ($d) => $d !== ''));
+
+        if ($main !== '') {
+            // 主な所属を先頭へ（重複は落とす）
+            $all = array_values(array_unique(array_merge([$main], $all)));
+        }
+
+        return $all;
+    }
+
+    /** その所属に属しているか（兼務も見る）。イベプラ判定などに使う。 */
+    public function hasDepartment(string $name): bool
+    {
+        return in_array($name, $this->departmentList(), true);
     }
 
     /** 社員だけを取り出すクエリスコープ（Person::employees()->get()） */
@@ -111,15 +141,32 @@ class Person extends Model implements AuthenticatableContract
      * ※ 拠点が未設定の人は既定拠点（東京）あつかい。名簿の office が空でも
      *   「東京のイベプラ」として先頭に来る（people.office 埋め直し前の保険）。
      * ※ グループの中の並びは五十音順（ふりがな）。→ scopeByKana
+     * ※ 兼務でイベプラに入っている人も先頭グループに入れる（departments を見る）。
+     *
+     * ⚠ JSONの中を探すのに like を2つ並べているのは、日本語の入り方が環境で違うため。
+     *   ・SQLite（ローカル）＝ Laravel が json_encode した文字がそのまま入る
+     *     ＝日本語は "イベプラ" のような形で保存される。
+     *   ・MySQL（本番）＝ JSON型が中身を解釈して持つので、文字に戻して比べられる。
+     *   どちらでも当たるように「そのままの形」と「\uXXXXの形」の両方を見る。
+     *   （JSON専用の関数は方言差が大きく、ローカルで動いても本番で落ちることがあるため使わない）
+     *   前後を " で囲って探すので「イベプロ」を「イベプラ」と誤って拾うことはない。
      */
     public function scopePlannersOfOfficeFirst($query, ?string $office)
     {
         $office = $office ?: \App\Support\OfficeScope::DEFAULT_OFFICE;
+        $planner = \App\Support\Departments::PLANNER;
 
         return $query
             ->orderByRaw(
-                "case when coalesce(nullif(office, ''), ?) = ? and department = ? then 0 else 1 end",
-                [\App\Support\OfficeScope::DEFAULT_OFFICE, $office, 'イベプラ']
+                "case when coalesce(nullif(office, ''), ?) = ?"
+                . " and (department = ? or departments like ? or departments like ?) then 0 else 1 end",
+                [
+                    \App\Support\OfficeScope::DEFAULT_OFFICE,
+                    $office,
+                    $planner,
+                    '%"' . $planner . '"%',              // MySQL：文字のまま
+                    '%' . json_encode($planner) . '%',   // SQLite：\uXXXX の形（前後の " も含む）
+                ]
             )
             ->byKana();
     }

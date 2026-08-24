@@ -140,6 +140,17 @@
     sel.appendChild(o);
   })();
 
+  // 所属バッジ。兼務があれば全部出す（先頭＝主な所属）。所属が無ければ「未設定」。
+  function deptBadges(p){
+    const list = Array.isArray(p.depts) ? p.depts : [];
+    if (!list.length) return '<span class="dept none">未設定</span>';
+    return list.map(function(d, i){
+      // 主な所属（先頭）は太字のまま。兼務は少し小さく出して見分けられるようにする。
+      const style = i === 0 ? '' : ' style="opacity:.85; font-size:11px;"';
+      return '<span class="dept ' + d.code + '"' + style + '>' + d.name + '</span>';
+    }).join(' ');
+  }
+
   // 入社半年以内＝新人
   function isFresh(m){ return m <= 6; }
 
@@ -158,7 +169,7 @@
             <br><span class="muted" style="font-size:11.5px;">${p.kana
               ? p.kana
               : '<span style="color:#b5673a;">ふりがな未入力</span>'}</span></td>
-        <td><span class="dept ${p.dept}">${p.deptName}</span></td>
+        <td>${deptBadges(p)}</td>
         <td><span class="muted" style="font-size:12.5px;">${p.office || '—'}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.wear || '—'} / ${p.shoe || '—'}</span></td>
         <td class="right"><span class="row-toggle" onclick="toggleDetail(${idx}, this)">詳細 ▾</span></td>`;
@@ -325,7 +336,10 @@
       const dr = tbody.querySelector(`tr.detail-row[data-for="${idx}"]`);
       const fresh = isFresh(p.joinedMonths);
       const okKw    = !kw    || p.name.includes(kw) || p.id.includes(kw) || (p.kana || '').includes(kw);
-      const okDept  = !fDept || p.dept === fDept;
+      // 所属の絞り込みは兼務も見る（兼ねている所属のどれかが一致すればヒット）。
+      const okDept  = !fDept
+        || p.dept === fDept
+        || (Array.isArray(p.depts) && p.depts.some(function(d){ return d.code === fDept; }));
       const okFresh = !fFresh|| fresh;
       const visible = okKw && okDept && okFresh;
       mr.style.display = visible ? '' : 'none';

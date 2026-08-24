@@ -91,6 +91,39 @@
           {{-- 入社日はここでは聞かない。発行する側には分からないことが多いため、
                本人が初回ログインの初期設定で入れる方式にした（2026-08-24 baba）。 --}}
 
+          {{-- 所属＝社員のときだけ意味がある。主な所属1つ＋兼務（チェック）。 --}}
+          <div class="form-row" id="deptRow">
+            <label>主な所属</label>
+            <select name="department">
+              <option value="">選択してください</option>
+              @foreach (\App\Support\Departments::ALL as $opt)
+                <option value="{{ $opt }}" @selected(old('department') === $opt)>{{ $opt }}</option>
+              @endforeach
+            </select>
+            <span class="hint">部署別の集計は、この所属で1回だけ数えます。空でも大丈夫です（本人があとで直せます）。</span>
+          </div>
+
+          <div class="form-row" id="deptsRow">
+            <label>兼務している所属</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
+              @foreach (\App\Support\Departments::ALL as $opt)
+                <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">
+                  <input type="checkbox" name="departments[]" value="{{ $opt }}"
+                         style="width:auto;" @checked(in_array($opt, (array) old('departments', []), true))>
+                  {{ $opt }}
+                </label>
+              @endforeach
+            </div>
+            <span class="hint">所属を兼ねている方は、兼ねている所属もチェックしてください（主な所属は自動で入ります）。</span>
+          </div>
+
+          {{-- チャットワークID＝リマインドを本人へ確実に届けるために使う。 --}}
+          <div class="form-row">
+            <label>チャットワークID</label>
+            <input type="text" name="chatwork_id" value="{{ old('chatwork_id') }}" placeholder="例）1234567">
+            <span class="hint">数字だけ。分かる場合だけ入れてください（本人があとでマイプロフィールから直せます）。リマインドの宛先に使います。</span>
+          </div>
+
           <div class="form-row">
             <label>仮パスワード</label>
             <input type="text" name="temp_password" value="{{ old('temp_password') }}" placeholder="空欄なら自動で作ります（6文字以上）">

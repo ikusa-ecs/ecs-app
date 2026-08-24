@@ -42,8 +42,13 @@ class PersonController extends Controller
                     'id'           => $p->id,
                     'name'         => $p->name,
                     'kana'         => $p->name_kana ?? '',   // ふりがな（五十音順の並び・未入力の人を見つける用）
-                    'dept'         => Departments::code($p->department),   // 色・絞り込み用のコード
+                    'dept'         => Departments::code($p->department),   // 主な所属の色コード（絞り込みにも使う）
                     'deptName'     => Departments::label($p->department),  // 画面に出す文字（未設定は「未設定」）
+                    // 兼務を含めた所属すべて（先頭＝主な所属）。バッジを複数出すのに使う。
+                    'depts'        => collect($p->departmentList())
+                        ->map(fn ($d) => ['name' => $d, 'code' => Departments::code($d)])
+                        ->values(),
+                    'cwid'         => $p->chatwork_id ?? '',   // チャットワークID（未登録を見つける用）
                     'office'       => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,
                     'exp'          => $p->experienced_contents ?? [],

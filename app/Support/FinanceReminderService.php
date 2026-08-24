@@ -148,19 +148,24 @@ class FinanceReminderService
         $skipSent = count($allCases) - count($cases);
 
         // 名前→CWID 辞書（ルームメンバーAPIで自動照合）
-        $nameToCwid = [];
+        // 宛先のCWIDは「名簿の登録（people.chatwork_id）」が正。
+        // 登録が無い人だけ、今までどおりルームメンバーの表示名で照合して穴埋めする。
+        // 名前の突き合わせは表記ゆれで外れることがあるため、名簿の登録を優先する。
+        $registered = ChatworkIds::fromPeople();
+        $fromRoom = [];
         $memberError = null;
         if (! empty($token) && ! empty($room)) {
             try {
                 foreach ($this->chatwork->roomMembers($room) as $m) {
                     if (isset($m['name'], $m['account_id'])) {
-                        $nameToCwid[$this->normName($m['name'])] = (string) $m['account_id'];
+                        $fromRoom[$this->normName($m['name'])] = (string) $m['account_id'];
                     }
                 }
             } catch (Throwable $e) {
                 $memberError = 'ルームメンバー一覧の取得に失敗：' . $e->getMessage();
             }
         }
+        $nameToCwid = ChatworkIds::merge($registered, $fromRoom);
 
         $unknownNames = [];
         $taskTargets = [];
@@ -305,6 +310,7 @@ class FinanceReminderService
     /** 氏名を照合用に正規化（全角/半角スペース・空白を除去）。 */
     private function normName(string $s): string
     {
-        return preg_replace('/[\s\x{3000}]+/u', '', trim($s));
+        // 正規化のしかたの正本は App\Support\ChatworkIds（名簿側と同じ揃え方にするため）。
+        return ChatworkIds::normName($s);
     }
 }

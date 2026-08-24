@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\Departments;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\CsvText;
@@ -15,7 +16,8 @@ use Illuminate\Http\Request;
  * BOM除去 → 改行で分割 → str_getcsv（第4引数=エスケープ無効・PHP8.4対応）→
  * 見出しを「列名→位置」表にして値を引く → 行ごとに必須チェック → OK行だけ登録。
  *
- * 列：種別／氏名／ふりがな／メール／事務所／所属／入社日／通算経験回数／できるポジション（任意）。
+ * 列：種別／氏名／ふりがな／メール／チャットワークID／事務所／所属／入社日／通算経験回数／できるポジション（任意）。
+ *   所属は兼務があるので「／」「,」区切りで複数書ける（先頭＝主な所属）。
  * ⚠ 列を足すときは、画面のプレビュー（resources/views/person_import.blade.php の PI_HEADERS と
  *   piParse）も必ず一緒に直す。片方だけ直すと「プレビューでは読めない／登録では入らない」になる。
  * 自動：社員番号（E-###/S-###）・権限（種別から）・在籍（active=true）。
@@ -93,6 +95,8 @@ class PersonImportController extends Controller
             $dept = $get($row, '所属');
             $hire = $get($row, '入社日');
             $expc = $get($row, '通算経験回数');
+            // チャットワークID（任意）。リマインドの宛先に使う。
+            $cwid = $get($row, 'チャットワークID') ?: $get($row, 'CWID');
 
             // --- 入力チェック（JSの validate と同じ基準）---
             $rowErrors = [];
@@ -119,6 +123,9 @@ class PersonImportController extends Controller
             if ($expc !== '' && ! ctype_digit($expc)) {
                 $rowErrors[] = '通算経験回数は数字で入力してください';
             }
+            if ($cwid !== '' && ! ctype_digit($cwid)) {
+                $rowErrors[] = 'チャットワークIDは数字で入力してください';
+            }
             if ($rowErrors) {
                 $errors[] = "{$lineNo}行目（{$name}）：" . implode('／', $rowErrors);
                 continue;
@@ -139,15 +146,20 @@ class PersonImportController extends Controller
                 'name' => $name,
                 'name_kana' => $kana ?: null,
                 'email' => $email ?: null,
+                'chatwork_id' => $cwid ?: null,
                 'permission' => $role === 'employee' ? 'employee' : 'staff',
                 'office' => $office ?: null,
                 'hire_date' => $hire ?: null,
                 'active' => true,
             ];
             if ($role === 'employee') {
-                // 所属（実際の部署名をそのまま保存）。選択肢の正本＝App\Support\Departments::ALL。
+                // 所属。兼務があるので「／」か「,」で区切って複数書ける（先頭＝主な所属）。
+                // 選択肢と整え方の正本＝App\Support\Departments。
                 // 色分け・集計はイベプラ/セールス/クリエイティブ以外を「その他」にまとめて扱う。
-                $attrs['department'] = $dept ?: null;
+                $deptList = preg_split('/[\/／,、･・]+/u', $dept) ?: [];
+                $deptList = array_values(array_filter(array_map('trim', $deptList), fn ($d) => $d !== ''));
+                $attrs['department'] = $deptList[0] ?? null;                      // 主な所属＝先頭
+                $attrs['departments'] = Departments::normalize($deptList[0] ?? null, $deptList);
             } else {
                 $attrs['experience_count'] = $expc !== '' ? (int) $expc : null;
             }
