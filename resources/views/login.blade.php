@@ -44,14 +44,18 @@
 
       <div class="form-row">
         <label>メールアドレス</label>
-        {{-- 開発中は既定値を入れておく（本番前に消す）。入力し直した値はエラー時も保持。 --}}
-        <input type="email" name="email" placeholder="you@example.com" value="{{ old('email', 'e-007@example.com') }}" required autofocus>
+        {{-- 開発用の初期値は、体験ログインが有効なときだけ入れる（本番では空にする）。
+             入力し直した値はエラー時も保持する。 --}}
+        <input type="email" name="email" placeholder="you@example.com"
+               value="{{ old('email', config('ecs.test_login') ? 'e-007@example.com' : '') }}" required autofocus>
       </div>
 
       <div class="form-row">
         <label>パスワード</label>
-        {{-- 開発中の仮パスワードを既定で入れておく（本番前に消す）。 --}}
-        <input type="password" name="password" placeholder="パスワード" value="password" required>
+        {{-- 同じく、仮パスワードの初期値は体験ログインが有効なときだけ。
+             ⚠ 本番でここに値が入っていると、画面のソースにパスワードが載ってしまう。 --}}
+        <input type="password" name="password" placeholder="パスワード"
+               value="{{ config('ecs.test_login') ? 'password' : '' }}" required>
       </div>
 
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin:2px 0 16px;">

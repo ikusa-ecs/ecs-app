@@ -23,6 +23,9 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- 体験ログイン（見本アカウント）を使うテストがあるので、テスト中だけ有効にする。
+             本体の既定は false（＝本番で書き忘れても開かない）。 -->
+        <env name="ECS_TEST_LOGIN" value="true"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
