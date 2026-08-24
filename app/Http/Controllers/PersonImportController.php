@@ -15,7 +15,9 @@ use Illuminate\Http\Request;
  * BOM除去 → 改行で分割 → str_getcsv（第4引数=エスケープ無効・PHP8.4対応）→
  * 見出しを「列名→位置」表にして値を引く → 行ごとに必須チェック → OK行だけ登録。
  *
- * 列：種別／氏名／メール／事務所／所属／入社日／通算経験回数／できるポジション（任意）。
+ * 列：種別／氏名／ふりがな／メール／事務所／所属／入社日／通算経験回数／できるポジション（任意）。
+ * ⚠ 列を足すときは、画面のプレビュー（resources/views/person_import.blade.php の PI_HEADERS と
+ *   piParse）も必ず一緒に直す。片方だけ直すと「プレビューでは読めない／登録では入らない」になる。
  * 自動：社員番号（E-###/S-###）・権限（種別から）・在籍（active=true）。
  * ※パスワードは入れない（アカウント発行は別作業）。
  * ※「できるポジション」はスタッフのみ対象。役割の正本は App\Support\AssignmentRole。
@@ -84,6 +86,8 @@ class PersonImportController extends Controller
 
             $type = $get($row, '種別');
             $name = $get($row, '氏名');
+            // ふりがな（任意）。五十音順の並びに使う。見出しの別名も許す。
+            $kana = $get($row, 'ふりがな') ?: ($get($row, 'よみ') ?: $get($row, '読み'));
             $email = $get($row, 'メール');
             $office = $get($row, '事務所');
             $dept = $get($row, '所属');
@@ -133,6 +137,7 @@ class PersonImportController extends Controller
                 'id' => $id,
                 'role' => $role,
                 'name' => $name,
+                'name_kana' => $kana ?: null,
                 'email' => $email ?: null,
                 'permission' => $role === 'employee' ? 'employee' : 'staff',
                 'office' => $office ?: null,

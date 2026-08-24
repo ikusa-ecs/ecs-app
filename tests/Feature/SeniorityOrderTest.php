@@ -91,6 +91,7 @@ class SeniorityOrderTest extends TestCase
 
         $this->actingAsPerson($me)->post('/onboarding', [
             'name' => $me->name,
+            'name_kana' => 'やまだ たろう',
             'email' => $me->email,
             'password' => 'password1234',
             'password_confirmation' => 'password1234',
@@ -111,9 +112,71 @@ class SeniorityOrderTest extends TestCase
 
         $this->actingAsPerson($me)->post('/onboarding', [
             'name' => $me->name,
+            'name_kana' => 'やまだ たろう',
             'password' => 'password1234',
             'password_confirmation' => 'password1234',
         ])->assertSessionHasErrors('hire_date');
+    }
+
+    /** 同じグループの中は五十音順（ふりがな）に並ぶ。漢字の氏名では並べられないため。 */
+    public function test_picker_group_is_ordered_by_kana(): void
+    {
+        // 漢字の文字コード順では「渡辺」が「青山」より先に来てしまう並びを作る。
+        PersonFactory::new()->create([
+            'id' => 'E-301', 'name' => '渡辺', 'name_kana' => 'わたなべ',
+            'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+        $me = PersonFactory::new()->create([
+            'id' => 'E-302', 'name' => '青山', 'name_kana' => 'あおやま',
+            'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+        // ふりがな未入力の人は末尾へ。
+        PersonFactory::new()->create([
+            'id' => 'E-303', 'name' => '井上', 'name_kana' => null,
+            'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+
+        $html = $this->actingAsPerson($me)->get('/projects')->assertOk()->getContent();
+
+        $at = [];
+        foreach (['E-301', 'E-302', 'E-303'] as $id) {
+            $at[$id] = strpos($html, '"id":"'.$id.'"');
+            $this->assertNotFalse($at[$id], $id.' がプルダウンに出ていない');
+        }
+
+        $this->assertTrue($at['E-302'] < $at['E-301'], 'あおやま が わたなべ より先に出ること（五十音順）');
+        $this->assertTrue($at['E-301'] < $at['E-303'], 'ふりがな未入力の人は末尾に来ること');
+    }
+
+    /** 初回ログインの初期設定で、ふりがなが保存される（必須）。 */
+    public function test_onboarding_saves_name_kana(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-600', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'must_onboard' => true, 'name_kana' => null,
+        ]);
+
+        // ふりがなを入れないと通らない。
+        $this->actingAsPerson($me)->post('/onboarding', [
+            'name' => $me->name,
+            'password' => 'password1234',
+            'password_confirmation' => 'password1234',
+            'hire_date' => '2020-04-01',
+        ])->assertSessionHasErrors('name_kana');
+
+        // 入れれば保存される。
+        $this->actingAsPerson($me)->post('/onboarding', [
+            'name' => $me->name,
+            'name_kana' => 'やまだ たろう',
+            'password' => 'password1234',
+            'password_confirmation' => 'password1234',
+            'hire_date' => '2020-04-01',
+        ])->assertRedirect();
+
+        $this->assertSame('やまだ たろう', $me->fresh()->name_kana);
     }
 
     /** D／SD／物品担当のプルダウンは「その拠点のイベプラ」が先頭に来る。 */
@@ -185,6 +248,7 @@ class SeniorityOrderTest extends TestCase
 
         $this->actingAsPerson($me)->post('/onboarding', [
             'name' => $me->name,
+            'name_kana' => 'やまだ はなこ',   // ふりがなは社員・スタッフとも必須
             'password' => 'password1234',
             'password_confirmation' => 'password1234',
         ])->assertSessionHasNoErrors();

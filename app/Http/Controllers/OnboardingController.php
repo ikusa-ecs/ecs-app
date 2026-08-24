@@ -34,11 +34,13 @@ class OnboardingController extends Controller
         // 社員は必須（名簿を社歴順に並べるため）。スタッフは分からないこともあるので任意。
         $request->validate([
             'name'      => ['required'],
+            'name_kana' => ['required', 'string', 'max:255'],
             'email'     => ['nullable', 'email'],
             'password'  => ['required', 'min:8', 'confirmed'],
             'hire_date' => [$user->role === 'employee' ? 'required' : 'nullable', 'date'],
         ], [], [
             'name'      => '氏名',
+            'name_kana' => 'ふりがな',
             'email'     => 'メールアドレス',
             'password'  => '新しいパスワード',
             'hire_date' => $user->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日',
@@ -57,6 +59,7 @@ class OnboardingController extends Controller
 
         // 基本情報（旧・新規登録の項目）
         $user->name            = $request->input('name');
+        $user->name_kana       = $request->input('name_kana');   // 五十音順の並びに使う
         $user->email           = $request->input('email') ?: $user->email;
         $user->office          = $request->input('office');
         $user->height          = $request->input('height');

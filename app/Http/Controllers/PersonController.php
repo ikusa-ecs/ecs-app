@@ -39,6 +39,7 @@ class PersonController extends Controller
                 return [
                     'id'           => $p->id,
                     'name'         => $p->name,
+                    'kana'         => $p->name_kana ?? '',   // ふりがな（五十音順の並び・未入力の人を見つける用）
                     'dept'         => $deptCode[$p->department] ?? 'plan',
                     'office'       => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,

@@ -51,6 +51,14 @@
             <input type="text" name="name" value="{{ old('name') }}" required placeholder="例）山田 太郎">
           </div>
 
+          {{-- ふりがな＝五十音順の並びに使う。分かれば入れておくと、本人が初回ログインする前から正しく並ぶ。
+               分からなければ空でよい（本人が初回ログインの初期設定で必ず入れる）。 --}}
+          <div class="form-row">
+            <label>ふりがな</label>
+            <input type="text" name="name_kana" value="{{ old('name_kana') }}" placeholder="例）やまだ たろう">
+            <span class="hint">分かる場合だけ。空でも大丈夫です（本人が初回ログインのときに入れます）。名前を五十音順に並べるために使います。</span>
+          </div>
+
           <div class="form-row">
             <label>メールアドレス（ログインID）<span class="req">必須</span></label>
             <input type="email" name="email" value="{{ old('email') }}" required placeholder="you@example.com">

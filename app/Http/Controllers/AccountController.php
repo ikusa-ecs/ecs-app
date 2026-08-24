@@ -51,6 +51,8 @@ class AccountController extends Controller
         $validated = $request->validate([
             'role'          => ['required', Rule::in(['employee', 'staff'])],
             'name'          => ['required', 'string', 'max:255'],
+            // ふりがなは任意（分からなければ本人が初回ログインの初期設定で入れる）。
+            'name_kana'     => ['nullable', 'string', 'max:255'],
             'email'         => ['required', 'email', Rule::unique('people', 'email')],
             'permission'    => ['required', Rule::in($allowedPerms)],
             'office'        => ['nullable', 'string'],
@@ -64,6 +66,7 @@ class AccountController extends Controller
         ], [
             'role'          => '種別',
             'name'          => '氏名',
+            'name_kana'     => 'ふりがな',
             'email'         => 'メールアドレス',
             'permission'    => '権限',
             'office'        => '事務所',
@@ -91,6 +94,7 @@ class AccountController extends Controller
             'id'           => $id,
             'role'         => $validated['role'],
             'name'         => $validated['name'],
+            'name_kana'    => ($validated['name_kana'] ?? null) ?: null,
             'email'        => $validated['email'],
             'permission'   => $validated['permission'],
             'office'       => ($validated['office'] ?? null) ?: null,

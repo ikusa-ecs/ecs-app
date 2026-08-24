@@ -88,6 +88,13 @@
           <input type="text" name="name" value="{{ old('name', $me->name) }}" required placeholder="例）山田 太郎">
         </div>
 
+        {{-- ふりがな＝プルダウンや名簿を五十音順に並べるために使う（漢字だけでは並べられない）。 --}}
+        <div class="field">
+          <label>ふりがな<span class="req">必須</span></label>
+          <input type="text" name="name_kana" value="{{ old('name_kana', $me->name_kana) }}" required placeholder="例）やまだ たろう">
+          <span class="hint">ひらがなで入れてください。名前を五十音順に並べるために使います。</span>
+        </div>
+
         <div class="field">
           <label>メールアドレス</label>
           <input type="email" name="email" value="{{ old('email', $me->email) }}" placeholder="you@example.com">

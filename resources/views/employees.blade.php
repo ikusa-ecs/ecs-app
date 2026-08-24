@@ -136,7 +136,10 @@
       tr.dataset.idx = idx;
       tr.innerHTML = `
         <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}
-            <br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
+            <br><span class="muted" style="font-size:11.5px;">${p.id}</span>
+            <br><span class="muted" style="font-size:11.5px;">${p.kana
+              ? p.kana
+              : '<span style="color:#b5673a;">ふりがな未入力</span>'}</span></td>
         <td><span class="dept ${p.dept}">${deptLabel[p.dept]}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.office || '—'}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.wear || '—'} / ${p.shoe || '—'}</span></td>
@@ -303,7 +306,7 @@
       const mr = tbody.querySelector(`tr.main-row[data-idx="${idx}"]`);
       const dr = tbody.querySelector(`tr.detail-row[data-for="${idx}"]`);
       const fresh = isFresh(p.joinedMonths);
-      const okKw    = !kw    || p.name.includes(kw) || p.id.includes(kw);
+      const okKw    = !kw    || p.name.includes(kw) || p.id.includes(kw) || (p.kana || '').includes(kw);
       const okDept  = !fDept || p.dept === fDept;
       const okFresh = !fFresh|| fresh;
       const visible = okKw && okDept && okFresh;

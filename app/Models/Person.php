@@ -110,8 +110,7 @@ class Person extends Model implements AuthenticatableContract
      * なぜ＝Dに立つのはほぼ自拠点のイベプラ。毎回リストを探しに行かなくて済むように。
      * ※ 拠点が未設定の人は既定拠点（東京）あつかい。名簿の office が空でも
      *   「東京のイベプラ」として先頭に来る（people.office 埋め直し前の保険）。
-     * ※ 氏名順は文字コード順。ふりがなの欄が無いため、漢字だと厳密な五十音にはならない。
-     *   正確にするには「ふりがな」を名簿に足す必要がある（宿題）。
+     * ※ グループの中の並びは五十音順（ふりがな）。→ scopeByKana
      */
     public function scopePlannersOfOfficeFirst($query, ?string $office)
     {
@@ -122,6 +121,24 @@ class Person extends Model implements AuthenticatableContract
                 "case when coalesce(nullif(office, ''), ?) = ? and department = ? then 0 else 1 end",
                 [\App\Support\OfficeScope::DEFAULT_OFFICE, $office, 'イベプラ']
             )
+            ->byKana();
+    }
+
+    /**
+     * 五十音順（ふりがな順）に並べるクエリスコープ。
+     *
+     * なぜ＝漢字の氏名だけで並べると文字コード順になり、五十音にならない
+     * （「青山」より「渡辺」が先に来ることがある）。読み（name_kana）で並べる。
+     *
+     * ふりがなが未入力の人は氏名順で末尾へ。
+     * ※ coalesce(nullif(...)) は SQLite（ローカル）でも MySQL（本番）でも同じ動きをする。
+     *   ローカルで確認した並びが本番で変わらないように、この書き方にしている。
+     */
+    public function scopeByKana($query)
+    {
+        return $query
+            ->orderByRaw("case when coalesce(nullif(name_kana, ''), '') = '' then 1 else 0 end")
+            ->orderBy('name_kana')
             ->orderBy('name')
             ->orderBy('id');
     }

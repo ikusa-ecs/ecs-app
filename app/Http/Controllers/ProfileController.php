@@ -38,16 +38,19 @@ class ProfileController extends Controller
 
         // 3. 入力チェック（氏名だけ必須・他は任意）
         $request->validate([
-            'name'  => ['required'],
-            'email' => ['nullable', 'email'],
+            'name'      => ['required'],
+            'name_kana' => ['nullable', 'string', 'max:255'],
+            'email'     => ['nullable', 'email'],
         ], [], [
-            'name'  => '氏名',
-            'email' => 'メールアドレス',
+            'name'      => '氏名',
+            'name_kana' => 'ふりがな',
+            'email'     => 'メールアドレス',
         ]);
 
         // 4. 共通項目（社員・スタッフ両方）
-        $user->name   = $request->input('name');
-        $user->email  = $request->input('email');
+        $user->name      = $request->input('name');
+        $user->name_kana = $request->input('name_kana');   // 五十音順の並びに使う
+        $user->email     = $request->input('email');
         $user->office = $request->input('office');
         // 身長・靴/服（衣装）サイズ・都道府県・最寄り駅（旧・新規登録の基本情報。当日準備の参考）
         $user->height          = $request->input('height');
