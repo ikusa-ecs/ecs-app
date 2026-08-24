@@ -50,6 +50,8 @@ class AssignBoardController extends Controller
 
         return view('assign', [
             'staffPool' => $this->staffPool($office),
+            // 「名簿から追加…」に出す人（社員＋スタッフ）。DBが元＝架空の名前を出さない。
+            'roster' => $this->rosterPeople($office),
             'boardCases' => $this->boardCases($anchor, $office),
             'boardAvail' => $this->boardAvail($anchor, $office), // off → その日に稼働可/希望のスタッフ一覧
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
@@ -200,6 +202,53 @@ class AssignBoardController extends Controller
     }
 
     /**
+     * 日別ボードの「名簿から追加…」プルダウンに出す人（社員＋スタッフ）。
+     *
+     * ⚠ 以前ここは凍結モック /ecs/data/people.js の ECS_PEOPLE をそのまま並べていた
+     *   （2026-08-24 に発見）。画面には架空の名前が出るのに、選ぶと「その架空の人のID」で
+     *   本物のアサインが保存される。ECSが自動で振る社員番号も E-001 形式なので、
+     *   実在する別人のアサインが作られる＝人の取り違えが起きる状態だった。
+     *
+     * 並びは五十音順（ふりがな）。拠点で絞っているときはその拠点の人だけ。
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function rosterPeople(?string $office = null): array
+    {
+        // 区分（新人/中堅/ベテラン）は画面のバッジ用のコードに直す。
+        $lvCode = ['新人' => 'new', '中堅' => 'mid', 'ベテラン' => 'vet'];
+
+        return OfficeScope::applyToPeople(Person::query(), $office)
+            ->where('active', true)   // 退職した人は候補に出さない
+            ->byKana()
+            ->with('roleEligibilities')
+            ->get()
+            ->map(function (Person $p) use ($lvCode) {
+                // できるポジション → {D:true, OP:false, ...}（スタッフ名簿と同じ形）
+                $can = $p->roleEligibilities->pluck('position')->all();
+                $pos = [];
+                foreach (AssignmentRole::POSITIONS as $k) {
+                    $pos[$k] = in_array($k, $can, true);
+                }
+
+                $lv = $lvCode[$p->skill_level ?? ''] ?? '';
+
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'role' => $p->role,                 // employee / staff
+                    'lv' => $lv,                        // new / mid / vet（空＝入社日未入力）
+                    'lvLabel' => $p->skill_level ?? '—',
+                    'pos' => $pos,
+                    // Dの経験があるコンテンツ（社員のとき D か FC かの既定を決めるのに使う）
+                    'dexp' => $p->director_contents ?? [],
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * ボード用の案件データ（割当メンバー込み）を DB から組み立てる。
      * Blade の前処理済みの形（id/off/name/.../assigned）に合わせて返す。
      *
@@ -304,6 +353,13 @@ class AssignBoardController extends Controller
             $state = $this->boardState($p);
             $salesOwners = is_array($p->sales_owners) ? $p->sales_owners : [];
 
+            // 「自分の案件」印＝営業担当かディレクターが自分かどうか。
+            // ⚠ 以前は in_array('baba', ...) と名前を直書きしていたため、誰がログインしても
+            //   baba さんの案件だけに印が付いていた（2026-08-24 修正）。
+            $myName = trim((string) (\Illuminate\Support\Facades\Auth::user()->name ?? ''));
+            $mine = $myName !== ''
+                && (in_array($myName, $salesOwners, true) || ($p->director_id ?? '') === (\Illuminate\Support\Facades\Auth::id() ?? '~'));
+
             return [
                 'id' => $p->id,
                 'off' => $off,
@@ -315,7 +371,7 @@ class AssignBoardController extends Controller
                 'need' => $p->required_count ?? 0,
                 'filled' => count($assigned),
                 'state' => $state,
-                'mine' => in_array('baba', $salesOwners, true),
+                'mine' => $mine,
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',
                 'enter' => $p->event_enter_time ?? '—',

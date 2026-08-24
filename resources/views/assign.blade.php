@@ -285,8 +285,9 @@
 @verbatim
       <div class="mock-note">
         案件・割当メンバー・希望者・その日の稼働可・件数バッジは、登録済みのデータ（DB）を表示しています。<br>
-        <b>※このボード上での操作（⚡自動アサイン・📣公開・社員／派遣の追加・手動編集）は、現在まだ保存に対応していません（見本の動きです）。</b>実際の保存は「手動アサイン」「D決め」「スタッフ公開ボード」から行います。<br>
-        <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細（提案チーム）に進みます。
+        <b>※この画面での操作（メンバーの追加・⚡自動アサイン・仮／確定の切替・✓確定にする・📣スタッフに公開・備考の編集）は、押した時点で保存されます。</b>
+        追加した人は<b>「仮」で入る</b>ので、スタッフの画面に出すには<b>「仮」を押して確定</b>にしてください。<br>
+        <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
       </div>
 
@@ -339,9 +340,14 @@
 @push('scripts')
 <!-- 共通の案件データ（全画面で同じ1つのリストを読む） -->
 <script src="/ecs/data/cases.js"></script>
-<script src="/ecs/data/people.js"></script>
+{{-- 凍結モック /ecs/data/people.js の読み込みはやめた（2026-08-24）。
+     「名簿から追加…」が架空の名簿（ECS_PEOPLE）を並べていて、選ぶと
+     その架空の人のIDで本物のアサインが保存される＝人の取り違えが起きる状態だった。
+     いまは下の ECS_ROSTER（DBの名簿）を使う。 --}}
 <!-- DBのスタッフ名一覧（NAME_POOL の単一ソース）。空のときは下のべた書きにフォールバック。 -->
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
+<!-- 「名簿から追加…」に出す人（社員＋スタッフ・DBが元・五十音順・退職者は除く） -->
+<script>window.ECS_ROSTER = @json($roster ?? []);</script>
 <!-- DBのボード用案件＋割当メンバー（実データ）。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_BOARD_CASES = @json($boardCases ?? []);</script>
 <!-- DBに案件があるか（拠点で絞って0件になっても見本データに戻さないための旗）。 -->
@@ -784,11 +790,13 @@
   }
   // この案件カードの「名簿から追加」プルダウンの中身（すでに入っている人は除外＝重複防止）
   function rosterOptions(c){
-    if (typeof ECS_PEOPLE === 'undefined') return '<option value="">名簿から追加…</option>';
+    // 名簿はDBが元（window.ECS_ROSTER）。架空の名前は出さない。
+    const roster = window.ECS_ROSTER || [];
+    if (!roster.length) return '<option value="">名簿から追加…（名簿が空です）</option>';
     const taken = new Set(c.assigned.map(m => m.name));
-    const optsFor = role => ECS_PEOPLE
+    const optsFor = role => roster
       .filter(pp => pp.role === role && !taken.has(pp.name))
-      .map(pp => `<option value="${pp.id}">${pp.name}（${ECS_LV_LABEL[ECS_lvOf(pp)]}）</option>`)
+      .map(pp => `<option value="${pp.id}">${pp.name}（${pp.lvLabel || '—'}）</option>`)
       .join('');
     const emp = optsFor('employee'), stf = optsFor('staff');
     return '<option value="">名簿から追加…</option>'
@@ -800,7 +808,7 @@
     if (!id) return;
     const c = cases.find(x => x.id === caseId);
     if (!c) return;
-    const pp = ECS_personById(id);
+    const pp = (window.ECS_ROSTER || []).find(x => x.id === id);
     if (!pp) return;
     if (c.assigned.some(m => m.name === pp.name)) { alert(pp.name + ' さんはすでにこの案件のメンバーに入っています。'); return; }
     if (takenSameDay(c).has(pp.name)) {
@@ -815,7 +823,7 @@
     const roleCode = isEmp ? ((pp.dexp && pp.dexp.length) ? 'D' : 'FC') : firstPosCodeOf(pp.pos);
     const posLabel = (window.ECS_ROLE_OPTIONS || {})[roleCode] || roleCode;
     // id・roleCode・status を持たせる＝追加直後から担当/巡回を編集・保存できる（id が無いと入力欄が出ない）。
-    const m = { id: pp.id, name: pp.name, lv: (isEmp ? '-' : ECS_lvOf(pp)), pos: posLabel, roleCode: roleCode, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: (isEmp ? 'emp' : 'staff') };
+    const m = { id: pp.id, name: pp.name, lv: (isEmp ? '-' : (pp.lv || '-')), pos: posLabel, roleCode: roleCode, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: (isEmp ? 'emp' : 'staff') };
     c.assigned.push(m);
     // 追加した時点で assignments に「仮」で保存する（見本ではなく本物のアサインにする）。
     fetch(window.ECS_QUICK_URL, {

@@ -278,7 +278,7 @@
 
 @section('content')
 @verbatim
-      <div class="mock-note">この画面は登録済みのデータ（DB）から、あなたの案件を表示しています。ログイン機能は準備中のため、今は社員「baba さん」を自分として表示中です（本番はログインした本人に切り替わります）。</div>
+      <div class="mock-note">この画面は登録済みのデータ（DB）から、<b>ログインしているあなたの案件</b>を表示しています。</div>
 
       <!-- プロフィール -->
       <div class="panel mp-wrap">
@@ -377,7 +377,7 @@
       </div>
 
       <p class="muted" style="font-size:11.5px; margin:0 0 4px; max-width:960px;">
-        ※ 「アサインされた案件」は、登録済みのアサイン（DB）から自動で表示しています。ログインは準備中のため、今は「baba さん」を自分として表示中です。「営業担当」も案件の営業担当から自動で抽出しています。
+        ※ 「アサインされた案件」は、登録済みのアサイン（DB）から自動で表示しています（ログインしているあなたの分）。「営業担当」も案件の営業担当から自動で抽出しています。
       </p>
 
       <!-- 通知設定（個人ごと・設定画面から移設） -->
@@ -491,7 +491,7 @@
 </script>
 @verbatim
 <script>
-  // ===== ログイン中の社員（認証はMTG後。今は MyPageController が固定した「自分」を使う）=====
+  // ===== ログイン中の本人（MyPageController が Auth から渡す）=====
   // DB（window.ECS_ME）があればその名前、無ければ 'baba'。
   const ME = (window.ECS_ME && window.ECS_ME.name) ? window.ECS_ME.name : 'baba';
   const WK = ['日','月','火','水','木','金','土'];
@@ -798,8 +798,21 @@
       document.getElementById(key + 'ArchCnt').textContent + '</span>';
   }
 
+  // ⚠ 以前はここが location.href = '/' だけで、画面が移るだけでログアウトしていなかった
+  //   （セッションが残る＝共用PCで次の人がそのまま入れる）。2026-08-24 修正。
+  //   サイドバーやスタッフ画面と同じく POST /logout を送る。
   function doLogout() {
-    if (confirm('ログアウトします。よろしいですか？')) location.href = '/';
+    if (!confirm('ログアウトします。よろしいですか？')) return;
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = '/logout';
+    const t = document.createElement('input');
+    t.type = 'hidden';
+    t.name = '_token';
+    t.value = window.ECS_CSRF || '';
+    f.appendChild(t);
+    document.body.appendChild(f);
+    f.submit();
   }
 
   // ログイン中の社員（ECS_ME）を画面に反映。認証前は MyPageController が固定した「自分」。

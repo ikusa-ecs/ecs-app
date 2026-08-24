@@ -270,7 +270,7 @@
 </script>
 @verbatim
 <script>
-  // ログイン中の社員（認証はMTG後。今は Controller が固定した「自分」）。
+  // ログイン中の本人（Controller が Auth から渡す）。
   const ME = (window.ECS_ME && window.ECS_ME.name) ? window.ECS_ME.name : 'baba';
   const WK = ['日','月','火','水','木','金','土'];
   const STORE = 'ecs_finance';   // { caseId: { rev:数値, items:{key:{qty,amount}}, memo } }

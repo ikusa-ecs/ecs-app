@@ -152,7 +152,7 @@
     <div class="alert ok" style="margin-bottom:14px;"><span class="ico">✓</span><div>{{ session('status') }}</div></div>
   @endif
 
-  <p class="asg-info">この画面は<b>本物のデータ</b>です。選んだスタッフは <code>assignments</code>（アサイン）テーブルにDB保存され、次に開くと選択済みで表示されます。既存のモック画面（日別ボード・案件詳細）とは別物です。</p>
+  <p class="asg-info">この画面は<b>本物のデータ</b>です。選んだスタッフは <code>assignments</code>（アサイン）テーブルにDB保存され、次に開くと選択済みで表示されます。</p>
 
   {{-- 案件ヘッダー --}}
   <div class="panel">

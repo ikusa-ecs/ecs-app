@@ -399,7 +399,7 @@
         @endif
         {{-- お知らせ文は DB（settings.staff_notice）から。担当が公開ボードで保存すると全スタッフに反映される。空なら既定文。 --}}
         <div class="notice" id="staffNotice">
-          📣 @if(!empty($notice)){{ $notice }}@else<b>7月分</b>の募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）@endif
+          📣 @if(!empty($notice)){{ $notice }}@else募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）@endif
         </div>
 
         <div class="notice extra-notice" id="extraNotice" style="display:none;"></div>

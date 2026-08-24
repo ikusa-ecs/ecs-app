@@ -105,7 +105,7 @@
       @csrf
       <input type="hidden" name="mode" value="live">
       <button type="submit" class="cr-btn live" {{ $hasToken ? '' : 'disabled' }}
-        onclick="return confirm('⚠️ 本番ルームへ実際に送ります。よろしいですか？\n※ いまのECSは見本データです。本番の実運用データが入るまでは、実送信にご注意ください。');">③ 本番送信</button>
+        onclick="return confirm('⚠️ 本番ルームへ実際に送ります。よろしいですか？\n※ 送る内容は登録済みの案件データです。宛先は本番のチャットワークルームです。');">③ 本番送信</button>
     </form>
   </div>
 </div>
