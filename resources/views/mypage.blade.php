@@ -471,7 +471,7 @@
 @push('scripts')
 <script src="/ecs/data/cases.js"></script>
 <script>
-  // DB（MyPageController）から渡したデータ。空でなければ見本（cases.js / 下の MY_ASSIGN_MOCK）より優先する。
+  // DB（MyPageController）から渡したデータ。ここが唯一の表示元＝見本には戻さない。
   // ・ECS_ME      … ログイン中の社員（名前・メール・部署）
   // ・MY_ASSIGN_DB … 自分のアサイン（案件ID→ポジション）。assignments 由来
   // ・ECS_CASES_DB … 全案件（projects 由来。cases.js と同じ形）
@@ -484,7 +484,8 @@
   window.ECS_CSRF = '{{ csrf_token() }}';
   // 役割コード（D/SD/MC…）→ 表示ラベル（「D（ディレクター）」等）の正本。暗号表示を避けるため。
   window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
-  if (window.ECS_CASES_DB && window.ECS_CASES_DB.length) { window.ECS_CASES = window.ECS_CASES_DB; }
+  // 案件は必ずDBの内容にする。0件なら0件のまま（見本 cases.js の架空案件に戻さない）。
+  window.ECS_CASES = window.ECS_CASES_DB || [];
 </script>
 @verbatim
 <script>
@@ -493,22 +494,9 @@
   const ME = (window.ECS_ME && window.ECS_ME.name) ? window.ECS_ME.name : 'baba';
   const WK = ['日','月','火','水','木','金','土'];
 
-  // 見本：DB にアサインが無いときのフォールバック（案件ID→自分のポジション）。
-  const MY_ASSIGN_MOCK = {
-    'past_fes':  'ディレクター',   // 終了（アーカイブ確認用）
-    'undo_d1':   'ディレクター',
-    'undo_d2':   'ディレクター',
-    'undo_d3':   'ディレクター',
-    'mizu':      'ディレクター',
-    'shinkan':   'ディレクター',
-    'konshin':   'SD',
-    'enni1':     'MC',
-    'bousai':    'ディレクター',   // 翌月（月絞り確認用）
-    'fes_setup': 'ディレクター'    // さらに先（月絞り確認用）
-  };
-  // DB の自分のアサイン（MyPageController が assignments から作る）。空なら見本を使う。
-  const MY_ASSIGN = (window.MY_ASSIGN_DB && Object.keys(window.MY_ASSIGN_DB).length)
-    ? window.MY_ASSIGN_DB : MY_ASSIGN_MOCK;
+  // 自分のアサイン（案件ID→自分のポジション）。MyPageController が assignments から作る。
+  // アサインが無ければ「無い」まま。架空のアサインを見せない（本人の予定に見えてしまうため）。
+  const MY_ASSIGN = window.MY_ASSIGN_DB || {};
 
   // off → Date
   function dateOf(off) {

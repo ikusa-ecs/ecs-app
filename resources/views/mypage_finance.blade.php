@@ -265,7 +265,8 @@
   window.ECS_COST_ITEMS = @json($costItems ?? []);
   // 収支一覧から「✏ 入力する」で来た案件（権限OKのときだけ入る）。担当以外の案件でも1件だけ選べるようにする。
   window.ECS_FORCED_CASE = @json($forcedCase ?? null);
-  if (window.ECS_CASES_DB && window.ECS_CASES_DB.length) { window.ECS_CASES = window.ECS_CASES_DB; }
+  // 案件は必ずDBの内容にする。0件なら0件のまま（見本 cases.js の架空案件に戻さない）。
+  window.ECS_CASES = window.ECS_CASES_DB || [];
 </script>
 @verbatim
 <script>
@@ -274,15 +275,10 @@
   const WK = ['日','月','火','水','木','金','土'];
   const STORE = 'ecs_finance';   // { caseId: { rev:数値, items:{key:{qty,amount}}, memo } }
 
-  // 自分のアサイン（案件ID→役割コード）。DB があればそれ、無ければ見本。
-  const MY_ASSIGN_MOCK = {
-    'past_fes':'ディレクター','undo_d1':'ディレクター','undo_d2':'ディレクター','undo_d3':'ディレクター',
-    'mizu':'ディレクター','shinkan':'ディレクター','konshin':'SD','enni1':'MC',
-    'bousai':'ディレクター','fes_setup':'ディレクター'
-  };
-  const MY_ASSIGN = (window.MY_ASSIGN_DB && Object.keys(window.MY_ASSIGN_DB).length)
-    ? window.MY_ASSIGN_DB : MY_ASSIGN_MOCK;
-  // 自分が「D（ディレクター）」の案件か？ 見本は'ディレクター'、DBは'D'で入る。
+  // 自分のアサイン（案件ID→役割コード）。Controller が assignments から作る。
+  // アサインが無ければ「無い」まま。架空の案件で収支を入力できてしまうのを防ぐ。
+  const MY_ASSIGN = window.MY_ASSIGN_DB || {};
+  // 自分が「D（ディレクター）」の案件か？ 役割は 'D' で入るが、古い表記ゆれ 'ディレクター' も拾う。
   function isMyDirector(id) { return MY_ASSIGN[id] === 'D' || MY_ASSIGN[id] === 'ディレクター'; }
 
   // 収支の入力定義（Notion）に合わせた経費項目。

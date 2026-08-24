@@ -275,10 +275,12 @@
 @endsection
 
 @push('scripts')
-<script src="/ecs/data/cases.js"></script>
-<!-- 社員一覧・登録済みの出勤可能日は DB（people＋shift_preferences）から渡す。空なら下の見本にフォールバック。 -->
+{{-- 社員一覧・出勤可能日・案件は、すべて DB（people＋shift_preferences＋projects）から渡す。
+     凍結モックの案件ファイルの読み込みはやめた（架空の案件で「大型」の印が付いていたため）。 --}}
 <script>
   window.ECS_EMPLOYEES = @json($employees ?? []);
+  window.ECS_CASES     = @json($cases ?? []);
+  window.ECS_ME        = @json($me ?? null);   // ログイン中の本人（保存先）
   window.ECS_PREFS     = @json($prefs ?? []);
   window.ECS_SAVE_URL  = '/employee-availability/save';
   window.ECS_CSRF      = '{{ csrf_token() }}';
@@ -299,7 +301,7 @@
   function isObon(m,d){ return m===8 && d>=13 && d<=16; }      // お盆
   function isNewYear(m,d){ return (m===12 && d>=29) || (m===1 && d<=3); } // 年末年始
 
-  // ===== 大型案件のある日（cases.js から、表示中の月だけ集計） =====
+  // ===== 大型案件のある日（DBの案件から、表示中の月だけ集計） =====
   const bigDayMap = {}; // { 日(数値): コンテンツ名 }
   function computeBig(){
     for (const k in bigDayMap) delete bigDayMap[k];
@@ -333,10 +335,12 @@
   function keyOf(y,m,d){ return y + '-' + m + '-' + d; }
   function monKey(y,m){ return y + '-' + m; }
 
-  // ===== 「自分」＝認証導入前は社員一覧の先頭をログイン者として扱う（保存先＝本物のpeople.id） =====
-  // DBに社員が居ればその先頭、居なければ null（モックのまま）。
-  const EMP_LIST = (window.ECS_EMPLOYEES && window.ECS_EMPLOYEES.length) ? window.ECS_EMPLOYEES : null;
-  const ME = EMP_LIST ? EMP_LIST[0] : null;             // { id, name } or null
+  // ===== 「自分」＝ログイン中の本人（保存先＝その人の people.id） =====
+  // 社員一覧はDBがすべて。居なければ空のまま（見本の社員名には戻さない）。
+  // ⚠ 以前は EMP_LIST[0]（一覧の先頭＝E-001）を自分としていたため、
+  //   誰がログインしても先頭の社員として保存されていた。必ず ECS_ME を使う。
+  const EMP_LIST = window.ECS_EMPLOYEES || [];
+  const ME = window.ECS_ME || null;                     // { id, name } or null
   const PREFS = window.ECS_PREFS || {};                 // { "E-001": { state, memo }, ... }
 
   // 自分の登録済みデータ（DB）を myState / myFields に展開（あれば）。
@@ -470,39 +474,28 @@
   })();
 
   // ===== タブ②：全社員の一覧 =====
-  // DBに社員が居れば本物の社員名（先頭＝自分）。居なければ従来の見本名。
-  const EMPLOYEES = EMP_LIST
-    ? EMP_LIST.map((e,i) => i===0 ? (e.name + '（自分）') : e.name)
-    : ['baba（自分）','佐藤 健太','鈴木 彩','田中 翔','高橋 由依','山本 拓真','中村 さくら','伊藤 健','渡辺 美優'];
+  // 社員名（先頭＝自分）。DBに社員が居なければ空。
+  const EMPLOYEES = EMP_LIST.map((e,i) => i===0 ? (e.name + '（自分）') : e.name);
   // 社員index → その社員の登録済み state（DBから）。先頭(自分)は myState を使うので別扱い。
   function empState(idx){
-    if (!EMP_LIST || idx===0) return null;            // 自分 or モックは null
+    if (idx===0) return null;                         // 自分は myState を使う
     const e = EMP_LIST[idx];
     return (e && PREFS[e.id]) ? (PREFS[e.id].state || {}) : null;
   }
-  // 社員index・年月 → その月の備考（DB）。データが無ければ null（＝seedMemoにフォールバック）。
+  // 社員index・年月 → その月の備考（DB）。まだ登録が無ければ null（画面には「―」を出す）。
   function empMemo(idx, y, m){
-    if (!EMP_LIST || idx===0) return null;
+    if (idx===0) return null;
     const e = EMP_LIST[idx];
     if (!e || !PREFS[e.id]) return null;
     const memoMap = PREFS[e.id].memo || {};
     return (monKey(y,m) in memoMap) ? (memoMap[monKey(y,m)] || '') : '';
   }
-  // 社員index・日 → 〇×△の値。本物データが無い日は従来の仮マーク（seedMark）にフォールバック。
+  // 社員index・日 → 〇×△の値。本人が入力していない日は undefined＝「−」。
+  // ⚠ 未入力の人に架空の〇×△を作らない（出られない人を出られると誤解する事故になるため）。
   function markFor(idx, name, y, m, d){
     if (idx===0) return myState[keyOf(y,m,d)];        // 自分＝入力タブの内容
     const st = empState(idx);
-    if (st){ return st[keyOf(y,m,d)]; }               // 本物データ（未入力日は undefined＝「−」）
-    return seedMark(name, d);                          // データ未登録の社員は従来の仮マーク
-  }
-  // 名前＋日からブレない仮の〇×△を作る
-  function seedMark(name, d){
-    let h = d * 13;
-    for (let i=0;i<name.length;i++) h += name.charCodeAt(i) * (i+3);
-    const r = h % 10;
-    if (r <= 5) return 'ok';      // 6割くらい〇
-    if (r <= 7) return 'ng';
-    return 'maybe';
+    return st ? st[keyOf(y,m,d)] : undefined;         // 未登録の社員は空欄（「−」）
   }
   function markHtml(v){
     if (v==='ok')    return '<span class="ov-mark ok">〇</span>';
@@ -510,12 +503,8 @@
     if (v==='maybe') return '<span class="ov-mark maybe">△</span>';
     return '<span class="ov-mark none">−</span>';
   }
-  // 他社員の仮の「備考」「平日希望休」
-  const MEMO_POOL = ['', 'お盆は実家のため要相談', '平日昼は会議が多めです', '遠方案件は前泊できると助かります',
-                     '特になし', '子どもの行事がある週は休み希望が多めです'];
-  function hashName(name){ let h=0; for (let i=0;i<name.length;i++) h += name.charCodeAt(i)*(i+3); return h; }
-  function seedMemo(name){ return MEMO_POOL[hashName(name) % MEMO_POOL.length]; }
-  // 平日のうち希望休にしている日（自分＝myState、他＝仮）を配列で返す
+  // 平日のうち希望休にしている日を配列で返す（自分＝myState、他＝その人が登録した内容）。
+  // ⚠ 未登録の人は空のまま。架空の希望休を作らない。
   function weekdayOffDays(name, y, m, me, idx){
     const days = new Date(y, m, 0).getDate();
     const out = [];
@@ -526,8 +515,6 @@
         if (myState[keyOf(y,m,d)] === 'off') out.push(d);
       } else if (st){
         if (st[keyOf(y,m,d)] === 'off') out.push(d); // 本物データ：希望休の日
-      } else {
-        if ((hashName(name) + d*7) % 11 === 0) out.push(d); // データ未登録＝従来の仮
       }
     }
     return out;
@@ -546,6 +533,12 @@
       }
     }
     const tbl = document.getElementById('ovTbl');
+    // 社員がまだ1人も居ないとき（名簿の取り込み前）。見本の社員名は出さない。
+    if (EMPLOYEES.length === 0){
+      tbl.innerHTML = '<thead><tr><th class="namecol">社員</th>'
+        + '<th>社員がまだ登録されていません（名簿を取り込むと、ここに一覧が出ます）</th></tr></thead>';
+      return;
+    }
     if (cols.length === 0){
       tbl.innerHTML = '<thead><tr><th class="namecol">社員</th><th>この月は対象日（土日・祝日・長期休暇・大型）がありません</th></tr></thead>';
       return;
@@ -569,11 +562,10 @@
       });
       const offs = weekdayOffDays(name, y, m, me, idx);
       const offTxt = offs.length ? offs.map(d=>d+'日').join('・') : '<span style="color:#c7bba9;">なし</span>';
-      // 備考：自分＝入力タブ／本物データ＝その月のnote／データ未登録＝従来の仮memo
+      // 備考：自分＝入力タブ／他＝その月に本人が書いた内容。未登録は「―」（架空の備考は出さない）。
       const realMemo = empMemo(idx, y, m);
       const memo = me ? (myMemo || '<span style="color:#c7bba9;">（未入力）</span>')
-                      : (realMemo !== null ? (realMemo || '<span style="color:#c7bba9;">―</span>')
-                                           : (seedMemo(name) || '<span style="color:#c7bba9;">―</span>'));
+                      : ((realMemo || '') || '<span style="color:#c7bba9;">―</span>');
       body += '<td class="offcol">' + offTxt + '</td><td class="memocol">' + memo + '</td>';
       body += '</tr>';
     });

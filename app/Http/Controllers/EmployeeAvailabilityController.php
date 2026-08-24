@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Models\ShiftPreference;
+use App\Support\PersonalCases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -22,7 +23,8 @@ use Illuminate\Support\Carbon;
  *  ・note         … その月の備考（memo）。社員×月で同じ文を各行に持たせ、読込時に拾う。
  *  ※ unique(staff_id, date) で同じ人×同じ日は1行＝入力し直しは上書き（save の updateOrCreate がこれに対応）。
  *
- * DBが空のときは Blade 側で従来の見本（モック）にフォールバックする。
+ * 表示はすべてDBが元。社員が0人・登録が0件でも見本（モック）には戻さない
+ * （架空の社員や架空の〇×△が本物に見えてしまうため。2026-08-24）。
  */
 class EmployeeAvailabilityController extends Controller
 {
@@ -45,11 +47,18 @@ class EmployeeAvailabilityController extends Controller
 
     public function index()
     {
+        // 「自分」＝ログイン中の本人。画面はここに自分の入力を保存する。
+        // ⚠ 以前は「社員一覧の先頭（＝E-001）」を自分として扱っていたため、
+        //   誰がログインしても先頭の社員の名前で保存されてしまっていた（2026-08-24 修正）。
+        $me = PersonalCases::meModel();
+
         // 本物の社員一覧（people.role='employee'）。画面の「全社員の一覧」タブの行になる。
+        // 画面は先頭行を「自分」として扱うので、自分を先頭に並べ替える。
         $employees = Person::employees()
             ->orderBy('id')
             ->get(['id', 'name'])
             ->map(fn (Person $p) => ['id' => $p->id, 'name' => $p->name])
+            ->sortBy(fn (array $e) => ($me && $e['id'] === $me->id) ? 0 : 1)
             ->values();
 
         // 登録済みの出勤可能日（全社員ぶん）。画面の state キー "YYYY-M-D" に合わせて整形する。
@@ -80,6 +89,11 @@ class EmployeeAvailabilityController extends Controller
         return view('employee_availability', [
             'employees' => $employees,
             'prefs' => $prefs,
+            // ログイン中の本人（保存先の staff_id はこの人）。未ログイン時は null。
+            'me' => $me ? ['id' => $me->id, 'name' => $me->name] : null,
+            // 「大型案件のある日」を出すための案件一覧（DBが元）。
+            // 以前は凍結モック /ecs/data/cases.js を読んでいたため、架空の案件で大型の印が付いていた。
+            'cases' => PersonalCases::cases(Carbon::today()),
         ]);
     }
 
@@ -94,7 +108,10 @@ class EmployeeAvailabilityController extends Controller
      */
     public function save(Request $request)
     {
-        $employeeId = $request->input('employee_id');
+        // 保存先は必ずログイン中の本人。画面から送られてきた employee_id は当てにしない
+        // （他人の出勤可能日を書き換えられないようにするため）。未ログイン時のみ受け取った値を使う。
+        $me = PersonalCases::meModel();
+        $employeeId = $me->id ?? $request->input('employee_id');
         $period = $request->input('period');          // 例 2026-07
         $state = (array) $request->input('state', []); // { "Y-M-D": "ok"|"ng"|"maybe"|"off" }
         $memo = $request->input('memo');
