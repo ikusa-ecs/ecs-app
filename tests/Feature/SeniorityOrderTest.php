@@ -116,6 +116,65 @@ class SeniorityOrderTest extends TestCase
         ])->assertSessionHasErrors('hire_date');
     }
 
+    /** D／SD／物品担当のプルダウンは「その拠点のイベプラ」が先頭に来る。 */
+    public function test_director_picker_puts_office_planners_first(): void
+    {
+        // 名前順だけなら「あ…」が先に来る並びにしておき、拠点＋イベプラが勝つことを見る。
+        PersonFactory::new()->create([
+            'id' => 'E-101', 'name' => 'あおやま', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'セールス', 'must_onboard' => false,
+        ]);
+        PersonFactory::new()->create([
+            'id' => 'E-102', 'name' => 'わたなべ', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+        PersonFactory::new()->create([
+            'id' => 'E-103', 'name' => 'いのうえ', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '大阪', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+        $me = PersonFactory::new()->create([
+            'id' => 'E-104', 'name' => 'うえだ', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+
+        $html = $this->actingAsPerson($me)->get('/projects')->assertOk()->getContent();
+
+        $at = [];
+        foreach (['E-101', 'E-102', 'E-103', 'E-104'] as $id) {
+            $at[$id] = strpos($html, '"id":"'.$id.'"');
+            $this->assertNotFalse($at[$id], $id.' がプルダウンに出ていない');
+        }
+
+        // 東京のイベプラ（E-102 わたなべ / E-104 うえだ）が、他より先。
+        $this->assertTrue($at['E-104'] < $at['E-101'], '自拠点のイベプラが他部署より先に出ること');
+        $this->assertTrue($at['E-102'] < $at['E-101'], '名前が後ろでも自拠点のイベプラが先に出ること');
+        $this->assertTrue($at['E-102'] < $at['E-103'], '自拠点のイベプラが他拠点のイベプラより先に出ること');
+        // 先頭グループの中は氏名順（うえだ → わたなべ）。
+        $this->assertTrue($at['E-104'] < $at['E-102'], '先頭グループの中は氏名順');
+    }
+
+    /** 営業担当のプルダウンは社歴順。 */
+    public function test_sales_owner_picker_is_ordered_by_seniority(): void
+    {
+        PersonFactory::new()->create([
+            'id' => 'E-201', 'name' => 'あたらしい人', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'セールス', 'hire_date' => '2025-04-01', 'must_onboard' => false,
+        ]);
+        $me = PersonFactory::new()->create([
+            'id' => 'E-202', 'name' => 'ふるい人', 'role' => 'employee', 'permission' => 'employee',
+            'office' => '東京', 'department' => 'セールス', 'hire_date' => '2012-04-01', 'must_onboard' => false,
+        ]);
+
+        $html = $this->actingAsPerson($me)->get('/project-form')->assertOk()->getContent();
+
+        // 営業担当は名前の配列で渡される（日本語は \uXXXX になるので JSON 表記で探す）。
+        $old = strpos($html, json_encode('ふるい人', JSON_UNESCAPED_SLASHES));
+        $new = strpos($html, json_encode('あたらしい人', JSON_UNESCAPED_SLASHES));
+        $this->assertNotFalse($old, '社歴の長い人が営業担当の候補に出ていない');
+        $this->assertNotFalse($new, '新しい人が営業担当の候補に出ていない');
+        $this->assertTrue($old < $new, '営業担当は社歴順（古い人が先）に並ぶこと');
+    }
+
     /** スタッフは任意（いつから働いているか分からないこともあるため）。 */
     public function test_onboarding_hire_date_is_optional_for_staff(): void
     {

@@ -86,8 +86,9 @@ class AssignDirectorController extends Controller
         // マスに並べる社員＝自拠点の社員（people の role='employee'。管理者が全拠点表示なら全員）。
         // 既定はイベプラ＋新人だけ表示、画面の「＋全社員」で全員に広げる（front 側で出し分け）。
         // 同姓の取り違えを防ぐため、保存・判定はすべて社員ID基準で行う。
+        // 並びは「その拠点のイベプラ」を先頭に、あとは氏名順（baba要望 2026-08-24）。
         $employees = OfficeScope::applyToPeople(Person::employees(), $officeScope, $keepIds)
-            ->orderBy('id')
+            ->plannersOfOfficeFirst($officeScope)
             ->get()
             ->map(fn (Person $p) => [
                 'id' => $p->id,

@@ -104,6 +104,29 @@ class Person extends Model implements AuthenticatableContract
     }
 
     /**
+     * D／SD／物品担当を選ぶプルダウン用の並び。
+     * 「その拠点のイベプラ」を先頭に持ち上げ、あとは氏名順（2026-08-24 baba）。
+     *
+     * なぜ＝Dに立つのはほぼ自拠点のイベプラ。毎回リストを探しに行かなくて済むように。
+     * ※ 拠点が未設定の人は既定拠点（東京）あつかい。名簿の office が空でも
+     *   「東京のイベプラ」として先頭に来る（people.office 埋め直し前の保険）。
+     * ※ 氏名順は文字コード順。ふりがなの欄が無いため、漢字だと厳密な五十音にはならない。
+     *   正確にするには「ふりがな」を名簿に足す必要がある（宿題）。
+     */
+    public function scopePlannersOfOfficeFirst($query, ?string $office)
+    {
+        $office = $office ?: \App\Support\OfficeScope::DEFAULT_OFFICE;
+
+        return $query
+            ->orderByRaw(
+                "case when coalesce(nullif(office, ''), ?) = ? and department = ? then 0 else 1 end",
+                [\App\Support\OfficeScope::DEFAULT_OFFICE, $office, 'イベプラ']
+            )
+            ->orderBy('name')
+            ->orderBy('id');
+    }
+
+    /**
      * 区分（新人/中堅/ベテラン）。保存せず hire_date からの在籍年数で都度計算する。
      * 新人＝在籍1年未満／中堅＝1年以上3年未満／ベテラン＝3年以上（設計書19.1の確定方針）。
      * 入社日が無い場合は null を返す。

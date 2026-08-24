@@ -173,11 +173,12 @@ class ProjectController extends Controller
             ->mapWithKeys(fn ($c) => [$c => true])
             ->all();
 
-        // 詳細のプルダウン（D／SD／物品担当）に出す「本物の社員一覧」（名前順）。
+        // 詳細のプルダウン（D／SD／物品担当）に出す「本物の社員一覧」。
         // これまでの見本配列（DIRECTORS/SDLIST 等）の代わりに、この一覧で選ばせる。
+        // 並びは「見ている拠点のイベプラ」を先頭に、あとは氏名順（Dに立つのはほぼ自拠点のイベプラ）。
         $employees = Person::employees()
-            ->orderBy('name')
-            ->get(['id', 'name'])
+            ->plannersOfOfficeFirst($officeScope ?: $myOffice)
+            ->get(['id', 'name', 'office', 'department'])
             ->map(fn (Person $e) => ['id' => $e->id, 'name' => $e->name])
             ->values();
 
@@ -331,9 +332,10 @@ class ProjectController extends Controller
             ])
             ->values();
 
-        // 営業担当プルダウン用：社員（role=employee）の名前一覧（名前順）。
+        // 営業担当プルダウン用：社員（role=employee）の名前一覧。
+        // 並びは社歴順（入社日の古い人が上・未入力は末尾）＝baba要望 2026-08-24。
         $salesOwners = Person::employees()
-            ->orderBy('name')
+            ->bySeniority()
             ->pluck('name')
             ->filter()
             ->unique()
