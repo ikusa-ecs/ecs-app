@@ -4,13 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Mail\PasswordResetMail;
 use App\Models\Person;
+use App\Support\PasswordResetToken;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 /**
  * パスワード再設定（お忘れの方）＝ログイン前（ゲスト）の画面。
@@ -21,8 +19,10 @@ use Illuminate\Support\Str;
  *   ③ /reset-password … メールのリンクを開き、新しいパスワードを設定する
  *
  * 仕組み（2段階認証のメールコードと同じ考え方）：
- *   ・リンクに入れる合言葉（トークン）は password_resets に“ハッシュ化して”保存し、平文はメールのURLだけ。
- *   ・有効期限 60 分・使い終わったら削除。
+ *   ・リンクに入れる合言葉（トークン）の扱いは App\Support\PasswordResetToken に集約。
+ *     ハッシュ化して保存し、平文はメールのURLだけ。使い終わったら削除。
+ *   ・有効期限 60 分。⚠ ログイン案内メール（初回設定）は同じ仕組みで期限だけ7日＝
+ *     期限は「発行するときに書き込む」（一律60分にすると案内メールが1時間で切れる不具合になる）。
  *   ・「そのメールが登録済みか」は画面に出さない（同じ文面）＝誰のアドレスが登録されているか探られないため。
  */
 class PasswordResetController extends Controller
@@ -54,12 +54,7 @@ class PasswordResetController extends Controller
 
         if ($person) {
             // 平文トークンはメールのURLにだけ載せ、DBにはハッシュを保存する。
-            $token = Str::random(64);
-
-            DB::table('password_resets')->updateOrInsert(
-                ['email' => $email],
-                ['token' => Hash::make($token), 'created_at' => now()]
-            );
+            $token = PasswordResetToken::issue($email, Carbon::now()->addMinutes(self::EXPIRE_MINUTES));
 
             $url = route('password.reset', ['token' => $token, 'email' => $email]);
 
@@ -92,14 +87,9 @@ class PasswordResetController extends Controller
 
         $email = $request->input('email');
 
-        $record = DB::table('password_resets')->where('email', $email)->first();
-
         // トークンが無い／合わない／期限切れは、まとめて同じエラーにする。
-        // 期限は「発行時刻＋60分がもう過ぎたか」で判定（diffの符号に左右されない確実な書き方）。
-        $expired = $record
-            && Carbon::parse($record->created_at)->addMinutes(self::EXPIRE_MINUTES)->isPast();
-
-        if (! $record || $expired || ! Hash::check($request->input('token'), $record->token)) {
+        // 期限そのものは発行のときに書き込んである（案内メールなら7日・お忘れの方なら60分）。
+        if (! PasswordResetToken::verify($email, (string) $request->input('token'))) {
             return back()
                 ->withInput(['email' => $email])
                 ->withErrors(['email' => 'この再設定リンクは無効か、期限が切れています。お手数ですが、もう一度「パスワードをお忘れの方」からやり直してください。']);
@@ -118,7 +108,7 @@ class PasswordResetController extends Controller
         $person->save();
 
         // 使い終わったトークンは削除（使い回し防止）。
-        DB::table('password_resets')->where('email', $email)->delete();
+        PasswordResetToken::consume($email);
 
         // ログイン画面へ戻し、成功を知らせる。
         return redirect('/')->with('status', 'password-reset-done');

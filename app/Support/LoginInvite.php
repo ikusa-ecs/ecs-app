@@ -4,10 +4,8 @@ namespace App\Support;
 
 use App\Mail\LoginInviteMail;
 use App\Models\Person;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -19,11 +17,14 @@ use Throwable;
  * 「自分でパスワードを決めるリンク」だけを送る（baba選択）。
  *
  * 【仕組み】
- * 「パスワードをお忘れの方」（PasswordResetController）と同じ password_resets を使う。
- *   ・リンクの合言葉（トークン）はハッシュにして保存し、平文はメールのURLだけ。
+ * 「パスワードをお忘れの方」（PasswordResetController）と同じ置き場を使う。
+ * 合言葉（トークン）の扱いは App\Support\PasswordResetToken が正本。
+ *   ・リンクの合言葉はハッシュにして保存し、平文はメールのURLだけ。
  *   ・1回使うと消える（使い回しできない）。
  *   ・有効期限は7日（baba選択）。スタッフは業務委託ですぐ見ないことがあるため長め。
  *     切れても本人が「パスワードをお忘れの方」から再発行できる。
+ *   ⚠ 2026-08-25まで、期限の判定が「お忘れの方」と同じ一律60分になっていて、
+ *     メールに7日と書いてあるのに1時間で切れていた。期限は発行時にDBへ書き込む。
  *
  * ⚠ 送る条件＝メールアドレスがあり、在籍中で、見本（テスト）アカウントでないこと。
  *   条件を満たさない人は送らずに理由を返す＝黙って失敗しない。
@@ -53,12 +54,7 @@ final class LoginInvite
         }
 
         // 平文トークンはメールのURLにだけ載せ、DBにはハッシュを保存する。
-        $token = Str::random(64);
-
-        DB::table('password_resets')->updateOrInsert(
-            ['email' => $email],
-            ['token' => Hash::make($token), 'created_at' => now()]
-        );
+        $token = PasswordResetToken::issue($email, Carbon::now()->addDays(self::EXPIRE_DAYS));
 
         $url = route('password.reset', ['token' => $token, 'email' => $email]);
 

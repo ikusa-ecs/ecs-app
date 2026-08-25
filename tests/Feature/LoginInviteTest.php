@@ -7,6 +7,8 @@ use App\Models\Person;
 use App\Support\LoginInvite;
 use Database\Factories\PersonFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -200,5 +202,75 @@ class LoginInviteTest extends TestCase
         $this->assertStringContainsString('"login":"ready"', $html);
         // 管理者以上には送信ボタンの受け口が出る。
         $this->assertStringContainsString('ECS_CAN_INVITE = true', $html);
+    }
+
+    /**
+     * 案内メールのリンクは、メールに書いてあるとおり7日もつ。
+     *
+     * ⚠ 2026-08-25まで、期限の判定が「パスワードをお忘れの方」と同じ一律60分になっていて、
+     *   1時間を過ぎて設定した人が全員「この再設定リンクは無効か、期限が切れています」になっていた。
+     *   実際にスタッフから報告があった不具合なので、丸ごと通しで確かめる。
+     */
+    public function test_invite_link_still_works_two_days_later(): void
+    {
+        Mail::fake();
+        $staff = $this->staff(['email' => 'hana@ikusa.co.jp', 'password' => null]);
+
+        LoginInvite::send($staff);
+        $token = $this->tokenFromLastInvite();
+
+        // 2日後に、届いたリンクからパスワードを決める。
+        Carbon::setTestNow(Carbon::now()->addDays(2));
+
+        $this->post('/reset-password', [
+            'token'                 => $token,
+            'email'                 => 'hana@ikusa.co.jp',
+            'password'              => 'brandnew123',
+            'password_confirmation' => 'brandnew123',
+        ])->assertRedirect('/');
+
+        $fresh = $staff->fresh();
+        $this->assertTrue(Hash::check('brandnew123', $fresh->password), '決めたパスワードで入れること');
+        $this->assertNotNull($fresh->password_set_at, '「ログインできる」の印が付くこと');
+
+        Carbon::setTestNow();
+    }
+
+    /** 7日を過ぎたリンクは無効（そのときは本人が「パスワードをお忘れの方」でやり直す）。 */
+    public function test_invite_link_expires_after_seven_days(): void
+    {
+        Mail::fake();
+        $staff = $this->staff(['email' => 'hana@ikusa.co.jp', 'password' => null]);
+
+        LoginInvite::send($staff);
+        $token = $this->tokenFromLastInvite();
+
+        Carbon::setTestNow(Carbon::now()->addDays(8));
+
+        $this->post('/reset-password', [
+            'token'                 => $token,
+            'email'                 => 'hana@ikusa.co.jp',
+            'password'              => 'brandnew123',
+            'password_confirmation' => 'brandnew123',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertNull($staff->fresh()->password_set_at, 'パスワードは決まっていないこと');
+
+        Carbon::setTestNow();
+    }
+
+    /** 送ったメールのURLから、合言葉（トークン）だけ取り出す。 */
+    private function tokenFromLastInvite(): string
+    {
+        $token = '';
+        Mail::assertSent(LoginInviteMail::class, function ($mail) use (&$token) {
+            parse_str((string) parse_url($mail->url, PHP_URL_QUERY), $q);
+            $token = (string) ($q['token'] ?? '');
+
+            return true;
+        });
+        $this->assertNotSame('', $token, 'メールのリンクに合言葉が入っていること');
+
+        return $token;
     }
 }

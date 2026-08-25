@@ -119,4 +119,45 @@ class PasswordResetTest extends TestCase
 
         $this->assertTrue(Hash::check('oldpassword', $me->fresh()->password), 'パスワードは変わっていないこと');
     }
+
+    /** 「お忘れの方」で発行したリンクの期限は60分（発行のときにDBへ書き込む）。 */
+    public function test_forgot_password_link_expires_in_sixty_minutes(): void
+    {
+        Mail::fake();
+        PersonFactory::new()->create(['email' => 'taro@example.com']);
+
+        $this->post('/forgot-password', ['email' => 'taro@example.com']);
+
+        $row = DB::table('password_resets')->where('email', 'taro@example.com')->first();
+        $this->assertNotNull($row->expires_at, '期限が書き込まれていること');
+        $this->assertSame(
+            Carbon::now()->addMinutes(60)->format('Y-m-d H:i'),
+            Carbon::parse($row->expires_at)->format('Y-m-d H:i')
+        );
+    }
+
+    /**
+     * 期限の欄が空の行（この仕組みより前に発行されたリンク）は、今までどおり60分で切れる。
+     * ⚠ 本番へ切り替えた瞬間に、配布済みのリンクの扱いが変にならないようにするため。
+     */
+    public function test_old_rows_without_expiry_still_use_sixty_minutes(): void
+    {
+        $me = PersonFactory::new()->create(['email' => 'old@example.com', 'password' => 'oldpassword']);
+
+        DB::table('password_resets')->insert([
+            'email'      => 'old@example.com',
+            'token'      => Hash::make('valid-token'),
+            'created_at' => Carbon::now()->subMinutes(30),
+            'expires_at' => null,
+        ]);
+
+        $this->post('/reset-password', [
+            'token'                 => 'valid-token',
+            'email'                 => 'old@example.com',
+            'password'              => 'brandnew123',
+            'password_confirmation' => 'brandnew123',
+        ])->assertRedirect('/');
+
+        $this->assertTrue(Hash::check('brandnew123', $me->fresh()->password));
+    }
 }
