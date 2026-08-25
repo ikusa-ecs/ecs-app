@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Support\DangerDays;
 use App\Support\Headcount;
+use App\Support\OfficeScope;
 use Illuminate\Support\Carbon;
 
 /**
@@ -56,9 +57,13 @@ class DashboardController extends Controller
                     'sales'    => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
                     'meet'     => $p->start_time ?? '—',
                     'leave'    => $p->end_time ?? '—',
-                    // 実施形態の生テキスト（例「イベント東(リアル)」）。
-                    // 「今月の件数集計」が拠点(種別)を読み解いて月別に集計するのに使う。
+                    // 実施形態（リアル／リアルロング／オンライン 等）。「今月の件数集計」の“種別”に使う。
                     'format'   => $p->format ?? '',
+                    // 登録拠点。「今月の件数集計」の“拠点”に使う（2026-08-25 修正）。
+                    // ⚠ 以前は実施形態の「イベント東(リアル)」というカッコ付きの文字から拠点を読んでいた。
+                    //   2026-07-31 の全拠点対応で拠点は projects.office に移ったのに、集計だけ古いままで、
+                    //   カッコが無い今のデータでは拠点も種別も読めず**全部「その他」**に落ちていた。
+                    'office'   => $p->office ?? '',
                     // cases.js では下書き・アーカイブは別フラグ。DB では status にまとめているので戻す。
                     'draft'    => $p->status === '下書き',
                     'archived' => $p->status === '完了',
@@ -68,6 +73,8 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'cases' => $cases,
+            // 件数集計の「拠点」の並び。⚠ 画面に拠点名を直書きしない（正本＝拠点マスタ）。
+            'offices' => OfficeScope::options(),
             // 危険日（手動指定）＝設定画面で足した日。カレンダーが自動判定に加えて赤くする。
             'manualDanger' => DangerDays::dates(),
         ]);

@@ -10,6 +10,8 @@
 <script src="/ecs/data/cases.js"></script>
 <script>
   window.ECS_CASES = @json($cases);
+  {{-- 件数集計の拠点の並び。⚠ ここに拠点名を書かない（正本＝拠点マスタ）。 --}}
+  window.ECS_COUNT_OFFICES = @json($offices ?? []);
   // 危険日（手動指定）＝設定画面で足した日（YYYY-MM-DD の配列）。自動判定に加えてカレンダーで赤くする。
   window.ECS_MANUAL_DANGER = @json($manualDanger ?? []);
 </script>
@@ -442,12 +444,29 @@
   function mKey(off){ var d=dOf(off); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
   function mLabel(key){ var p=key.split('-'); return p[0]+'年'+Number(p[1])+'月'; }
 
-  // 実施形態「イベント東(リアル)」→ {base:'イベント東', type:'リアル'}（全角・半角カッコ対応）
-  function parseFmt(s){
-    s = String(s||'').trim();
-    var mo = s.match(/^(.*?)[（(]\s*(.*?)\s*[）)]\s*$/);
-    if (mo) return { base:(mo[1].trim()||'その他'), type:(mo[2].trim()||'その他') };
-    return { base:(s||'その他'), type:'その他' };
+  // 案件を「拠点」と「種別」に分ける（2026-08-25 修正）。
+  //
+  // ⚠ 以前は実施形態の「イベント東(リアル)」というカッコ付きの文字だけを見て、
+  //   カッコの前を拠点・中を種別として読んでいた。2026-07-31 の全拠点対応で
+  //   **拠点は登録拠点（projects.office）に移った**のに、ここだけ古いままだったため、
+  //   カッコの無い今のデータ（実施形態＝「リアル」だけ）では拠点も種別も読めず、
+  //   **全部「その他」**に数えられていた。
+  //
+  //   拠点＝登録拠点。種別＝実施形態。
+  //   昔の「イベント東(リアル)」の形で入っている案件も読めるように、カッコがあれば中を種別にする。
+  function parseFmt(c){
+    var fmt = String((c && c.format) || '').trim();
+    var office = String((c && c.office) || '').trim();
+
+    var type = fmt;
+    var mo = fmt.match(/^(.*?)[（(]\s*(.*?)\s*[）)]\s*$/);
+    if (mo) {
+      type = mo[2].trim();
+      // 昔のデータで登録拠点が空のときだけ、カッコの前を拠点として使う。
+      if (office === '') office = mo[1].trim();
+    }
+
+    return { base: (office || '拠点なし'), type: (type || '実施形態なし') };
   }
 
   // 月セレクトの選択肢（案件のある月）。既定＝今月（あれば）／無ければ最も早い月。
@@ -461,14 +480,14 @@
     ? monthList.map(function(k){ return '<option value="'+k+'"'+(k===def?' selected':'')+'>'+mLabel(k)+'</option>'; }).join('')
     : '<option value="">（案件なし）</option>';
 
-  // 拠点の並び順（よく出るものを先に・それ以外は後ろ）
-  var BASE_ORDER = ['イベント東','イベント東北','イベント他拠点'];
+  // 拠点の並び順。⚠ ここに拠点名を書かない（正本＝拠点マスタ。増えても直さなくてよい）。
+  var BASE_ORDER = (window.ECS_COUNT_OFFICES || []).slice();
   function baseRank(b){ var i=BASE_ORDER.indexOf(b); return i<0?BASE_ORDER.length:i; }
   function num(v){ return '<td class="num">'+v+'</td>'; }
 
   // 全データに登場する拠点を最初に集める（0件の月でも全拠点を表示するため）
   var allBaseMap = {};
-  cases.forEach(function(c){ allBaseMap[parseFmt(c.format).base] = true; });
+  cases.forEach(function(c){ allBaseMap[parseFmt(c).base] = true; });
   BASE_ORDER.forEach(function(b){ allBaseMap[b] = true; }); // 定番拠点は案件0でも常に出す
   var allBases = Object.keys(allBaseMap).sort(function(a,b){ return baseRank(a)-baseRank(b) || (a<b?-1:1); });
 
@@ -479,7 +498,7 @@
     // 拠点ごとに種別を数える
     var byBase = {};
     rows.forEach(function(c){
-      var f = parseFmt(c.format);
+      var f = parseFmt(c);
       var b = byBase[f.base] || (byBase[f.base] = { total:0, types:{} });
       b.total++;
       b.types[f.type] = (b.types[f.type]||0) + 1;

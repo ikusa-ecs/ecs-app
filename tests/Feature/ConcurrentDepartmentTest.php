@@ -52,6 +52,14 @@ class ConcurrentDepartmentTest extends TestCase
         $this->assertSame(['イベプラ'], Departments::normalize('イベプラ', ['存在しない部署']));
         // 何も残らなければ未設定（null）。
         $this->assertNull(Departments::normalize(null, []));
+
+        // 「アサイン」も所属として選べる（2026-08-25 baba要望で追加）。
+        // ⚠ 色分け・集計は「その他」にまとめる（MAIN に入れていないため）。名簿のバッジは「アサイン」と出る。
+        $this->assertTrue(Departments::isKnown('アサイン'));
+        $this->assertContains('アサイン', Departments::ALL);
+        $this->assertSame(['アサイン'], Departments::normalize('アサイン', []));
+        $this->assertSame('その他', Departments::group('アサイン'));
+        $this->assertSame('アサイン', Departments::label('アサイン'));
     }
 
     /** 兼務が無い人は、主な所属1つだけとして扱う（departments 未入力でも動く）。 */
