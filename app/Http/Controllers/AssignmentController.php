@@ -16,6 +16,7 @@ use App\Support\ProjectAccess;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -177,6 +178,8 @@ class AssignmentController extends Controller
                     'level' => $p->skill_level ?? '—',
                     'exp' => $p->experience_count ?? 0,
                     'exclusive' => (bool) $p->is_exclusive,
+                    // 臨時スタッフ（インターン・知り合いの助っ人など・2026-08-25 baba）。
+                    'spot' => (bool) $p->is_spot,
                     'posLabels' => $posLabels,
                     'posCodes' => $can,   // 自動仮置きで「この役割ができる人か」を判定するため
                     'ng' => $p->ngRelations->pluck('partner_name')->all(),
@@ -236,6 +239,12 @@ class AssignmentController extends Controller
             'monthCount' => $monthCount,
             'monthCap' => self::MONTH_CAP,
             'officeScope' => $officeScope,   // 今絞っている拠点（null＝全拠点）。画面の注記に使う。
+            // 臨時スタッフ（インターン・知り合いの助っ人など）を、この画面から足せるようにした
+            // （2026-08-25 baba）。⚠ 名簿への登録は管理者以上なので、ボタンもその人にだけ出す。
+            'canAddSpot' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
+            // 足した直後は、その人にチェックを入れた状態で開く
+            // （足しただけで保存を押すと消えてしまうため）。
+            'addedId' => (string) request()->query('added', ''),
         ]);
     }
 

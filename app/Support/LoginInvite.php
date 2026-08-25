@@ -52,6 +52,11 @@ final class LoginInvite
         if (TestAccounts::isTest($person)) {
             return ['ok' => false, 'message' => '体験用のアカウントには送れません。'];
         }
+        // 臨時スタッフはログインしない決まり（2026-08-25 baba）。
+        // 送ると本人がパスワードを決められてしまうので、はっきり断る。
+        if ($person->is_spot) {
+            return ['ok' => false, 'message' => $person->name.' さんは臨時スタッフのため、ログインの案内は送りません。'];
+        }
 
         // 平文トークンはメールのURLにだけ載せ、DBにはハッシュを保存する。
         $token = PasswordResetToken::issue($email, Carbon::now()->addDays(self::EXPIRE_DAYS));

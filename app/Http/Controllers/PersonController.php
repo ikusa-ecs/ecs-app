@@ -10,6 +10,7 @@ use App\Support\AssignmentRole;
 use App\Support\Departments;
 use App\Support\LoginInvite;
 use App\Support\OfficeScope;
+use App\Support\SpotStaff;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
@@ -289,6 +290,8 @@ class PersonController extends Controller
                     //   invited … 案内メールを送ったが、本人がまだパスワードを決めていない
                     //   ready   … 本人がパスワードを決めた＝ログインできる
                     'login'     => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
+                    // 臨時スタッフ（インターン・知り合いの助っ人など）。ログインしない（2026-08-25 baba）。
+                    'spot'      => (bool) $p->is_spot,
                     'invitedAt' => optional($p->invited_at)->format('Y-m-d'),
                     'office'    => $p->office ?? '',   // 事務所（地域オフィス）
                     // joinDate ＝ 区分（新人/中堅/ベテラン）計算の元。people.js と同じく文字列で渡す。
@@ -445,6 +448,39 @@ class PersonController extends Controller
      * ⚠ パスワードはメールに載せない。「自分でパスワードを決めるリンク」を送る
      *   （中身の判断・送信は App\Support\LoginInvite が正本）。
      */
+    /**
+     * 臨時スタッフをその場で名簿に足す（2026-08-25 baba要望）。
+     *
+     * インターンで今月だけ来る方、誰かの知り合いの助っ人など、
+     * 名簿に無い人をアサイン画面から足せるようにする。中身は App\Support\SpotStaff が正本。
+     *
+     * ⚠ 名簿への登録は「管理者以上」（2026-07-02 確定の権限ルール）。
+     *   ここもそれに合わせて tier:manager にしてある（routes/web.php）。
+     */
+    public function addSpot(Request $request)
+    {
+        // ⚠ $request->validate() は使わない。このアプリは JSON を返すのを api/* だけに絞っている
+        //   （bootstrap/app.php の shouldRenderJsonWhen）ので、検証に落ちると画面用の
+        //   リダイレクトが返ってしまい、呼んでいる側（fetch）が受け取れない。
+        //   入力の確かめ方は App\Support\SpotStaff にまとめてある（名前が空・長すぎ・同姓同名）。
+        $name = trim((string) $request->input('name', ''));
+
+        // どの拠点の人として足すか。指定が無い／知らない拠点名なら自分の拠点にする
+        // （知らない名前をそのまま入れると、どの拠点の名簿にも出てこない人になってしまう）。
+        $office = trim((string) $request->input('office', ''));
+        if ($office === '' || ! in_array($office, OfficeScope::options(), true)) {
+            $office = OfficeScope::filterSingle($request);
+        }
+
+        $result = SpotStaff::create($name, $office);
+
+        return response()->json([
+            'ok' => $result['ok'],
+            'message' => $result['message'],
+            'id' => $result['person']?->id,
+        ], $result['ok'] ? 200 : 422);
+    }
+
     public function sendInvite(Request $request, string $id)
     {
         $person = Person::find($id);

@@ -198,6 +198,36 @@
         <input type="text" id="staffSearch" placeholder="名前でしぼり込み" oninput="filterStaff()">
       </div>
 
+      @if ($addedId !== '')
+        {{-- 足しただけで「保存」を押すと消えてしまうので、チェックを入れた状態で開いていることを伝える。 --}}
+        <div class="alert" id="spotAdded"
+             style="margin-bottom:12px; background:#e7f6ec; border:1px solid #bfe6d2; color:#166534;">
+          <span class="ico">✓</span>
+          <div><b>臨時スタッフとして名簿に足しました（{{ $addedId }}）。</b>
+            この画面では<b>チェックを入れた状態</b>にしてあります。
+            役割を選んで<b>「保存」</b>を押すと、この案件のアサインになります。<br>
+            <span class="muted" style="font-size:11.5px;">
+              声を掛けている途中なら「仮」で保存しておけます（本人はログインしないので、何かが見えることはありません）。</span>
+          </div>
+        </div>
+      @endif
+
+      @if ($canAddSpot)
+        {{-- 名前で探して見つからなかったときだけ出す（ふだんは邪魔にならないよう隠しておく）。 --}}
+        <div class="alert" id="spotBox" style="display:none; margin-bottom:12px; background:#fbf6ef;">
+          <span class="ico">＋</span>
+          <div>
+            <b>「<span id="spotName"></span>」は名簿にありません。</b>
+            インターンの方や知り合いの助っ人など、<b>今回だけ入る人</b>なら、ここから足せます。<br>
+            <button type="button" class="btn sm" id="spotBtn" onclick="addSpotStaff()"
+                    style="margin-top:6px;">＋ 臨時スタッフとして名簿に足して、この案件に入れる</button>
+            <span class="muted" style="font-size:11.5px; margin-left:8px;">
+              ログインは付きません。出勤数・稼働状況にはふつうのスタッフと同じように数えます。</span>
+            <div id="spotErr" style="display:none; margin-top:6px; color:#b91c1c; font-size:12px;"></div>
+          </div>
+        </div>
+      @endif
+
       {{-- ポジション雛型：コンテンツ×規模の必要人数から「枠」を出し、下で選ぶと現在数が動く --}}
       @if (count($roleReq))
         <div class="panel pos-tpl">
@@ -271,7 +301,8 @@
               @php($isAvail = in_array($w, ['希望', '稼働可'], true))
               <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-pos="{{ implode('|', $s['posCodes']) }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-entry="{{ !empty($s['entry']) ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
                 <td class="chk">
-                  <input type="checkbox" name="staff_ids[]" value="{{ $s['id'] }}" {{ $ex ? 'checked' : '' }} onchange="updateCount()">
+                  {{-- 足した直後の人は、はじめからチェックを入れておく（保存で消えないように）。 --}}
+                  <input type="checkbox" name="staff_ids[]" value="{{ $s['id'] }}" {{ ($ex || $s['id'] === $addedId) ? 'checked' : '' }} onchange="updateCount()">
                 </td>
                 <td>
                   <strong>{{ $s['name'] }}</strong>
@@ -279,6 +310,7 @@
                   @if (!empty($s['entry']))<span class="wish entry" title="この案件にエントリー（応募）しています@if(!empty($s['entryNote']))：{{ $s['entryNote'] }}@endif">★エントリー</span>@endif
                   @if ($w === '希望')<span class="wish 希望">希望</span>@elseif ($w === '稼働可')<span class="wish 稼働可">稼働可</span>@elseif ($w === 'NG')<span class="wish NG">NG</span>@endif
                   @if ($s['exclusive'])<span class="badge ok" style="font-size:10px;">専属</span>@endif
+                  @if (!empty($s['spot']))<span class="badge" style="font-size:10px; background:#f1ece4; color:#7a6f63;" title="臨時スタッフ（インターン・助っ人など）。ログインはありません。">臨時</span>@endif
                   @if ($ex && $ex['status'] === '確定')<span class="badge ok" style="font-size:10px;">確定済</span>@endif
                   @if (!empty($s['entryNote']))
                     <div class="entry-note" title="エントリーのときに本人が書いた一言">💬 {{ $s['entryNote'] }}</div>
@@ -451,8 +483,10 @@
     const availToggle = document.getElementById('onlyAvail');
     const availOnly = availToggle ? availToggle.checked : false;
     let visible = 0;
+    let nameHits = 0;   // 「希望者だけ」の絞り込みとは別に、名前だけで見た一致数
     document.querySelectorAll('.staff-row').forEach(tr => {
       const nameOk = !q || (tr.dataset.name || '').includes(q);
+      if (nameOk) nameHits++;
       // 「希望者だけ」表示でも、すでにアサイン済みの人は隠さない（外す判断ができるように）
       const availOk = !availOnly || tr.dataset.avail === '1' || tr.dataset.assigned === '1';
       const show = nameOk && availOk;
@@ -461,6 +495,66 @@
     });
     const note = document.getElementById('noAvail');
     if (note) note.style.display = (visible === 0 && availOnly) ? '' : 'none';
+
+    // 名簿に無い人（インターン・知り合いの助っ人など）を足す受け口。
+    // ⚠ 出すのは「名前で探したのに1人も居なかったとき」だけ。ふだんは邪魔にならないように隠す。
+    const box = document.getElementById('spotBox');
+    if (box) {
+      const show = (q !== '' && nameHits === 0);
+      box.style.display = show ? '' : 'none';
+      if (show) { document.getElementById('spotName').textContent = q; }
+      const err = document.getElementById('spotErr');
+      if (err) { err.style.display = 'none'; err.textContent = ''; }
+    }
+  }
+
+  // 臨時スタッフとして名簿に足して、この画面を開き直す（足した人にチェックが入った状態で戻る）。
+  // ⚠ 足すだけで「保存」を押さないとアサインにはならない。開き直したときにチェックを入れておくのは
+  //   そのため（足したのに保存で消える、を防ぐ）。
+  function addSpotStaff() {
+    const name = document.getElementById('staffSearch').value.trim();
+    if (!name) { return; }
+
+    const btn = document.getElementById('spotBtn');
+    const err = document.getElementById('spotErr');
+    const form = document.getElementById('asgForm');
+    const token = form ? form.querySelector('input[name="_token"]').value : '';
+
+    if (!confirm('「' + name + '」さんを臨時スタッフとして名簿に足します。'
+      + String.fromCharCode(10) + String.fromCharCode(10)
+      + '・ログインは付きません（メール・パスワードなし）'
+      + String.fromCharCode(10)
+      + '・出勤数や稼働状況には、ふつうのスタッフと同じように数えます'
+      + String.fromCharCode(10) + String.fromCharCode(10)
+      + 'よろしいですか？')) { return; }
+
+    if (btn) { btn.disabled = true; btn.textContent = '足しています…'; }
+
+    fetch('/people/spot', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': token
+      },
+      body: JSON.stringify({ name: name })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    }).then(function (r) {
+      if (!r.ok || !r.data.ok) {
+        if (err) { err.style.display = ''; err.textContent = r.data.message || '足せませんでした。'; }
+        if (btn) { btn.disabled = false; btn.textContent = '＋ 臨時スタッフとして名簿に足して、この案件に入れる'; }
+        return;
+      }
+      // 足した人にチェックが入った状態で開き直す。
+      const url = new URL(window.location.href);
+      url.searchParams.set('added', r.data.id);
+      window.location.href = url.toString();
+    }).catch(function () {
+      if (err) { err.style.display = ''; err.textContent = '足せませんでした。通信の状態を確かめて、もう一度お試しください。'; }
+      if (btn) { btn.disabled = false; btn.textContent = '＋ 臨時スタッフとして名簿に足して、この案件に入れる'; }
+    });
   }
   // おすすめ順（点数の高い順・除外は末尾）と名前順を切り替える。行を並べ替えるだけ（表示/非表示は filterStaff が担当）。
   function sortRows() {

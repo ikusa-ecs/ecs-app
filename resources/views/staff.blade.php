@@ -146,6 +146,8 @@
             <option value="">ログイン：すべて</option>
             <option value="none">まだアカウント無し</option>
             <option value="invited">案内メール送信済み（未設定）</option>
+            <option value="spot">臨時スタッフのみ</option>
+            <option value="notspot">臨時スタッフを除く</option>
             <option value="temp">仮パスワード発行済み</option>
             <option value="ready">ログインできる</option>
             <option value="notready">まだログインできない人（まとめて）</option>
@@ -447,7 +449,9 @@
       temp:    ['仮パスワード発行済み', '#e0f2fe', '#0369a1'],
       none:    ['まだアカウント無し', '#f1ece4', '#7a6f63']
     };
-    var v = m[p.login] || m.none;
+    // 臨時スタッフ（インターン・知り合いの助っ人など）は、そもそもログインしない決まり。
+    // 「まだアカウント無し」と出すと、案内を送り忘れているように見えるので分けて出す（2026-08-25 baba）。
+    var v = p.spot ? ['臨時（ログインなし）', '#f1ece4', '#7a6f63'] : (m[p.login] || m.none);
     return '<span style="margin-left:6px; font-size:11px; padding:1px 8px; border-radius:999px; white-space:nowrap;'
       + 'background:' + v[1] + '; color:' + v[2] + ';">' + v[0] + '</span>';
   }
@@ -455,6 +459,8 @@
   // 「ログイン案内を送る」ボタン。メールが未登録ならその場で入力してもらう。
   function inviteHtml(p){
     if (!window.ECS_CAN_INVITE) return '';
+    // 臨時スタッフはログインしない＝案内メールの出番が無い（押しても断られる）。
+    if (p.spot) return '';
     var label = p.login === 'ready' ? '案内メールを送り直す' : '📧 ログイン案内メールを送る';
     var sub = p.invitedAt ? ('（前回 ' + p.invitedAt + ' に送信）') : '';
     return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px; flex-wrap:wrap;">
@@ -616,7 +622,10 @@
       const okPos = !fPos|| p.pos[fPos];
       // ログインの状態で絞る。「まだログインできない人」＝本人がパスワードを決めていない人ぜんぶ。
       const okLogin = !fLogin
-        || (fLogin === 'notready' ? (p.login !== 'ready') : (p.login === fLogin));
+        || (fLogin === 'spot' ? !!p.spot
+          : fLogin === 'notspot' ? !p.spot
+          : fLogin === 'notready' ? (p.login !== 'ready' && !p.spot)
+          : (p.login === fLogin && !p.spot));
       const okOffice = !fOffice || officeOf(p) === fOffice;
       const visible = okKw && okLv && okPos && okLogin && okOffice;
       mr.style.display = visible ? '' : 'none';
