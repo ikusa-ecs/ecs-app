@@ -9,6 +9,7 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\ClientName;
 use App\Support\CsvText;
+use App\Support\Headcount;
 use App\Support\MonthlySheetReader;
 use App\Support\OfficeScope;
 use App\Support\PersonLookup;
@@ -177,9 +178,9 @@ class PastProjectImportController extends Controller
                 ? "日程が読めません（{$rawDate}）。年から入れてください（例 2026-07-20）"
                 : '日程が空です（例 2026-07-20）';
         }
-        // 「5名」のように単位つきでも読める（月シートはこの書き方）。数字が1つも無ければエラー。
-        if ($count !== '' && $this->digits($count) === '') {
-            $errors[] = '運営人数が読めません（例 5 または 5名）';
+        // 「5名」のように単位つきでも、「6〜8人」のような範囲でも読める。数字が1つも無ければエラー。
+        if ($count !== '' && Headcount::parse($count)['max'] === null) {
+            $errors[] = '運営人数が読めません（例 5 ／ 5名 ／ 6〜8人）';
         }
 
         return [
@@ -547,7 +548,9 @@ class PastProjectImportController extends Controller
             'is_outdoor' => $get('屋内外') ? ($get('屋内外') === '屋外') : null,
             'lodging' => $get('宿泊') ?: null,
             'assembly_type' => $get('集合形式') ?: null,
-            'required_count' => $this->digits($count) !== '' ? (int) $this->digits($count) : null,
+            // ⚠ 数字だけ抜き出すと「6〜8」が「68」になる。範囲の読み取りは Headcount が正本。
+            'required_count' => Headcount::parse($count)['max'],
+            'required_count_min' => Headcount::parse($count)['min'],
             'guest_count' => $guests !== '' ? (int) $guests : null,
             'team_count' => $teams !== '' ? (int) $teams : null,
             'is_repeat' => $get('リピート') === 'あり',

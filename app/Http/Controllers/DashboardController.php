@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Support\DangerDays;
+use App\Support\Headcount;
 use Illuminate\Support\Carbon;
 
 /**
@@ -47,7 +48,7 @@ class DashboardController extends Controller
                     // fmt ＝ 実施形態の種別コード（real / long / online）。
                     // 危険日判定が c.fmt を見るので、format テキストから cases.js と同じ規則で求める。
                     'fmt'      => $this->fmtCode($p->format),
-                    'need'     => $p->required_count ?? '',
+                    'need'     => Headcount::label($p->required_count_min, $p->required_count),
                     'off'      => $off,
                     // 危険日カレンダーのマスにカーソルを当てたとき表示する案件の中身。
                     // 取り出し方は ProjectController の案件一覧と揃える（client / sales_owners 先頭 / 集合・解散時間）。

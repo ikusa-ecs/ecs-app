@@ -66,6 +66,8 @@ class ProjectFieldLabels
         // ── 人数 ──
         'staff_role'         => '運営体制',
         'required_count'     => '運営人数',
+        // ⚠ 範囲で入れたときの少ないほう（例 6〜8人 の 6）。多いほうは required_count。
+        'required_count_min' => '運営人数（下限）',
         'count_as_event'     => 'イベント数に数える',
         'count_tentative'    => '運営人数は仮',
         'guest_count'        => 'お客様人数',

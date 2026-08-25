@@ -339,7 +339,8 @@
             'inputs' => [['f' => 'guest_count', 'v' => $c['guests'], 't' => 'number', 'w' => 'num', 'ph' => '客', 'suf' => '名'], ['f' => 'team_count', 'v' => $c['teams'], 't' => 'number', 'w' => 'num', 'ph' => '組', 'suf' => '組']]],
           ['edit' => true, 'lbl' => '運営',
             'read' => ($c['need'] !== '' ? $c['need'] . '名' : ''), 'empty' => ($c['need'] === ''),
-            'inputs' => [['f' => 'required_count', 'v' => $c['need'], 't' => 'number', 'w' => 'num', 'ph' => '人数', 'suf' => '名']]],
+            // ⚠ 「6〜8」のような範囲も入れられるので、数字だけの欄（number）にしないこと（2026-08-25 baba）。
+            'inputs' => [['f' => 'required_count', 'v' => $c['need'], 't' => 'text', 'w' => 'num', 'ph' => '6〜8', 'suf' => '名']]],
           ['edit' => true, 'lbl' => '運営方式',
             'read' => $c['staffRole'], 'empty' => ($c['staffRole'] === ''),
             'inputs' => [['f' => 'staff_role', 'v' => $c['staffRole'], 'ph' => '運営方式', 'w' => 'wide']]],

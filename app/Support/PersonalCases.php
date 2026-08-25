@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\Headcount;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -119,7 +120,7 @@ class PersonalCases
             'sales' => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
             'status' => $p->status ?? '未着手',
             'note' => $p->note ?? '',
-            'need' => $p->required_count ?? '',
+            'need' => Headcount::label($p->required_count_min, $p->required_count),
             'fmt' => $fmt,
             // リストのバッジ用（大型・前泊・予備日・リハ）
             'scale' => $p->scale ?? '',

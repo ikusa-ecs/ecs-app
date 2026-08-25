@@ -9,6 +9,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\AssignmentRole;
+use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
@@ -226,7 +227,8 @@ class AssignSheetController extends Controller
                 'evEnd'       => $this->clean($p->event_end_time),
                 'guests'      => $p->guest_count !== null ? (string) $p->guest_count : '',
                 'teams'       => $p->team_count !== null ? (string) $p->team_count : '',
-                'need'        => $p->required_count !== null ? (string) $p->required_count : '',
+                // 「6〜8」のような範囲もそのまま出す（2026-08-25 baba）。
+                'need'        => Headcount::label($p->required_count_min, $p->required_count),
                 'format'      => $this->clean($p->format),
                 // 日付ヘッダーの色分け＝登録拠点が東北なら専用色（baba 2026-07-24）、それ以外は形態で色分け。
                 'typeKey'     => ($ownerOffice === '東北') ? 'tohoku' : $this->classifyType($p->format),
@@ -281,7 +283,13 @@ class AssignSheetController extends Controller
      * 公開ボードの時間保存と同じ「入れると保存」方式。送られてきた field だけを更新する。
      */
     /** 数字で保存する項目（空→null）。 */
-    private const INT_FIELDS = ['guest_count', 'team_count', 'required_count'];
+    private const INT_FIELDS = ['guest_count', 'team_count'];
+
+    /**
+     * 運営人数だけは「6〜8人」の範囲で入れられる（2026-08-25 baba）。
+     * 多いほうを required_count（＝計算に使う数字）、少ないほうを required_count_min に入れる。
+     */
+    private const RANGE_FIELD = 'required_count';
 
     /** はい/いいえ（真偽）で保存する項目（空→null＝未設定）。 */
     private const BOOL_FIELDS = ['is_multi', 'alcohol', 'prep_line_sent', 'prep_handover', 'prep_script'];
@@ -297,7 +305,8 @@ class AssignSheetController extends Controller
 
     public function updateProject(Request $request)
     {
-        $allowed = array_merge(self::TEXT_FIELDS, self::INT_FIELDS, self::BOOL_FIELDS);
+        $allowed = array_merge(self::TEXT_FIELDS, self::INT_FIELDS, self::BOOL_FIELDS,
+            [self::RANGE_FIELD]);
 
         $data = $request->validate([
             'project_id' => ['required', 'string'],
@@ -317,7 +326,13 @@ class AssignSheetController extends Controller
         $field = $data['field'];
         $value = trim((string) ($data['value'] ?? ''));
 
-        if (in_array($field, self::INT_FIELDS, true)) {
+        if ($field === self::RANGE_FIELD) {
+            // 運営人数だけは「6〜8人」の範囲で入れられる（2026-08-25 baba）。
+            // ⚠ 数字だけ抜き出すと「6〜8」が「68」になるので、必ず Headcount を通す。
+            $range = Headcount::parse($value);
+            $project->required_count = $range['max'];
+            $project->required_count_min = $range['min'];
+        } elseif (in_array($field, self::INT_FIELDS, true)) {
             $project->{$field} = ($value === '') ? null : (int) $value;
         } elseif (in_array($field, self::BOOL_FIELDS, true)) {
             // '有'/'1'/'true'＝はい、'無'/'0'/'false'＝いいえ、空＝未設定(null)。

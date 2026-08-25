@@ -15,6 +15,14 @@
     }
     .panel + .panel { margin-top: 20px; }
 
+    /* 複数選べる欄（音響機材・移動車両）。2026-08-25 baba要望 */
+    .multi-pick { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px 10px;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .multi-pick label { display: inline-flex; align-items: center; gap: 5px;
+      font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    .multi-pick input { margin: 0; }
+    .multi-pick .none { color: var(--muted); font-size: 12.5px; }
+
     /* フォームを2カラムに（共通の .form-grid を利用しつつ全幅指定を追加） */
     .form-grid { row-gap: 4px; }
     .form-grid .full { grid-column: 1 / -1; }
@@ -628,12 +636,18 @@
             <div class="triple">
               <div class="form-row">
                 <label>運営人数<span class="req-mark yellow">必須</span></label>
-                <input type="number" id="requiredCount" name="required_count" data-need="later" min="1" placeholder="例）16">
+                <!-- 「6〜8人」のような おおよその人数 も入れられる（2026-08-25 baba）。
+                     ⚠ type="number" だと「6〜8」が入力できないので text にしている。
+                        読み取りは App\Support\Headcount が正本。 -->
+                <input type="text" id="requiredCount" name="required_count" data-need="later"
+                       inputmode="numeric" placeholder="例）16 ／ 6〜8">
                 <div class="check-row tbd-row" style="margin-top:8px;">
                   <input type="checkbox" id="countTentative" name="count_tentative" class="tbd-check" data-tbd-for="requiredCount">
                   <label for="countTentative">人数は仮（未定）</label>
                 </div>
-                <div class="hint">当日の運営に入る人数（＝アサインする人数）。</div>
+                <div class="hint">当日の運営に入る人数（＝アサインする人数）。
+                  <b>「6〜8」のように幅を持たせて書けます。</b>
+                  その場合、募集・残り人数の計算は<b>多いほう（8名）</b>で行います。</div>
               </div>
               <div class="form-row">
                 <label>お客様（参加者）の人数<span class="req-mark yellow">必須</span></label>
@@ -710,16 +724,21 @@
             </select>
           </div>
 
-          <!-- 音響機材 ｜ 移動・車両（横並び・2026-08-18 baba要望） -->
+          <!-- 音響機材 ｜ 移動・車両（横並び・2026-08-18 baba要望）
+               2026-08-25 baba要望で「複数選べる」形にした。
+               選んだものは「電車+IKUSAカー」のようにつないで保存する
+               ＝表示や書き出しは今までのまま動く（列の作り替えが要らない）。 -->
           <div class="form-row non-arena">
-            <label>音響機材</label>
-<!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる。 -->
-            <select id="audioSel" name="audio_equipment"></select>
+            <label>音響機材<span class="muted" style="font-weight:400;">（いくつでも選べます）</span></label>
+            <!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる。 -->
+            <div class="multi-pick" id="audioPick"></div>
+            <input type="hidden" id="audioSel" name="audio_equipment">
           </div>
           <div class="form-row non-arena">
-            <label>移動・車両</label>
-<!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる。 -->
-            <select id="transportSel" name="transport"></select>
+            <label>移動・車両<span class="muted" style="font-weight:400;">（いくつでも選べます）</span></label>
+            <!-- 選択肢は拠点ごと（マスタ管理で編集）。中身はJSで入れる。 -->
+            <div class="multi-pick" id="transportPick"></div>
+            <input type="hidden" id="transportSel" name="transport">
           </div>
 
           <!-- ロゴ ｜ カメラ ｜ 事例記事 ｜ 動画（横4列） -->
@@ -1207,7 +1226,12 @@
   // サーバー側（ProjectController::store）は元々まとめて返している＝出し方をそろえた。
   function check() {
     const date = document.getElementById('startDate').value;
-    const count = parseInt(document.getElementById('requiredCount').value) || 0;
+    // 「6〜8」のような範囲でも「入力あり」と数える（数字が1つでもあればOK）。
+    // ⚠ parseInt だけだと全角や「6〜8」で 0 になり、入力済みなのに怒られる。
+    const countRaw = String(document.getElementById('requiredCount').value || '')
+      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); });
+    const countNums = countRaw.match(/\d+/g) || [];
+    const count = countNums.length ? Math.max.apply(null, countNums.map(Number)) : 0;
     const missing = [];   // 足りないものの文章
     let firstEl = null;   // 最初に直してほしい欄（あとでそこへ移動する）
 
@@ -1532,8 +1556,9 @@
     // 対象のプルダウン。blank＝先頭に置く「未定」等（空文字なら置かない）。
     const targets = [
       { id: 'assemblyTypeSel',   kind: 'assembly_type',   blank: '未定' },
-      { id: 'audioSel',          kind: 'audio_equipment', blank: '' },
-      { id: 'transportSel',      kind: 'transport',       blank: 'ー' },
+      // box が付いているものは「いくつでも選べる」欄（2026-08-25 baba）。
+      { id: 'audioSel',          kind: 'audio_equipment', blank: '',   box: 'audioPick' },
+      { id: 'transportSel',      kind: 'transport',       blank: 'ー', box: 'transportPick' },
       { id: 'operationPlaceSel', kind: 'operation_place', blank: '' },
     ];
     const all = window.ECS_OFFICE_OPTIONS || {};
@@ -1547,6 +1572,10 @@
       // （過去の案件を開いたときに値が消えないようにするため）。
       const keep = sel.value || (E[t.kind] || '');
       const list = Array.isArray(set[t.kind]) ? set[t.kind] : [];
+
+      // いくつでも選べる欄は、プルダウンではなくチェックボックスで作る。
+      if (t.box) { fillMultiPick(t, list, keep); return; }
+
       sel.innerHTML = '';
       if (t.blank !== '') {
         const o = document.createElement('option');
@@ -1565,6 +1594,73 @@
       }
       if (keep) sel.value = keep;
     });
+  }
+
+  // ===== いくつでも選べる欄（音響機材・移動車両）。2026-08-25 baba要望 =====
+  // 保存の形は今までと同じ1つの文字。選んだものを「+」でつないで入れる
+  // （例：電車+IKUSAカー）。マスタに元からある「電車+IKUSAカー」と同じ書き方なので、
+  // 一覧・アサイン表・書き出しは何も変えずにそのまま動く。
+
+  // 「電車+IKUSAカー」を ['電車','IKUSAカー'] にばらす。
+  function splitPicks(value) {
+    return String(value == null ? '' : value)
+      .split('+')
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s !== '' && s !== 'ー'; });
+  }
+
+  function pickEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fillMultiPick(t, list, keep) {
+    const box = document.getElementById(t.box);
+    const hidden = document.getElementById(t.id);
+    if (!box || !hidden) return;
+
+    const chosen = splitPicks(keep);
+
+    // マスタの「電車+IKUSAカー」のような組み合わせは、ばらして1つずつの選択肢にする
+    // ＝同じものが二重に並ばない（組み合わせは自分で選んで作れるようになったため）。
+    const atoms = [];
+    list.forEach(function (name) {
+      splitPicks(name).forEach(function (a) { if (atoms.indexOf(a) === -1) atoms.push(a); });
+    });
+    // 保存されている値が、その拠点の一覧に無くても消さない（過去の案件を開いたとき用）。
+    chosen.forEach(function (a) { if (atoms.indexOf(a) === -1) atoms.push(a); });
+
+    if (atoms.length === 0) {
+      box.innerHTML = '<span class="none">選択肢がありません（共通設定 → マスタ管理で追加できます）</span>';
+      hidden.value = '';
+      return;
+    }
+
+    box.innerHTML = atoms.map(function (a, i) {
+      const id = t.box + '_' + i;
+      const on = chosen.indexOf(a) !== -1 ? ' checked' : '';
+      return '<label for="' + id + '"><input type="checkbox" id="' + id + '" value="'
+        + pickEsc(a) + '"' + on + '>' + pickEsc(a) + '</label>';
+    }).join('');
+
+    Array.prototype.forEach.call(box.querySelectorAll('input[type="checkbox"]'), function (cb) {
+      cb.addEventListener('change', function () { syncMultiPick(t); });
+    });
+
+    syncMultiPick(t);
+  }
+
+  // チェックの状態を、送信用の hidden（例：電車+IKUSAカー）に写す。
+  function syncMultiPick(t) {
+    const box = document.getElementById(t.box);
+    const hidden = document.getElementById(t.id);
+    if (!box || !hidden) return;
+    const vals = [];
+    Array.prototype.forEach.call(box.querySelectorAll('input[type="checkbox"]'), function (cb) {
+      if (cb.checked) vals.push(cb.value);
+    });
+    hidden.value = vals.join('+');
   }
 
   // ===== リピート（常連）クライアントの照会 =====

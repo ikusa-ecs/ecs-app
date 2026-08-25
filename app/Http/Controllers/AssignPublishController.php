@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectAccess;
@@ -51,7 +52,8 @@ class AssignPublishController extends Controller
                 'client'    => $p->client ?? '',
                 'cat'       => $p->site_category ?? '通常',   // 現場種別（バッジ用）
                 'category'  => $p->category ?? '',            // 案件区分（通常案件/追加案件）
-                'need'      => $p->required_count ?? '—',
+                // 「6〜8」のような範囲もそのまま出す（2026-08-25 baba）。
+                'need'      => Headcount::label($p->required_count_min, $p->required_count) ?: '—',
                 'off'       => $off,
                 'added'     => $added,
                 'meet'      => $p->start_time ?? '—',          // 社員の集合時間

@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectHistory;
 use App\Support\CsvText;
 use App\Support\DirectorSync;
+use App\Support\Headcount;
 use App\Support\ProjectAccess;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
@@ -94,7 +95,8 @@ class ProjectController extends Controller
                 'placeShort' => $p->location ?? '',
                 'area'       => $p->operation_place ?? '',   // 運営場所（エリア）。アサイン表書き出し用
                 'meetPlace'  => $p->assembly_type ?? '',      // 集合形式。アサイン表書き出し用
-                'need'       => $p->required_count ?? '',      // 運営人数（必要人数）。アサイン表書き出し用
+                // 運営人数。「6〜8」のような範囲もそのまま出せる形にして渡す（2026-08-25 baba）。
+                'need'       => Headcount::label($p->required_count_min, $p->required_count),
                 'category'   => $p->category ?? '',
                 'toc'        => (bool) $p->is_toc,     // toC（一般消費者向け）＝一覧の絞り込み用
                 'yomi'       => $p->yomi ?? '',
@@ -281,7 +283,8 @@ class ProjectController extends Controller
                     'staff_dresscode'  => $p->staff_dresscode,
                     'staff_notes'      => $p->staff_notes,
                     'staff_role'       => $p->staff_role,
-                    'required_count'   => $p->required_count,
+                    // 編集フォームには「6〜8」の形で戻す（入れたとおりに直せるように）。
+                    'required_count'   => Headcount::label($p->required_count_min, $p->required_count),
                     'count_tentative'  => (bool) $p->count_tentative,
                     'guest_count'      => $p->guest_count,
                     'guest_count_type' => $p->guest_count_type,
@@ -499,7 +502,8 @@ class ProjectController extends Controller
             if (! $request->filled('start_date') && ! $request->boolean('date_tbd')) {
                 $errors['start_date'] = '開催日を入力するか、「日付未定」にチェックを入れてください。';
             }
-            $count = (int) $request->input('required_count', 0);
+            // 「6〜8人」のような範囲でもよい（2026-08-25 baba）。読み方は Headcount が正本。
+            $count = Headcount::parse($request->input('required_count'))['max'] ?? 0;
             if ($count < 1 && ! $request->boolean('count_tentative')) {
                 $errors['required_count'] = '運営人数を入力するか、「人数は仮（未定）」にチェックを入れてください。';
             }
@@ -624,7 +628,11 @@ class ProjectController extends Controller
             //   入力する場所をスタッフ公開ボードの「📣 スタッフに伝えること」1か所にまとめたため
             //   （2026-08-21 baba）。ここで拾うと、案件を保存し直すたびに空で上書きしてしまう。
             'staff_role' => $request->input('staff_role'),
-            'required_count' => $request->filled('required_count') ? (int) $request->input('required_count') : null,
+            // 運営人数は「6〜8人」のように範囲で入れられる（2026-08-25 baba）。
+            // ⚠ 計算に使う数字（required_count）は範囲の**多いほう**。
+            //   こうすると「残り○名」の計算をひとつも変えずに「8人埋まって初めて満員」になる。
+            'required_count' => Headcount::parse($request->input('required_count'))['max'],
+            'required_count_min' => Headcount::parse($request->input('required_count'))['min'],
             'count_tentative' => $request->has('count_tentative'),
             'guest_count' => $request->filled('guest_count') ? (int) $request->input('guest_count') : null,
             'guest_count_type' => $request->input('guestCount'),
@@ -708,8 +716,9 @@ class ProjectController extends Controller
             'director_id'    => ['nullable', 'string'],
             'sd_id'          => ['nullable', 'string'],
             'goods_owner_id' => ['nullable', 'string'],
-            'transport'      => ['nullable', 'string', 'max:100'],
-            'audio_equipment' => ['nullable', 'string', 'max:100'],
+            // 複数選べるようにしたので、つないだ文字（電車+IKUSAカー+...）が入る（2026-08-25 baba）。
+            'transport'      => ['nullable', 'string', 'max:200'],
+            'audio_equipment' => ['nullable', 'string', 'max:200'],
             // 備考（社員だけが見るメモ）。アサイン系の画面からもその場で直せるようにした（2026-08-21 baba）。
             'note'            => ['nullable', 'string', 'max:2000'],
             // アサイン状況。日別ボードの「✓ 確定にする」から保存する（2026-08-21 baba）。
@@ -918,8 +927,10 @@ class ProjectController extends Controller
                     ? "開催日が読めません（{$rawDate}）。年から入れてください（例 2026-07-20）"
                     : '開催日が空です（例 2026-07-20）';
             }
-            if ($count === '' || ! ctype_digit($count) || (int) $count < 1) {
-                $rowErrors[] = '運営人数が空または不正です';
+            // 「6〜8」のような範囲も受ける（2026-08-25 baba）。読み方は Headcount が正本。
+            // ⚠ ctype_digit だと「6〜8」を弾いてしまう。
+            if (($count === '') || (Headcount::parse($count)['max'] ?? 0) < 1) {
+                $rowErrors[] = '運営人数が空または不正です（例 16 ／ 6〜8）';
             }
             if ($rowErrors) {
                 $errors[] = "{$lineNo}行目（{$name}）：" . implode('／', $rowErrors);
@@ -960,7 +971,8 @@ class ProjectController extends Controller
                 'is_outdoor' => $get($row, '屋内外') ? ($get($row, '屋内外') === '屋外') : null,
                 'lodging' => $get($row, '宿泊') ?: null,
                 'assembly_type' => $get($row, '集合形式') ?: null,
-                'required_count' => (int) $count,
+                'required_count' => Headcount::parse((string) $count)['max'],
+                'required_count_min' => Headcount::parse((string) $count)['min'],
                 'guest_count' => ctype_digit($get($row, 'お客様人数')) ? (int) $get($row, 'お客様人数') : null,
                 'team_count' => ctype_digit($get($row, 'チーム数')) ? (int) $get($row, 'チーム数') : null,
                 'is_repeat' => $get($row, 'リピート') === 'あり',

@@ -165,7 +165,7 @@
         <div class="meta">
           <span>コンテンツ：<b>{{ $contentName }}</b></span>
           <span>日程：<b>{{ $date ? $date->format('Y/n/j') . '（' . ['日','月','火','水','木','金','土'][$date->dayOfWeek] . '）' : '未設定' }}</b></span>
-          <span>必要人数：<b>{{ $project->required_count ?? '—' }}名</b></span>
+          <span>必要人数：<b>{{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名</b></span>
           <span>会場：<b>{{ $project->location ?: '—' }}</b></span>
           <span>顧客：<b>{{ $project->client ?: '—' }}</b></span>
           <span>D：<b>{{ $project->director->name ?? '未定' }}</b></span>
@@ -189,7 +189,8 @@
       <input type="hidden" name="project_id" value="{{ $project->id }}">
 
       <div class="asg-bar">
-        <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ $project->required_count ?? '—' }}名</span></span>
+        {{-- 範囲で入っているときは「6〜8名」と出す。数え合わせは多いほう（data-need）で行う。 --}}
+        <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名</span></span>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="onlyAvail" checked onchange="filterStaff()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> この日 希望・稼働可 の人だけ</label>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="sortByScore" checked onchange="sortRows()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> おすすめ順に並べる</label>
         <button type="button" class="btn primary" id="autoPlaceBtn" onclick="autoPlace()" title="空いている必要人数ぶん、おすすめ上位を自動でチェックします（保存はしません）">✨ おすすめを自動で仮置き</button>

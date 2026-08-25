@@ -193,6 +193,29 @@
     .mini-field + .mini-field { margin-top: 5px; }
     .mini-field .mini-label { font-size: 11px; color: var(--muted); white-space: nowrap; width: 28px; }
 
+    /* 移動・音響を「いくつでも選べる」形にした（2026-08-25 baba要望）。
+       狭いセルに収めるため、いま選んでいるものを押すとチェックが開く。 */
+    .pick-pop { flex: 1; min-width: 0; }
+    .pick-pop > summary {
+      list-style: none; cursor: pointer; font-size: 12px; padding: 3px 8px;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pick-pop > summary::-webkit-details-marker { display: none; }
+    .pick-pop > summary:hover { background: #f6f1ea; }
+    .pick-pop[open] > summary { border-color: var(--brand, #8a5a2b); }
+    /* ⚠ その場で下に開く（浮かせない）。表が横スクロールする枠の中にあるので、
+       浮かせると枠に切られて見えなくなることがあるため。 */
+    .pick-pop .pick-list {
+      margin-top: 4px; max-height: 220px; overflow: auto; padding: 8px 10px;
+      background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    }
+    .pick-pop .pick-list label {
+      display: flex; align-items: center; gap: 6px; font-size: 12.5px;
+      padding: 3px 0; cursor: pointer; white-space: nowrap;
+    }
+    .pick-pop .pick-list input { margin: 0; }
+
     /* 備考の📝マーク（案件名の横） */
     .note-flag { font-size: 13px; margin-left: 5px; cursor: pointer; }
 
@@ -810,6 +833,76 @@
     return `<select class="cell-edit" onchange="onCellSaveText(${idx}, '${id}', '${field}', this)">${opts}</select>`;
   }
 
+  // ===== 移動・音響を「いくつでも選べる」形にする（2026-08-25 baba要望）=====
+  // 保存の形は今までと同じ1つの文字。選んだものを「+」でつないで入れる（例：電車+IKUSAカー）。
+  // ⚠ 一覧の表示・書き出しはこの文字をそのまま出しているので、何も変えずに動く。
+  // 見た目は「いま選んでいるもの」を押すと下にチェックが開く形（狭いセルに収めるため）。
+
+  // 画面に出す文字をそのまま埋め込まないための下ごしらえ。
+  function escHtml(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function escAttr(v) { return escHtml(v); }
+
+  // 「電車+IKUSAカー」を ['電車','IKUSAカー'] にばらす。
+  function splitPicks(value) {
+    return String(value == null ? '' : value)
+      .split('+')
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s !== '' && s !== 'ー'; });
+  }
+
+  function multiPickHtml(idx, id, field, options, currentVal, noneLabel) {
+    const chosen = splitPicks(currentVal);
+
+    // 一覧に元からある「電車+IKUSAカー」のような組み合わせは、ばらして1つずつにする
+    // ＝同じものが二重に並ばない（組み合わせは自分で選んで作れるようになったため）。
+    const atoms = [];
+    options.forEach(function (name) {
+      splitPicks(name).forEach(function (a) { if (atoms.indexOf(a) === -1) atoms.push(a); });
+    });
+    chosen.forEach(function (a) { if (atoms.indexOf(a) === -1) atoms.push(a); });
+
+    const boxId = 'pick_' + field + '_' + idx;
+    const label = chosen.length ? chosen.join('＋') : noneLabel;
+    const items = atoms.map(function (a, i) {
+      const on = chosen.indexOf(a) !== -1 ? ' checked' : '';
+      return '<label><input type="checkbox" value="' + escAttr(a) + '"' + on
+        + ' onchange="onMultiPickSave(' + idx + ', \'' + id + '\', \'' + field + '\', this)">'
+        + escHtml(a) + '</label>';
+    }).join('');
+
+    return '<details class="pick-pop" id="' + boxId + '">'
+      + '<summary>' + escHtml(label) + '</summary>'
+      + '<div class="pick-list">' + items + '</div>'
+      + '</details>';
+  }
+
+  // チェックを付け外しした瞬間にDBへ保存する（他の欄と同じ「変えたら保存」）。
+  function onMultiPickSave(idx, id, field, cb) {
+    const box = cb.closest('.pick-pop');
+    if (!box) return;
+    const vals = [];
+    Array.prototype.forEach.call(box.querySelectorAll('input[type="checkbox"]'), function (c) {
+      if (c.checked) vals.push(c.value);
+    });
+    const val = vals.join('+');
+
+    saveCell(id, field, val);
+
+    // 見出し（いま選んでいるもの）と手元のデータも更新する。
+    const sum = box.querySelector('summary');
+    if (sum) {
+      sum.textContent = vals.length
+        ? vals.join('＋')
+        : (field === 'transport' ? 'ー（未設定）' : '（未設定）');
+    }
+    if (field === 'transport')       projects[idx].transport = val || 'ー';
+    if (field === 'audio_equipment') projects[idx].sound = val;
+  }
+
   // 詳細セルをDBに保存（POST /projects/cells）。変えたキーだけ送る（他項目は消さない）。
   function saveCell(id, field, value) {
     const payload = { id: id };
@@ -1104,8 +1197,8 @@
             </div>
             <div class="d-item">
               <span class="d-label">移動・音響</span>
-              <div class="mini-field"><span class="mini-label">移動</span>${textSelectHtml(p._i, p.id, 'transport', TRANSPORTS, p.transport, 'ー（未設定）')}</div>
-              <div class="mini-field"><span class="mini-label">音響</span>${textSelectHtml(p._i, p.id, 'audio_equipment', SOUND, p.sound, '（未設定）')}</div>
+              <div class="mini-field"><span class="mini-label">移動</span>${multiPickHtml(p._i, p.id, 'transport', TRANSPORTS, p.transport, 'ー（未設定）')}</div>
+              <div class="mini-field"><span class="mini-label">音響</span>${multiPickHtml(p._i, p.id, 'audio_equipment', SOUND, p.sound, '（未設定）')}</div>
             </div>
             <div class="d-item" style="flex-basis:100%;">
               <span class="d-label">準備チェック・制作記録</span>

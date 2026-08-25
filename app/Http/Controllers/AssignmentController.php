@@ -11,6 +11,7 @@ use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
 use App\Support\AssignmentStamp;
+use App\Support\Headcount;
 use App\Support\ProjectAccess;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
@@ -224,8 +225,11 @@ class AssignmentController extends Controller
             'roleDetail' => $roleDetail,
             // 枠が出せないとき（ポジション別人数が未登録）に見せる目標人数。
             // 案件の運営人数が未入力なら既定5名（スタッフ画面の表示と同じ考え方・2026-08-20 baba）。
+            // 計算に使う数（範囲なら多いほう）。未入力のときは5名として扱う（今までどおり）。
             'needTotal' => ((int) ($project->required_count ?? 0)) > 0 ? (int) $project->required_count : 5,
             'needIsDefault' => ((int) ($project->required_count ?? 0)) <= 0,
+            // 画面に出す文字。「6〜8」のような範囲はそのまま見せる（2026-08-25 baba）。
+            'needLabel' => Headcount::label($project->required_count_min, $project->required_count),
             'noteOptions' => $noteOptions,
             'roleAssigned' => $roleAssigned,
             'sameDay' => $sameDay,
