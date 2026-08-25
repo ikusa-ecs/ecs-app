@@ -15,6 +15,10 @@
   {{-- ログイン案内メールのボタンを出すか＝管理者以上。 --}}
   window.ECS_CAN_INVITE = @json($canInvite ?? false);
   window.ECS_CSRF = '{{ csrf_token() }}';
+  {{-- 拠点で絞って見るための選択肢と、自分の拠点（2026-08-25 baba要望）。
+       ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
+  window.ECS_OFFICES = @json($offices ?? []);
+  window.ECS_MY_OFFICE = @json($myOffice ?? '');
   window.ECS_LV_LABEL = { new: '新人', mid: '中堅', vet: 'ベテラン' };
   window.ECS_yearsSince = function (joinDate) {
     if (!joinDate) return 0;
@@ -136,6 +140,8 @@
             <option value="SP">軍師・サポーター</option>
           </select>
           <!-- メールをもらった順に案内を送る運用のため、「まだの人」だけ出せるようにする。 -->
+          <!-- 拠点で絞る。選択肢は拠点マスタから（ここに拠点名を書かない）。既定は自分の拠点。 -->
+          <select id="fOffice" onchange="rosterFilter()"></select>
           <select id="fLogin" onchange="rosterFilter()">
             <option value="">ログイン：すべて</option>
             <option value="none">まだアカウント無し</option>
@@ -149,7 +155,9 @@
              title="アカウント発行画面が開きます。スタッフのログインアカウントはそこで発行します。">＋ スタッフを招待</a>
         </div>
 
-        <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>
+        <div class="count-line"><span id="countTxt">0</span> 名を表示中
+          <span class="muted" id="officeHint" style="font-size:11.5px;"></span>
+        </div>
 
         <table class="tbl">
           <thead>
@@ -213,6 +221,8 @@
             <option value="mid">中堅</option>
             <option value="vet">ベテラン</option>
           </select>
+          <!-- 名簿タブと同じく拠点で絞る（既定は自分の拠点）。 -->
+          <select id="wOffice" onchange="workFilter()"></select>
           <select id="fAct" onchange="workFilter()">
             <option value="">活性度：すべて</option>
             <option value="active">アクティブ</option>
@@ -557,10 +567,44 @@
   }
 
   // 絞り込み
+
+  // ===== 拠点（事務所）の絞り込み（2026-08-25 baba要望）=====
+  // ⚠ 事務所が空の人は「東京」として扱う。アプリの他の場所（案件・ボード）と同じ決まりで、
+  //   空の人がどの拠点にも出てこなくなるのを防ぐため。名簿の事務所の欄は「—」のままなので、
+  //   誰が未入力かは見て分かる。
+  function officeOf(p){
+    var o = (p && p.office ? String(p.office) : '').trim();
+    return o !== '' ? o : '東京';
+  }
+  // 拠点の選択肢を作る。既定は自分の拠点（「すべての拠点」も選べる）。
+  function buildOfficeFilter(selId){
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    var list = (window.ECS_OFFICES || []);
+    var mine = (window.ECS_MY_OFFICE || '').trim();
+    var html = '<option value="">拠点：すべて</option>';
+    list.forEach(function(o){
+      html += '<option value="' + o + '"' + (o === mine ? ' selected' : '') + '>' + o + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  // 「いま何拠点で絞っているか」を件数の横に出す。
+  // ⚠ 既定が自分の拠点なので、これが無いと「他拠点の人が消えた」と誤解されるため。
+  function showOfficeHint(office){
+    var el = document.getElementById('officeHint');
+    if (!el) return;
+    el.textContent = office
+      ? '（' + office + 'の人だけを表示中。他の拠点も見るときは「拠点：すべて」を選んでください）'
+      : '（すべての拠点を表示中）';
+  }
+
   function applyFilter(){
     const kw  = document.getElementById('kw').value.trim();
     const fLv = document.getElementById('fLv').value;
     const fPos= document.getElementById('fPos').value;
+    const fOfficeEl = document.getElementById('fOffice');
+    const fOffice = fOfficeEl ? fOfficeEl.value : '';
     const fLoginEl = document.getElementById('fLogin');
     const fLogin = fLoginEl ? fLoginEl.value : '';
     let shown = 0;
@@ -573,13 +617,15 @@
       // ログインの状態で絞る。「まだログインできない人」＝本人がパスワードを決めていない人ぜんぶ。
       const okLogin = !fLogin
         || (fLogin === 'notready' ? (p.login !== 'ready') : (p.login === fLogin));
-      const visible = okKw && okLv && okPos && okLogin;
+      const okOffice = !fOffice || officeOf(p) === fOffice;
+      const visible = okKw && okLv && okPos && okLogin && okOffice;
       mr.style.display = visible ? '' : 'none';
       if (!visible && dr) { dr.style.display = 'none';
         const t = mr.querySelector('.row-toggle'); if (t) t.innerHTML = '詳細 ▾'; }
       if (visible) shown++;
     });
     document.getElementById('countTxt').textContent = shown;
+    showOfficeHint(fOffice);
   }
 
   // 詳細パネルの「保存する」→ 可否(OP/MC/SP)・専属・人柄・NG・メモをDBへ保存（AJAX）。
@@ -644,6 +690,7 @@
   window.rosterToggle = toggleDetail;
   window.rosterSave = saveStaff;
 
+  buildOfficeFilter('fOffice');
   render();
   })();
 </script>
@@ -719,6 +766,8 @@
       const tr = document.createElement('tr');
       tr.dataset.lv = lvOf(p.total);
       tr.dataset.act = p.active;
+      // 事務所が空の人は「東京」扱い（名簿タブと同じ決まり）。
+      tr.dataset.office = (p.office && String(p.office).trim()) ? String(p.office).trim() : '東京';
       const renkinCls = p.renkin >= 5 ? 'bad' : (p.renkin >= 4 ? 'warn' : '');
       tr.innerHTML = `
         <td><strong>${p.name}</strong><br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
@@ -767,15 +816,30 @@
     document.getElementById('cInactive').textContent = inactive.length;
   }
 
+  // 拠点の選択肢を作る（既定は自分の拠点）。名簿タブとは別の囲いなので同じものをここにも置く。
+  function buildWorkOfficeFilter(){
+    var sel = document.getElementById('wOffice');
+    if (!sel) return;
+    var mine = (window.ECS_MY_OFFICE || '').trim();
+    var html = '<option value="">拠点：すべて</option>';
+    (window.ECS_OFFICES || []).forEach(function(o){
+      html += '<option value="' + o + '"' + (o === mine ? ' selected' : '') + '>' + o + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
   // 絞り込み
   function applyFilter(){
     const fLv = document.getElementById('wLv').value;
     const fAct= document.getElementById('fAct').value;
+    const fOfficeEl = document.getElementById('wOffice');
+    const fOffice = fOfficeEl ? fOfficeEl.value : '';
     let shown = 0;
     tbody.querySelectorAll('tr').forEach(tr => {
       const okLv  = !fLv  || tr.dataset.lv === fLv;
       const okAct = !fAct || tr.dataset.act === fAct;
-      const visible = okLv && okAct;
+      const okOffice = !fOffice || tr.dataset.office === fOffice;
+      const visible = okLv && okAct && okOffice;
       tr.style.display = visible ? '' : 'none';
       if (visible) shown++;
     });
@@ -786,6 +850,7 @@
   window.workFilter = applyFilter;
   window.workRender = render;
 
+  buildWorkOfficeFilter();
   renderSummary();
   render();
   })();

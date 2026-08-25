@@ -1,0 +1,75 @@
+<?php
+
+namespace Tests\Feature;
+
+use Database\Factories\PersonFactory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * 社員名簿・スタッフ名簿を「拠点ごと」に見られるようにした（2026-08-25 baba要望）。
+ *
+ * 作り＝画面の絞り込み（他の絞り込みと同じ並び）。
+ *  ・既定は自分の拠点。「拠点：すべて」も選べる
+ *    （他拠点へヘルプに行く／来てもらう運用があるので、他拠点の人を探せなくならないようにする）
+ *  ・拠点名は画面に書かず、拠点マスタ（Office）から作る＝拠点が増えても直さなくてよい
+ */
+class RosterOfficeFilterTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** 両方の名簿に「拠点の絞り込み」があり、既定が自分の拠点になっている。 */
+    public function test_both_rosters_have_office_filter_defaulting_to_own_office(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-200', 'office' => '東北', 'permission' => 'manager', 'must_onboard' => false,
+        ]);
+
+        foreach (['/employees', '/staff'] as $url) {
+            $html = $this->actingAsPerson($me)->get($url)->assertOk()->getContent();
+
+            $this->assertStringContainsString('id="fOffice"', $html, "{$url} に拠点の絞り込みがあること");
+            // 既定＝自分の拠点。画面へは @json で渡るので、日本語はエスケープされた形になる。
+            $this->assertStringContainsString(
+                'window.ECS_MY_OFFICE = '.json_encode('東北', JSON_UNESCAPED_SLASHES), $html);
+            // 選択肢は拠点マスタから作る（画面に拠点名を直書きしない）。
+            $this->assertStringContainsString('window.ECS_OFFICES = ', $html);
+            $this->assertStringContainsString(json_encode('東北', JSON_UNESCAPED_SLASHES), $html);
+        }
+    }
+
+    /** 稼働状況タブも拠点で絞れるよう、人ごとの拠点が渡っている。 */
+    public function test_staff_status_rows_carry_office(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-201', 'office' => '東京', 'permission' => 'manager', 'must_onboard' => false,
+        ]);
+        PersonFactory::new()->create([
+            'id' => 'S-201', 'name' => '東北のスタッフ', 'role' => 'staff', 'permission' => 'staff',
+            'office' => '東北', 'must_onboard' => false,
+        ]);
+
+        $status = $this->actingAsPerson($me)->get('/staff')->assertOk()->viewData('status');
+
+        $row = collect($status)->firstWhere('id', 'S-201');
+        $this->assertNotNull($row, '稼働状況にスタッフが並ぶこと');
+        $this->assertSame('東北', $row['office']);
+    }
+
+    /** 一般社員でも「拠点：すべて」で他拠点の人を探せる（＝隠すのではなく絞り込み）。 */
+    public function test_roster_still_contains_other_office_people(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-202', 'office' => '東京', 'permission' => 'employee', 'must_onboard' => false,
+        ]);
+        PersonFactory::new()->create([
+            'id' => 'S-202', 'name' => '大阪のスタッフ', 'role' => 'staff', 'permission' => 'staff',
+            'office' => '大阪', 'must_onboard' => false,
+        ]);
+
+        $people = $this->actingAsPerson($me)->get('/staff')->assertOk()->viewData('people');
+
+        $this->assertNotNull(collect($people)->firstWhere('id', 'S-202'),
+            '他拠点の人も画面には渡っている（絞り込みで出し分けるだけ）');
+    }
+}

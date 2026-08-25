@@ -18,6 +18,10 @@
   window.ECS_DEPT_ALL = @json(\App\Support\Departments::ALL);
   {{-- ログイン案内メールのボタンを出すか＝管理者以上。 --}}
   window.ECS_CAN_INVITE = @json($canInvite ?? false);
+  {{-- 拠点で絞って見るための選択肢と、自分の拠点（2026-08-25 baba要望）。
+       ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
+  window.ECS_OFFICES = @json($offices ?? []);
+  window.ECS_MY_OFFICE = @json($myOffice ?? '');
 </script>
 {{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
 <style>
@@ -90,11 +94,15 @@
             <option value="">新人：すべて</option>
             <option value="fresh">新人（入社半年以内）のみ</option>
           </select>
+          <!-- 拠点で絞る。選択肢は拠点マスタから（ここに拠点名を書かない）。既定は自分の拠点。 -->
+          <select id="fOffice" onchange="applyFilter()"></select>
           <div class="spacer"></div>
           <a class="btn primary" href="/account-new" title="アカウント発行画面が開きます。社員のログインアカウントはそこで発行します。">＋ 社員を追加</a>
         </div>
 
-        <div class="count-line"><span id="countTxt">0</span> 名を表示中</div>
+        <div class="count-line"><span id="countTxt">0</span> 名を表示中
+          <span class="muted" id="officeHint" style="font-size:11.5px;"></span>
+        </div>
 
         <table class="tbl">
           <thead>
@@ -520,10 +528,44 @@
   }
 
   // 絞り込み
+
+  // ===== 拠点（事務所）の絞り込み（2026-08-25 baba要望）=====
+  // ⚠ 事務所が空の人は「東京」として扱う。アプリの他の場所（案件・ボード）と同じ決まりで、
+  //   空の人がどの拠点にも出てこなくなるのを防ぐため。名簿の事務所の欄は「—」のままなので、
+  //   誰が未入力かは見て分かる。
+  function officeOf(p){
+    var o = (p && p.office ? String(p.office) : '').trim();
+    return o !== '' ? o : '東京';
+  }
+  // 拠点の選択肢を作る。既定は自分の拠点（「すべての拠点」も選べる）。
+  function buildOfficeFilter(selId){
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    var list = (window.ECS_OFFICES || []);
+    var mine = (window.ECS_MY_OFFICE || '').trim();
+    var html = '<option value="">拠点：すべて</option>';
+    list.forEach(function(o){
+      html += '<option value="' + o + '"' + (o === mine ? ' selected' : '') + '>' + o + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  // 「いま何拠点で絞っているか」を件数の横に出す。
+  // ⚠ 既定が自分の拠点なので、これが無いと「他拠点の人が消えた」と誤解されるため。
+  function showOfficeHint(office){
+    var el = document.getElementById('officeHint');
+    if (!el) return;
+    el.textContent = office
+      ? '（' + office + 'の人だけを表示中。他の拠点も見るときは「拠点：すべて」を選んでください）'
+      : '（すべての拠点を表示中）';
+  }
+
   function applyFilter(){
     const kw     = document.getElementById('kw').value.trim();
     const fDept  = document.getElementById('fDept').value;
     const fFresh = document.getElementById('fFresh').value;
+    const fOfficeEl = document.getElementById('fOffice');
+    const fOffice = fOfficeEl ? fOfficeEl.value : '';
     let shown = 0;
     employees.forEach((p, idx) => {
       const mr = tbody.querySelector(`tr.main-row[data-idx="${idx}"]`);
@@ -535,15 +577,18 @@
         || p.dept === fDept
         || (Array.isArray(p.depts) && p.depts.some(function(d){ return d.code === fDept; }));
       const okFresh = !fFresh|| fresh;
-      const visible = okKw && okDept && okFresh;
+      const okOffice = !fOffice || officeOf(p) === fOffice;
+      const visible = okKw && okDept && okFresh && okOffice;
       mr.style.display = visible ? '' : 'none';
       if (!visible && dr) { dr.style.display = 'none';
         const t = mr.querySelector('.row-toggle'); if (t) t.innerHTML = '詳細 ▾'; }
       if (visible) shown++;
     });
     document.getElementById('countTxt').textContent = shown;
+    showOfficeHint(fOffice);
   }
 
+  buildOfficeFilter('fOffice');
   render();
 </script>
 @endverbatim

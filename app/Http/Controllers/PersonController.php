@@ -9,6 +9,7 @@ use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\Departments;
 use App\Support\LoginInvite;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
@@ -85,6 +86,9 @@ class PersonController extends Controller
             ->values();
 
         return view('employees', [
+            // 拠点で絞って見るための選択肢（2026-08-25 baba要望）。既定は自分の拠点。
+            'offices' => OfficeScope::options(),
+            'myOffice' => OfficeScope::filterSingle(request()),
             'employees'      => $employees,
             'contentOptions' => $contentOptions,
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
@@ -331,6 +335,11 @@ class PersonController extends Controller
         return view('staff', [
             'people' => $people,
             'status' => $status,
+            // 拠点で絞って見るための選択肢（2026-08-25 baba要望）。
+            // 既定は自分の拠点。「すべての拠点」も選べる＝他拠点の人を探せなくならないように
+            // （他拠点へヘルプに行く／来てもらう運用があるため）。
+            'offices' => OfficeScope::options(),
+            'myOffice' => OfficeScope::filterSingle(request()),
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
             // ログイン案内メールを送れるか＝管理者以上（アカウント発行と同じ扱い）。

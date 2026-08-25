@@ -97,6 +97,8 @@ class StaffStatusController extends Controller
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
+                    // 拠点で絞って見るために渡す（2026-08-25 baba要望）。
+                    'office' => $p->office ?? '',
                     'active' => $active,
                     'month' => $month,
                     'cap' => 20,
