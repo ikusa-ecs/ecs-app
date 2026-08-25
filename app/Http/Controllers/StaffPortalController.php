@@ -6,11 +6,11 @@ use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
-use App\Models\Setting;
 use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
+use App\Support\OfficeSettings;
 use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
@@ -131,7 +131,8 @@ class StaffPortalController extends Controller
         return view('staff_portal', [
             'published' => $published,
             'recruitJobs' => $this->recruitJobs($today, $me),
-            'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
+            // お知らせ文＝本人の拠点のもの（2026-08-25 baba要望：拠点ごとに出し分ける）。
+            'notice' => OfficeSettings::get(OfficeSettings::NOTICE, OfficeScope::filter(request())),
             // 体験用（見本）アカウントか。true のときは応募・希望が保存されないので、
             // 画面の上に注意を出す（2026-08-21 baba：保存されないのに応募できたように見えた）。
             'mockOnly' => (! $me || TestAccounts::isMockOnly($me)),
@@ -535,8 +536,9 @@ class StaffPortalController extends Controller
 
         $contentNames = Content::pluck('content_name', 'id');
 
-        // 通常案件の締切＝全体で1つの「一斉締切日」（settings）。追加案件は下の deadlineLabel で個別計算。
-        $bulkDeadline = trim((string) Setting::get('entry_deadline', ''));
+        // 通常案件の締切＝**その拠点の**「一斉締切日」（settings）。追加案件は下の deadlineLabel で個別計算。
+        // ⚠ 以前は全国共通だったため、東京の締切が東北のスタッフにも出ていた（2026-08-25 baba）。
+        $bulkDeadline = OfficeSettings::get(OfficeSettings::DEADLINE, $office);
 
         return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps) {
             $off = $p->start_date

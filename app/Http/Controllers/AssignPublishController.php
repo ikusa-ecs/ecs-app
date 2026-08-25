@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
-use App\Models\Setting;
 use App\Support\OfficeScope;
+use App\Support\OfficeSettings;
 use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -70,8 +70,10 @@ class AssignPublishController extends Controller
 
         return view('assign_publish', [
             'cases'  => $cases,
-            'notice' => Setting::get('staff_notice', ''),   // スタッフ画面のお知らせ文（DB保存）
-            'entryDeadline' => Setting::get('entry_deadline', ''), // 通常案件の一斉締切日（DB保存・空=未設定）
+            // お知らせ文・締切日は「今見ている拠点」のもの（2026-08-25 baba要望）。
+            // ⚠ 以前は全国共通だったため、東京で直すと東北のスタッフ画面まで変わっていた。
+            'notice' => OfficeSettings::get(OfficeSettings::NOTICE, $office),
+            'entryDeadline' => OfficeSettings::get(OfficeSettings::DEADLINE, $office),
             'officeScope' => $office,                       // 今絞っている拠点（null＝全拠点）。注記に使う
         ]);
     }
@@ -147,16 +149,47 @@ class AssignPublishController extends Controller
 
     /**
      * スタッフ画面のお知らせ文を DB に保存する（空＝既定文に戻す）。
+     * 保存先は**拠点ごと**。どの拠点かは画面が送ってくる office で決める。
      */
     public function setNotice(Request $request)
     {
         $data = $request->validate([
             'notice' => ['nullable', 'string', 'max:2000'],
+            'office' => ['nullable', 'string'],
         ]);
 
-        Setting::put('staff_notice', trim((string) ($data['notice'] ?? '')));
+        $office = $this->editableOffice($request, $data['office'] ?? '');
+        if ($office === null) {
+            return response()->json(['ok' => false, 'message' => '他の拠点の設定は変えられません。'], 403);
+        }
 
-        return response()->json(['ok' => true]);
+        OfficeSettings::put(OfficeSettings::NOTICE, $office, (string) ($data['notice'] ?? ''));
+
+        return response()->json(['ok' => true, 'office' => $office]);
+    }
+
+    /**
+     * 「この拠点の設定を変えてよいか」を確かめて、保存先の拠点名を返す（だめなら null）。
+     *
+     * ⚠ 画面から送られてきた拠点名をそのまま信じない。
+     *   一般社員が他拠点のお知らせ文を書き換えられてしまわないようにするため
+     *   （公開ボードは拠点を1つに絞って使う画面・2026-08-21 の決まりと同じ考え方）。
+     */
+    private function editableOffice(Request $request, string $sent): ?string
+    {
+        $sent = trim($sent);
+        $mine = OfficeScope::filterSingle($request);
+
+        if ($sent === '' || $sent === $mine) {
+            return $mine;
+        }
+
+        // 管理者以上は拠点スイッチで他拠点を見られるので、実在する拠点なら保存してよい。
+        if (OfficeScope::canSeeAll() && in_array($sent, OfficeScope::options(), true)) {
+            return $sent;
+        }
+
+        return null;
     }
 
     /**
@@ -304,17 +337,23 @@ class AssignPublishController extends Controller
     }
 
     /**
-     * 通常案件の「一斉の締切日」を DB に保存する（全体で1つ・空＝未設定に戻す）。
-     * 受け取り：date（YYYY-MM-DD もしくは空）。
+     * 通常案件の「一斉の締切日」を DB に保存する（**拠点ごとに1つ**・空＝未設定に戻す）。
+     * 受け取り：date（YYYY-MM-DD もしくは空）＋ office（どの拠点の締切か）。
      */
     public function setDeadline(Request $request)
     {
         $data = $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
+            'office' => ['nullable', 'string'],
         ]);
 
-        Setting::put('entry_deadline', $data['date'] ?? '');
+        $office = $this->editableOffice($request, $data['office'] ?? '');
+        if ($office === null) {
+            return response()->json(['ok' => false, 'message' => '他の拠点の設定は変えられません。'], 403);
+        }
 
-        return response()->json(['ok' => true]);
+        OfficeSettings::put(OfficeSettings::DEADLINE, $office, (string) ($data['date'] ?? ''));
+
+        return response()->json(['ok' => true, 'office' => $office]);
     }
 }

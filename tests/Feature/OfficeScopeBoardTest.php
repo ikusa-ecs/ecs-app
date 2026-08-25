@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\Assignment;
+use App\Support\OfficeSettings;
 use Database\Factories\PersonFactory;
 use Database\Factories\ProjectFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -238,5 +239,42 @@ class OfficeScopeBoardTest extends TestCase
         $this->assertContains($tokyoJob->id, $ids);
         $this->assertContains($osakaApplied->id, $ids, '応募済みの案件は他拠点でも残す');
         $this->assertNotContains($osakaJob->id, $ids, '関係のない他拠点の募集は出さない');
+    }
+
+    /**
+     * スタッフ画面のお知らせ文は、その人の拠点のものが出る（2026-08-25 baba要望）。
+     * ⚠ 以前は全国共通で、東京で直すと東北のスタッフの画面まで変わっていた。
+     */
+    public function test_staff_sees_notice_of_own_office(): void
+    {
+        OfficeSettings::put(OfficeSettings::NOTICE, '東京', '東京のお知らせです。');
+        OfficeSettings::put(OfficeSettings::NOTICE, '東北', '東北のお知らせです。');
+
+        $tokyo = PersonFactory::new()->create(['id' => 'S-901', 'role' => 'staff', 'permission' => 'staff', 'office' => '東京', 'must_onboard' => false]);
+        $tohoku = PersonFactory::new()->create(['id' => 'S-902', 'role' => 'staff', 'permission' => 'staff', 'office' => '東北', 'must_onboard' => false]);
+
+        $this->actingAsPerson($tokyo)->get('/staff-portal')->assertOk()
+            ->assertViewHas('notice', '東京のお知らせです。');
+        $this->actingAsPerson($tohoku)->get('/staff-portal')->assertOk()
+            ->assertViewHas('notice', '東北のお知らせです。');
+    }
+
+    /** 通常案件の締切日も、その人の拠点のものが出る。 */
+    public function test_staff_sees_deadline_of_own_office(): void
+    {
+        OfficeSettings::put(OfficeSettings::DEADLINE, '東京', '2026-09-10');
+        OfficeSettings::put(OfficeSettings::DEADLINE, '東北', '2026-09-20');
+
+        ProjectFactory::new()->create([
+            'office' => '東北', 'start_date' => $this->soon(10),
+            'staff_published' => true, 'is_recruiting' => true, 'category' => '通常案件',
+        ]);
+
+        $tohoku = PersonFactory::new()->create(['id' => 'S-903', 'role' => 'staff', 'permission' => 'staff', 'office' => '東北', 'must_onboard' => false]);
+        $jobs = $this->actingAsPerson($tohoku)->get('/staff-portal')->assertOk()
+            ->viewData('recruitJobs');
+
+        $this->assertNotEmpty($jobs, '東北のスタッフに東北の募集が出ること');
+        $this->assertStringContainsString('9/20', (string) $jobs->first()['deadline']);
     }
 }

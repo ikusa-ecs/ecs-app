@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Project;
 use App\Models\Setting;
+use App\Support\OfficeSettings;
 use Database\Factories\PersonFactory;
 use Database\Factories\ProjectFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,8 +106,15 @@ class AssignPublishBoardTest extends TestCase
         $fresh = Project::find($project->id);
         $this->assertSame('08:30', $fresh->staff_meet_time);
         $this->assertSame('18:00', $fresh->staff_leave_time);
-        $this->assertSame('テスト用のお知らせ文です。', Setting::get('staff_notice'));
-        $this->assertSame('2026-08-25', Setting::get('entry_deadline'));
+        // お知らせ文・締切日は**拠点ごと**に持つ（2026-08-25 baba要望）。
+        // この社員の拠点＝東京なので、東京のキーに入っていること。
+        $this->assertSame('テスト用のお知らせ文です。',
+            OfficeSettings::get(OfficeSettings::NOTICE, '東京'));
+        $this->assertSame('2026-08-25',
+            OfficeSettings::get(OfficeSettings::DEADLINE, '東京'));
+        // 全国共通だった置き場には書かない（他拠点まで変わってしまうため）。
+        $this->assertNull(Setting::get('staff_notice'));
+        $this->assertNull(Setting::get('entry_deadline'));
 
         // 画面(index)を開き直しても、お知らせ・締切がそのまま渡っている＝再取得で残る。
         $view = $this->actingAsPerson($employee)->get('/assign-publish');
@@ -137,5 +145,46 @@ class AssignPublishBoardTest extends TestCase
         $fresh = Project::find($project->id);
         $this->assertNull($fresh->staff_meet_time);
         $this->assertNull($fresh->staff_leave_time);
+    }
+
+    /**
+     * お知らせ文・締切日は**拠点ごと**（2026-08-25 baba要望）。
+     * ⚠ 以前は全国共通だったため、東京で直すと東北のスタッフ画面まで変わっていた。
+     */
+    public function test_notice_and_deadline_are_kept_per_office(): void
+    {
+        $tokyo = PersonFactory::new()->create(['id' => 'E-101', 'office' => '東京', 'permission' => 'employee']);
+        $tohoku = PersonFactory::new()->create(['id' => 'E-102', 'office' => '東北', 'permission' => 'employee']);
+
+        $this->actingAsPerson($tokyo)->postJson('/assign-publish/notice', [
+            'notice' => '東京のお知らせです。', 'office' => '東京',
+        ])->assertOk();
+        $this->actingAsPerson($tohoku)->postJson('/assign-publish/notice', [
+            'notice' => '東北のお知らせです。', 'office' => '東北',
+        ])->assertOk();
+
+        $this->assertSame('東京のお知らせです。', OfficeSettings::get(OfficeSettings::NOTICE, '東京'));
+        $this->assertSame('東北のお知らせです。', OfficeSettings::get(OfficeSettings::NOTICE, '東北'));
+
+        // それぞれの画面には自分の拠点の文が出る。
+        $this->actingAsPerson($tokyo)->get('/assign-publish')
+            ->assertViewHas('notice', '東京のお知らせです。');
+        $this->actingAsPerson($tohoku)->get('/assign-publish')
+            ->assertViewHas('notice', '東北のお知らせです。');
+    }
+
+    /**
+     * 一般社員は、他の拠点のお知らせ文を書き換えられない。
+     * ⚠ 画面から送られてきた拠点名をそのまま信じると、他拠点のスタッフ画面を変えられてしまう。
+     */
+    public function test_employee_cannot_edit_another_office_notice(): void
+    {
+        $tokyo = PersonFactory::new()->create(['id' => 'E-103', 'office' => '東京', 'permission' => 'employee']);
+
+        $this->actingAsPerson($tokyo)->postJson('/assign-publish/notice', [
+            'notice' => '勝手に書き換え', 'office' => '東北',
+        ])->assertStatus(403);
+
+        $this->assertSame('', OfficeSettings::get(OfficeSettings::NOTICE, '東北'));
     }
 }

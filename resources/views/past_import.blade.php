@@ -109,6 +109,21 @@
     {{-- 実登録はこのフォームでCSVファイルそのものをPOSTし、サーバーが読み直して登録する。 --}}
     <form id="pjForm" method="POST" action="/past-import" enctype="multipart/form-data">
       @csrf
+      {{-- ⚠ どの拠点の案件として入れるか。他拠点のアサイン表を代わりに取り込むことがあるため、
+           取り込んだ人の拠点で決め打ちにしない（2026-08-25 baba）。 --}}
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+        <label for="pjOffice" style="font-size:13px;"><b>どの拠点の案件として入れますか</b></label>
+        <select name="office" id="pjOffice"
+                style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+          @foreach ($offices as $o)
+            <option value="{{ $o }}" @selected($o === $myOffice)>{{ $o }}</option>
+          @endforeach
+        </select>
+        <span class="muted" style="font-size:11.5px;">
+          ※ 東北のアサイン表を東京の方が取り込むときは、ここを<b>東北</b>にしてください。
+          ここが違うと、その拠点の案件一覧に出てきません。
+        </span>
+      </div>
       <div class="pj-drop" id="pjDrop">
         ここにCSVをドラッグ＆ドロップ、または<br>
         <input type="file" name="csv" id="pjFile" accept=".csv,text/csv" style="margin-top:8px;">
@@ -275,7 +290,8 @@
   function pjSubmit() {
     var f = document.getElementById('pjFile').files[0];
     if (!f) { alert('先にCSVファイルを選んでください。'); return; }
-    var msg = ['過去案件を取り込みます。',
+    var office = document.getElementById('pjOffice').value;
+    var msg = ['過去案件を「' + office + '」の案件として取り込みます。',
                '',
                '・案件は「確定」・スタッフに公開済みで入ります',
                '・アサイン表に名前のある人は「確定」のアサインで入ります',

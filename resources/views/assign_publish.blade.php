@@ -200,9 +200,9 @@
       <!-- スタッフ画面のお知らせ文の編集 -->
       <div class="panel notice-edit">
         <div class="panel-head">
-          <h2>📣 スタッフ画面の上のお知らせ文</h2>
+          <h2>📣 スタッフ画面の上のお知らせ文（{{ $officeScope }}）</h2>
           <div class="spacer"></div>
-          <span class="muted" style="font-size:12px;">スタッフ画面（募集タブ）の一番上に出る文です</span>
+          <span class="muted" style="font-size:12px;">{{ $officeScope }}のスタッフの画面（募集タブ）の一番上に出る文です</span>
         </div>
         <textarea id="noticeInput" placeholder="例）7月分の募集が出ています。気になる案件は「エントリーする」を押してください。"></textarea>
         <div class="row">
@@ -210,14 +210,18 @@
           <button class="btn" onclick="resetNotice()">既定の文に戻す</button>
           <span class="saved" id="noticeSaved">✓ 保存しました（スタッフ画面に反映されます）</span>
         </div>
+        <p class="muted" style="font-size:11.5px; margin:8px 0 0;">
+          ※ この文は<b>{{ $officeScope }}のスタッフにだけ</b>出ます（拠点ごとに別の文にできます・2026-08-25）。
+          他の拠点の文を直すときは、上の拠点スイッチで切り替えてください。
+        </p>
       </div>
 
-      <!-- 通常案件の一斉締切日（全体で1つ） -->
+      <!-- 通常案件の一斉締切日（拠点ごとに1つ） -->
       <div class="panel notice-edit">
         <div class="panel-head">
-          <h2>🗓 通常案件の締切日（一斉）</h2>
+          <h2>🗓 通常案件の締切日（一斉・{{ $officeScope }}）</h2>
           <div class="spacer"></div>
-          <span class="muted" style="font-size:12px;">月まとめで公開した通常案件の締切として、スタッフ画面に表示されます</span>
+          <span class="muted" style="font-size:12px;">月まとめで公開した通常案件の締切として、{{ $officeScope }}のスタッフの画面に表示されます</span>
         </div>
         <div class="row">
           <input id="deadlineInput" type="date" style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
@@ -226,6 +230,7 @@
           <span class="saved" id="deadlineSaved">✓ 保存しました（スタッフ画面に反映されます）</span>
         </div>
         <p class="muted" style="font-size:11.5px; margin:8px 0 0;">
+          ※ この締切は<b>{{ $officeScope }}のスタッフにだけ</b>出ます（拠点ごとに別の日にできます・2026-08-25）。<br>
           ※ 締切は<b>表示だけ</b>です（過ぎても応募は受け付けます）。<br>
           ※「追加」にした案件は、この日付ではなく<b>公開した日＋3日（土日なら月曜）</b>が自動で締切になります。
         </p>
@@ -475,7 +480,8 @@
     fetch('/assign-publish/notice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
-      body: JSON.stringify({ notice: v })
+      // どの拠点のお知らせ文かを一緒に送る（拠点ごとに持つため・2026-08-25）。
+      body: JSON.stringify({ notice: v, office: window.ECS_OFFICE_SCOPE || '' })
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); flash('noticeSaved'); })
     .catch(() => alert('お知らせ文の保存に失敗しました。もう一度お試しください。'));
@@ -570,13 +576,13 @@
     .catch(() => { ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c) c.category = prev[id]; }); render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
 
-  // ===== 通常案件の一斉締切日（全体で1つ・DBの settings に保存）=====
+  // ===== 通常案件の一斉締切日（拠点ごとに1つ・DBの settings に保存）=====
   function saveDeadline(){
     const v = (document.getElementById('deadlineInput').value || '').trim();
     fetch('/assign-publish/deadline', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
-      body: JSON.stringify({ date: v || null })
+      body: JSON.stringify({ date: v || null, office: window.ECS_OFFICE_SCOPE || '' })
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); flash('deadlineSaved'); })
     .catch(() => alert('保存に失敗しました。通信を確認してもう一度お試しください。'));

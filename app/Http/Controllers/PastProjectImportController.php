@@ -15,7 +15,6 @@ use App\Support\PersonLookup;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,9 +41,14 @@ class PastProjectImportController extends Controller
     /** 取込画面。 */
     public function show()
     {
-        // 画面に渡すものは無い。CSVを選んだときの下見（誰が入る／名簿に無い）は
-        // サーバーの preview がまとめて返す＝読み取りの決まりを1か所にするため。
-        return view('past_import');
+        // CSVを選んだときの下見（誰が入る／名簿に無い）はサーバーの preview がまとめて返す
+        // ＝読み取りの決まりを1か所にするため。画面へ渡すのは「どの拠点の案件として入れるか」だけ。
+        return view('past_import', [
+            // ⚠ 他拠点のアサイン表を、東京の人が代わりに取り込むことがある（2026-08-25 baba）。
+            //   取り込んだ人の拠点で決め打ちにすると、東北の案件が東京の案件として入ってしまう。
+            'offices' => OfficeScope::options(),
+            'myOffice' => OfficeScope::filterSingle(request()),
+        ]);
     }
 
     /**
@@ -255,7 +259,13 @@ class PastProjectImportController extends Controller
      */
     public function import(Request $request)
     {
-        $request->validate(['csv' => ['required', 'file', 'mimes:csv,txt']]);
+        $request->validate([
+            'csv' => ['required', 'file', 'mimes:csv,txt'],
+            // どの拠点の案件として入れるか（画面で選ぶ）。未指定は自分の拠点。
+            'office' => ['nullable', 'string'],
+        ]);
+
+        $office = $this->targetOffice($request);
 
         $read = $this->readCsv($request);
         if ($read['error'] !== null) {
@@ -294,7 +304,7 @@ class PastProjectImportController extends Controller
             $client = $info['client'];
             $meetTime = $info['meetTime'];
 
-            $attrs = $this->projectAttributes($get, $name, $date, $info['count'], $client, $meetTime);
+            $attrs = $this->projectAttributes($get, $name, $date, $info['count'], $client, $meetTime, $office);
 
             // 同じ案件があるか＝開催日・コンテンツ名・顧客名・集合時間が全部同じ。
             // ⚠ 日付は「2026-01-20 00:00:00」の形で保存されるので、where ではなく whereDate で探す
@@ -465,17 +475,18 @@ class PastProjectImportController extends Controller
      * 通常の取込と同じ読み替えを使うが、状態は「確定」・公開済みにする（過去の実績なので）。
      */
     private function projectAttributes(callable $get, string $name, string $date,
-        string $count, ?string $client, ?string $meetTime): array
+        string $count, ?string $client, ?string $meetTime, string $office): array
     {
         $guests = $this->digits($get('お客様人数'));
         $teams = $this->digits($get('チーム数'));
 
         return [
             'project_name' => $name,
-            // 登録拠点＝取り込んだ人の拠点。
+            // 登録拠点＝画面で選んだ拠点（既定は取り込んだ人の拠点）。
             // ⚠ ここが空だと案件一覧の拠点しぼりに引っかからず、誰にも見えない案件になる。
-            //   月ごとのアサイン表は拠点ごとに分かれているので、取り込んだ人の拠点でよい。
-            'office' => trim((string) (Auth::user()->office ?? '')) ?: OfficeScope::DEFAULT_OFFICE,
+            // ⚠ 他拠点のアサイン表を代わりに取り込むことがあるので、取り込んだ人の拠点で
+            //   決め打ちにしない（東北の案件が東京の案件として入ってしまう・2026-08-25 baba）。
+            'office' => $office,
             'content_ids' => $this->resolveContentIds($name),
             'content_names' => [$name],
             'category' => $get('区分') ?: null,
@@ -527,6 +538,24 @@ class PastProjectImportController extends Controller
             'status' => '確定',
             'staff_published' => true,
         ];
+    }
+
+    /**
+     * 取り込んだ案件を「どの拠点の案件」として入れるか。
+     *
+     * 画面で選んだ拠点。選ばれていない・知らない拠点名のときは自分の拠点にする
+     * （知らない名前をそのまま入れると、案件一覧の拠点しぼりに引っかからず
+     *   誰にも見えない案件になってしまうため）。
+     */
+    private function targetOffice(Request $request): string
+    {
+        $sent = trim((string) $request->input('office', ''));
+
+        if ($sent !== '' && in_array($sent, OfficeScope::options(), true)) {
+            return $sent;
+        }
+
+        return OfficeScope::filterSingle($request);
     }
 
     /**

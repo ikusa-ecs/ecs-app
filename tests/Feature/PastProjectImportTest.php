@@ -466,4 +466,38 @@ class PastProjectImportTest extends TestCase
         $this->assertSame(1, $json['rows'][0]['people']);
         $this->assertSame(0, Project::count());
     }
+
+    /**
+     * 「どの拠点の案件として入れるか」を画面で選べる（2026-08-25 baba）。
+     *
+     * ⚠ 取り込んだ人の拠点で決め打ちにすると、東北のアサイン表を東京の方が取り込んだとき
+     *   東京の案件として入り、東北の案件一覧に出てこない。
+     */
+    public function test_office_can_be_chosen_on_import(): void
+    {
+        $me = $this->manager();   // 拠点＝東京
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row()]),
+            'office' => '東北',
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame('東北', Project::where('project_name', '水合戦')->firstOrFail()->office);
+    }
+
+    /**
+     * 知らない拠点名が送られてきたら、自分の拠点にする。
+     * ⚠ そのまま入れると、どの拠点の一覧にも出てこない案件になってしまう。
+     */
+    public function test_unknown_office_falls_back_to_own_office(): void
+    {
+        $me = $this->manager();   // 拠点＝東京
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row()]),
+            'office' => 'ありえない拠点',
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame('東京', Project::where('project_name', '水合戦')->firstOrFail()->office);
+    }
 }
