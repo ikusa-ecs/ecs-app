@@ -160,13 +160,16 @@ class StaffPortalController extends Controller
     }
 
     /**
-     * 稼働希望カレンダーの「その月の情報」。画面の見出し・締切・マスの並びに使う。
+     * 稼働希望カレンダーの「その月の情報」。画面の見出し・マスの並びに使う。
      *
-     * これまで画面に「2026年7月」「締切：6月25日」「1日は火曜（＝先頭の空マス2つ）」「31日ぶん」が
+     * これまで画面に「2026年7月」「1日は火曜（＝先頭の空マス2つ）」「31日ぶん」が
      * 直書きされていたため、月が変わると表示と保存対象月がズレていた。ここで月から計算して渡す。
-     * 希望の締切＝対象月の前月25日（例：2026-07分 → 6月25日）。
      *
-     * @return array{year:int,month:int,days:int,firstDow:int,label:string,deadline:string}
+     * ⚠ 以前は「締切＝対象月の前月25日」も計算して画面に出していたが、やめた（2026-08-25 baba）。
+     *   実際の運用の締切と合っておらず、過ぎた日付が出て混乱のもとになるため。
+     *   締切の連絡はLINEで行う（ECS＝見せる・記録する／LINE＝連絡する、の分担）。
+     *
+     * @return array{year:int,month:int,days:int,firstDow:int,label:string}
      */
     /** 稼働希望カレンダーで先に進める月数（当月＋この数）。半年先まで出せる（2026-08-21 baba）。 */
     private const PREF_MONTHS_AHEAD = 6;
@@ -192,7 +195,6 @@ class StaffPortalController extends Controller
             'label'    => $y . '年' . $m . '月',
             // いま表示している月（YYYY-MM に揃えたもの）。プルダウンの選択中の判定に使う。
             'value'    => $first->format('Y-m'),
-            'deadline' => $first->copy()->subMonthNoOverflow()->day(25)->format('n月j日'),
             // 月の切り替え（2026-08-21 baba要望）。範囲外は null＝ボタンを出さない。
             'prev'      => $prev->gte($min) ? $prev->format('Y-m') : null,
             'next'      => $next->lte($max) ? $next->format('Y-m') : null,

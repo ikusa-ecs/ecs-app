@@ -61,11 +61,9 @@ class StaffPortalVisibilityTest extends TestCase
         $this->assertSame((int) $now->month, $meta['month']);
         $this->assertSame($now->daysInMonth, $meta['days']);
         $this->assertSame((int) $now->copy()->startOfMonth()->dayOfWeek, $meta['firstDow']);
-        // 締切＝前月25日
-        $this->assertSame(
-            $now->copy()->startOfMonth()->subMonthNoOverflow()->day(25)->format('n月j日'),
-            $meta['deadline']
-        );
+        // ⚠ 締切の表示はやめた（2026-08-25 baba）。実際の運用と合っておらず、
+        //   過ぎた日付が出て混乱のもとだったため。締切の連絡はLINEで行う。
+        $this->assertArrayNotHasKey('deadline', $meta);
     }
 
     /** ?period= を渡せばその月で開く（見出し・日数もその月になる）。 */
@@ -79,7 +77,7 @@ class StaffPortalVisibilityTest extends TestCase
         $this->assertSame(2027, $meta['year']);
         $this->assertSame(2, $meta['month']);
         $this->assertSame(28, $meta['days'], '2027年2月は28日');
-        $this->assertSame('1月25日', $meta['deadline']);
+        $this->assertArrayNotHasKey('deadline', $meta, '締切は出さない');
     }
 
     /** 募集タブ：公開ONの案件だけ出る。登録しただけ（非公開）の案件は出さない。 */
