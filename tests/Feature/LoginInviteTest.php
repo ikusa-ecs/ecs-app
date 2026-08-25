@@ -89,6 +89,13 @@ class LoginInviteTest extends TestCase
 
         // パスワードそのものを本文に書いていないこと（リンクだけを送る方針）。
         $this->assertStringNotContainsString('仮パスワード', $body);
+
+        // プロフィール登録のお願いが入っていること（baba要望 2026-08-25）。
+        // ⚠ スタッフが実際に開くのは画面上部の「設定」タブ。呼び名がずれると迷わせるので、
+        //   スタッフ画面のタブ名と同じ言い方が本文にあることを固定する。
+        $this->assertStringContainsString('設定', $body);
+        $this->assertStringContainsString('マイプロフィール', $body);
+        $this->assertStringContainsString('一言アピール', $body);
     }
 
     /** メールが無い人・退職した人には送らず、理由を返す（黙って失敗しない）。 */
