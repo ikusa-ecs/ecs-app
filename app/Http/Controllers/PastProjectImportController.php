@@ -147,15 +147,23 @@ class PastProjectImportController extends Controller
      * @return array{name:string, date:string, rawDate:string, count:string, client:?string,
      *               meetTime:?string, errors: list<string>}
      */
-    private function inspect(?array $period, callable $get): array
+    private function inspect(?array $period, callable $get, array $edit = []): array
     {
-        $name = $get('案件名');
-        $rawDate = $get('開催日');
+        // 画面で直した値があれば、そちらを使う（2026-08-25 baba要望）。
+        // ⚠ 空にしたのも「直した」＝そのまま空として扱い、必須ならエラーにする
+        //   （?? だと「空にした」が無視されてCSVの値に戻ってしまうので array_key_exists で見る）。
+        $pick = fn (string $key, string $fallback) => array_key_exists($key, $edit)
+            ? trim((string) $edit[$key])
+            : $fallback;
+
+        $name = $pick('name', $get('案件名'));
+        $rawDate = $pick('date', $get('開催日'));
         // 月シートは年が無いので、ファイル名から読んだ年を補ってから解釈する。
+        // 画面で直した日付は「2027-09-01」の形で来るので、そのまま通る。
         $date = ProjectImportColumns::normalizeDate(
             MonthlySheetReader::completeDate($rawDate, $period)
         );
-        $count = $get('運営人数');
+        $count = $pick('count', $get('運営人数'));
 
         // 必須は「案件名」と「開催日」の2つ。
         // ⚠ 運営人数は、これからの案件では必須だが過去案件では空のことがあるので必須にしない
@@ -179,7 +187,7 @@ class PastProjectImportController extends Controller
             'date' => $date,
             'rawDate' => $rawDate,
             'count' => $count,
-            'client' => ClientName::normalize($get('クライアント')),
+            'client' => ClientName::normalize($pick('client', $get('クライアント'))),
             'meetTime' => $get('集合時間') ?: null,
             'errors' => $errors,
         ];
@@ -194,7 +202,13 @@ class PastProjectImportController extends Controller
      */
     public function preview(Request $request)
     {
-        $request->validate(['csv' => ['required', 'file', 'mimes:csv,txt']]);
+        $request->validate([
+            'csv' => ['required', 'file', 'mimes:csv,txt'],
+            // 画面の表で直した内容（JSON）。直していなければ空。
+            'edits' => ['nullable', 'string'],
+        ]);
+
+        $edits = $this->editsFromRequest($request);
 
         $read = $this->readCsv($request);
         if ($read['error'] !== null) {
@@ -207,9 +221,10 @@ class PastProjectImportController extends Controller
         $ambiguousNames = [];
         $unknownRoles = [];
 
-        foreach ($read['entries'] as $entry) {
+        foreach ($read['entries'] as $i => $entry) {
+            $edit = $edits[$i] ?? [];
             $get = $this->cellReader($entry['header'], $entry['row']);
-            $info = $this->inspect($read['period'], $get);
+            $info = $this->inspect($read['period'], $get, $edit);
 
             // 誰が入るかも先に見せる（登録してから「名簿に無い」と分かると直すのに時間がかかるため）。
             $miss = [];
@@ -230,6 +245,10 @@ class PastProjectImportController extends Controller
             }
 
             $rows[] = [
+                // 何件目か＝画面で直した内容を、取り込みのときに同じ案件へ当てるための鍵。
+                'index' => $i,
+                // 「この件は取り込まない」に印を付けたかどうか（確かめ直しても印が消えないように返す）。
+                'skip' => ! empty($edit['skip']),
                 'label' => $entry['label'],
                 'date' => $info['date'],
                 'name' => $info['name'],
@@ -263,9 +282,12 @@ class PastProjectImportController extends Controller
             'csv' => ['required', 'file', 'mimes:csv,txt'],
             // どの拠点の案件として入れるか（画面で選ぶ）。未指定は自分の拠点。
             'office' => ['nullable', 'string'],
+            // 画面の表で直した内容（JSON）。直していなければ空。
+            'edits' => ['nullable', 'string'],
         ]);
 
         $office = $this->targetOffice($request);
+        $edits = $this->editsFromRequest($request);
 
         $read = $this->readCsv($request);
         if ($read['error'] !== null) {
@@ -284,15 +306,26 @@ class PastProjectImportController extends Controller
         $created = 0;
         $updated = 0;
         $assignCount = 0;
+        $skipped = 0;
         $errors = [];
         $missingNames = [];     // 名簿に無かった人
         $ambiguousNames = [];   // 同姓同名で決められなかった人
 
-        foreach ($entries as $entry) {
+        foreach ($entries as $i => $entry) {
+            $edit = $edits[$i] ?? [];
+
+            // 「この件は取り込まない」に印が付いていれば、まるごと飛ばす。
+            if (! empty($edit['skip'])) {
+                $skipped++;
+
+                continue;
+            }
+
             $get = $this->cellReader($entry['header'], $entry['row']);
 
             // 中身を取り出して、入れられるかどうかを見る（下見の画面とまったく同じ判定）。
-            $info = $this->inspect($period, $get);
+            // 画面で直した値があれば、そちらを使う。
+            $info = $this->inspect($period, $get, $edit);
             if ($info['errors']) {
                 $errors[] = $entry['label']."（{$info['name']}）：".implode('／', $info['errors']);
 
@@ -369,7 +402,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $errors, $unmapped))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped))
             ->with('past_missing', array_keys($missingNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
@@ -541,6 +574,53 @@ class PastProjectImportController extends Controller
     }
 
     /**
+     * 画面の表で直した内容を受け取る（2026-08-25 baba要望）。
+     *
+     * 【なぜ「直した分だけ」を送るのか】
+     * CSVそのものは今までどおりサーバーが読む。画面から送るのは「上書きする値」だけにして、
+     * 読み取りの決まりを増やさない。⚠ 画面にもう1つ読み取りを書くと、片方だけ直して
+     * 食い違う事故が起きる（この画面で実際に起きやすい）。
+     *
+     * 形： {"0":{"date":"2027-09-01","name":"謎解き","client":"〇〇株式会社","count":"5","skip":false}, ...}
+     * 鍵は「CSVの何件目か」（0から数える）。
+     *
+     * @return array<int, array{date?:string,name?:string,client?:string,count?:string,skip?:bool}>
+     */
+    private function editsFromRequest(Request $request): array
+    {
+        $raw = $request->input('edits');
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return [];   // 壊れていたら「直していない」と同じ扱い＝CSVのまま取り込む
+        }
+
+        $edits = [];
+        foreach ($decoded as $index => $edit) {
+            if (! is_array($edit) || ! is_numeric($index)) {
+                continue;
+            }
+            $clean = [];
+            foreach (['date', 'name', 'client', 'count'] as $key) {
+                if (array_key_exists($key, $edit) && is_scalar($edit[$key])) {
+                    $clean[$key] = (string) $edit[$key];
+                }
+            }
+            if (! empty($edit['skip'])) {
+                $clean['skip'] = true;
+            }
+            if ($clean !== []) {
+                $edits[(int) $index] = $clean;
+            }
+        }
+
+        return $edits;
+    }
+
+    /**
      * 取り込んだ案件を「どの拠点の案件」として入れるか。
      *
      * 画面で選んだ拠点。選ばれていない・知らない拠点名のときは自分の拠点にする
@@ -658,7 +738,7 @@ class PastProjectImportController extends Controller
 
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
-        array $errors, array $unmapped): string
+        int $skipped, array $errors, array $unmapped): string
     {
         $msg = $isMonthly
             ? '月ごとのアサイン表として読みました。'
@@ -668,6 +748,10 @@ class PastProjectImportController extends Controller
             $msg .= "（同じ案件だった{$updated}件は上書きしました）";
         }
         $msg .= "。アサインは{$assignCount}件を「確定」で入れました。";
+
+        if ($skipped > 0) {
+            $msg .= " 「取り込まない」に印を付けた{$skipped}件は入れていません。";
+        }
 
         if ($errors) {
             $msg .= ' エラー'.count($errors).'件は取り込みませんでした：'.implode(' / ', $errors);

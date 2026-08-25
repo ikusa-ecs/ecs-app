@@ -500,4 +500,159 @@ class PastProjectImportTest extends TestCase
 
         $this->assertSame('東京', Project::where('project_name', '水合戦')->firstOrFail()->office);
     }
+
+    /**
+     * ========= 取込画面でその場で直せる（2026-08-25 baba要望）=========
+     *
+     * 【なぜこの作りか】CSVそのものは今までどおりサーバーが読み、画面から送るのは
+     * 「上書きする値」だけ。⚠ 画面にもう1つ読み取りを書くと、月シート対応のときのように
+     * 片方だけ直して食い違う事故が起きる。
+     */
+
+    /** 画面で直した日程・コンテンツ・顧客名・運営人数が、その内容で登録される。 */
+    public function test_edits_from_the_screen_are_used_on_import(): void
+    {
+        $res = $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([3 => '1/20'])]),   // 年が無い＝そのままではエラー
+            'edits' => json_encode([
+                0 => [
+                    'date' => '2026-03-05',
+                    'name' => '謎解き',
+                    'client' => '直した株式会社',
+                    'count' => '8',
+                ],
+            ]),
+        ]);
+
+        $res->assertRedirect('/past-import');
+
+        $p = Project::firstOrFail();
+        $this->assertSame('2026-03-05', $p->start_date->format('Y-m-d'), '直した日程で入ること');
+        $this->assertSame('謎解き', $p->project_name);
+        $this->assertSame('直した株式会社', $p->client);
+        $this->assertSame(8, $p->required_count);
+        $this->assertStringNotContainsString('日程が読めません', (string) session('status'));
+    }
+
+    /** 「取り込まない」に印を付けた案件は入らない（他の案件は入る）。 */
+    public function test_rows_marked_skip_are_not_imported(): void
+    {
+        $res = $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([
+                $this->row([5 => '入れない案件']),
+                $this->row([0 => '2', 5 => '入れる案件']),
+            ]),
+            'edits' => json_encode([0 => ['skip' => true]]),
+        ]);
+
+        $res->assertRedirect('/past-import');
+        $this->assertSame(1, Project::count());
+        $this->assertNotNull(Project::where('project_name', '入れる案件')->first());
+        $this->assertNull(Project::where('project_name', '入れない案件')->first());
+        $this->assertStringContainsString('1件は入れていません', (string) session('status'));
+    }
+
+    /** 「取り込まない」に印を付けた案件は、アサインも入らない。 */
+    public function test_skipped_row_creates_no_assignment(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([50 => '鈴木 彩'])]),
+            'edits' => json_encode([0 => ['skip' => true]]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(0, Project::count());
+        $this->assertSame(0, Assignment::count());
+    }
+
+    /** 下見も直した内容で判定し直す（エラーが消えたことを画面で確かめられる）。 */
+    public function test_preview_reflects_edits(): void
+    {
+        $me = $this->manager();
+
+        // 直す前＝年が無いのでエラー。
+        $before = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->csv([$this->row([3 => '1/20'])]),
+        ])->assertOk()->json();
+        $this->assertNotSame([], $before['rows'][0]['errors']);
+
+        // 直したあと＝エラーが消え、直した値が返る。
+        $after = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->csv([$this->row([3 => '1/20'])]),
+            'edits' => json_encode([0 => ['date' => '2026-03-05', 'name' => '謎解き']]),
+        ])->assertOk()->json();
+
+        $this->assertSame([], $after['rows'][0]['errors']);
+        $this->assertSame('2026-03-05', $after['rows'][0]['date']);
+        $this->assertSame('謎解き', $after['rows'][0]['name']);
+        $this->assertSame(0, $after['rows'][0]['index'], '何件目かが返ること（直した内容を当てる鍵）');
+
+        // 下見なので、やはり1件も登録しない。
+        $this->assertSame(0, Project::count());
+    }
+
+    /** 「取り込まない」の印は、確かめ直しても消えない（画面がチェックを描き直せるように）。 */
+    public function test_preview_returns_skip_flag(): void
+    {
+        $json = $this->actingAsPerson($this->manager())->post('/past-import/preview', [
+            'csv' => $this->csv([$this->row(), $this->row([0 => '2', 5 => '別案件'])]),
+            'edits' => json_encode([1 => ['skip' => true]]),
+        ])->assertOk()->json();
+
+        $this->assertFalse($json['rows'][0]['skip']);
+        $this->assertTrue($json['rows'][1]['skip']);
+    }
+
+    /** 空にした項目は「空にした」として扱う＝必須ならエラーにする（CSVの値に戻さない）。 */
+    public function test_clearing_a_required_field_becomes_an_error(): void
+    {
+        $res = $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row()]),
+            'edits' => json_encode([0 => ['name' => '']]),
+        ]);
+
+        $res->assertRedirect('/past-import');
+        $this->assertSame(0, Project::count());
+        $this->assertStringContainsString('コンテンツ（案件名）が空です', (string) session('status'));
+    }
+
+    /** 直した内容が壊れて届いても、CSVのまま取り込む（画面の不調で取込ごと落とさない）。 */
+    public function test_broken_edits_are_ignored(): void
+    {
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row()]),
+            'edits' => 'これはJSONではない',
+        ])->assertRedirect('/past-import');
+
+        $p = Project::firstOrFail();
+        $this->assertSame('水合戦', $p->project_name, 'CSVの値で入ること');
+    }
+
+    /** 月ごとのアサイン表でも、その場で直せる。 */
+    public function test_monthly_sheet_can_be_edited_too(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'FC']]),
+            'edits' => json_encode([0 => ['client' => '直した株式会社', 'count' => '12']]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::firstOrFail();
+        $this->assertSame('直した株式会社', $p->client);
+        $this->assertSame(12, $p->required_count);
+        // 人はCSVのまま入る（人の直しはこの画面の対象外＝名簿で直す）。
+        $this->assertSame(1, Assignment::count());
+    }
+
+    /** 取込画面に、その場で直すための入れ物がある。 */
+    public function test_screen_has_editable_table(): void
+    {
+        $html = $this->actingAsPerson($this->manager())->get('/past-import')->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="pjEdits"', $html, '直した内容を送る入れ物');
+        $this->assertStringContainsString('pjRecheck()', $html, '確かめ直すボタン');
+        $this->assertStringContainsString('取込', $html);
+    }
 }

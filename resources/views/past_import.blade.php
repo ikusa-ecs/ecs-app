@@ -31,6 +31,16 @@
   table.pj-table tr.row-ok td { background: #f2faf5; }
   .pj-reason { color: #b91c1c; font-size: 11px; white-space: normal; }
   .pj-miss { color: #8a5a10; font-size: 11px; white-space: normal; }
+  /* 表の中でそのまま直せるようにする（2026-08-25 baba要望）。 */
+  table.pj-table input[type="text"], table.pj-table input[type="date"] {
+    width: 100%; box-sizing: border-box; border: 1px solid #d7cec2; border-radius: 5px;
+    padding: 3px 5px; font-size: 12px; background: #fff; font-family: inherit;
+  }
+  table.pj-table input.edited { border-color: #4f8a63; background: #f2faf5; font-weight: 700; }
+  table.pj-table tr.row-skip td { background: #f1efec; color: #9a8f80; }
+  table.pj-table tr.row-skip input { opacity: .55; }
+  .pj-col-date { width: 140px; } .pj-col-name { width: 220px; }
+  .pj-col-client { width: 180px; } .pj-col-count { width: 78px; }
 </style>
 @endpush
 
@@ -90,6 +100,9 @@
       <li><b>アサイン表に名前のある人は、アサインも「確定」で入ります。</b>
         （ふつうの案件取込は、その時点でDが決まっていないので取り込みません）</li>
       <li>案件は<b>「確定」・スタッフに公開済み</b>で入ります＝本人が自分の過去の実績として見られます。<b>募集はしません</b>。</li>
+      <li><b>取り込む前に、この画面の表で直せます。</b>日程・コンテンツ・顧客名・運営人数はその場で書き換えられ、
+        <b>「この件は取り込まない」</b>に印を付けた案件は飛ばせます。
+        <span class="muted">＝CSVを作り直してアップロードし直す必要はありません（元のCSVは変わりません）。</span></li>
       <li><b>同じ案件は上書き</b>します。同じかどうかは<b>「日程・コンテンツ・顧客名・集合時間」が全部同じか</b>で見ます。
         1つでも違えば別案件として新しく作ります（同じ日・同じコンテンツでも顧客が違えば別案件）。<br>
         <span class="muted">＝失敗しても、直してもう一度入れれば大丈夫です（案件が二重に増えません）。</span></li>
@@ -109,6 +122,9 @@
     {{-- 実登録はこのフォームでCSVファイルそのものをPOSTし、サーバーが読み直して登録する。 --}}
     <form id="pjForm" method="POST" action="/past-import" enctype="multipart/form-data">
       @csrf
+      {{-- 表で直した内容（JSON）。CSVそのものはサーバーが読み直し、ここは「上書きする値」だけを送る
+           ＝読み取りの決まりを画面側に増やさないため（2026-08-25）。 --}}
+      <input type="hidden" name="edits" id="pjEdits" value="">
       {{-- ⚠ どの拠点の案件として入れるか。他拠点のアサイン表を代わりに取り込むことがあるため、
            取り込んだ人の拠点で決め打ちにしない（2026-08-25 baba）。 --}}
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
@@ -137,21 +153,30 @@
     <h2>② 取り込む内容の確認</h2>
     <div class="pj-summary">
       読み込み：<b id="pjTotal">0</b> 件 ／ <span class="ok">OK <b id="pjOk">0</b></span> ／ <span class="ng">エラー <b id="pjNg">0</b></span>
-      ／ アサインに入る人：<b id="pjPeople">0</b> 名
+      ／ 取り込まない <b id="pjSkip">0</b> 件 ／ アサインに入る人：<b id="pjPeople">0</b> 名
     </div>
     <div id="pjWarn"></div>
+    <p class="pj-lead" style="margin:0 2px 8px;">
+      <b>間違っているところは、この表の中でそのまま直せます。</b>直したところは<b>緑色</b>になります。
+      入れたくない案件は<b>「取込」のチェックを外して</b>ください。<br>
+      <span class="muted">直したら<b>「② 直した内容で確かめ直す」</b>を押すと、判定をやり直します（押さずに取り込んでも、直した内容で入ります）。
+        <b>元のCSVファイルは変わりません。</b></span>
+    </p>
     <div class="pj-scroll">
       <table class="pj-table">
         <thead>
           <tr>
-            <th>件</th><th>判定</th><th>日程</th><th>コンテンツ</th><th>顧客名</th>
-            <th>運営人数</th><th>入る人</th><th>理由・注意</th>
+            <th>件</th><th>取込</th><th>判定</th>
+            <th class="pj-col-date">日程</th><th class="pj-col-name">コンテンツ</th>
+            <th class="pj-col-client">顧客名</th><th class="pj-col-count">運営人数</th>
+            <th>入る人</th><th>理由・注意</th>
           </tr>
         </thead>
         <tbody id="pjBody"></tbody>
       </table>
     </div>
     <div class="pj-actions">
+      <button type="button" class="btn" id="pjRecheck" onclick="pjRecheck()">② 直した内容で確かめ直す</button>
       <button type="button" class="btn primary" id="pjBtn" onclick="pjSubmit()">③ この内容で取り込む</button>
       <span class="muted" style="font-size:12px;">
         ※ 案件は「確定・公開済み」で入り、アサインは「確定」で入ります。取り込み直しても二重になりません。
@@ -171,6 +196,12 @@
   //   画面にも同じ読み取りを書くと、片方だけ直して食い違う事故が起きるため（2026-08-25）。
   //   ここがやるのは「送る」と「返ってきたものを表に並べる」だけ。
 
+  // 表で直した内容をためておく（「確かめ直す」を押しても消えないように）。
+  // 形： { "0": {date:'2027-09-01', name:'謎解き', skip:true}, ... }（鍵＝CSVの何件目か）
+  // ⚠ 直した項目だけを持つ。全部送ると「日程が読めません（9月1日）」のような
+  //   元の値を使った案内が出せなくなるため。
+  var pjEdits = {};
+
   function pjEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
@@ -181,6 +212,7 @@
     document.getElementById('pjTotal').textContent = '0';
     document.getElementById('pjOk').textContent = '0';
     document.getElementById('pjNg').textContent = '0';
+    document.getElementById('pjSkip').textContent = '0';
     document.getElementById('pjPeople').textContent = '0';
     document.getElementById('pjBody').innerHTML = '';
   }
@@ -199,14 +231,16 @@
     }
 
     var rows = data.rows || [];
-    var okCount = 0, ngCount = 0, peopleCount = 0;
+    var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0;
     rows.forEach(function (r) {
+      if (r.skip) { skipCount++; return; }   // 取り込まない件は数に入れない
       if (r.errors && r.errors.length) { ngCount++; } else { okCount++; peopleCount += (r.people || 0); }
     });
 
     document.getElementById('pjTotal').textContent = rows.length;
     document.getElementById('pjOk').textContent = okCount;
     document.getElementById('pjNg').textContent = ngCount;
+    document.getElementById('pjSkip').textContent = skipCount;
     document.getElementById('pjPeople').textContent = peopleCount;
 
     var w = '';
@@ -241,17 +275,23 @@
       var notes = (r.errors || []).slice();
       if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
       if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
-      return '<tr class="' + (ok ? 'row-ok' : 'row-ng') + '">'
+      var cls = r.skip ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
+      return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '">'
         + '<td>' + pjEsc(r.label) + '</td>'
-        + '<td>' + (ok ? 'OK' : 'エラー') + '</td>'
-        + '<td>' + pjEsc(r.date) + '</td>'
-        + '<td>' + pjEsc(r.name) + '</td>'
-        + '<td>' + pjEsc(r.client) + '</td>'
-        + '<td>' + pjEsc(r.count) + '</td>'
+        + '<td style="text-align:center;">'
+          + '<input type="checkbox" data-f="skip" onchange="pjToggleSkip(this)"'
+          + ' title="チェックを外すと、この案件は取り込みません"' + (r.skip ? '' : ' checked') + '></td>'
+        + '<td>' + (r.skip ? '—' : (ok ? 'OK' : 'エラー')) + '</td>'
+        + '<td>' + pjInput('date', r.date, 'date') + '</td>'
+        + '<td>' + pjInput('name', r.name, 'text') + '</td>'
+        + '<td>' + pjInput('client', r.client, 'text') + '</td>'
+        + '<td>' + pjInput('count', r.count, 'text') + '</td>'
         + '<td>' + pjEsc(r.people) + ' 名</td>'
         + '<td class="' + (ok ? 'pj-miss' : 'pj-reason') + '">' + pjEsc(notes.join(' / ')) + '</td>'
         + '</tr>';
     }).join('');
+
+    pjMarkEdited();
 
     var result = document.getElementById('pjResult');
     result.style.display = '';
@@ -259,9 +299,71 @@
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // 表の中の入力欄。data-orig にはサーバーが読んだ値を入れておき、
+  // それと違えば「直した」と分かるようにする。
+  function pjInput(field, value, type) {
+    var v = pjEsc(value == null ? '' : value);
+
+    return '<input type="' + type + '" data-f="' + field + '" value="' + v + '" data-orig="' + v + '"'
+      + ' oninput="pjMarkEdited()" onchange="pjMarkEdited()">';
+  }
+
+  // 直したところを緑にする（どこを触ったか見て分かるように）。
+  function pjMarkEdited() {
+    var list = document.querySelectorAll('#pjBody input[data-orig]');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.value !== el.dataset.orig) { el.classList.add('edited'); } else { el.classList.remove('edited'); }
+    });
+  }
+
+  // 「取込」のチェックを外した行は、その場で灰色にする（判定のやり直しを待たずに分かるように）。
+  function pjToggleSkip(el) {
+    var tr = el.closest('tr');
+    if (!tr) return;
+    tr.classList.toggle('row-skip', !el.checked);
+  }
+
+  // いま表に入っている「直した内容」を pjEdits にためる。
+  function pjSyncEdits() {
+    var trs = document.querySelectorAll('#pjBody tr[data-index]');
+    Array.prototype.forEach.call(trs, function (tr) {
+      var idx = tr.dataset.index;
+      var cur = pjEdits[idx] || {};
+      ['date', 'name', 'client', 'count'].forEach(function (k) {
+        var el = tr.querySelector('[data-f="' + k + '"]');
+        if (el && el.value !== el.dataset.orig) { cur[k] = el.value; }
+      });
+      var sk = tr.querySelector('[data-f="skip"]');
+      // チェックが外れている＝取り込まない。
+      if (sk) { if (sk.checked) { delete cur.skip; } else { cur.skip = true; } }
+      if (Object.keys(cur).length) { pjEdits[idx] = cur; } else { delete pjEdits[idx]; }
+    });
+
+    var json = JSON.stringify(pjEdits);
+    document.getElementById('pjEdits').value = (json === '{}') ? '' : json;
+
+    return document.getElementById('pjEdits').value;
+  }
+
+  // 直した内容で、判定だけやり直す（登録はしない）。
+  // ⚠ 判定はサーバーにやらせる＝画面にもう1つ同じ判定を書かないため。
+  function pjRecheck() {
+    var f = document.getElementById('pjFile').files[0];
+    if (!f) { alert('先にCSVファイルを選んでください。'); return; }
+    pjSyncEdits();
+    pjPost(f, document.getElementById('pjEdits').value);
+  }
+
   function pjReadAndPreview(file) {
     if (!file) return;
+    // 別のファイルを選び直したら、前のファイルへの直しは持ち越さない。
+    pjEdits = {};
+    document.getElementById('pjEdits').value = '';
     document.getElementById('pjFileName').textContent = '選んだファイル：' + file.name;
+    pjPost(file, '');
+  }
+
+  function pjPost(file, editsJson) {
     document.getElementById('pjResult').style.display = '';
     document.getElementById('pjWarn').innerHTML = '<div class="pj-flash">読み込んでいます…</div>';
     pjClear();
@@ -272,6 +374,7 @@
     var fd = new FormData();
     fd.append('csv', file);
     fd.append('_token', token);
+    fd.append('edits', editsJson || '');
 
     fetch('/past-import/preview', {
       method: 'POST',
@@ -291,13 +394,28 @@
     var f = document.getElementById('pjFile').files[0];
     if (!f) { alert('先にCSVファイルを選んでください。'); return; }
     var office = document.getElementById('pjOffice').value;
-    var msg = ['過去案件を「' + office + '」の案件として取り込みます。',
-               '',
-               '・案件は「確定」・スタッフに公開済みで入ります',
-               '・アサイン表に名前のある人は「確定」のアサインで入ります',
-               '・同じ案件（日程・コンテンツ・顧客名・集合時間が同じ）は上書きします',
-               '',
-               'よろしいですか？'].join(String.fromCharCode(10));
+    // ⚠ 押す直前に集め直す。表を直したまま「確かめ直す」を押していない人がいるため。
+    pjSyncEdits();
+    // 「中身を直した件数」と「取り込まないにした件数」は分けて数える（意味が違うため）。
+    var edited = 0, skipped = 0;
+    Object.keys(pjEdits).forEach(function (k) {
+      var e = pjEdits[k];
+      if (e.skip) { skipped++; }
+      var touched = ['date', 'name', 'client', 'count'].some(function (f) {
+        return Object.prototype.hasOwnProperty.call(e, f);
+      });
+      if (touched) { edited++; }
+    });
+
+    var lines = ['過去案件を「' + office + '」の案件として取り込みます。', ''];
+    lines.push(edited ? '・この画面で直した ' + edited + ' 件は、直した内容で入ります'
+                      : '・この画面では中身を直していません');
+    if (skipped) { lines.push('・「取り込まない」にした ' + skipped + ' 件は入れません'); }
+    lines.push('・案件は「確定」・スタッフに公開済みで入ります');
+    lines.push('・アサイン表に名前のある人は「確定」のアサインで入ります');
+    lines.push('・同じ案件（日程・コンテンツ・顧客名・集合時間が同じ）は上書きします');
+    lines.push('', 'よろしいですか？');
+    var msg = lines.join(String.fromCharCode(10));
     if (!confirm(msg)) return;
     document.getElementById('pjForm').submit();
   }
