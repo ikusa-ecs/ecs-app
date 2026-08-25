@@ -42,4 +42,33 @@ class CsvText
         // （ここで諦めて返すと、結局「空です」のエラーになって原因が分からないため）
         return mb_convert_encoding($raw, 'UTF-8', 'SJIS-win');
     }
+
+    /**
+     * CSVの本文 → 行（各行は列の配列）。
+     *
+     * ⚠ 1行ずつ str_getcsv に渡す書き方はしないこと。
+     *   セルの中に改行が入っていると（備考欄などでよくある）行がずれ、
+     *   まったく別の項目を読んでしまう（2026-08-25 に実際に踏んだ）。
+     *   ここでは fgetcsv を使う＝引用符で囲まれた中の改行を正しく1つのセルとして扱う。
+     *
+     * @return list<list<string>>
+     */
+    public static function rows(string $raw): array
+    {
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, self::toUtf8($raw));
+        rewind($handle);
+
+        $rows = [];
+        while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
+            // 完全な空行（全部 null / 空）は飛ばす
+            if ($row === [null] || $row === ['']) {
+                continue;
+            }
+            $rows[] = array_map(fn ($v) => (string) ($v ?? ''), $row);
+        }
+        fclose($handle);
+
+        return $rows;
+    }
 }

@@ -4,11 +4,6 @@
 @php($active = 'past_import')
 
 @push('head')
-{{-- 名簿の氏名をJSに渡す（アサイン列の照合をその場で見せるため）。 --}}
-<script>
-  window.ECS_CSRF = "{{ csrf_token() }}";
-  window.ECS_ROSTER_NAMES = @json($rosterNames ?? []);
-</script>
 <style>
   .pj-wrap { max-width: 1040px; }
   .pj-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
@@ -79,11 +74,20 @@
     <h2>この画面は何をするもの？</h2>
     <p class="pj-lead">
       <b>終わった案件（過去の実績）を、アサインごとまとめて登録する画面です。</b>
-      アサイン表の「1行に1案件」が並ぶシート（例：<code>202601_list</code>）を <b>CSVで保存してそのままアップロード</b>してください。
+      アサイン表のシートを <b>CSVで保存してそのままアップロード</b>してください。
       <b>列を並べ替える必要はありません。</b>Excelでそのまま保存した（Shift_JISの）CSVでも読めます。
     </p>
     <ul class="pj-lead" style="padding-left:1.2em;">
-      <li><b>D・MC・OP・スタッフの列から、アサインも「確定」で入ります。</b>
+      <li><b>アサイン表の2つの形、どちらでも入ります（自動で見分けます）。</b>
+        <ul style="padding-left:1.2em;">
+          <li><b>1行に1案件のシート</b>（例：<code>202601_list</code>）… D・MC・OP・スタッフの列から人を読みます。</li>
+          <li><b>月ごとのシート</b>（例：<code>202701</code>）… 1案件が横1ブロックに並んでいる、いつものアサイン表です。
+            名前の横のポジション（D／MC／OP／FC など）をそのまま読みます。<br>
+            <span class="muted">※ このシートは日程に年が書かれていないため、<b>ファイル名の「202701」から年を読みます</b>。
+              スプレッドシートの「ファイル → ダウンロード → カンマ区切り形式」で落としたファイル名のままお使いください。</span></li>
+        </ul>
+      </li>
+      <li><b>アサイン表に名前のある人は、アサインも「確定」で入ります。</b>
         （ふつうの案件取込は、その時点でDが決まっていないので取り込みません）</li>
       <li>案件は<b>「確定」・スタッフに公開済み</b>で入ります＝本人が自分の過去の実績として見られます。<b>募集はしません</b>。</li>
       <li><b>同じ案件は上書き</b>します。同じかどうかは<b>「日程・コンテンツ・顧客名・集合時間」が全部同じか</b>で見ます。
@@ -91,9 +95,11 @@
         <span class="muted">＝失敗しても、直してもう一度入れれば大丈夫です（案件が二重に増えません）。</span></li>
     </ul>
     <p class="pj-lead">
-      <b>人の書き方</b>：D・MC・OP・スタッフの列には<b>氏名</b>を書いてください。複数いるときは<b>カンマ区切り</b>（例：<code>田中 健一, 鈴木彩</code>）。
-      <b>氏名の空白の有無は気にしなくて大丈夫</b>です。「スタッフ」列の人は<b>FC（巡回ファシリ）</b>として入ります。<br>
-      <b>日程</b>は<b>年から</b>入れてください（<code>2026/1/20</code>・<code>2026-01-20</code>・Excelの日付セルどれでもOK）。<br>
+      <b>人の書き方</b>：氏名で照合します。<b>氏名の空白の有無は気にしなくて大丈夫</b>です。
+      1行1案件のシートでは、複数いるときは<b>カンマ区切り</b>（例：<code>田中 健一, 鈴木彩</code>）。「スタッフ」列の人は<b>FC（巡回ファシリ）</b>として入ります。<br>
+      <b>名簿に無い人・同姓同名の人は、取り違えを防ぐため入れません</b>（誰が入らなかったかは画面に出ます）。<br>
+      <b>日程</b>は、1行1案件のシートでは<b>年から</b>入れてください（<code>2026/1/20</code>・<code>2026-01-20</code>・Excelの日付セルどれでもOK）。
+      月ごとのシートは「<code>9月1日(火)</code>」のままでOKです（年はファイル名から補います）。<br>
       ECSに対応する項目が無い列（拘束・顧客担当名・シート期日 など）は無視し、取り込み後に「取り込まなかった列」として表示します。
     </p>
   </div>
@@ -115,7 +121,7 @@
   <div class="pj-card" id="pjResult" style="display:none;">
     <h2>② 取り込む内容の確認</h2>
     <div class="pj-summary">
-      読み込み：<b id="pjTotal">0</b> 行 ／ <span class="ok">OK <b id="pjOk">0</b></span> ／ <span class="ng">エラー <b id="pjNg">0</b></span>
+      読み込み：<b id="pjTotal">0</b> 件 ／ <span class="ok">OK <b id="pjOk">0</b></span> ／ <span class="ng">エラー <b id="pjNg">0</b></span>
       ／ アサインに入る人：<b id="pjPeople">0</b> 名
     </div>
     <div id="pjWarn"></div>
@@ -123,8 +129,8 @@
       <table class="pj-table">
         <thead>
           <tr>
-            <th>行</th><th>判定</th><th>日程</th><th>コンテンツ</th><th>顧客名</th><th>集合</th>
-            <th>運営人数</th><th>D</th><th>MC</th><th>OP</th><th>スタッフ</th><th>理由・注意</th>
+            <th>件</th><th>判定</th><th>日程</th><th>コンテンツ</th><th>顧客名</th>
+            <th>運営人数</th><th>入る人</th><th>理由・注意</th>
           </tr>
         </thead>
         <tbody id="pjBody"></tbody>
@@ -142,107 +148,13 @@
 @endsection
 
 @push('scripts')
-{{-- CSVの文字コード（UTF-8 / Excel保存のShift_JIS）を見分けて読む共通処理 --}}
-<script src="/ecs/csv-read.js?v={{ \App\Support\Asset::ver('ecs/csv-read.js') }}"></script>
 @verbatim
 <script>
   // ===== 過去案件の取込：ファイルを選んだらその場で中身を見せる =====
-  // ⚠ 他の取込画面と同じ「選んだら出る」動きにそろえている（2026-08-24）。
-  //    最初はボタンを押す形にしていて「選んでも何も起きない」と誤解された。
-
-  // 名簿の氏名（空白を落としたもの → 人数）。同姓同名も分かるようにする。
-  var PJ_NAMES = (function () {
-    var m = {};
-    (window.ECS_ROSTER_NAMES || []).forEach(function (n) {
-      var k = String(n).replace(/[\s　]+/g, '');
-      m[k] = (m[k] || 0) + 1;
-    });
-    return m;
-  })();
-
-  // 見出しの言い方をそろえる（全角カッコ・スペース・記号を落として比べる）。
-  function pjNormKey(s) {
-    return String(s == null ? '' : s)
-      .replace(/[\s　]+/g, '')
-      .replace(/[（）]/g, function (c) { return c === '（' ? '(' : ')'; })
-      .toLowerCase();
-  }
-
-  // この画面が見る列（サーバーの読み替えと同じ言い方を並べる）。
-  var PJ_COLS = {
-    date:    ['日程', '開催日', '日付', '開催日程', 'イベント日'],
-    content: ['コンテンツ', '案件名', 'コンテンツ名'],
-    client:  ['顧客名(代理店名)', '顧客名', 'クライアント', '顧客', '取引先'],
-    meet:    ['集合', '集合時間'],
-    count:   ['運営人数', '運営'],
-    d:       ['D', 'ディレクター'],
-    mc:      ['MC'],
-    op:      ['OP', '音響担当'],
-    staff:   ['スタッフ', '運営スタッフ', '現場スタッフ']
-  };
-
-  function pjParseLine(line) {
-    var out = [], cur = '', q = false;
-    for (var i = 0; i < line.length; i++) {
-      var c = line[i];
-      if (q) {
-        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-        else if (c === '"') { q = false; }
-        else { cur += c; }
-      } else {
-        if (c === '"') { q = true; }
-        else if (c === ',') { out.push(cur); cur = ''; }
-        else { cur += c; }
-      }
-    }
-    out.push(cur);
-    return out;
-  }
-
-  // 「2026/1/20」「2026年1月20日」「Excelの日付（数字）」を 2026-01-20 に直す。
-  // 年が無いもの（1/20）は勘で補わずエラーにする＝サーバーと同じ考え方。
-  function pjNormDate(v) {
-    v = String(v == null ? '' : v).trim();
-    if (v === '') return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    var m = v.match(/^(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})/);
-    if (m) {
-      return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
-    }
-    // Excelのシリアル値（1900-01-01 起点。1900年うるう年の1日ずれを含む）
-    if (/^\d+(\.\d+)?$/.test(v)) {
-      var n = Math.floor(parseFloat(v));
-      if (n > 20000 && n < 80000) {
-        var base = Date.UTC(1899, 11, 30);
-        var d = new Date(base + n * 86400000);
-        return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
-      }
-    }
-    return '';
-  }
-
-  function pjIsRealDate(s) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-    var p = s.split('-'), y = +p[0], mo = +p[1], da = +p[2];
-    var dt = new Date(y, mo - 1, da);
-    return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === da;
-  }
-
-  // 1つのセルの氏名を分けて、名簿にいるか調べる。
-  function pjCheckNames(cell) {
-    var names = String(cell == null ? '' : cell)
-      .split(/[,、，\/／\r\n]+/)
-      .map(function (s) { return s.trim(); })
-      .filter(function (s) { return s !== ''; });
-    var ok = [], miss = [], dup = [];
-    names.forEach(function (n) {
-      var c = PJ_NAMES[n.replace(/[\s　]+/g, '')] || 0;
-      if (c === 1) ok.push(n);
-      else if (c > 1) dup.push(n);
-      else miss.push(n);
-    });
-    return { names: names, ok: ok, miss: miss, dup: dup };
-  }
+  // ⚠ 読み取り（列の読み替え・月シートの読み方・名簿との突き合わせ）は
+  //   すべてサーバー（PastProjectImportController::preview）にやらせている。
+  //   画面にも同じ読み取りを書くと、片方だけ直して食い違う事故が起きるため（2026-08-25）。
+  //   ここがやるのは「送る」と「返ってきたものを表に並べる」だけ。
 
   function pjEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
@@ -250,82 +162,31 @@
     });
   }
 
-  function pjRender(text) {
-    text = text.replace(/^﻿/, '');
-    var lines = text.split(/\r\n|\r|\n/).filter(function (l) { return l.trim() !== ''; });
-    var result = document.getElementById('pjResult');
-    var warn = document.getElementById('pjWarn');
-    var body = document.getElementById('pjBody');
+  function pjClear() {
+    document.getElementById('pjTotal').textContent = '0';
+    document.getElementById('pjOk').textContent = '0';
+    document.getElementById('pjNg').textContent = '0';
+    document.getElementById('pjPeople').textContent = '0';
+    document.getElementById('pjBody').innerHTML = '';
+  }
 
-    if (lines.length < 2) {
-      result.style.display = '';
-      warn.innerHTML = '<div class="pj-flash err">CSVにデータ行がありません（1行目の見出しのみ、または空です）。</div>';
-      body.innerHTML = '';
-      document.getElementById('pjTotal').textContent = '0';
-      document.getElementById('pjOk').textContent = '0';
-      document.getElementById('pjNg').textContent = '0';
-      document.getElementById('pjPeople').textContent = '0';
-      document.getElementById('pjBtn').disabled = true;
+  function pjShowError(message) {
+    document.getElementById('pjResult').style.display = '';
+    document.getElementById('pjWarn').innerHTML = '<div class="pj-flash err">' + pjEsc(message) + '</div>';
+    pjClear();
+    document.getElementById('pjBtn').disabled = true;
+  }
+
+  function pjRender(data) {
+    if (!data || !data.ok) {
+      pjShowError((data && data.message) || 'CSVを読み込めませんでした。');
       return;
     }
 
-    var header = pjParseLine(lines.shift()).map(function (h) { return pjNormKey(h); });
-    var idx = {};
-    Object.keys(PJ_COLS).forEach(function (key) {
-      for (var i = 0; i < PJ_COLS[key].length; i++) {
-        var pos = header.indexOf(pjNormKey(PJ_COLS[key][i]));
-        if (pos >= 0) { idx[key] = pos; break; }
-      }
-    });
-
-    var missingCols = [];
-    if (idx.date === undefined) missingCols.push('日程');
-    if (idx.content === undefined) missingCols.push('コンテンツ');
-
-    var rows = [], okCount = 0, ngCount = 0;
-    var allMiss = {}, allDup = {}, peopleCount = 0;
-
-    lines.forEach(function (line, i) {
-      var cells = pjParseLine(line);
-      var get = function (key) {
-        var p = idx[key];
-        return (p !== undefined && cells[p] != null) ? String(cells[p]).trim() : '';
-      };
-
-      var rawDate = get('date');
-      var date = pjNormDate(rawDate);
-      var content = get('content');
-      var count = get('count');
-
-      var errs = [];
-      if (content === '') errs.push('コンテンツ（案件名）が空です');
-      if (!pjIsRealDate(date)) {
-        errs.push(rawDate !== ''
-          ? '日程が読めません（' + rawDate + '）。年から入れてください（例 2026-01-20）'
-          : '日程が空です（例 2026-01-20）');
-      }
-      if (count !== '' && !/^\d+$/.test(count)) errs.push('運営人数は数字で入れてください');
-
-      var people = { d: pjCheckNames(get('d')), mc: pjCheckNames(get('mc')), op: pjCheckNames(get('op')), staff: pjCheckNames(get('staff')) };
-      var notes = [];
-      ['d', 'mc', 'op', 'staff'].forEach(function (k) {
-        people[k].miss.forEach(function (n) { allMiss[n] = true; });
-        people[k].dup.forEach(function (n) { allDup[n] = true; });
-        if (!errs.length) peopleCount += people[k].ok.length;
-      });
-      var missAll = [].concat(people.d.miss, people.mc.miss, people.op.miss, people.staff.miss);
-      var dupAll = [].concat(people.d.dup, people.mc.dup, people.op.dup, people.staff.dup);
-      if (missAll.length) notes.push('名簿に無い：' + missAll.join('・'));
-      if (dupAll.length) notes.push('同姓同名で決められない：' + dupAll.join('・'));
-
-      if (errs.length) ngCount++; else okCount++;
-
-      rows.push({
-        no: i + 2, ok: errs.length === 0, date: date || rawDate, content: content,
-        client: get('client'), meet: get('meet'), count: count,
-        d: get('d'), mc: get('mc'), op: get('op'), staff: get('staff'),
-        reason: errs.concat(notes).join(' / ')
-      });
+    var rows = data.rows || [];
+    var okCount = 0, ngCount = 0, peopleCount = 0;
+    rows.forEach(function (r) {
+      if (r.errors && r.errors.length) { ngCount++; } else { okCount++; peopleCount += (r.people || 0); }
     });
 
     document.getElementById('pjTotal').textContent = rows.length;
@@ -334,54 +195,81 @@
     document.getElementById('pjPeople').textContent = peopleCount;
 
     var w = '';
-    if (missingCols.length) {
-      w += '<div class="pj-flash err">必要な列が見つかりません：<b>' + pjEsc(missingCols.join('・'))
-        + '</b>。アサイン表の「1行1案件」のシートをそのまま保存したCSVか確認してください。</div>';
+    if (data.isMonthly) {
+      w += '<div class="pj-flash">月ごとのアサイン表（1案件＝横1ブロック）として読みました。'
+        + '日程の年は、ファイル名の「202701」のような数字から補っています。</div>';
     }
-    if (Object.keys(allMiss).length) {
-      w += '<div class="pj-flash warn"><b>名簿に無い人：</b>' + pjEsc(Object.keys(allMiss).join('・'))
+    if (rows.length === 0) {
+      w += '<div class="pj-flash err">取り込める案件が見つかりませんでした。'
+        + 'アサイン表のシートをそのまま「カンマ区切り形式」で保存したCSVか確認してください。</div>';
+    }
+    if (data.missing && data.missing.length) {
+      w += '<div class="pj-flash warn"><b>名簿に無い人：</b>' + pjEsc(data.missing.join('・'))
         + '<br>この方のアサインは入りません。名簿に登録してから、同じCSVをもう一度入れてください（案件は上書きされ二重になりません）。</div>';
     }
-    if (Object.keys(allDup).length) {
-      w += '<div class="pj-flash warn"><b>同姓同名で決められない人：</b>' + pjEsc(Object.keys(allDup).join('・'))
+    if (data.ambiguous && data.ambiguous.length) {
+      w += '<div class="pj-flash warn"><b>同姓同名で決められない人：</b>' + pjEsc(data.ambiguous.join('・'))
         + '<br>取り違えを防ぐため入れません。名簿でどちらかの氏名を直してください。</div>';
     }
-    warn.innerHTML = w;
+    if (data.unknownRoles && data.unknownRoles.length) {
+      w += '<div class="pj-flash warn"><b>知らないポジションの書き方：</b>' + pjEsc(data.unknownRoles.join('・'))
+        + '<br>勝手に決めずに入れていません。この書き方も使うなら教えてください（対応を足します）。</div>';
+    }
+    if (data.unmapped && data.unmapped.length) {
+      w += '<div class="pj-flash">取り込まなかった項目：' + pjEsc(data.unmapped.join('・'))
+        + '<br>ECSに入れる場所がまだ無い項目です（案件は入ります）。</div>';
+    }
+    document.getElementById('pjWarn').innerHTML = w;
 
-    body.innerHTML = rows.map(function (r) {
-      return '<tr class="' + (r.ok ? 'row-ok' : 'row-ng') + '">'
-        + '<td>' + r.no + '</td>'
-        + '<td>' + (r.ok ? 'OK' : 'エラー') + '</td>'
+    document.getElementById('pjBody').innerHTML = rows.map(function (r) {
+      var ok = !(r.errors && r.errors.length);
+      var notes = (r.errors || []).slice();
+      if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
+      if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
+      return '<tr class="' + (ok ? 'row-ok' : 'row-ng') + '">'
+        + '<td>' + pjEsc(r.label) + '</td>'
+        + '<td>' + (ok ? 'OK' : 'エラー') + '</td>'
         + '<td>' + pjEsc(r.date) + '</td>'
-        + '<td>' + pjEsc(r.content) + '</td>'
+        + '<td>' + pjEsc(r.name) + '</td>'
         + '<td>' + pjEsc(r.client) + '</td>'
-        + '<td>' + pjEsc(r.meet) + '</td>'
         + '<td>' + pjEsc(r.count) + '</td>'
-        + '<td>' + pjEsc(r.d) + '</td>'
-        + '<td>' + pjEsc(r.mc) + '</td>'
-        + '<td>' + pjEsc(r.op) + '</td>'
-        + '<td>' + pjEsc(r.staff) + '</td>'
-        + '<td class="' + (r.ok ? 'pj-miss' : 'pj-reason') + '">' + pjEsc(r.reason) + '</td>'
+        + '<td>' + pjEsc(r.people) + ' 名</td>'
+        + '<td class="' + (ok ? 'pj-miss' : 'pj-reason') + '">' + pjEsc(notes.join(' / ')) + '</td>'
         + '</tr>';
     }).join('');
 
+    var result = document.getElementById('pjResult');
     result.style.display = '';
-    document.getElementById('pjBtn').disabled = (okCount === 0 || missingCols.length > 0);
+    document.getElementById('pjBtn').disabled = (okCount === 0);
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function pjReadAndPreview(file) {
     if (!file) return;
     document.getElementById('pjFileName').textContent = '選んだファイル：' + file.name;
-    // 文字コード（UTF-8 / Excel保存のShift_JIS）を見分けて読む共通処理を使う。
-    // 正本＝public/ecs/csv-read.js の ECS_readCsvFile（他の取込画面と同じ）。
-    if (window.ECS_readCsvFile) {
-      window.ECS_readCsvFile(file, pjRender);
-    } else {
-      var fr = new FileReader();
-      fr.onload = function () { pjRender(String(fr.result || '')); };
-      fr.readAsText(file);
-    }
+    document.getElementById('pjResult').style.display = '';
+    document.getElementById('pjWarn').innerHTML = '<div class="pj-flash">読み込んでいます…</div>';
+    pjClear();
+    document.getElementById('pjBtn').disabled = true;
+
+    var form = document.getElementById('pjForm');
+    var token = form.querySelector('input[name="_token"]').value;
+    var fd = new FormData();
+    fd.append('csv', file);
+    fd.append('_token', token);
+
+    fetch('/past-import/preview', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': token }
+    }).then(function (res) {
+      if (!res.ok) { throw new Error(String(res.status)); }
+      return res.json();
+    }).then(pjRender).catch(function () {
+      pjShowError('CSVを読み込めませんでした。CSV（カンマ区切り）のファイルか確認してください。'
+        + '直らないときは、いったんこの画面を開き直してからもう一度お試しください。');
+    });
   }
 
   function pjSubmit() {
@@ -390,7 +278,7 @@
     var msg = ['過去案件を取り込みます。',
                '',
                '・案件は「確定」・スタッフに公開済みで入ります',
-               '・D／MC／OP／スタッフの列の人は「確定」のアサインで入ります',
+               '・アサイン表に名前のある人は「確定」のアサインで入ります',
                '・同じ案件（日程・コンテンツ・顧客名・集合時間が同じ）は上書きします',
                '',
                'よろしいですか？'].join(String.fromCharCode(10));

@@ -79,4 +79,63 @@ class AssignmentRole
     {
         return $code !== null && $code !== '' && in_array($code, self::all(), true);
     }
+
+    /**
+     * アサイン表に書かれた役割の言い方 → 役割コード。読めなければ null。
+     *
+     * なぜ要るか＝月ごとのアサイン表の「P」列には、D／MC／OP／FC のほか
+     * 日本語や旧コードが書かれることがある（2026-08-25 baba要望の取込で使う）。
+     * ⚠ 読めない書き方は勝手に決めず null を返す＝呼ぶ側が一覧で知らせる。
+     *   （知らない語を FC などに寄せてしまうと、間違った役割で記録が残る）
+     *
+     * 旧コードの読み替え＝GUN→SP（軍師）／UKE→RP（受付）。DBは2026-07-01に変換済み。
+     */
+    public static function fromLabel(?string $text): ?string
+    {
+        $t = preg_replace('/[\s　]+/u', '', trim((string) $text));
+        if ($t === '') {
+            return null;
+        }
+
+        // コードそのもの（大文字にそろえる）。旧コードはここで読み替える。
+        $upper = mb_strtoupper($t);
+        $upper = ['GUN' => self::SP, 'UKE' => self::RP][$upper] ?? $upper;
+        if (self::isValid($upper)) {
+            return $upper;
+        }
+
+        // 日本語・別名から。
+        $aliases = [
+            'ディレクター' => self::D,
+            'サブディレクター' => self::SD,
+            'サブD' => self::SD,
+            '音響' => self::OP,
+            'オペレーター' => self::OP,
+            '司会' => self::MC,
+            '司会進行' => self::MC,
+            '巡回' => self::FC,
+            'ファシリ' => self::FC,
+            '巡回ファシリ' => self::FC,
+            'チェッカー' => self::CK,
+            '軍師' => self::SP,
+            'サポーター' => self::SP,
+            '軍師・サポーター' => self::SP,
+            '受付' => self::RP,
+        ];
+
+        foreach ($aliases as $name => $code) {
+            if ($t === preg_replace('/[\s　]+/u', '', $name)) {
+                return $code;
+            }
+        }
+
+        // 「D（ディレクター）」のようにコード＋説明の形も拾う。
+        foreach (self::LABELS as $code => $label) {
+            if ($t === preg_replace('/[\s　]+/u', '', $label)) {
+                return $code;
+            }
+        }
+
+        return null;
+    }
 }

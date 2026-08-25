@@ -227,7 +227,7 @@ class PastProjectImportTest extends TestCase
             ->assertRedirect('/past-import');
 
         // 「拘束」「顧客担当名」などはECSに入れる場所が無い＝一覧に出る。
-        $this->assertStringContainsString('取り込まなかった列', session('status'));
+        $this->assertStringContainsString('取り込まなかった項目', session('status'));
         $this->assertStringContainsString('拘束', session('status'));
     }
 
@@ -273,14 +273,197 @@ class PastProjectImportTest extends TestCase
 
         // ファイルを選んだら読み込む仕掛けがある。
         $this->assertStringContainsString("getElementById('pjFile').addEventListener('change'", $html);
-        // 文字コードを見分ける共通処理を使っている（Excel保存のShift_JIS対応）。
-        $this->assertStringContainsString('ECS_readCsvFile', $html);
+        // 下見はサーバーに投げる＝読み取りの決まりが1か所（画面とサーバーで食い違わない）。
+        $this->assertStringContainsString("fetch('/past-import/preview'", $html);
         // 確認の表と取り込みボタンがある。
         $this->assertStringContainsString('id="pjResult"', $html);
         $this->assertStringContainsString('id="pjBtn"', $html);
-        // 名簿の氏名を渡している＝その場で「名簿にいる／いない」を出せる。
-        $this->assertStringContainsString('ECS_ROSTER_NAMES', $html);
-        // 画面へは @json で渡るので、日本語はエスケープされた形になる。その形で確かめる。
-        $this->assertStringContainsString(json_encode('鈴木 彩', JSON_UNESCAPED_SLASHES), $html);
+    }
+
+    /**
+     * 下見（preview）は、登録せずに「何件入るか・誰が入るか」を返す。
+     *
+     * ⚠ 画面側にも同じ読み取りを書くと片方だけ直して食い違うため、
+     *   読み取りはサーバー1か所にした（2026-08-25）。ここはその約束を守る番人。
+     */
+    public function test_preview_returns_rows_without_saving(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->csv([
+                $this->row([50 => '鈴木 彩, 誰か 知らない']),   // 50＝スタッフ列
+            ]),
+        ])->assertOk();
+
+        $json = $res->json();
+        $this->assertTrue($json['ok']);
+        $this->assertFalse($json['isMonthly']);
+        $this->assertCount(1, $json['rows']);
+        $this->assertSame('2026-01-20', $json['rows'][0]['date']);
+        $this->assertSame('水合戦', $json['rows'][0]['name']);
+        $this->assertSame([], $json['rows'][0]['errors']);
+        // 名簿にいる人だけ数え、いない人は名前を返す（登録してから気づく、を避ける）。
+        $this->assertSame(1, $json['rows'][0]['people']);
+        $this->assertContains('誰か 知らない', $json['missing']);
+
+        // 下見では1件も登録しない。
+        $this->assertSame(0, Project::count());
+        $this->assertSame(0, Assignment::count());
+    }
+
+    /**
+     * 月ごとのアサイン表（1案件＝横1ブロック）のCSVを作る。
+     *
+     * 実物と同じ形にしてある＝項目名が縦に並び、その右に値。下の方に「NO／名前／P」で人。
+     * ⚠ 拠点によって項目の場所が少し違うので、位置は決め打ちにせず項目名で読む決まり。
+     *   このテストの列位置も、実物とわざと少しずらしてある（ずれても読めることの確認）。
+     *
+     * @param  list<array{name:string, role:string}>  $people
+     */
+    private function monthlyCsv(array $people, string $filename = '東京アサイン表 - 202609.csv',
+        string $date = '9月1日(火)', string $content = '会議室'): UploadedFile
+    {
+        $blank = fn () => array_fill(0, 24, '');
+        $put = function (array $row, array $cells) {
+            foreach ($cells as $i => $v) {
+                $row[$i] = $v;
+            }
+
+            return $row;
+        };
+
+        $rows = [];
+        $rows[] = $put($blank(), [13 => '1']);                                  // ブロック番号
+        $rows[] = $put($blank(), [13 => '日程', 16 => $date, 19 => '宿泊', 20 => '無']);
+        $rows[] = $put($blank(), [13 => 'コンテンツ', 16 => $content]);
+        $rows[] = $put($blank(), [13 => '案件規模', 16 => '小型', 18 => '営業担当', 20 => '馬場 智之']);
+        $rows[] = $put($blank(), [13 => '顧客名（代理店名）', 16 => '株式会社テスト']);
+        $rows[] = $put($blank(), [13 => '集合/解散/拘束時間', 16 => '9:00', 18 => '17:00', 20 => '8:00']);
+        $rows[] = $put($blank(), [13 => '人数 / チーム数', 16 => '50名', 19 => '10チーム']);
+        $rows[] = $put($blank(), [13 => '運営人数 / 形式', 16 => '5名', 19 => '確定']);
+        $rows[] = $put($blank(), [13 => '備考', 16 => 'テスト']);
+        $rows[] = $put($blank(), [13 => 'NO', 14 => '名前', 17 => 'P', 18 => '巡回', 19 => '備考']);
+        foreach ($people as $i => $person) {
+            $rows[] = $put($blank(), [13 => (string) ($i + 1), 14 => $person['name'], 17 => $person['role']]);
+        }
+
+        $line = fn (array $r) => implode(',', array_map(
+            fn ($v) => str_contains((string) $v, ',')
+                ? '"'.str_replace('"', '""', (string) $v).'"'
+                : (string) $v,
+            $r
+        ));
+
+        return UploadedFile::fake()->createWithContent(
+            $filename, implode("\n", array_map($line, $rows))."\n"
+        );
+    }
+
+    /**
+     * 月ごとのアサイン表（1案件＝横1ブロック）も、そのまま取り込める。
+     * ⚠ 他拠点は list のシートを使っていないため（2026-08-25 baba要望）。
+     */
+    public function test_imports_monthly_sheet_with_positions(): void
+    {
+        $me = $this->manager();
+        PersonFactory::new()->create([
+            'id' => 'E-010', 'name' => '田中 健一', 'permission' => 'employee',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([
+                ['name' => '田中 健一', 'role' => 'D'],
+                ['name' => '鈴木 彩', 'role' => 'MC'],
+                ['name' => '名簿に無い 人', 'role' => 'FC'],
+            ]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        // 日程は「9月1日(火)」＝年が無い。ファイル名の 202609 から年を補う。
+        $this->assertSame('2026-09-01', $p->start_date->format('Y-m-d'));
+        $this->assertSame('株式会社テスト', $p->client);
+        $this->assertSame('9:00', $p->start_time);
+        // 「5名」「50名」「10チーム」のように単位つきでも数字だけ取り出す。
+        $this->assertSame(5, $p->required_count);
+        $this->assertSame(50, $p->guest_count);
+        $this->assertSame(10, $p->team_count);
+        $this->assertSame('確定', $p->status);
+        $this->assertTrue((bool) $p->staff_published);
+        // ⚠ 登録拠点が空だと案件一覧の拠点しぼりに引っかからず誰にも見えなくなる。
+        $this->assertSame('東京', $p->office);
+
+        // 名前の横のポジションがそのままアサインの役割になる。
+        $this->assertSame('D', Assignment::where('staff_id', 'E-010')->firstOrFail()->role);
+        $this->assertSame('MC', Assignment::where('staff_id', 'S-001')->firstOrFail()->role);
+        $this->assertSame('確定', Assignment::where('staff_id', 'S-001')->firstOrFail()->status);
+        // 名簿に無い人は入れずに知らせる（人の取り違えを防ぐ）。
+        $this->assertSame(2, Assignment::count());
+        $this->assertContains('名簿に無い 人', $res->getSession()->get('past_missing'));
+    }
+
+    /** 月シートを取り込み直しても、案件もアサインも二重にならない。 */
+    public function test_monthly_sheet_can_be_imported_twice(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+        $people = [['name' => '鈴木 彩', 'role' => 'MC']];
+
+        $this->actingAsPerson($me)->post('/past-import', ['csv' => $this->monthlyCsv($people)]);
+        $this->actingAsPerson($me)->post('/past-import', ['csv' => $this->monthlyCsv($people)]);
+
+        $this->assertSame(1, Project::count());
+        $this->assertSame(1, Assignment::count());
+    }
+
+    /**
+     * ファイル名から「何年何月ぶんか」が読めない月シートは、勝手に年を決めずエラーにする。
+     * ⚠ 年を勘で補うと、去年の案件が今年に入るなど静かに間違う。
+     */
+    public function test_monthly_sheet_without_year_in_filename_is_refused(): void
+    {
+        $me = $this->manager();
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([], 'アサイン表.csv'),
+        ])->assertRedirect('/past-import');
+
+        $this->assertStringContainsString('何年何月', (string) $res->getSession()->get('import_error'));
+        $this->assertSame(0, Project::count());
+    }
+
+    /** 知らないポジションの書き方は、勝手に決めずに入れないで知らせる。 */
+    public function test_unknown_position_is_reported_not_guessed(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'なにか']]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(0, Assignment::count());
+        $this->assertContains('なにか', $res->getSession()->get('past_unknown_roles'));
+    }
+
+    /** 下見（preview）でも月シートとして読めていることが分かる。 */
+    public function test_preview_tells_monthly_sheet(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $json = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']]),
+        ])->assertOk()->json();
+
+        $this->assertTrue($json['ok']);
+        $this->assertTrue($json['isMonthly']);
+        $this->assertCount(1, $json['rows']);
+        $this->assertSame('2026-09-01', $json['rows'][0]['date']);
+        $this->assertSame(1, $json['rows'][0]['people']);
+        $this->assertSame(0, Project::count());
     }
 }
