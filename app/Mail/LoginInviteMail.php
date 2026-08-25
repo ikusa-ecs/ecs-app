@@ -31,7 +31,7 @@ class LoginInviteMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【IKUSA】ECS（アサイン管理システム）のご利用開始について',
+            subject: '【重要】イベント管理システム「ECS」アカウント発行のご案内',
         );
     }
 

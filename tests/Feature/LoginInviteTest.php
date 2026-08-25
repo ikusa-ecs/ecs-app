@@ -80,9 +80,15 @@ class LoginInviteTest extends TestCase
         $body = $mail->render();
 
         $this->assertStringContainsString('reset-password', $body, 'パスワードを決めるリンクが入っていること');
-        $this->assertStringContainsString('7 日間', $body);
-        // 「パスワード：xxxx」のように値を書いていないこと。
-        $this->assertStringContainsString('パスワードは記載しておりません', $body);
+        $this->assertStringContainsString('有効期限は7日間', $body);
+
+        // ⚠ ログイン画面のURLはトップページ。/login はブラウザで開くとエラーになる
+        //   （POST専用の裏口）ので、絶対に案内に載せない。
+        $this->assertStringContainsString(route('login'), $body, 'ログインURLが入っていること');
+        $this->assertStringNotContainsString('/login', $body, '/login を案内に載せないこと');
+
+        // パスワードそのものを本文に書いていないこと（リンクだけを送る方針）。
+        $this->assertStringNotContainsString('仮パスワード', $body);
     }
 
     /** メールが無い人・退職した人には送らず、理由を返す（黙って失敗しない）。 */
