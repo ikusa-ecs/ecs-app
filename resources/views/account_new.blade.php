@@ -30,6 +30,12 @@
           <p style="font-size:12px; color:#166534; margin:10px 0 0;">
             この<b>メールとパスワード</b>を本人に伝えてください。本人が初回ログインすると、パスワード変更とプロフィール入力の画面が出ます。
           </p>
+          @if (session('invite_message'))
+            <p style="font-size:12.5px; color:#166534; margin:8px 0 0; font-weight:700;">📧 {{ session('invite_message') }}</p>
+            <p style="font-size:12px; color:#166534; margin:4px 0 0;">
+              案内メールを送った場合、本人はメールのリンクから自分でパスワードを決められます（上の仮パスワードを伝える必要はありません）。
+            </p>
+          @endif
         </div>
       @endif
 
@@ -122,6 +128,20 @@
             <label>チャットワークID</label>
             <input type="text" name="chatwork_id" value="{{ old('chatwork_id') }}" placeholder="例）1234567">
             <span class="hint">数字だけ。分かる場合だけ入れてください（本人があとでマイプロフィールから直せます）。リマインドの宛先に使います。</span>
+          </div>
+
+          {{-- ログイン案内メール。パスワードはメールに載せず、本人が決めるリンクを送る。 --}}
+          <div class="form-row">
+            <label>ログイン案内メール</label>
+            <label style="display:inline-flex; align-items:flex-start; gap:8px; font-weight:400;">
+              <input type="checkbox" name="send_invite" value="1" style="width:auto; margin-top:3px;">
+              <span>この方に<b>ログイン案内メールを送る</b>
+                <span style="display:block; font-size:12px; color:#8a7a66; margin-top:2px;">
+                  メールには<b>パスワードを書きません</b>。本人がリンクを開いて自分で決めます（有効7日間）。<br>
+                  ※ メールを使わず、下の仮パスワードを口頭などで伝える場合はチェック不要です。
+                </span>
+              </span>
+            </label>
           </div>
 
           <div class="form-row">

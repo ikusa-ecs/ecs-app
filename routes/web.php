@@ -155,6 +155,9 @@ Route::post('/admin-console/permission', [AdminConsoleController::class, 'update
 // ⚠ 辞めた人は「退職にする」（在籍を外す）。削除は間違い登録・テストで作った人の片づけ用で、
 //   アサイン等の記録が残っている人はサーバー側で拒否する（過去の案件が追えなくなるため）。
 Route::post('/people/{id}/active', [PersonController::class, 'setActive'])->middleware('tier:admin');
+// ログイン案内メール（パスワードを決めるリンク）を送る。アカウント発行に準じるので管理者以上。
+// メールアドレスが未登録なら、この場で登録してから送れる（もらった順に送っていく運用のため）。
+Route::post('/people/{id}/invite', [PersonController::class, 'sendInvite'])->middleware('tier:manager');
 Route::post('/people/{id}/delete', [PersonController::class, 'destroyPerson'])->middleware('tier:admin');
 // 別ウィンドウで開くポップアップ画面（Blade化済み）
 // 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。

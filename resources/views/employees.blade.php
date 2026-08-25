@@ -16,6 +16,8 @@
   window.ECS_MY_ID = @json($myId ?? null);
   {{-- 所属の選択肢（実際の10種類）。氏名・ふりがな・所属を直す欄で使う。 --}}
   window.ECS_DEPT_ALL = @json(\App\Support\Departments::ALL);
+  {{-- ログイン案内メールのボタンを出すか＝管理者以上。 --}}
+  window.ECS_CAN_INVITE = @json($canInvite ?? false);
 </script>
 {{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
 <style>
@@ -169,7 +171,7 @@
       tr.className = 'main-row';
       tr.dataset.idx = idx;
       tr.innerHTML = `
-        <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}${p.active === false ? '<span class="dept none" style="margin-left:6px;">退職</span>' : ''}
+        <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}${p.active === false ? '<span class="dept none" style="margin-left:6px;">退職</span>' : ''}${loginBadge(p)}
             <br><span class="muted" style="font-size:11.5px;">${p.id}</span>
             <br><span class="muted" style="font-size:11.5px;">${p.kana
               ? p.kana
@@ -229,8 +231,54 @@
           <button class="btn sm" onclick="toggleDetail(${idx})">閉じる</button>
           <span class="muted" style="font-size:12px;">※「経験コンテンツ」「Dの経験コンテンツ」「サイズ」の変更は保存されます。社員はエントリーしません（この名簿はアサインとは別管理）。</span>
         </div>
+        ${inviteHtml(p)}
         ${personAdminHtml(p)}
       </div>`;
+  }
+
+  // ログインの状態バッジ（2026-08-25）。誰がまだログインできないかを名簿で分かるようにする。
+  function loginBadge(p){
+    var m = {
+      ready:   ['ログインできる', '#e7f6ec', '#15803d'],
+      invited: ['案内メール送信済み', '#fdf3e2', '#8a5a10'],
+      temp:    ['仮パスワード発行済み', '#e0f2fe', '#0369a1'],
+      none:    ['まだアカウント無し', '#f1ece4', '#7a6f63']
+    };
+    var v = m[p.login] || m.none;
+    return '<span style="margin-left:6px; font-size:11px; padding:1px 8px; border-radius:999px; white-space:nowrap;'
+      + 'background:' + v[1] + '; color:' + v[2] + ';">' + v[0] + '</span>';
+  }
+
+  // 「ログイン案内を送る」ボタン。メールが未登録ならその場で入力してもらう。
+  function inviteHtml(p){
+    if (!window.ECS_CAN_INVITE) return '';
+    var label = p.login === 'ready' ? '案内メールを送り直す' : '📧 ログイン案内メールを送る';
+    var sub = p.invitedAt ? ('（前回 ' + p.invitedAt + ' に送信）') : '';
+    return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px; flex-wrap:wrap;">
+        <label class="size-item" style="font-size:13px;">メール：
+          <input type="text" class="size-input" style="width:230px;" id="inv-mail-${p.id}" value="${escAttr(p.email)}" placeholder="name@ikusa.co.jp">
+        </label>
+        <button class="btn sm" data-invite-id="${p.id}">${label}</button>
+        <span class="muted" style="font-size:12px;">${sub}
+          パスワードはメールに書きません。本人が<b>リンクから自分で決めます</b>（有効7日間）。</span>
+      </div>`;
+  }
+
+  function sendInvite(id){
+    var el = document.getElementById('inv-mail-' + id);
+    var email = el ? el.value.trim() : '';
+    if (!email) { alert('メールアドレスを入れてください。'); return; }
+    if (!confirm(email + ' 宛にログイン案内メールを送ります。よろしいですか？')) return;
+    fetch('/people/' + encodeURIComponent(id) + '/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: email })
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert((j && j.message) || (ok ? '送りました。' : '送れませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
   }
 
   // Administrator だけに出す「氏名・ふりがな・所属を直す」欄。
@@ -328,7 +376,9 @@
     const act = e.target.closest('[data-act-id]');
     if (act) { setPersonActive(act.dataset.actId, act.dataset.actNext === 'true'); return; }
     const del = e.target.closest('[data-del-id]');
-    if (del) { deletePerson(del.dataset.delId, del.dataset.delName); }
+    if (del) { deletePerson(del.dataset.delId, del.dataset.delName); return; }
+    const inv = e.target.closest('[data-invite-id]');
+    if (inv) { sendInvite(inv.dataset.inviteId); }
   });
 
   function setPersonActive(id, active){

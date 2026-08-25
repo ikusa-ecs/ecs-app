@@ -12,6 +12,9 @@
   {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
   window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
   window.ECS_MY_ID = @json($myId ?? null);
+  {{-- ログイン案内メールのボタンを出すか＝管理者以上。 --}}
+  window.ECS_CAN_INVITE = @json($canInvite ?? false);
+  window.ECS_CSRF = '{{ csrf_token() }}';
   window.ECS_LV_LABEL = { new: '新人', mid: '中堅', vet: 'ベテラン' };
   window.ECS_yearsSince = function (joinDate) {
     if (!joinDate) return 0;
@@ -131,6 +134,15 @@
             <option value="OP">OP（音響）</option>
             <option value="MC">MC（司会進行）</option>
             <option value="SP">軍師・サポーター</option>
+          </select>
+          <!-- メールをもらった順に案内を送る運用のため、「まだの人」だけ出せるようにする。 -->
+          <select id="fLogin" onchange="rosterFilter()">
+            <option value="">ログイン：すべて</option>
+            <option value="none">まだアカウント無し</option>
+            <option value="invited">案内メール送信済み（未設定）</option>
+            <option value="temp">仮パスワード発行済み</option>
+            <option value="ready">ログインできる</option>
+            <option value="notready">まだログインできない人（まとめて）</option>
           </select>
           <div class="spacer"></div>
           <a class="btn primary" href="/account-new?role=staff"
@@ -316,7 +328,7 @@
       tr.className = 'main-row';
       tr.dataset.idx = idx;
       tr.innerHTML = `
-        <td><strong>${p.name}</strong><br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
+        <td><strong>${p.name}</strong>${loginBadge(p)}<br><span class="muted" style="font-size:11.5px;">${p.id}</span></td>
         <td><span class="lv ${lvOf(p)}">${lvLabel[lvOf(p)]}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.office || '—'}</span></td>
         <td>${p.exclusive ? '<span class="badge green">専属</span>' : '<span class="muted" style="font-size:12px;">—</span>'}</td>
@@ -409,12 +421,65 @@
           <button class="btn sm" onclick="rosterToggle(${idx})">閉じる</button>
           <span class="save-status muted" style="font-size:12px;"></span>
         </div>
+        ${inviteHtml(p)}
         ${personAdminHtml(p)}
       </div>`;
   }
 
   // Administrator だけに出す「退職にする／在籍に戻す」「削除」（社員名簿と同じ作り）。
   // 辞めた方は削除ではなく退職（在籍を外す）＝過去の案件の記録を残すため。
+  // ログインの状態バッジ（2026-08-25）。メールアドレスをもらった順に案内を送る運用なので、
+  // 「誰がまだログインできないか」が名簿でひと目で分かるようにする。
+  function loginBadge(p){
+    var m = {
+      ready:   ['ログインできる', '#e7f6ec', '#15803d'],
+      invited: ['案内メール送信済み', '#fdf3e2', '#8a5a10'],
+      temp:    ['仮パスワード発行済み', '#e0f2fe', '#0369a1'],
+      none:    ['まだアカウント無し', '#f1ece4', '#7a6f63']
+    };
+    var v = m[p.login] || m.none;
+    return '<span style="margin-left:6px; font-size:11px; padding:1px 8px; border-radius:999px; white-space:nowrap;'
+      + 'background:' + v[1] + '; color:' + v[2] + ';">' + v[0] + '</span>';
+  }
+
+  // 「ログイン案内を送る」ボタン。メールが未登録ならその場で入力してもらう。
+  function inviteHtml(p){
+    if (!window.ECS_CAN_INVITE) return '';
+    var label = p.login === 'ready' ? '案内メールを送り直す' : '📧 ログイン案内メールを送る';
+    var sub = p.invitedAt ? ('（前回 ' + p.invitedAt + ' に送信）') : '';
+    return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px; flex-wrap:wrap;">
+        <label class="size-item" style="font-size:13px;">メール：
+          <input type="text" class="size-input" style="width:230px;" id="inv-mail-${p.id}" value="${escAttrS(p.email)}" placeholder="staff@example.com">
+        </label>
+        <button class="btn sm" data-invite-id="${p.id}">${label}</button>
+        <span class="muted" style="font-size:12px;">${sub}
+          パスワードはメールに書きません。本人が<b>リンクから自分で決めます</b>（有効7日間）。</span>
+      </div>`;
+  }
+
+  function escAttrS(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+    });
+  }
+
+  function sendInvite(id){
+    var el = document.getElementById('inv-mail-' + id);
+    var email = el ? el.value.trim() : '';
+    if (!email) { alert('メールアドレスを入れてください。'); return; }
+    if (!confirm(email + ' 宛にログイン案内メールを送ります。よろしいですか？')) return;
+    fetch('/people/' + encodeURIComponent(id) + '/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: email })
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert((j && j.message) || (ok ? '送りました。' : '送れませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
+  }
+
   function personAdminHtml(p){
     if (!window.ECS_CAN_MANAGE_PEOPLE) return '';
     if (p.id === window.ECS_MY_ID) {
@@ -437,7 +502,9 @@
     const act = e.target.closest('[data-act-id]');
     if (act) { setPersonActive(act.dataset.actId, act.dataset.actNext === 'true'); return; }
     const del = e.target.closest('[data-del-id]');
-    if (del) { deletePerson(del.dataset.delId, del.dataset.delName); }
+    if (del) { deletePerson(del.dataset.delId, del.dataset.delName); return; }
+    const inv = e.target.closest('[data-invite-id]');
+    if (inv) { sendInvite(inv.dataset.inviteId); }
   });
 
   function setPersonActive(id, active){
@@ -494,14 +561,19 @@
     const kw  = document.getElementById('kw').value.trim();
     const fLv = document.getElementById('fLv').value;
     const fPos= document.getElementById('fPos').value;
+    const fLoginEl = document.getElementById('fLogin');
+    const fLogin = fLoginEl ? fLoginEl.value : '';
     let shown = 0;
     staff.forEach((p, idx) => {
       const mr = tbody.querySelector(`tr.main-row[data-idx="${idx}"]`);
       const dr = tbody.querySelector(`tr.detail-row[data-for="${idx}"]`);
-      const okKw  = !kw  || p.name.includes(kw) || p.id.includes(kw);
+      const okKw  = !kw  || p.name.includes(kw) || p.id.includes(kw) || (p.kana || '').includes(kw);
       const okLv  = !fLv || lvOf(p) === fLv;
       const okPos = !fPos|| p.pos[fPos];
-      const visible = okKw && okLv && okPos;
+      // ログインの状態で絞る。「まだログインできない人」＝本人がパスワードを決めていない人ぜんぶ。
+      const okLogin = !fLogin
+        || (fLogin === 'notready' ? (p.login !== 'ready') : (p.login === fLogin));
+      const visible = okKw && okLv && okPos && okLogin;
       mr.style.display = visible ? '' : 'none';
       if (!visible && dr) { dr.style.display = 'none';
         const t = mr.querySelector('.row-toggle'); if (t) t.innerHTML = '詳細 ▾'; }

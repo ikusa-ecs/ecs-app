@@ -115,6 +115,8 @@
       <input type="hidden" name="_token" id="piToken">
       {{-- 「ログインアカウントも一緒に作る」の状態。チェック欄はフォームの外にあるのでここで渡す。 --}}
       <input type="hidden" name="make_accounts" id="piMakeAccountsHidden" value="">
+      {{-- 「ログイン案内メールを送る」の状態。チェック欄はフォームの外にあるのでここで渡す。 --}}
+      <input type="hidden" name="send_invites" id="piSendInvitesHidden" value="">
       <div id="piDrop" class="pi-drop">
         ここにCSVをドラッグ＆ドロップ、または<br>
         <input type="file" name="csv" id="piFile" accept=".csv,text/csv" style="margin-top:8px;">
@@ -146,6 +148,16 @@
               仮パスワードを自動で作ります。登録後に一覧が出るので、そのままCSVでダウンロードできます。<br>
               本人は初回ログインで、パスワード変更とふりがな・入社年月日の入力を行います。<br>
               ※ <b>メールが空の行はアカウントを作りません</b>（ログインに使うため）。名簿への登録はされます。
+            </span>
+          </span>
+        </label>
+        <label style="display:inline-flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:700; margin-left:4px;">
+          <input type="checkbox" id="piSendInvites" style="width:auto; margin-top:3px;">
+          <span>ログイン案内メールも送る
+            <span style="display:block; font-weight:400; font-size:12px; color:#8a7a66; margin-top:2px;">
+              メールには<b>パスワードを書きません</b>。本人がリンクを開いて自分で決めます（有効7日間）。<br>
+              ※ チェックしない場合は、上の仮パスワード一覧を使ってご自身で連絡してください。<br>
+              ※ あとから名簿の「詳細」→「ログイン案内メールを送る」でも送れます。
             </span>
           </span>
         </label>
@@ -332,6 +344,8 @@
     document.getElementById('piToken').value = window.ECS_CSRF || '';
     // チェックの状態をサーバーへ送る（フォームに隠し欄で入れる）。
     document.getElementById('piMakeAccountsHidden').value = makeAccounts ? '1' : '';
+    var si = document.getElementById('piSendInvites');
+    document.getElementById('piSendInvitesHidden').value = (si && si.checked && makeAccounts) ? '1' : '';
     document.getElementById('piForm').submit();
   }
 

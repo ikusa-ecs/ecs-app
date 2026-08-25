@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Support\Departments;
+use App\Support\LoginInvite;
 use App\Support\TempPassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -73,6 +74,8 @@ class AccountController extends Controller
             // 名簿CSV取込など他の入口から届くことはあるので、受け取れる形は残しておく。
             'hire_date'     => ['nullable', 'date'],
             'temp_password' => ['nullable', 'string', 'min:6'],
+            // 発行と同時にログイン案内メールを送るか（チェック・任意）。
+            'send_invite'   => ['nullable'],
         ], [
             'permission.in' => 'その権限を付与する権限がありません（Administrator権限を付けられるのはAdministratorだけです）。',
             'email.unique'  => 'このメールアドレスは既に使われています。',
@@ -129,8 +132,17 @@ class AccountController extends Controller
             'active'       => true,
         ]);
 
+        // ログイン案内メールを送る（チェックが入っていたときだけ）。
+        // ⚠ パスワードはメールに載せない。「自分でパスワードを決めるリンク」を送る
+        //   （正本＝App\Support\LoginInvite）。仮パスワードの表示は今までどおり残す
+        //   ＝メールを使わずに口頭で伝えたい場合もあるため（社員は既にこの方法で配布済み）。
+        $inviteMessage = null;
+        if ($request->boolean('send_invite')) {
+            $inviteMessage = LoginInvite::send(Person::find($id))['message'];
+        }
+
         // 発行結果（メール＋仮パスワード）を本人に伝えられるよう画面に表示する。
-        return redirect('/account-new')->with('issued', [
+        return redirect('/account-new')->with('invite_message', $inviteMessage)->with('issued', [
             'id'       => $id,
             'name'     => $validated['name'],
             'email'    => $validated['email'],

@@ -36,7 +36,11 @@ class OnboardingController extends Controller
             'name'      => ['required'],
             'name_kana' => ['required', 'string', 'max:255'],
             'email'     => ['nullable', 'email'],
-            'password'  => ['required', 'min:8', 'confirmed'],
+            // パスワードは、まだ本人が決めていない人だけ必須。
+            // ログイン案内メールのリンクから既に決めた人には画面にも出さない（2026-08-25）。
+            'password'  => $user->password_set_at
+                ? ['nullable', 'min:8', 'confirmed']
+                : ['required', 'min:8', 'confirmed'],
             'hire_date' => [$user->role === 'employee' ? 'required' : 'nullable', 'date'],
         ], [], [
             'name'      => '氏名',
@@ -54,8 +58,12 @@ class OnboardingController extends Controller
                 ->with('status', 'デモ用アカウントのため保存はされませんが、実際のスタッフはここで入力した内容が登録されます。設定完了として先へ進みます。');
         }
 
-        // パスワード（モデルのキャストで自動ハッシュ化される）
-        $user->password = $request->input('password');
+        // パスワード（モデルのキャストで自動ハッシュ化される）。
+        // 入力があるときだけ更新する＝既に自分で決めている人は、その内容を消さない。
+        if ($request->filled('password')) {
+            $user->password = $request->input('password');
+            $user->password_set_at = \Illuminate\Support\Carbon::now();
+        }
 
         // 基本情報（旧・新規登録の項目）
         $user->name            = $request->input('name');

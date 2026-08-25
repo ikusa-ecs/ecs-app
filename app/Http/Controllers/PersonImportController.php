@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Support\Departments;
+use App\Support\LoginInvite;
 use App\Support\TempPassword;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
@@ -40,6 +41,8 @@ class PersonImportController extends Controller
             'csv' => ['required', 'file', 'mimes:csv,txt'],
             // 「ログインアカウントも一緒に作る」チェック（任意）。
             'make_accounts' => ['nullable'],
+            // 取込と同時にログイン案内メールを送るか（任意）。
+            'send_invites' => ['nullable'],
         ]);
 
         // アカウントも作るか。作る場合は仮パスワードを自動生成し、初回ログインで
@@ -49,6 +52,10 @@ class PersonImportController extends Controller
         $makeAccounts = $request->boolean('make_accounts');
         $issued = [];        // 発行できた人（画面に一覧＋CSVで渡す）
         $noEmail = [];       // メールが無くて発行できなかった人
+        // 案内メールを送るか。⚠ パスワードはメールに載せず「自分で決めるリンク」を送る
+        //   （正本＝App\Support\LoginInvite）。まとめて送れると、スタッフを一気に登録するときに楽。
+        $sendInvites = $request->boolean('send_invites');
+        $invitedPeople = [];
 
         // CSV を行配列にする（BOM除去・文字コードをUTF-8にそろえる・CRLF対応）。
         $raw = (string) file_get_contents($request->file('csv')->getRealPath());
@@ -197,6 +204,9 @@ class PersonImportController extends Controller
             $person = Person::create($attrs);
 
             if ($makeAccounts && $email !== '') {
+                if ($sendInvites) {
+                    $invitedPeople[] = $person;
+                }
                 $issued[] = [
                     'id' => $person->id,
                     'name' => $name,
@@ -234,9 +244,21 @@ class PersonImportController extends Controller
             $okCount++;
         }
 
+        // 案内メールはここでまとめて送る（1件ずつ送ると途中で失敗したとき分かりにくいため）。
+        $inviteResult = ['sent' => 0, 'skipped' => []];
+        if ($sendInvites && $invitedPeople) {
+            $inviteResult = LoginInvite::sendMany($invitedPeople);
+        }
+
         $msg = "CSVから{$okCount}名を名簿に登録しました。";
         if ($makeAccounts) {
             $msg .= ' そのうち' . count($issued) . '名にログインアカウント（仮パスワード）を発行しました。';
+        }
+        if ($sendInvites) {
+            $msg .= ' ログイン案内メールを'.$inviteResult['sent'].'名に送りました。';
+            if ($inviteResult['skipped']) {
+                $msg .= ' 送れなかった方：'.implode(' / ', $inviteResult['skipped']);
+            }
         }
         if ($noEmail) {
             $msg .= ' メール未記入のため発行できなかった方：' . implode('・', $noEmail)

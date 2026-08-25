@@ -8,7 +8,9 @@ use App\Models\StaffRelation;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\Departments;
+use App\Support\LoginInvite;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +53,11 @@ class PersonController extends Controller
                         ->values(),
                     'cwid'         => $p->chatwork_id ?? '',   // チャットワークID（未登録を見つける用）
                     'active'       => (bool) $p->active,      // 在籍中か（false＝退職）
+                    'email'        => $p->email ?? '',
+                    // ログインの状態（none=アカウント無し／temp=仮パスワード発行済み／
+                    // invited=案内メール送信済み／ready=本人が設定済み）
+                    'login'        => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
+                    'invitedAt'    => optional($p->invited_at)->format('Y-m-d'),
                     'deptMain'     => $p->department ?? '',   // 主な所属（編集欄の初期値）
                     'office'       => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,
@@ -82,6 +89,8 @@ class PersonController extends Controller
             'contentOptions' => $contentOptions,
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
+            // ログイン案内メールを送れるか＝管理者以上（アカウント発行と同じ扱い）。
+            'canInvite' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             // 自分自身には出さない（自分を消す・退職にするのは止めている）。
             'myId'            => optional(Auth::user())->id,
         ]);
@@ -270,6 +279,13 @@ class PersonController extends Controller
                     'name'      => $p->name,
                     'kana'      => $p->name_kana ?? '',
                     'active'    => (bool) $p->active,   // 在籍中か（false＝退職）
+                    'email'     => $p->email ?? '',
+                    // ログインの状態（2026-08-25 baba要望＝名簿で「登録済み／まだ」が分かるように）
+                    //   none    … アカウントがまだ無い（パスワードが空）
+                    //   invited … 案内メールを送ったが、本人がまだパスワードを決めていない
+                    //   ready   … 本人がパスワードを決めた＝ログインできる
+                    'login'     => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
+                    'invitedAt' => optional($p->invited_at)->format('Y-m-d'),
                     'office'    => $p->office ?? '',   // 事務所（地域オフィス）
                     // joinDate ＝ 区分（新人/中堅/ベテラン）計算の元。people.js と同じく文字列で渡す。
                     'joinDate'  => $p->hire_date?->format('Y-m-d'),
@@ -317,6 +333,8 @@ class PersonController extends Controller
             'status' => $status,
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
+            // ログイン案内メールを送れるか＝管理者以上（アカウント発行と同じ扱い）。
+            'canInvite' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             'myId' => optional(Auth::user())->id,
         ]);
     }
@@ -406,6 +424,40 @@ class PersonController extends Controller
         }
 
         return redirect('/staff')->with('status', $message);
+    }
+
+    /**
+     * ログイン案内メールを送る。POST /people/{id}/invite（管理者以上）
+     *
+     * 使う場面（2026-08-25 baba要望）：
+     *   スタッフは先に名簿だけ作っておき、メールアドレスをもらった人から順に案内を送りたい。
+     *   そのため、この場でメールアドレスを登録してから送れるようにしている。
+     *
+     * ⚠ パスワードはメールに載せない。「自分でパスワードを決めるリンク」を送る
+     *   （中身の判断・送信は App\Support\LoginInvite が正本）。
+     */
+    public function sendInvite(Request $request, string $id)
+    {
+        $person = Person::find($id);
+        if (! $person) {
+            return response()->json(['ok' => false, 'message' => 'その人が見つかりませんでした。'], 404);
+        }
+
+        // メールアドレスが未登録なら、この場で登録してから送る（もらった順に送れるように）。
+        if ($request->filled('email')) {
+            $data = $request->validate([
+                'email' => ['email', Rule::unique('people', 'email')->ignore($person->id, 'id')],
+            ], [
+                'email.unique' => 'このメールアドレスは別の方が使っています。',
+            ], ['email' => 'メールアドレス']);
+
+            $person->email = $data['email'];
+            $person->save();
+        }
+
+        $result = LoginInvite::send($person);
+
+        return response()->json($result, $result['ok'] ? 200 : 422);
     }
 
     /**

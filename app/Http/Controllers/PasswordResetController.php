@@ -112,7 +112,9 @@ class PasswordResetController extends Controller
 
         // 保存（Person の password はキャストで自動ハッシュ化される）。
         $person->password = $request->input('password');
-        // 初回設定待ち（must_onboard）だった場合もパスワードは設定済みになる。
+        // 本人が自分で決めた印。初回設定の画面で、もう一度パスワードを聞かないために使う
+        // （ログイン案内メールのリンクから来た人は、ここで既に決めているため・2026-08-25）。
+        $person->password_set_at = Carbon::now();
         $person->save();
 
         // 使い終わったトークンは削除（使い回し防止）。

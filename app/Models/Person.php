@@ -45,6 +45,8 @@ class Person extends Model implements AuthenticatableContract
             'departments' => 'array',   // 兼務も含めた所属すべて（主な所属＝department）
             'is_admin' => 'boolean',
             'must_onboard' => 'boolean',   // 初回ログインの初期設定が必要か
+            'invited_at' => 'datetime',      // ログイン案内メールを最後に送った日時
+            'password_set_at' => 'datetime', // 本人が自分でパスワードを決めた日時
             'is_exclusive' => 'boolean',
             'op_online' => 'boolean',   // OPオンライン可（B案）
             'op_real' => 'boolean',     // OPリアル(現地)可（B案）

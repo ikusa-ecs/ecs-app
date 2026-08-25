@@ -62,21 +62,25 @@
     <form method="POST" action="/onboarding">
       @csrf
 
-      {{-- ① パスワードの設定（初回なので現在のパスワードは不要） --}}
-      <div class="sec">
-        <h3><span class="no">1</span> パスワードを決める</h3>
-        <p class="sub">これからのログインで使う、あなただけのパスワードを決めてください。</p>
+      {{-- ① パスワードの設定（初回なので現在のパスワードは不要）。
+           ⚠ ログイン案内メールのリンクから既に自分で決めた人には出さない
+              （二度手間になるため・2026-08-25）。判定＝people.password_set_at --}}
+      @if (empty($me->password_set_at))
+        <div class="sec">
+          <h3><span class="no">1</span> パスワードを決める</h3>
+          <p class="sub">これからのログインで使う、あなただけのパスワードを決めてください。</p>
 
-        <div class="field">
-          <label>新しいパスワード<span class="req">必須</span></label>
-          <input type="password" name="password" required placeholder="8文字以上">
-          <span class="hint">8文字以上で入力してください。</span>
+          <div class="field">
+            <label>新しいパスワード<span class="req">必須</span></label>
+            <input type="password" name="password" required placeholder="8文字以上">
+            <span class="hint">8文字以上で入力してください。</span>
+          </div>
+          <div class="field">
+            <label>新しいパスワード（確認）<span class="req">必須</span></label>
+            <input type="password" name="password_confirmation" required placeholder="確認のためもう一度">
+          </div>
         </div>
-        <div class="field">
-          <label>新しいパスワード（確認）<span class="req">必須</span></label>
-          <input type="password" name="password_confirmation" required placeholder="確認のためもう一度">
-        </div>
-      </div>
+      @endif
 
       {{-- ② 基本情報（旧・新規登録で聞いていた項目） --}}
       <div class="sec">
