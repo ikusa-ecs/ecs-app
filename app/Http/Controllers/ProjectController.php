@@ -178,7 +178,18 @@ class ProjectController extends Controller
         // 詳細のプルダウン（D／SD／物品担当）に出す「本物の社員一覧」。
         // これまでの見本配列（DIRECTORS/SDLIST 等）の代わりに、この一覧で選ばせる。
         // 並びは「見ている拠点のイベプラ」を先頭に、あとは氏名順（Dに立つのはほぼ自拠点のイベプラ）。
+        // ⚠ 「アサインの候補に出さない」社員はプルダウンに出さない（2026-08-26 baba要望）。
+        //   いま担当に入っている人（D/SD/物品）は対象外でも残す＝プルダウンから消えると
+        //   その案件のセルが空に見えてしまうため。
+        $assignedIds = $projects
+            ->flatMap(fn (Project $p) => [$p->director_id, $p->sd_id, $p->goods_owner_id])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         $employees = Person::employees()
+            ->inAssignPool($assignedIds)
             ->plannersOfOfficeFirst($officeScope ?: $myOffice)
             ->get(['id', 'name', 'office', 'department'])
             ->map(fn (Person $e) => ['id' => $e->id, 'name' => $e->name])

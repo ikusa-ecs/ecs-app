@@ -56,7 +56,11 @@ class EmployeeAvailabilityController extends Controller
         // 本物の社員一覧（people.role='employee'）。画面の「全社員の一覧」タブの行になる。
         // 並びは社歴順（入社日の古い人が上）。画面は先頭行を「自分」として扱うので、
         // そのあとで自分だけを先頭に持ち上げる。
+        // ⚠ 「アサインの候補に出さない」社員は一覧に並べない（2026-08-26 baba要望）。
+        //   自分は対象外にしていても必ず残す＝画面は「先頭の行＝自分」という決まりで
+        //   動いているので、自分が消えると他人の行に自分の入力が出てしまう。
         $employees = Person::employees()
+            ->inAssignPool($me ? [$me->id] : [])
             ->bySeniority()
             ->get(['id', 'name', 'office'])
             // 拠点で絞って見られるように office も渡す（2026-08-26 baba要望）。

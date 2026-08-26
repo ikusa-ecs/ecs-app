@@ -47,6 +47,7 @@ class Person extends Model implements AuthenticatableContract
             'must_onboard' => 'boolean',   // 初回ログインの初期設定が必要か
             // 臨時スタッフ（インターン・知り合いの助っ人など）。ログインしない（2026-08-25 baba）
             'is_spot' => 'boolean',
+            'in_assign_pool' => 'boolean',
             'invited_at' => 'datetime',      // ログイン案内メールを最後に送った日時
             'password_set_at' => 'datetime', // 本人が自分でパスワードを決めた日時
             'is_exclusive' => 'boolean',
@@ -109,6 +110,26 @@ class Person extends Model implements AuthenticatableContract
     public function scopeEmployees($query)
     {
         return $query->where('role', 'employee');
+    }
+
+    /**
+     * アサインの候補に出す人だけに絞るクエリスコープ（2026-08-26 baba要望）。
+     *
+     * 使う画面＝社員の出勤可能日の一覧・D決め・D/SD/物品担当のプルダウン。
+     * ⚠ 名簿・集計・営業担当のプルダウンでは使わない（そこには全員出す）。
+     *
+     * @param  list<string>  $keepIds  対象外でも残すID。
+     *   すでに担当に入っている人を候補から消すと、「いま画面に出ている人で上書き」する
+     *   保存でその担当が外れてしまうため。
+     */
+    public function scopeInAssignPool($query, array $keepIds = [])
+    {
+        return $query->where(function ($q) use ($keepIds) {
+            $q->where('in_assign_pool', true);
+            if ($keepIds) {
+                $q->orWhereIn('id', $keepIds);
+            }
+        });
     }
 
     /** スタッフだけを取り出すクエリスコープ（Person::staff()->get()） */

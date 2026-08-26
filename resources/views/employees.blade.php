@@ -18,6 +18,8 @@
   window.ECS_DEPT_ALL = @json(\App\Support\Departments::ALL);
   {{-- ログイン案内メールのボタンを出すか＝管理者以上。 --}}
   window.ECS_CAN_INVITE = @json($canInvite ?? false);
+  {{-- 「アサイン表に出す／出さない」を切り替えられるか＝管理者以上（2026-08-26 baba要望）。 --}}
+  window.ECS_CAN_ASSIGN_POOL = @json($canManageAssignPool ?? false);
   {{-- 拠点で絞って見るための選択肢と、自分の拠点（2026-08-25 baba要望）。
        ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
   window.ECS_OFFICES = @json($offices ?? []);
@@ -179,7 +181,7 @@
       tr.className = 'main-row';
       tr.dataset.idx = idx;
       tr.innerHTML = `
-        <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}${p.active === false ? '<span class="dept none" style="margin-left:6px;">退職</span>' : ''}${loginBadge(p)}
+        <td><strong>${p.name}</strong>${fresh ? '<span class="fresh-badge">新人</span>' : ''}${p.active === false ? '<span class="dept none" style="margin-left:6px;">退職</span>' : ''}${p.inAssignPool === false ? '<span class="dept none" style="margin-left:6px;" title="社員の出勤可能日の一覧・D決め・D/SD/物品担当のプルダウンに出しません">アサイン対象外</span>' : ''}${loginBadge(p)}
             <br><span class="muted" style="font-size:11.5px;">${p.id}</span>
             <br><span class="muted" style="font-size:11.5px;">${p.kana
               ? p.kana
@@ -229,6 +231,8 @@
               <button class="btn primary sm" onclick="saveSize(${idx}, this)">サイズを保存</button>
               <span class="save-ok" id="sizeSaved-${idx}" style="display:none;">✓ 保存しました</span>
             </div>
+
+            ${assignPoolHtml(p, idx)}
 
             ${fresh ? `<div class="muted" style="font-size:12px; margin-top:12px;">🌱 入社半年以内の新人です。経験コンテンツとDの経験コンテンツを重点的に確認してください。</div>` : ''}
           </div>
@@ -489,6 +493,62 @@
       if (m) { m.style.display = ''; setTimeout(() => { m.style.display = 'none'; }, 1800); }
     })
     .catch(() => alert('保存に失敗しました。もう一度お試しください。'));
+  }
+
+  // ===== アサイン表に出す／出さない（2026-08-26 baba要望）=====
+  // ⚠ 名簿から消すわけではない。出勤可能日の一覧・D決め・D/SD/物品担当のプルダウンに
+  //   出さないだけ（営業だけの人も「営業担当」には選べないと困るため）。
+  function assignPoolHtml(p, idx){
+    const on = p.inAssignPool !== false;
+    if (!window.ECS_CAN_ASSIGN_POOL) {
+      return `<h4 style="margin-top:16px;">アサイン表への表示</h4>
+        <div class="muted" style="font-size:12px;">
+          ${on ? 'アサインの候補に出ます。' : 'アサインの候補に<b>出しません</b>。'}
+          切り替えられるのは管理者以上です。
+        </div>`;
+    }
+    return `<h4 style="margin-top:16px;">アサイン表への表示</h4>
+      <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; line-height:1.7;">
+        <input type="checkbox" id="pool-${idx}" ${on ? 'checked' : ''}
+               onchange="saveAssignPool(${idx}, this)" style="margin-top:3px;">
+        <span>アサインの候補に出す<br>
+          <span class="muted" style="font-size:11.5px;">
+            外すと<b>社員の出勤可能日の一覧・D決め・D/SD/物品担当のプルダウン</b>に出なくなります。
+            名簿・集計・営業担当のプルダウンには今までどおり出ます。
+            すでに担当に入っている案件からは外れません。
+          </span>
+        </span>
+      </label>
+      <div class="save-row" style="margin-top:6px;">
+        <span class="save-ok" id="poolSaved-${idx}" style="display:none;">✓ 保存しました</span>
+      </div>`;
+  }
+
+  // チェックを変えたらその場で保存する（他の欄と違い、押し忘れが事故になるため）。
+  function saveAssignPool(idx, el){
+    const p = employees[idx];
+    const want = !!el.checked;
+    el.disabled = true;
+    const body = new URLSearchParams();
+    body.append('in_assign_pool', want ? '1' : '0');
+    fetch(`/employees/${encodeURIComponent(p.id)}/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: body.toString()
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      if (!ok || !j.ok) { throw new Error(j && j.message ? j.message : 'save failed'); }
+      p.inAssignPool = want;
+      const s = document.getElementById(`poolSaved-${idx}`);
+      if (s) { s.style.display = 'inline'; setTimeout(() => { s.style.display = 'none'; }, 1600); }
+      applyFilter();   // 一覧の「アサイン対象外」の印を更新
+    })
+    .catch(e => {
+      el.checked = !want;   // 保存できなかったら元に戻す（画面と中身がずれないように）
+      alert(e.message || '保存できませんでした。');
+    })
+    .finally(() => { el.disabled = false; });
   }
 
   // サイズ（身長・靴・服）を DB に保存する。

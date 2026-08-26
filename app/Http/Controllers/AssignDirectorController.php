@@ -88,7 +88,10 @@ class AssignDirectorController extends Controller
         // 既定はイベプラ＋新人だけ表示、画面の「＋全社員」で全員に広げる（front 側で出し分け）。
         // 同姓の取り違えを防ぐため、保存・判定はすべて社員ID基準で行う。
         // 並びは「その拠点のイベプラ」を先頭に、あとは氏名順（baba要望 2026-08-24）。
+        // ⚠ 「アサインの候補に出さない」社員は並べない（2026-08-26 baba要望）。
+        //   ただし すでにD/SD/FCに入っている人（$keepIds）は残す＝保存で担当が外れないように。
         $employees = OfficeScope::applyToPeople(Person::employees(), $officeScope, $keepIds)
+            ->inAssignPool($keepIds)
             ->plannersOfOfficeFirst($officeScope)
             ->get()
             ->map(fn (Person $p) => [

@@ -71,6 +71,9 @@ class PersonController extends Controller
                     'height'       => $p->height ?? '',
                     'shoeSize'     => $p->shoe_size ?? '',
                     'shirtSize'    => $p->shirt_size ?? '',
+                    // アサインの候補に出すか（2026-08-26 baba要望）。false＝出勤可能日の一覧・
+                    // D決め・D/SD/物品担当のプルダウンに出さない。名簿には今までどおり出る。
+                    'inAssignPool' => (bool) $p->in_assign_pool,
                 ];
             })
             ->values();
@@ -90,6 +93,8 @@ class PersonController extends Controller
             // 拠点で絞って見るための選択肢（2026-08-25 baba要望）。既定は自分の拠点。
             'offices' => OfficeScope::options(),
             'myOffice' => OfficeScope::filterSingle(request()),
+            // 「アサイン表に出す／出さない」を切り替えられるか＝管理者以上（アサイン担当）。
+            'canManageAssignPool' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             'employees'      => $employees,
             'contentOptions' => $contentOptions,
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
@@ -157,6 +162,8 @@ class PersonController extends Controller
             'department' => ['nullable', 'string', 'max:50'],
             'departments' => ['nullable', 'array'],
             'departments.*' => ['string', 'max:50'],
+            // アサインの候補に出すか（'1'/'0'）。
+            'in_assign_pool' => ['nullable', 'boolean'],
         ], [], [
             'name' => '氏名',
             'name_kana' => 'ふりがな',
@@ -172,6 +179,17 @@ class PersonController extends Controller
         }
         if ($request->has('shirt_size')) {
             $person->shirt_size = $data['shirt_size'] ?? null;
+        }
+
+        // 「アサインの候補に出す／出さない」＝アサイン担当の操作なので管理者以上。
+        if ($request->has('in_assign_pool')) {
+            if (! in_array(optional(Auth::user())->permission, ['manager', 'admin'], true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'アサイン表に出す／出さないを切り替えられるのは管理者以上です。',
+                ], 403);
+            }
+            $person->in_assign_pool = (bool) $data['in_assign_pool'];
         }
 
         // ここから下は他人の氏名・ふりがな・所属の書き換え＝Administrator だけ。
