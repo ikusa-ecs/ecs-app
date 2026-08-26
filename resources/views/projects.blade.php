@@ -1318,9 +1318,7 @@
   function toggleCancelled(idx) {
     const p = projects[idx];
     const next = !p.cancelled;
-    if (next && !confirm('この案件をキャンセルにします。
-イベント数に数えなくなり、アサインの画面とスタッフの画面からも見えなくなります。
-（記録は消えません。あとで戻せます）')) return;
+    if (next && !confirm('この案件をキャンセルにします。\nイベント数に数えなくなり、アサインの画面とスタッフの画面からも見えなくなります。\n（記録は消えません。あとで戻せます）')) return;
     fetch('/projects/cancel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },

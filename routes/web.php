@@ -234,6 +234,9 @@ Route::get('/entries', [AssignBoardController::class, 'entries']);
 Route::get('/entry-feed', [EntryFeedController::class, 'index']);
 // エントリー一覧「月ごと」の表からの1人ぶんアサイン切替（A案）。assignments に追加/削除する。
 Route::post('/entries/assign', [AssignmentController::class, 'quickToggle']);
+// この案件のメンバーを全員「確定」にする（2026-08-26）。日別ボードの「確定にする」「スタッフに公開」から呼ぶ。
+// 公開してもメンバーは自動で確定にならないため、「公開したのにスタッフに出ない」を防ぐ。
+Route::post('/projects/confirm-members', [AssignmentController::class, 'confirmMembers']);
 Route::get('/pickup', [AssignBoardController::class, 'pickup']);
 // ピックアップのメンバーを assignments にDB保存（担当メモ・巡回数も一緒に上書き）。
 Route::post('/pickup/save', [AssignBoardController::class, 'pickupSave']);

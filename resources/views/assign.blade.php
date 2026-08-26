@@ -298,7 +298,9 @@
       <div class="mock-note">
         案件・割当メンバー・希望者・その日の稼働可・件数バッジは、登録済みのデータ（DB）を表示しています。<br>
         <b>※この画面での操作（メンバーの追加・⚡自動アサイン・仮／確定の切替・✓確定にする・📣スタッフに公開・備考の編集）は、押した時点で保存されます。</b>
-        追加した人は<b>「仮」で入る</b>ので、スタッフの画面に出すには<b>「仮」を押して確定</b>にしてください。<br>
+        追加した人は<b>「仮」で入ります</b>。<b>「✓確定にする」「📣スタッフに公開」を押すと、そのカードのメンバーは全員「確定」になります</b>（2026-08-26）。<br>
+        <b>そのあとで足した人は また「仮」から始まります</b>ので、名前の横の<b>「仮」を押して確定</b>にしてください。
+        <span style="display:inline-block;">※ 本人の画面に出るのは「確定」の人だけです。</span><br>
         <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
       </div>
@@ -735,8 +737,34 @@
       body: JSON.stringify({ id: id, status: '確定' })
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      // メンバーも全員「確定」にする（2026-08-26 baba要望）。
+      // ⚠ 案件だけ確定にしても、メンバーが「仮」のままではスタッフの画面に出ない。
+      .then(() => confirmAllMembers(c))
       .then(() => { c.state = 'fix'; render(); })
       .catch(e => alert('確定にできませんでした（' + e + '）。もう一度お試しください。'));
+  }
+
+  // この案件のメンバー（仮の人）を全員「確定」にする。保存はサーバーで1回だけ（1人ずつ通信しない）。
+  // すでに確定の人は触らない＝確定した日時の記録を上書きしないため。
+  // 公開したあとで足した人は「仮」から始まるので、名前の横の「仮」を押して確定にする。
+  function confirmAllMembers(c){
+    const kari = c.assigned.filter(m => m.status === '仮' && m.id);
+    if (!kari.length) return Promise.resolve(0);
+    return fetch('/projects/confirm-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: c.id })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (!res || !res.ok) {
+          alert('メンバーを確定にできませんでした。' + (res && res.message ? '\n' + res.message : ''));
+          return 0;
+        }
+        kari.forEach(m => { m.status = '確定'; });
+        return res.confirmed || kari.length;
+      })
+      .catch(() => { alert('通信エラーでメンバーを確定にできませんでした。'); return 0; });
   }
   function markPub(id){
     const c = cases.find(x => x.id === id);
@@ -746,7 +774,7 @@
       ? '\n（必要 ' + c.need + '名に対して ' + filledOf(c) + '名です。人数が足りなくても公開できます）' : '';
     if (!confirm('「' + c.name + '」をスタッフに公開します。' + short
       + '\n\n公開すると、この案件が募集としてスタッフ画面に出ます。'
-      + '\nアサインした人の画面に出るのは「確定」の人だけです（「仮」は出ません）。'
+      + (kari ? '\nいま「仮」の ' + kari + '名も、あわせて「確定」にします（確定にしないと本人の画面に出ません）。' : '')
       + '\n公開してよろしいですか？')) return;
     if (!USING_DB){ c.state = 'pub'; render(); return; }   // 見本データのときは画面だけ
     // 公開の処理はスタッフ公開ボードと同じ入口を使う（staff_published を立てる＝編集履歴にも残る）。
@@ -760,11 +788,15 @@
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(res => {
         if (!res || !res.updated){ alert('公開できませんでした（他の拠点の案件か、すでに公開済みです）。'); return; }
-        c.state = 'pub';
-        render();
-        alert('📣 スタッフに公開しました。'
-          + (kari ? '\n\n⚠ このカードには「仮」の人が ' + kari + '名います。仮の人はスタッフの画面に出ません。'
-                  + '\nメンバー欄の「仮」を押すと確定にできます。' : ''));
+        // 公開と同時にメンバーも全員「確定」にする（2026-08-26 baba要望）。
+        // ⚠ 公開しても仮の人は本人の画面に出ないため、ここで揃える。
+        confirmAllMembers(c).then(n => {
+          c.state = 'pub';
+          render();
+          alert('📣 スタッフに公開しました。'
+            + (n ? '\nメンバー ' + n + '名を「確定」にしました（本人の画面に出ます）。' : '')
+            + '\n\nこのあとで足した人は「仮」から始まります。名前の横の「仮」を押すと確定になります。');
+        });
       })
       .catch(e => alert('公開できませんでした（' + e + '）。もう一度お試しください。'));
   }
@@ -1382,7 +1414,7 @@
 
     // 状態を進めるボタン（ボード上で完結：未着手/調整中→確定→公開）
     let stateBtn = '';
-    if (c.state === 'todo' || c.state === 'adj') stateBtn = `<button class="edit-btn" onclick="markFix('${c.id}')">✓ 確定にする</button>`;
+    if (c.state === 'todo' || c.state === 'adj') stateBtn = `<button class="edit-btn" onclick="markFix('${c.id}')" title="案件を確定にし、あわせてメンバー全員を「確定」にします">✓ 確定にする</button>`;
     else if (c.state === 'fix')                  stateBtn = `<button class="auto-btn" onclick="markPub('${c.id}')">📣 スタッフに公開</button>`;
     // 公開をやめる操作は公開ボードに任せる（公開のON/OFFの入口を増やしすぎないため）。
     else if (c.state === 'pub')                  stateBtn = `<span style="font-size:12px; font-weight:700; color:#15803d;">公開中 ✓</span><a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;

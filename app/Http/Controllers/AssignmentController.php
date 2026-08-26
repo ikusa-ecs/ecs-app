@@ -585,4 +585,47 @@ class AssignmentController extends Controller
 
         return response()->json(['ok' => true, 'assigned' => false, 'status' => null]);
     }
+
+    /**
+     * この案件のメンバーを全員「確定」にする（POST /projects/confirm-members）。2026-08-26 baba要望。
+     *
+     * 【なぜ要るか】
+     * 「公開」と「その人が確定か」は別のもので、公開してもメンバーは自動で確定にならない。
+     * ⚠ そのため「公開したのにスタッフの画面に出ない」（＝仮のままだった）が起きていた。
+     * 日別ボードの「✓確定にする」「📣スタッフに公開」から呼んで、その場で全員を確定にする。
+     *
+     * ・対象＝その案件・その開催日の、キャンセル以外で「仮」のアサインだけ
+     * ・すでに確定の人は触らない（確定した日時の記録を上書きしないため）
+     * ・公開したあとで足した人は「仮」から始まる＝名前の横の「仮」を押して確定にする
+     */
+    public function confirmMembers(Request $request)
+    {
+        $data = $request->validate(['project_id' => ['required', 'string']]);
+
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        // 拠点チェック（保存の入口で必ず通す）。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+        if (! $project->start_date) {
+            return response()->json(['ok' => false, 'message' => 'この案件は開催日が未設定です。'], 422);
+        }
+
+        $date = $project->start_date->format('Y-m-d');
+        $rows = Assignment::where('project_id', $project->id)
+            ->whereDate('date', $date)
+            ->where('status', '仮')
+            ->get();
+
+        // ⚠ 1件ずつ save する（まとめて update すると保存イベントが動かず、
+        //   確定の記録＝confirmed_at / confirmed_by が付かない）。
+        foreach ($rows as $row) {
+            $row->update(['status' => '確定'] + AssignmentStamp::forUpdate($row, '確定'));
+        }
+
+        return response()->json(['ok' => true, 'confirmed' => $rows->count()]);
+    }
 }
