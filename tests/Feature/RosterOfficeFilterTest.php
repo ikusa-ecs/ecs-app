@@ -56,6 +56,39 @@ class RosterOfficeFilterTest extends TestCase
         $this->assertSame('東北', $row['office']);
     }
 
+    /**
+     * 社員の出勤可能日（全社員の一覧タブ）も拠点で絞れる（2026-08-26 baba要望）。
+     * 名簿と同じ作り＝既定は自分の拠点・選択肢は拠点マスタから・人ごとに拠点を渡す。
+     */
+    public function test_employee_availability_can_filter_by_office(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-210', 'name' => '東北の社員', 'office' => '東北',
+            'permission' => 'manager', 'must_onboard' => false,
+        ]);
+        PersonFactory::new()->create([
+            'id' => 'E-211', 'name' => '東京の社員', 'office' => '東京',
+            'permission' => 'employee', 'must_onboard' => false,
+        ]);
+
+        $res = $this->actingAsPerson($me)->get('/employee-availability')->assertOk();
+        $html = $res->getContent();
+
+        $this->assertStringContainsString('id="ovOffice"', $html, '拠点の絞り込みがあること');
+        $this->assertStringContainsString(
+            'window.ECS_MY_OFFICE = '.json_encode('東北', JSON_UNESCAPED_SLASHES), $html,
+            '既定は自分の拠点であること');
+        $this->assertStringContainsString('window.ECS_OFFICES = ', $html,
+            '選択肢は拠点マスタから作ること（画面に拠点名を直書きしない）');
+
+        // 表を絞るには人ごとの拠点が要る。他拠点の人も画面には渡す（絞り込みで出し分けるだけ）。
+        $employees = collect($res->viewData('employees'));
+        $this->assertSame('東北', $employees->firstWhere('id', 'E-210')['office']);
+        $this->assertSame('東京', $employees->firstWhere('id', 'E-211')['office']);
+        // 「先頭＝自分」の決まりは変えていない（絞り込みは画面側で番号を持ち回す）。
+        $this->assertSame('E-210', $employees->first()['id']);
+    }
+
     /** 一般社員でも「拠点：すべて」で他拠点の人を探せる（＝隠すのではなく絞り込み）。 */
     public function test_roster_still_contains_other_office_people(): void
     {

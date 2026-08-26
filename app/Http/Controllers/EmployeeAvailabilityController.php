@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Models\ShiftPreference;
+use App\Support\OfficeScope;
 use App\Support\PersonalCases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -57,8 +58,10 @@ class EmployeeAvailabilityController extends Controller
         // そのあとで自分だけを先頭に持ち上げる。
         $employees = Person::employees()
             ->bySeniority()
-            ->get(['id', 'name'])
-            ->map(fn (Person $p) => ['id' => $p->id, 'name' => $p->name])
+            ->get(['id', 'name', 'office'])
+            // 拠点で絞って見られるように office も渡す（2026-08-26 baba要望）。
+            // ⚠ 空の人は画面側で「東京」として扱う（名簿・案件と同じ決まり）。
+            ->map(fn (Person $p) => ['id' => $p->id, 'name' => $p->name, 'office' => $p->office])
             ->sortBy(fn (array $e) => ($me && $e['id'] === $me->id) ? 0 : 1)
             ->values();
 
@@ -95,6 +98,10 @@ class EmployeeAvailabilityController extends Controller
             // 「大型案件のある日」を出すための案件一覧（DBが元）。
             // 以前は凍結モック /ecs/data/cases.js を読んでいたため、架空の案件で大型の印が付いていた。
             'cases' => PersonalCases::cases(Carbon::today()),
+            // 拠点で絞って見るための選択肢（2026-08-26 baba要望）。既定は自分の拠点。
+            // ⚠ 拠点名は画面に書かない。正本は拠点マスタ（共通設定 → マスタ管理）。
+            'offices' => OfficeScope::options(),
+            'myOffice' => OfficeScope::filterSingle(request()),
         ]);
     }
 

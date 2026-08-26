@@ -262,12 +262,20 @@
         <div class="ea-card">
           <h3>👥 全社員の出勤可能日（この月の土日・祝日・長期休暇）</h3>
           <p class="sub">アサイン担当が「その日に誰が出られるか」をまとめて見る表です。<b>〇＝出勤可／×＝不可／△＝条件つき・未定</b>。一番下に「〇の人数」を出します。</p>
+          <!-- 拠点で絞る。選択肢は拠点マスタから作る（ここに拠点名を書かない）。既定は自分の拠点。 -->
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 10px;">
+            <select id="ovOffice" onchange="renderOverview()"
+                    style="padding:7px 9px; border:1px solid #d1d5db; border-radius:8px; font-size:13px;"></select>
+            <span class="sub" id="ovOfficeHint" style="margin:0;"></span>
+          </div>
           <div class="ov-wrap">
             <table class="ov-tbl" id="ovTbl"></table>
           </div>
           <p class="ov-note">
             ※ 黄色い行があなた自身の行です。自分の行は「自分の入力」タブで入れた内容がそのまま反映されます。ほかの社員は、出勤可能日を登録済みならその内容、未登録ならグレーの仮データを表示します。<br>
-            ※ 一番下の「〇の人数」が少ない日（赤）は、イベントがあるのに出られる社員が少ない＝注意したい日です。
+            ※ 一番下の「〇の人数」が少ない日（赤）は、イベントがあるのに出られる社員が少ない＝注意したい日です。<br>
+            ※ 上の<b>拠点</b>で絞れます（はじめは自分の拠点）。<b>「〇の人数」も、いま表に出ている人だけで数えます</b>
+            ＝その拠点で何人出られるかが分かります。他拠点の人も見たいときは「拠点：すべて」にしてください。
           </p>
         </div>
       </div>
@@ -282,6 +290,10 @@
   window.ECS_CASES     = @json($cases ?? []);
   window.ECS_ME        = @json($me ?? null);   // ログイン中の本人（保存先）
   window.ECS_PREFS     = @json($prefs ?? []);
+  {{-- 拠点で絞って見るための選択肢と、自分の拠点（2026-08-26 baba要望）。
+       ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
+  window.ECS_OFFICES = @json($offices ?? []);
+  window.ECS_MY_OFFICE = @json($myOffice ?? '');
   window.ECS_SAVE_URL  = '/employee-availability/save';
   window.ECS_CSRF      = '{{ csrf_token() }}';
 </script>
@@ -476,6 +488,54 @@
   // ===== タブ②：全社員の一覧 =====
   // 社員名（先頭＝自分）。DBに社員が居なければ空。
   const EMPLOYEES = EMP_LIST.map((e,i) => i===0 ? (e.name + '（自分）') : e.name);
+
+  // ===== 拠点で絞る（2026-08-26 baba要望）=====
+  function ovEsc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  // ⚠ 事務所が空の人は「東京」として扱う（名簿・案件と同じ決まり）。
+  //   そうしないと、拠点が未入力の人がどの拠点にも出てこなくなる。
+  function ovOfficeOf(idx){
+    const e = EMP_LIST[idx];
+    const o = (e && e.office) ? String(e.office).trim() : '';
+    return o !== '' ? o : '東京';
+  }
+  // 選択肢は拠点マスタから作る（画面に拠点名を書かない）。既定は自分の拠点。
+  // 「拠点：すべて」も残す＝他拠点へヘルプに行く／来てもらう運用があるので隠さない。
+  function buildOvOfficeFilter(){
+    const sel = document.getElementById('ovOffice');
+    if (!sel) return;
+    const mine = (window.ECS_MY_OFFICE || '').trim();
+    let html = '<option value="">拠点：すべて</option>';
+    (window.ECS_OFFICES || []).forEach(function(o){
+      html += '<option value="' + ovEsc(o) + '"' + (o === mine ? ' selected' : '') + '>'
+            + ovEsc(o) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+  // 表に出す社員（絞り込み後）。
+  // ⚠ 元の並びの番号(idx)を持ち回す＝「先頭(0)が自分」という決まりが絞り込みで崩れないように
+  //   （崩れると、他人の行に自分の入力が出る）。
+  function ovRows(){
+    const sel = document.getElementById('ovOffice');
+    const want = sel ? sel.value : '';
+    const rows = [];
+    EMPLOYEES.forEach(function(name, idx){
+      if (want === '' || ovOfficeOf(idx) === want) rows.push({ name: name, idx: idx });
+    });
+    return rows;
+  }
+  // 既定が自分の拠点なので「他拠点の人が消えた」と誤解されないように出す。
+  function ovOfficeHint(shown){
+    const el = document.getElementById('ovOfficeHint');
+    if (!el) return;
+    const sel = document.getElementById('ovOffice');
+    const want = sel ? sel.value : '';
+    el.innerHTML = want === ''
+      ? (shown + '名を表示中（すべての拠点）')
+      : (shown + '名を表示中（<b>' + ovEsc(want) + '</b>の社員だけ）');
+  }
   // 社員index → その社員の登録済み state（DBから）。先頭(自分)は myState を使うので別扱い。
   function empState(idx){
     if (idx===0) return null;                         // 自分は myState を使う
@@ -543,6 +603,14 @@
       tbl.innerHTML = '<thead><tr><th class="namecol">社員</th><th>この月は対象日（土日・祝日・長期休暇・大型）がありません</th></tr></thead>';
       return;
     }
+    // 拠点で絞ったあとの行（元の番号を持ったまま）。
+    const rows = ovRows();
+    ovOfficeHint(rows.length);
+    if (rows.length === 0){
+      tbl.innerHTML = '<thead><tr><th class="namecol">社員</th>'
+        + '<th>この拠点の社員はいません（「拠点：すべて」にすると全員出ます）</th></tr></thead>';
+      return;
+    }
     // ヘッダー（最後に「平日の希望休」「備考」列を追加）
     let head = '<thead><tr class="vh"><th class="namecol">社員</th>';
     cols.forEach(c=>{
@@ -553,7 +621,7 @@
     // 本体
     const myMemo = document.getElementById('memo').value.trim(); // 自分は入力タブの内容を反映
     let body = '<tbody>';
-    EMPLOYEES.forEach((name, idx)=>{
+    rows.forEach(({name, idx})=>{
       const me = idx === 0;
       body += '<tr class="' + (me?'me':'') + '"><td class="namecol">' + name + '</td>';
       cols.forEach(c=>{
@@ -574,7 +642,8 @@
     let foot = '<tfoot><tr><td class="namecol">〇の人数</td>';
     cols.forEach(c=>{
       let cnt = 0;
-      EMPLOYEES.forEach((name, idx)=>{
+      // ⚠ 〇の人数も「いま表に出ている人」で数える（拠点で絞ったら、その拠点の人数になる）。
+      rows.forEach(({name, idx})=>{
         const v = markFor(idx, name, y, m, c.d);
         if (v==='ok') cnt++;
       });
@@ -608,6 +677,7 @@
   }
 
   // 初期表示
+  buildOvOfficeFilter();   // 拠点の選択肢（既定＝自分の拠点）。表を描く前に作る。
   renderCalendar();
 </script>
 @endverbatim
