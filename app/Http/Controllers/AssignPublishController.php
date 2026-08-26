@@ -35,6 +35,7 @@ class AssignPublishController extends Controller
         $office = OfficeScope::filterSingle($request);
 
         $cases = OfficeScope::applyToProjects(Project::query(), $office)
+            ->notCancelled()   // キャンセルになった案件は公開の対象にしない（2026-08-26）
             ->orderBy('start_date')->get()->map(function (Project $p) use ($today) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
             $off = $p->start_date

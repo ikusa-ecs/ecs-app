@@ -63,6 +63,7 @@ class StaffPortalController extends Controller
             ? collect()
             : Project::whereIn('id', $mine->pluck('project_id')->unique()->all())
                 ->where('staff_published', true)
+                ->notCancelled()   // キャンセルになった案件は本人にも見せない（2026-08-26）
                 ->whereNotIn('status', ['下書き', '完了'])
                 ->get()
                 ->keyBy('id');
@@ -507,6 +508,7 @@ class StaffPortalController extends Controller
         //   クライアント名・会場までスタッフ全員に見えてしまう。公開の入口は公開ボードの1つだけにする。
         //   ※すでに応募した案件は、非公開に戻されても残す（一覧から消えると取り消せなくなるため）。
         $projects = Project::where('is_recruiting', true)
+            ->notCancelled()   // キャンセルになった案件は募集もしない（2026-08-26）
             ->whereNotIn('status', ['完了', '下書き'])
             ->where(function ($q) use ($appliedIds) {
                 $q->where('staff_published', true);

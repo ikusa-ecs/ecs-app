@@ -261,12 +261,12 @@
       <details class="help-note">
         <summary>📖 この画面の使い方（クリックで開く）</summary>
         <div class="help-body">
-          <b>各日に「イベプラ社員＋新人」を並べ、名前をクリックして担当（D／SD）を決める画面です。</b>
+          <b>各日に「イベプラの社員」を並べ、名前をクリックして担当（D／SD）を決める画面です。</b>
           日付の横の<b>●件数</b>にカーソルを当てると、その日の案件一覧が出ます。
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
           <span style="color:#15803d; font-weight:700;">緑＝D/SD担当</span>／<span style="color:#2c6ca0; font-weight:700;">青＝FC等で稼働</span>／<span style="color:#9c8f80; font-weight:700;">グレー＝未アサイン</span>／<span style="color:#92600a; font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:#7a6a58; font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:#6d28d9; font-weight:700;">新＝新人</span>。
           名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>・<span style="color:#6e5b49;font-weight:700;">茶＝その他</span>）。
-          右上の<b>「＋全社員を表示」</b>でセールス等も選べます。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。
+          右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定はイベプラだけ）。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。
         </div>
       </details>
 
@@ -278,7 +278,7 @@
           <button type="button" onclick="shiftMonth(1)" title="次の月へ">▶</button>
         </div>
         <div class="spacer"></div>
-        <label class="chk"><input type="checkbox" id="showAllEmp" onchange="render()"> ＋全社員を表示（セールス・クリエイティブも）</label>
+        <label class="chk"><input type="checkbox" id="showAllEmp" onchange="render()"> ＋全社員を表示（既定はイベプラだけ）</label>
         <button type="button" id="saveDirBtn" class="btn-save-dir">D／SDを保存</button>
       </div>
 
@@ -352,6 +352,7 @@
 <script>
   window.ECS_DIR_CASES   = @json($cases);        // 本物の案件（D/SDは assignments から・ID基準）
   window.ECS_EMPLOYEES   = @json($employees);    // 社員一覧（id・氏名・姓・部署・新人/イベプラ判定）
+  window.ECS_DIR_OTHERS  = @json($others ?? []);  // 社員一覧に居ない人（スタッフ等）の名前
   window.ECS_EMP_BUSY    = @json($empBusy);      // 他ロール(FC等)のアサイン状況: {Y-m-d:{社員ID:[role]}}
   window.ECS_DIR_USINGDB = @json($usingDb);      // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
 </script>
@@ -374,7 +375,14 @@
   ];
   const empById = {};
   EMP.forEach(e => empById[e.id] = e);
-  function empName(id){ return empById[id] ? empById[id].surname : (id || ''); }
+  // 名前の引き方。社員一覧 → それ以外の人（スタッフ等）の順に探す。
+  // ⚠ ここで見つからないと、S-015 のような番号がそのまま画面に出る。
+  const OTHERS = window.ECS_DIR_OTHERS || {};
+  function empName(id){
+    if (empById[id]) return empById[id].surname;
+    if (OTHERS[id]) return OTHERS[id].surname + '（' + OTHERS[id].kind + '）';
+    return id || '';
+  }
 
   // 他ロール(FC等)のアサイン状況 {Y-m-d:{社員ID:[role]}}。DBのassignments由来（D/SDは除外済み）。
   const EMP_BUSY = window.ECS_EMP_BUSY || {};
@@ -455,7 +463,10 @@
     return { count, big };
   }
 
-  // その日にマスへ並べる社員（既定＝イベプラ＋新人＋その日に担当済み/FC等で稼働中の人／「＋全社員」で全員）
+  // その日にマスへ並べる社員。既定は **イベプラだけ**（2026-08-26 baba要望。
+  // 以前は「新人」も部署に関係なく並んでいた）。「＋全社員を表示」を押したときだけ全員。
+  // ⚠ ただし その日すでに D/SD/FC に入っている人と、他の役割で稼動中の人は消さない。
+  //   消すと「担当に入っているのに画面に居ない」状態になり、外すこともできなくなる。
   function shownEmployees(dcs, busyMap, showAll){
     const inUse = new Set();
     dcs.forEach(c => {
@@ -463,7 +474,7 @@
       if (c.sdId) inUse.add(c.sdId);
       (c.fcIds || []).forEach(id => inUse.add(id));
     });
-    return EMP.filter(e => showAll || e.planner || e.newbie || inUse.has(e.id) || busyMap[e.id]);
+    return EMP.filter(e => showAll || e.planner || inUse.has(e.id) || busyMap[e.id]);
   }
 
   // ===== 件数ふきだし（その日の案件一覧）=====
@@ -616,10 +627,15 @@
   document.addEventListener('click', closePick);   // 外側クリックで閉じる
 
   // ===== 担当バランス集計（この月の案件から、社員ID基準で数える）=====
+  // 既定で表に並べるのは **イベプラだけ**（2026-08-26 baba要望。カレンダーのマスと同じ考え方）。
+  // 「＋全社員を表示」を押しているときは全員。
+  // ⚠ いずれにしても**実際にD/SD/FCに入っている人は必ず出す**（下のループで ensure される）。
+  //   数字を持っている人を隠すと、合計が合わない表になる。
   function computeAgg(){
+    const showAll = document.getElementById('showAllEmp').checked;
     const map = {};
     function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), d:0, fc:0, bigD:0, bigSD:0 }; return map[id]; }
-    EMP.forEach(e => ensure(e.id));   // 0件の社員も表に出す
+    EMP.filter(e => showAll || e.planner).forEach(e => ensure(e.id));   // 0件の人も表に出す
     cases.forEach(c => {
       if (!inTarget(c)) return;
       const isBig = c.scale === '大型';

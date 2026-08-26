@@ -42,7 +42,7 @@ class AssignDashboardController extends Controller
         $projectType = Project::pluck('date_type', 'id');
 
         // ── アサインが必要な案件（未着手・調整中・これから先の開催）──────────────
-        $needProjects = Project::whereIn('status', ['未着手', '調整中'])
+        $needProjects = Project::whereIn('status', ['未着手', '調整中'])->notCancelled()
             ->whereNotNull('start_date')
             ->whereDate('start_date', '>=', $today)
             ->orderBy('start_date')
@@ -76,7 +76,7 @@ class AssignDashboardController extends Controller
 
         // ── 数値サマリ：募集中の案件 ──────────────────────────────────────
         // 募集中＝スタッフに公開中（staff_published=ON）。うち「未確定」＝決定人数<必要人数。
-        $published = Project::where('staff_published', true)->get();
+        $published = Project::where('staff_published', true)->notCancelled()->get();
         $recruitCount = $published->count();
         $recruitUndecided = $published->filter(function (Project $p) use ($filledByProject) {
             $need = (int) $p->required_count;
@@ -89,7 +89,7 @@ class AssignDashboardController extends Controller
         // 今週開催で status=確定 の案件数。サブの「のべ◯名」＝その案件群の非キャンセルのアサイン延べ行数。
         $weekStart = $today->copy()->startOfWeek();
         $weekEnd = $today->copy()->endOfWeek();
-        $weekConfirmed = Project::where('status', '確定')
+        $weekConfirmed = Project::where('status', '確定')->notCancelled()
             ->whereBetween('start_date', [$weekStart, $weekEnd])
             ->get();
         $weekConfirmedCount = $weekConfirmed->count();
@@ -220,7 +220,7 @@ class AssignDashboardController extends Controller
             ->pluck('cnt', 'project_id');
 
         // index() と同じ対象・並び（未着手・調整中／これから先／開催日順）。
-        $needProjects = Project::whereIn('status', ['未着手', '調整中'])
+        $needProjects = Project::whereIn('status', ['未着手', '調整中'])->notCancelled()
             ->whereNotNull('start_date')
             ->whereDate('start_date', '>=', $today)
             ->orderBy('start_date')

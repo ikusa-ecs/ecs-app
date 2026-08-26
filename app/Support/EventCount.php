@@ -56,6 +56,12 @@ class EventCount
      */
     public static function autoReason(Project $project): ?string
     {
+        // キャンセルになった案件は数えない（2026-08-26）。
+        // 実施していないので「イベント数」に入れてはいけない。
+        if ($project->is_cancelled) {
+            return 'キャンセルのため';
+        }
+
         $format = trim((string) ($project->format ?? ''));
         if (in_array($format, self::EXCLUDED_FORMATS, true)) {
             return $format . 'のため';

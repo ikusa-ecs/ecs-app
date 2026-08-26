@@ -259,6 +259,7 @@ class AssignBoardController extends Controller
         // ボード対象＝完了/下書きでなく、開催日があり、基準日〜21日先の案件。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」（案件一覧と同じ）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
@@ -474,6 +475,7 @@ class AssignBoardController extends Controller
         // 拠点で絞るのは「案件」だけ。応募者（applications）は本人が手を挙げた記録なので、
         // 他拠点のスタッフが応募していてもそのまま出す（隠すと応募が無かったように見えてしまう）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));
@@ -583,6 +585,7 @@ class AssignBoardController extends Controller
         // 拠点で絞るのは「案件」だけ。候補者＝応募者∪現メンバー＝その案件に紐づく人なので、
         // 他拠点の人でもそのまま出す（メンバーが消えると保存＝上書きで担当が外れてしまう）。
         $projects = OfficeScope::applyToProjects(Project::with('director:id,name'), $office)
+            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));

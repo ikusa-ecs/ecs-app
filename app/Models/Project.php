@@ -47,6 +47,7 @@ class Project extends Model
             'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）
             // イベント数に数えるか（null=自動判定／true=数える／false=数えない・先-2）
             'count_as_event' => 'boolean',
+            'is_cancelled' => 'boolean',   // キャンセルになった案件（2026-08-26）
         ];
     }
 
@@ -60,6 +61,21 @@ class Project extends Model
         static::created(fn (Project $project) => ProjectHistoryRecorder::recordCreated($project));
         static::updated(fn (Project $project) => ProjectHistoryRecorder::recordUpdated($project));
         static::deleted(fn (Project $project) => ProjectHistoryRecorder::recordDeleted($project));
+    }
+
+    /**
+     * キャンセルになっていない案件だけ。
+     *
+     * 中止になった案件を「これからの仕事」として並べる画面（アサイン表・D決め・
+     * 公開ボード・日別ボード・スタッフ画面など）で使う。
+     * ⚠ 案件一覧・収支・編集履歴には出す（記録なので隅すと見つからなくなる。
+     *   とくに収支はキャンセル料が発生する）。
+     */
+    public function scopeNotCancelled($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('is_cancelled', false)->orWhereNull('is_cancelled');
+        });
     }
 
     /** 編集履歴（新しい順に取り出すのは呼び出し側で）。 */

@@ -151,6 +151,9 @@ class ProjectController extends Controller
                 'draft'      => $p->status === '下書き',
                 'archived'   => $effectiveArchived,
                 'is_archived' => $p->is_archived,   // 生の手動状態（null=自動／true/false=手動）。参考用
+                // キャンセル（2026-08-26）。実施形態のバッジを「キャンセル」に差し替えて出し、
+                // チェックボックスで一覧から隠せる。実施形態の値は消していない（戻せる）。
+                'cancelled'  => (bool) $p->is_cancelled,
                 'off'        => $off,
                 // ---- 拠点まわり（全拠点運用・設計書19.2）----
                 'office'        => $p->office ?? '',                          // 登録拠点
@@ -826,6 +829,33 @@ class ProjectController extends Controller
 
         $project = Project::findOrFail($request->input('id'));
         $project->is_archived = $request->boolean('archived');
+        $project->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * キャンセルの切り替え（POST /projects/cancel）。2026-08-26 baba要望。
+     *
+     * ・記録は消さない（削除とは別）。実施形態・状態・アサインもそのまま残る。
+     * ・キャンセルにすると、イベント数に数えなくなり（App\Support\EventCount）、
+     * これからの仕事を並べる画面（アサイン表・D決め・公開ボード・日別ボード・
+     * スタッフ画面）から外れる。
+     * ⚠ 拠点チェックを通す（他拠点の案件を勝手に中止にできないように）。
+     */
+    public function setCancelled(Request $request)
+    {
+        $request->validate([
+            'id'        => ['required', 'string', 'exists:projects,id'],
+            'cancelled' => ['required', 'boolean'],
+        ]);
+
+        $project = Project::findOrFail($request->input('id'));
+        if (! ProjectAccess::canEdit($project)) {
+            return response()->json(['ok' => false, 'message' => 'この案件は他の拠点のものなので変えられません。'], 403);
+        }
+
+        $project->is_cancelled = $request->boolean('cancelled');
         $project->save();
 
         return response()->json(['ok' => true]);

@@ -44,6 +44,7 @@ class AssignDirectorController extends Controller
         // この画面に出す案件＝完了/下書き以外。拠点で絞るときは「登録拠点」＋「共有された案件」。
         // ※ 先に案件を確定させてから、その案件のD/SD/FCだけを引く（他拠点の分まで数えない）。
         $projects = OfficeScope::applyToProjects(Project::query(), $officeScope)
+            ->notCancelled()   // キャンセルになった案件はDを決めない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))
@@ -176,9 +177,23 @@ class AssignDirectorController extends Controller
                 $empBusy[$key][$a->staff_id][] = $a->role;
             });
 
+        // D/SD/FC に入っているのに社員一覧に居ない人（＝スタッフや退職者）の名前。
+        // ⚠ これが無いと画面が名前を見つけられず、`S-015` のようなIDがそのまま出る（2026-08-26 baba指摘）。
+        //   例：アサイン表の取込で、Dやフロアの欄に書かれていた名前がスタッフ名簿の人と一致した場合。
+        // 消さずに「名前（スタッフ）」と出す＝誰なのか分かるようにし、担当を外す判断ができるようにする。
+        $otherIds = array_values(array_diff($keepIds, $employees->pluck('id')->all()));
+        $others = Person::whereIn('id', $otherIds)
+            ->get(['id', 'name', 'role'])
+            ->mapWithKeys(fn (Person $p) => [$p->id => [
+                'name' => $p->name,
+                'surname' => $this->surname($p->name),
+                'kind' => $p->role === 'staff' ? 'スタッフ' : '社員以外',
+            ]]);
+
         return view('assign_director', [
             'cases' => $cases,
             'employees' => $employees,
+            'others' => $others,
             'empBusy' => $empBusy,
             'officeScope' => $officeScope,   // 今絞っている拠点（null＝全拠点）。画面の注記に使う。
             // 「DBに社員がいるか」（拠点で絞る前）。絞った結果が0人でも見本データに戻らないようにするための旗。

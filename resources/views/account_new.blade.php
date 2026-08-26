@@ -21,6 +21,17 @@
       @if (session('issued'))
         @php($issued = session('issued'))
         <div style="background:#e7f6ec; color:#166534; border:1px solid #b7e0c2; border-radius:12px; padding:16px 18px; margin-bottom:18px; max-width:560px;">
+          @if ($issued['noLogin'] ?? false)
+            <div style="font-weight:700; margin-bottom:8px;">✅ 名簿に登録しました（{{ $issued['id'] }}）</div>
+            <div style="font-size:13px; line-height:1.9;">
+              <div>氏名：<b>{{ $issued['name'] }}</b></div>
+              <div>ログイン：<b>まだ作っていません</b>（メールアドレスはあとで）</div>
+            </div>
+            <p style="font-size:12px; color:#166534; margin:10px 0 0;">
+              この方は<b>今すぐアサインに使えます</b>（名簿に入ったので、出勤数や集計にも数えられます）。<br>
+              メールアドレスが分かったら、<b>スタッフ名簿 → その方の詳細 → メールを入れて「ログイン案内メールを送る」</b>を押せば、その場でログインを作れます。
+            </p>
+          @else
           <div style="font-weight:700; margin-bottom:8px;">✅ アカウントを発行しました（{{ $issued['id'] }}）</div>
           <div style="font-size:13px; line-height:1.9;">
             <div>氏名：<b>{{ $issued['name'] }}</b></div>
@@ -35,6 +46,7 @@
             <p style="font-size:12px; color:#166534; margin:4px 0 0;">
               案内メールを送った場合、本人はメールのリンクから自分でパスワードを決められます（上の仮パスワードを伝える必要はありません）。
             </p>
+          @endif
           @endif
         </div>
       @endif
@@ -66,9 +78,26 @@
           </div>
 
           <div class="form-row">
-            <label>メールアドレス（ログインID）<span class="req">必須</span></label>
-            <input type="email" name="email" value="{{ old('email') }}" required placeholder="you@example.com">
-            <span class="hint">このアドレスとパスワードでログインします。重複はできません。</span>
+            <label>メールアドレス（ログインID）<span class="req" id="mailReq">必須</span></label>
+            <input type="email" name="email" id="mailInput" value="{{ old('email') }}" required placeholder="you@example.com">
+            <span class="hint" id="mailHint">このアドレスとパスワードでログインします。重複はできません。</span>
+          </div>
+
+          {{-- メアドがまだ分からない人を、名簿にだけ先に登録できるようにする（2026-08-26 baba要望）。
+              以前はメール必須で、メアドが来るまで名簿にも入れられなかった。
+              ログインはあとで＝名簿の詳細にある「ログイン案内メールを送る」でメアドを入れて送れば、その場で発行できる。 --}}
+          <div class="form-row">
+            <label>ログインの発行</label>
+            <label style="display:inline-flex; align-items:flex-start; gap:8px; font-weight:400;">
+              <input type="checkbox" name="no_login" id="noLogin" value="1" style="width:auto; margin-top:3px;"
+                     @checked(old('no_login')) onchange="noLoginChanged()">
+              <span><b>メールアドレスはあとで（いまは名簿に登録するだけ）</b>
+                <span style="display:block; font-size:12px; color:#8a7a66; margin-top:2px;">
+                  ログインは作らず、名簿にだけ登録します（アサインにはすぐ使えます）。<br>
+                  メアドが来たら、<b>名簿の詳細 → 「📧 ログイン案内メールを送る」</b>でその場で発行できます。
+                </span>
+              </span>
+            </label>
           </div>
 
           <div class="form-row" id="permRow">
@@ -234,8 +263,30 @@
       hint.textContent = '';
     }
   }
+  // 「メールアドレスはあとで」の切り替え。2026-08-26。
+  // ⚠ 入力欄をグレーアウト（disabled）にしない。ブラウザが送らなくなるため
+  //   （上の権限欄で同じ事故を踏んでいる）。required を外して空でも送れるようにするだけ。
+  function noLoginChanged(){
+    var on   = document.getElementById('noLogin').checked;
+    var mail = document.getElementById('mailInput');
+    var req  = document.getElementById('mailReq');
+    var hint = document.getElementById('mailHint');
+    var inv  = document.querySelector('input[name="send_invite"]');
+    var pw   = document.querySelector('input[name="temp_password"]');
+
+    mail.required = !on;
+    if (req) req.style.display = on ? 'none' : '';
+    if (hint) hint.textContent = on
+      ? 'いまは空のままでよいです（メアドが来たら名簿から登録します）。'
+      : 'このアドレスとパスワードでログインします。重複はできません。';
+    // ログインを作らないので、案内メールと仮パスワードの出番はない。
+    if (inv){ if (on) inv.checked = false; inv.closest('.form-row').style.display = on ? 'none' : ''; }
+    if (pw){ if (on) pw.value = ''; pw.closest('.form-row').style.display = on ? 'none' : ''; }
+  }
+
   // 開いたとき・エラーで戻ったときにも状態を合わせる
   ECSonRole();
+  noLoginChanged();
 </script>
 @endverbatim
 @endpush

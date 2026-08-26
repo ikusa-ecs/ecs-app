@@ -71,6 +71,7 @@ class AssignSheetController extends Controller
             Project::with(['director:id,name', 'goodsOwner:id,name']),
             $officeScope
         )
+            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))

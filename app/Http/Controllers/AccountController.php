@@ -51,6 +51,9 @@ class AccountController extends Controller
             $request->merge(['permission' => 'staff']);
         }
 
+        // 「メールアドレスはあとで」＝ログインを作らず名簿にだけ登録する。
+        $noLogin = $request->boolean('no_login');
+
         // 付与できる権限（Administrator は admin まで／管理者は manager まで）
         $allowedPerms = $isAdmin
             ? ['staff', 'employee', 'manager', 'admin']
@@ -61,7 +64,10 @@ class AccountController extends Controller
             'name'          => ['required', 'string', 'max:255'],
             // ふりがなは任意（分からなければ本人が初回ログインの初期設定で入れる）。
             'name_kana'     => ['nullable', 'string', 'max:255'],
-            'email'         => ['required', 'email', Rule::unique('people', 'email')],
+            // 「メールはあとで」のときだけ空でも登録できる（2026-08-26 baba要望）。
+            // ログインしない人として名簿にだけ入れ、メアドが来たら名簿から発行する。
+            'email'         => [$noLogin ? 'nullable' : 'required', 'email', Rule::unique('people', 'email')],
+            'no_login'      => ['nullable'],
             'permission'    => ['required', Rule::in($allowedPerms)],
             'office'        => ['nullable', 'string'],
             // 所属（社員のみ意味がある）。主な所属1つ＋兼務。
@@ -115,7 +121,8 @@ class AccountController extends Controller
             'role'         => $validated['role'],
             'name'         => $validated['name'],
             'name_kana'    => ($validated['name_kana'] ?? null) ?: null,
-            'email'        => $validated['email'],
+            // 「あとで」のときはキー自体が無いことがある（任意項目なので）。
+            'email'        => ($validated['email'] ?? null) ?: null,
             'permission'   => $validated['permission'],
             'office'       => ($validated['office'] ?? null) ?: null,
             'chatwork_id'  => ($validated['chatwork_id'] ?? null) ?: null,
@@ -127,8 +134,11 @@ class AccountController extends Controller
                 ? Departments::normalize($validated['department'] ?? null, $validated['departments'] ?? [])
                 : null,
             'hire_date'    => ($validated['hire_date'] ?? null) ?: null,
-            'password'     => $tempPassword,   // モデルのキャストで自動ハッシュ化
-            'must_onboard' => true,            // 初回ログインで初期設定へ誘導
+            // 「メールはあとで」ならパスワードを持たせない（臨時スタッフと同じ形）。
+            // ⚠ 仮パスワードを入れてしまうと、ログインID（メール）が無いのに
+            //   「発行済み」に見えてしまう。初期設定にも通さない。
+            'password'     => $noLogin ? null : $tempPassword,   // モデルのキャストで自動ハッシュ化
+            'must_onboard' => ! $noLogin,      // 初回ログインで初期設定へ誘導
             'active'       => true,
         ]);
 
@@ -137,6 +147,15 @@ class AccountController extends Controller
         //   （正本＝App\Support\LoginInvite）。仮パスワードの表示は今までどおり残す
         //   ＝メールを使わずに口頭で伝えたい場合もあるため（社員は既にこの方法で配布済み）。
         $inviteMessage = null;
+        if ($noLogin) {
+            return redirect('/account-new')->with('issued', [
+                'id'       => $id,
+                'name'     => $validated['name'],
+                'email'    => null,
+                'password' => null,
+                'noLogin'  => true,
+            ]);
+        }
         if ($request->boolean('send_invite')) {
             $inviteMessage = LoginInvite::send(Person::find($id))['message'];
         }

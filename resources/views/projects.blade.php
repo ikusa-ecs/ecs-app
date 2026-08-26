@@ -107,6 +107,12 @@
     .fbadge.fmt-arena  { background: #efe6f6; color: #6d28d9; }  /* ARENA場所貸し */
     .fbadge.fmt-other  { background: #e1f1ee; color: #0f766e; }  /* 他拠点 */
     .fbadge.fmt-etc    { background: #ece3d4; color: #7a6a58; }  /* その他 */
+    /* キャンセル（2026-08-26）。実施形態のかわりにこれを出す。 */
+    .fbadge.fmt-cancel { background: #fbe4e4; color: #b42318; }
+    .fmt-was { font-size: 10.5px; color: #a89684; margin-left: 6px; }
+    /* キャンセルの行は薄く見せる（一覧に出しているときに見分けだすため）。 */
+    tr.main-row.row-cancelled .proj-cell strong { text-decoration: line-through; color: #a89684; }
+    tr.main-row.row-cancelled { background: #fdf7f6; }
 
     /* 集合・解散時間（＋下に小さく 入場/開始/終了） */
     td.time-cell { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 13px; }
@@ -510,6 +516,15 @@
               <option value="リハ">リハ</option>
             </select>
           </div>
+          <!-- キャンセルになった案件を隠す（2026-08-26 baba要望・既定は隠す）。
+               隠している件数を横に出す＝「消えたのかと思わない」ように。 -->
+          <div class="f-item">
+            <label>キャンセル</label>
+            <label class="f-chk" style="display:flex; align-items:center; gap:6px; font-size:13px; padding:6px 0;">
+              <input type="checkbox" id="hideCancelled" checked onchange="applyFilter()">
+              <span>キャンセルは非表示にする<span id="cancelledHint" class="muted"></span></span>
+            </label>
+          </div>
           <!-- 開催日でしぼる。左だけ＝その日以降／右だけ＝その日まで／両方同じ日＝その1日だけ。 -->
           <div class="f-item">
             <label>開催日（この日から〜この日まで）</label>
@@ -705,7 +720,7 @@
       offset:c.off, multi:(c.parentId != null) || isParent, tentative:!!c.tentative,
       area:c.area, catering:c.catering, agency:c.agency,
       logo:c.logo, camera:c.camera, article:c.article, video:c.video,
-      note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, scale:c.scale, sd:c.sd, id:c.id,
+      note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, cancelled:!!c.cancelled, scale:c.scale, sd:c.sd, id:c.id,
       toc:!!c.toc, cateringNote:c.cateringNote, need:c.need,
       // 拠点まわり（全拠点運用・設計書19.2）。ここに書き写さないと画面側では空になり、
       // 拠点の札も「自拠点にコピー」も出なくなる（ケータリングで同じ抜けをやった＝注意）。
@@ -806,6 +821,17 @@
     if (fmt.indexOf('リアルロング') !== -1) return 'fmt-long';
     if (fmt.indexOf('リアル') !== -1)     return 'fmt-real';
     return 'fmt-etc';
+  }
+
+  // 実施形態のバッジ。キャンセルの案件は「キャンセル」に差し替えて出す（2026-08-26 baba要望）。
+  // ⚠ 実施形態の値自体は消していないので、キャンセルを戻すともとの表示に戻る。
+  //   もとの実施形態は小さく横に添える（何の案件だったか分からなくなるのを防ぐ）。
+  function fmtBadge(p) {
+    if (p.cancelled) {
+      const was = p.format ? '<span class="fmt-was">' + p.format + '</span>' : '';
+      return '<span class="fbadge fmt-cancel">キャンセル</span>' + was;
+    }
+    return '<span class="fbadge ' + formatClass(p.format) + '">' + p.format + '</span>';
   }
 
   // 社員ID → 名前（EMPLOYEES から引く）。無ければ空文字。
@@ -1103,6 +1129,8 @@
       tr.dataset.linemade = p.lineMade ? '1' : '0';   // 「LINE作成」の済／未での絞り込み用
       tr.dataset.draft  = p.draft ? '1' : '0';
       tr.dataset.archived = p.archived ? '1' : '0';
+      tr.dataset.cancelled = p.cancelled ? '1' : '0';
+      if (p.cancelled) tr.classList.add('row-cancelled');
       tr.setAttribute('onclick', `toggleDetail(${p._i})`);
 
       // リピート（常連）クライアントなら、クライアント名を履歴（/assign-history）へのリンクにし「リピート」バッジを付ける。
@@ -1121,7 +1149,7 @@
         <td class="date-cell">${fmtMD(p.date)}<span class="dow ${dowCls}">(${dow})</span>${ymHtml}<span class="big-mark" id="big-${p._i}"${p.scale === '大型' ? '' : ' style="display:none;"'}>大型</span>${dateTagsHtml}</td>
         <td class="proj-cell">
           <strong>${p.content}</strong>${tags}${noteFlag}
-          <div class="sub-info"><span class="fbadge ${formatClass(p.format)}">${p.format}</span></div>
+          <div class="sub-info">${fmtBadge(p)}</div>
           <div class="sub-info">${clientLine}</div>
           ${officeBadge}
         </td>
@@ -1137,6 +1165,7 @@
           <a href="/project-form?copy=${encodeURIComponent(p.id)}" title="この案件をもとに新しい案件を作ります（元の案件は変わりません）">⧉ 複製</a>
           ${copyCtl}
           <a href="#" id="arc-${p._i}" onclick="event.preventDefault(); toggleArchive(${p._i});">${p.archived ? '↩ 戻す' : '🗄 アーカイブ'}</a>
+          <a href="#" id="cxl-${p._i}" onclick="event.preventDefault(); toggleCancelled(${p._i});" title="中止になった案件に印を付けます（記録は消しません）">${p.cancelled ? '↩ 実施に戻す' : '✖ キャンセル'}</a>
           <a href="#" class="del-link" onclick="event.preventDefault(); deleteProject('${p.id}');">削除</a>
         </td>`;
       tbody.appendChild(tr);
@@ -1281,6 +1310,39 @@
     .catch(() => alert('アーカイブの保存に失敗しました。もう一度お試しください。'));
   }
 
+  // ===== キャンセルの印（中止になった案件） =====
+  // 削除とは別。記録・アサイン・実施形態はそのまま残る。
+  // ・実施形態のバッジが「キャンセル」に変わる
+  // ・イベント数に数えなくなる（サーバー側で判定）
+  // ・アサイン系の画面・スタッフ画面から外れる（サーバー側で除外）
+  function toggleCancelled(idx) {
+    const p = projects[idx];
+    const next = !p.cancelled;
+    if (next && !confirm('この案件をキャンセルにします。
+イベント数に数えなくなり、アサインの画面とスタッフの画面からも見えなくなります。
+（記録は消えません。あとで戻せます）')) return;
+    fetch('/projects/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: JSON.stringify({ id: p.id, cancelled: next })
+    })
+    .then(r => { if (!r.ok) throw new Error('save failed'); return r.json(); })
+    .then(() => {
+      p.cancelled = next;
+      const tr = document.querySelector('tr.main-row[data-idx="' + idx + '"]');
+      if (tr) {
+        tr.dataset.cancelled = p.cancelled ? '1' : '0';
+        tr.classList.toggle('row-cancelled', p.cancelled);
+        const badge = tr.querySelector('.proj-cell .sub-info');
+        if (badge) badge.innerHTML = fmtBadge(p);
+      }
+      const a = document.getElementById('cxl-' + idx);
+      if (a) a.textContent = p.cancelled ? '↩ 実施に戻す' : '✖ キャンセル';
+      applyFilter();   // 「キャンセルは非表示」にしていればここで消える
+    })
+    .catch(() => alert('キャンセルの保存に失敗しました。もう一度お試しください。'));
+  }
+
   // ===== 案件の削除（キャンセルになった案件を消す） =====
   // 確認ダイアログでOKのときだけ POST /projects/{id}/delete を送る（元に戻せないため一度確認する）。
   // CSRFトークンは画面上部で用意した window.ECS_CSRF を使う。
@@ -1320,6 +1382,9 @@
     const dFrom   = document.getElementById('dFrom').value;        // ''か '2026-08-01'
     const dTo     = document.getElementById('dTo').value;
 
+    // キャンセルを隠すか（既定は隠す）。隠した件数はチェックボックスの横に出す。
+    const hideCxl = document.getElementById('hideCancelled').checked;
+    let cancelledHidden = 0;
     let shown = 0, total = 0, draftTotal = 0, archivedTotal = 0;
     const groupShown = {};
     // 絞り込みを通った案件をここにためる（表とカレンダーで同じものを使うため）。
@@ -1329,6 +1394,7 @@
     document.querySelectorAll('#projBody tr.main-row').forEach(tr => {
       const isDraft = tr.dataset.draft === '1';
       const isArch  = tr.dataset.archived === '1';
+      const isCxl   = tr.dataset.cancelled === '1';
       if (isDraft) draftTotal++;
       if (isArch && !isDraft) archivedTotal++;
       // タブで表示を切り替える（下書き＞アーカイブ＞通常の優先で振り分け／件数は表示中タブのぶんだけ）
@@ -1337,6 +1403,8 @@
       else if (currentTab === 'archived') okTab = isArch && !isDraft;
       else                                okTab = !isDraft && !isArch;
       if (okTab) total++;
+      const okCxl = !(hideCxl && isCxl);
+      if (okTab && !okCxl) cancelledHidden++;
       const okKw  = !kw     || tr.dataset.name.includes(kw);
       const okYo  = !yomi   || tr.dataset.yomi === yomi;
       const okFmt = formatMatches(tr.dataset.format, format);
@@ -1348,7 +1416,7 @@
       // 開催日は "2026-08-01" の形なので、文字列のまま大小を比べれば日付の前後になる。
       const okDate = (!dFrom || tr.dataset.date >= dFrom) && (!dTo || tr.dataset.date <= dTo);
       // 絞り込みに一致するか（matched）と、その月が畳まれているか（collapsed）は別。
-      const matched = okTab && okKw && okYo && okFmt && okToc && okCat && okLine && okKbn && okOf && okDate;
+      const matched = okTab && okCxl && okKw && okYo && okFmt && okToc && okCat && okLine && okKbn && okOf && okDate;
       // チャットワーク用の書き出しは「月を畳んでいても、絞り込みに一致した案件」を対象にする。
       tr.dataset.matched = matched ? '1' : '0';
       const collapsed = collapsedMonths.has(tr.dataset.group);
@@ -1380,6 +1448,9 @@
     document.getElementById('shownCount').textContent = shown;
     document.getElementById('draftCount').textContent = draftTotal;
     document.getElementById('archivedCount').textContent = archivedTotal;
+    // キャンセルを何件隠しているかを出す（黄でなく文字で。消えたと思わないため）。
+    const cxlHint = document.getElementById('cancelledHint');
+    if (cxlHint) cxlHint.textContent = cancelledHidden ? '（' + cancelledHidden + '件を隠しています）' : '';
     emptyRow.style.display = shown === 0 ? '' : 'none';
 
     // 絞り込み結果を共通の置き場に入れ替える。カレンダーを見ているときは描き直す。

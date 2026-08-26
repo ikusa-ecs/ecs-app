@@ -109,6 +109,7 @@ class ProjectFieldLabels
         'publish_memo'       => '公開ボードの備考',
         'extra_published_at' => '追加案件の公開日',
         'is_archived'        => 'アーカイブ',
+        'is_cancelled'       => 'キャンセル',
     ];
 
     /**
@@ -134,6 +135,7 @@ class ProjectFieldLabels
         'prep_script'     => ['済', '未'],
         'staff_published' => ['公開', '非公開'],
         'is_archived'     => ['アーカイブ', '通常'],
+        'is_cancelled'    => ['キャンセル', '実施する'],
     ];
 
     /**

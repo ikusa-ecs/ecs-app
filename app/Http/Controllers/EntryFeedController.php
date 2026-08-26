@@ -40,6 +40,7 @@ class EntryFeedController extends Controller
 
         // 拠点で絞るのは「案件」だけ（応募は本人が手を挙げた記録なので、他拠点のスタッフでも出す）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->notCancelled()   // キャンセルになった案件は出さない（2026-08-26）
             ->get()
             ->keyBy('id');
 
