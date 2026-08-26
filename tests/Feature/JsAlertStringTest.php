@@ -38,6 +38,25 @@ class JsAlertStringTest extends TestCase
             . implode("\n", $bad));
     }
 
+    /**
+     * 画面のファイルが空になっていないこと。
+     *
+     * ⚠ 2026-08-26 に guide.blade.php を空にしたまま本番へ上げてしまった
+     *   （書き換えの途中で失敗し、ファイルが 0 バイトになった）。
+     *   空でもエラーにならず「真っ白なページ」になるだけなので、ここで見張る。
+     */
+    public function test_no_blade_file_is_empty(): void
+    {
+        $empty = [];
+        foreach ($this->bladeFiles() as $path) {
+            if (trim((string) file_get_contents($path)) === '') {
+                $empty[] = basename($path);
+            }
+        }
+
+        $this->assertSame([], $empty, '中身が空の画面ファイルがあります: ' . implode(', ', $empty));
+    }
+
     /** その行のあと、シングル／ダブルクォートが開いたままか。 */
     private function quoteLeftOpen(string $line): bool
     {
