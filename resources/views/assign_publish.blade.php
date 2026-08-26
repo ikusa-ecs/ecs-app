@@ -26,6 +26,8 @@
       display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
       background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
       padding: 12px 16px; margin-bottom: 16px;
+      /* 表と同じ幅で止める（幅がちぐはぐに見えないように）。2026-08-26 */
+      max-width: 1180px;
     }
     .pub-bar .stat-mini { display: flex; align-items: baseline; gap: 6px; }
     .pub-bar .stat-mini .n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -41,7 +43,13 @@
        ・横スクロールは「どうしても入りきらないとき」の保険。ふだんは出さない
        ・そのために、見出しもセルも折り返しを許して幅を詰める */
     .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .tbl-scroll > table.tbl { width: 100%; table-layout: fixed; }
+    /* 大きい画面（デスクトップ）で、案件名と会場の欄が伸びすぎるのを止める（2026-08-26 baba要望）。
+       ⚠ 幅いっぱいに広げると、案件名と会場のあいだの空白がとても広くなって読みにくい。
+       ノートPCで見たときとほぼ同じ幅（1180px）で止める。狭い画面では今までどおり幅いっぱい。
+       幅を変えたいときはこの数字だけ直す。 */
+    .tbl-scroll > table.tbl { width: 100%; max-width: 1180px; table-layout: fixed; }
+    /* 表を入れている箱も同じ幅で止める（枠だけが右まで伸びて見えるのを防ぐ） */
+    .panel.panel-table { max-width: 1180px; }
     /* 会場・集合場所は長くなりがちなので折り返す */
     table.tbl td.place-cell { white-space: normal; word-break: break-all; }
     /* 見出しも折り返す（「会場（住所）／集合場所」のような長い見出しで幅が広がらないように） */
@@ -268,7 +276,7 @@
       </div>
 
       <!-- 表 -->
-      <div class="panel">
+      <div class="panel panel-table">
         <!-- ノートPCの画面幅からはみ出さないように、表だけを横スクロールできる箱に入れる
              （2026-08-21 baba。ページ全体が横に伸びると操作しづらいため）。 -->
         <div class="tbl-scroll">
