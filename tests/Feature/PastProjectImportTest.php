@@ -323,7 +323,7 @@ class PastProjectImportTest extends TestCase
      * @param  list<array{name:string, role:string}>  $people
      */
     private function monthlyCsv(array $people, string $filename = '東京アサイン表 - 202609.csv',
-        string $date = '9月1日(火)', string $content = '会議室'): UploadedFile
+        string $date = '9月1日(火)', string $content = '会議室', string $type = ''): UploadedFile
     {
         $blank = fn () => array_fill(0, 24, '');
         $put = function (array $row, array $cells) {
@@ -336,6 +336,8 @@ class PastProjectImportTest extends TestCase
 
         $rows = [];
         $rows[] = $put($blank(), [13 => '1']);                                  // ブロック番号
+        // 種別（＝実施形態）。実物は項目名が付かず、日程のすぐ上に「イベント東(リアル)」と入る。
+        $rows[] = $put($blank(), [13 => $type]);
         $rows[] = $put($blank(), [13 => '日程', 16 => $date, 19 => '宿泊', 20 => '無']);
         $rows[] = $put($blank(), [13 => 'コンテンツ', 16 => $content]);
         $rows[] = $put($blank(), [13 => '案件規模', 16 => '小型', 18 => '営業担当', 20 => '馬場 智之']);
@@ -403,6 +405,49 @@ class PastProjectImportTest extends TestCase
         // 名簿に無い人は入れずに知らせる（人の取り違えを防ぐ）。
         $this->assertSame(2, Assignment::count());
         $this->assertContains('名簿に無い 人', $res->getSession()->get('past_missing'));
+    }
+
+    /**
+     * 実施形態は「種別」から読む（2026-08-26 baba確認）。
+     *
+     * ⚠ 実物の月シートでは、種別だけ**項目名が付いていない**（日程のすぐ上に
+     *   「イベント東(リアルロング)」と入る）。ここが読めていなかったため、
+     *   取り込んだ案件の実施形態が全部空になっていた。
+     * ⚠ 「形式」は実施形態ではない（中身は「イベプラD＋メンバー」など）。実施形態に使わない。
+     * ⚠ カッコの前（イベント東）は捨てる＝拠点は projects.office（画面で選ぶ登録拠点）が正。
+     */
+    public function test_monthly_sheet_reads_format_from_type_cell(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', 'イベント東(リアルロング)'),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertSame('リアルロング', $p->format);
+    }
+
+    /**
+     * 種別に決まった実施形態でない書き方（キャンセル・巻き取り等）が入っていたら、
+     * 勘で実施形態にせず「取り込まなかった項目」として知らせる。
+     * ⚠ 勘で入れると集計（イベント数・種別別の件数）が静かに狂う。
+     */
+    public function test_monthly_sheet_unknown_type_is_reported_not_guessed(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', 'キャンセル'),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertNull($p->format);
+        $this->assertStringContainsString('キャンセル', (string) $res->getSession()->get('status'));
     }
 
     /** 月シートを取り込み直しても、案件もアサインも二重にならない。 */

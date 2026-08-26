@@ -51,6 +51,9 @@ final class MonthlySheetReader
         '顧客(代理店)担当名' => ['顧客担当名'],
         '人数/チーム数' => ['人数', 'チーム数'],
         '運営人数/形式' => ['運営人数', '形式'],
+        // ⚠ 「形式」は実施形態ではない（中身は「イベプラD＋メンバー」など＝運営のしかた。2026-08-26 baba確認）。
+        //   実施形態は下の readFormat() で「種別」から読む。ここに書いても実施形態にはならない。
+        '種別' => ['種別'],
         '運営方式/担当' => ['運営方式', '担当'],
         'LINE作成/LINE概要送付' => ['LINE作成', 'LINE概要送付'],
         '引継/ダブチェ' => ['引継', 'ダブチェ'],
@@ -81,6 +84,16 @@ final class MonthlySheetReader
 
     /** 役割の列の見出し。実物では「P」（ポジション）。 */
     private const ASSIGN_ROLE_LABELS = ['P', 'ポジション', '役割'];
+
+    /**
+     * 実施形態（＝月シートの「種別」）として認める書き方。
+     * 案件登録画面（`resources/views/project_form.blade.php` の実施形態）と同じ5つ。
+     * ⚠ ここに無い書き方は**入れずに知らせる**（勘で実施形態を決めると集計が狂う）。
+     */
+    private const FORMATS = ['リアル', 'リアルロング', 'オンライン', 'ARENA場所貸し', '体験会'];
+
+    /** 種別のセルを、日程の項目名から何行ぶん上まで探すか。 */
+    private const FORMAT_ROWS_ABOVE = 3;
 
     /**
      * この表が「月ごとのシート」かどうか。
@@ -116,6 +129,14 @@ final class MonthlySheetReader
             $blocks++;
 
             $fields = self::readFields($rows, $col, $assignRow, $unknown);
+
+            // 実施形態（種別）は、項目名が付いていないセルに入っている拠点があるので別で読む。
+            if (($fields['種別'] ?? '') === '') {
+                $format = self::readFormat($rows, $col, $unknown);
+                if ($format !== '') {
+                    $fields['種別'] = $format;
+                }
+            }
 
             // コンテンツも日程も無いブロックは「まだ書かれていない枠」＝飛ばす。
             if (($fields['コンテンツ'] ?? '') === '' && ($fields['日程'] ?? '') === '') {
@@ -187,6 +208,69 @@ final class MonthlySheetReader
                 $fields[$name] = $values[$i];
             }
         }
+    }
+
+    /**
+     * 実施形態（月シートの「種別」）を読む。
+     *
+     * ⚠ 実物では、この値だけ**項目名が付いていない**（東京アサイン表では「日程」のすぐ上の行に
+     *   「イベント東(リアルロング)」と入っている。2026-08-26 baba確認）。
+     *   そのため他の項目と同じやり方（項目名を探す）では拾えず、ここだけ別で読む。
+     *   ただし行を決め打ちにはせず、「日程」の項目名から数行ぶん上を探す。
+     *
+     * カッコの前（イベント東）は**捨てる**。2026-07-31 の全拠点対応で拠点は
+     * `projects.office`（画面で選ぶ登録拠点）が正になり、実施形態は「リアル/オンライン」だけを
+     * 持つ決まりになったため（カッコ付きの古い形を入れると、拠点を二重に持つことになる）。
+     */
+    private static function readFormat(array $rows, int $col, array &$unknown): string
+    {
+        $dateRow = null;
+        for ($r = 0; $r < min(count($rows), 40); $r++) {
+            if (self::matchLabel(self::cell($rows, $r, $col)) === '日程') {
+                $dateRow = $r;
+                break;
+            }
+        }
+        if ($dateRow === null) {
+            return '';
+        }
+
+        for ($r = $dateRow - 1; $r >= 0 && $r >= $dateRow - self::FORMAT_ROWS_ABOVE; $r--) {
+            $value = self::cell($rows, $r, $col);
+            // 空・案件番号（1,2,3…）・他の項目名は種別ではない。
+            if ($value === '' || is_numeric($value) || self::matchLabel($value) !== null) {
+                continue;
+            }
+
+            $format = self::matchFormat($value);
+            if ($format !== null) {
+                return $format;
+            }
+
+            // 何か書いてあるが決まった実施形態ではない＝勘で入れず、画面で知らせる。
+            $unknown[] = $value;
+
+            return '';
+        }
+
+        return '';
+    }
+
+    /** 「イベント東(リアルロング)」→「リアルロング」。決まった実施形態でなければ null。 */
+    private static function matchFormat(string $value): ?string
+    {
+        $inner = $value;
+        if (preg_match('/[（(]\s*([^）)]+?)\s*[）)]/u', $value, $m)) {
+            $inner = $m[1];
+        }
+
+        foreach (self::FORMATS as $format) {
+            if (self::norm($inner) === self::norm($format)) {
+                return $format;
+            }
+        }
+
+        return null;
     }
 
     /** アサインされた人（氏名＋役割）を読む。 */
