@@ -569,11 +569,44 @@ class PastProjectImportController extends Controller
             'prep_line_double_check' => $this->isDone($get('準備:LINEダブルチェック')),
             'prep_handover' => $this->isDone($get('準備:引き継ぎ')),
             'prep_script' => $this->isDone($get('準備:台本')),
-            'note' => $get('備考') ?: null,
+            'note' => $this->noteWithMarks($get),
+            // キャンセルの案件は「イベント数に数えない」で入れる（実施していないため。2026-08-26 baba要望）。
+            // ⚠ 案件の状態（status）は 未着手/調整中/確定/完了 の4つしか無いので、キャンセルは
+            //   ここと備考で表す。数え方の正本は App\Support\EventCount（null＝自動／false＝数えない）。
+            'count_as_event' => $get('キャンセル') !== '' ? false : null,
             // 過去の実績＝確定・公開済み（本人が自分の履歴として見られるように）。
             'status' => '確定',
             'staff_published' => true,
         ];
+    }
+
+    /**
+     * 備考＝シートの備考に、月シートの「日程の上の印」を足したもの（2026-08-26 baba要望）。
+     *
+     * 【なぜ備考なのか】
+     * ・キャンセル … 案件の状態（status）に「キャンセル」が無い。作るとアサイン画面の
+     *   進み方（未着手→調整中→確定→公開）まで作り直しになるので、いまは備考＋
+     *   「イベント数に数えない」で表す。
+     * ・巻き取り／ヘルプ … 本来は拠点間共有（project_shares）に入れるものだが、
+     *   **どの拠点から来たのかがシートに書かれていない**。勘で拠点を決めると拠点別の集計が
+     *   狂うので、備考に書き残すだけにする。
+     *
+     * ⚠ 毎回シートから作り直すので、取り込み直しても同じ文字が二重に増えることはない。
+     */
+    private function noteWithMarks(callable $get): ?string
+    {
+        $marks = [];
+        if ($get('キャンセル') !== '') {
+            $marks[] = 'キャンセル';
+        }
+        if ($get('拠点間の関わり') !== '') {
+            $marks[] = '他拠点から'.$get('拠点間の関わり');
+        }
+
+        $note = $get('備考');
+        $head = $marks ? '【'.implode('・', $marks).'】' : '';
+
+        return ($head.$note) ?: null;
     }
 
     /**

@@ -96,6 +96,37 @@ final class MonthlySheetReader
     private const FORMAT_ROWS_ABOVE = 3;
 
     /**
+     * 日程の上にある「項目名の付いていない印」→ ECS側の項目名と値（2026-08-26 baba要望）。
+     *
+     * 実物の月シートでは、種別と一緒にこういう印が同じあたりに書かれている
+     * （1つのセルに「追加案件, メンバー募集なし」と2つ入ることもある）。
+     * ⚠ 見つけた印は、どれも**もう ECS に入れる場所がある**のでそこへ入れる。
+     */
+    private const MARKS = [
+        '追加案件' => ['区分' => '追加案件'],
+        'キャンセル' => ['キャンセル' => 'あり'],
+        'Aヨミ' => ['確度' => 'Aヨミ'],
+        'Bヨミ' => ['確度' => 'Bヨミ'],
+        'Cヨミ' => ['確度' => 'Cヨミ'],
+    ];
+
+    /**
+     * 読むけれど入れる場所が要らない印。
+     * ・メンバー募集なし … 過去案件は必ず「募集しない」で入れる（スタッフ画面に募集中として
+     *   出さないため）ので、書いてあってもなくても結果は同じ。
+     * ⚠ ここに載せておかないと「取り込まなかった項目」に毎回出てしまい、本当に見落とした
+     *   ものが埋もれる。
+     */
+    private const IGNORED_MARKS = ['メンバー募集なし', 'メンバー募集無し'];
+
+    /**
+     * 拠点をまたいだ関わり。カッコの中に入る（例「イベント他拠点東(巻き取り)」）。
+     * ⚠ どの拠点から来たのかはシートに書かれていないので、拠点間共有（project_shares）は
+     *   作らない（拠点を勘で決めると集計が狂う）。備考に書き残すだけにする。
+     */
+    private const CROSS_OFFICE = ['巻き取り', 'ヘルプ'];
+
+    /**
      * この表が「月ごとのシート」かどうか。
      * 見分け方＝どこかの列に「日程」「コンテンツ」「顧客名」の項目名が縦に並んでいるか。
      * ⚠ list形式（1行目が見出しの行）と取り違えないよう、3つそろって初めて YES にする。
@@ -130,11 +161,11 @@ final class MonthlySheetReader
 
             $fields = self::readFields($rows, $col, $assignRow, $unknown);
 
-            // 実施形態（種別）は、項目名が付いていないセルに入っている拠点があるので別で読む。
-            if (($fields['種別'] ?? '') === '') {
-                $format = self::readFormat($rows, $col, $unknown);
-                if ($format !== '') {
-                    $fields['種別'] = $format;
+            // 実施形態（種別）や「追加案件・キャンセル」などは、項目名が付いていない
+            // セルに入っているので別で読む。
+            foreach (self::readAbove($rows, $col, $unknown) as $name => $value) {
+                if (($fields[$name] ?? '') === '') {
+                    $fields[$name] = $value;
                 }
             }
 
@@ -222,7 +253,7 @@ final class MonthlySheetReader
      * `projects.office`（画面で選ぶ登録拠点）が正になり、実施形態は「リアル/オンライン」だけを
      * 持つ決まりになったため（カッコ付きの古い形を入れると、拠点を二重に持つことになる）。
      */
-    private static function readFormat(array $rows, int $col, array &$unknown): string
+    private static function readAbove(array $rows, int $col, array &$unknown): array
     {
         $dateRow = null;
         for ($r = 0; $r < min(count($rows), 40); $r++) {
@@ -232,37 +263,84 @@ final class MonthlySheetReader
             }
         }
         if ($dateRow === null) {
-            return '';
+            return [];
         }
 
+        $found = [];
         for ($r = $dateRow - 1; $r >= 0 && $r >= $dateRow - self::FORMAT_ROWS_ABOVE; $r--) {
             $value = self::cell($rows, $r, $col);
-            // 空・案件番号（1,2,3…）・他の項目名は種別ではない。
+            // 空・案件番号（1,2,3…）・他の項目名は印ではない。
             if ($value === '' || is_numeric($value) || self::matchLabel($value) !== null) {
                 continue;
             }
 
-            $format = self::matchFormat($value);
-            if ($format !== null) {
-                return $format;
+            // 1つのセルに「追加案件, メンバー募集なし」と2つ入っていることがある。
+            foreach (preg_split('/[,、，]+/u', $value) as $piece) {
+                $piece = trim((string) $piece);
+                if ($piece !== '') {
+                    self::classifyMark($piece, $found, $unknown);
+                }
             }
-
-            // 何か書いてあるが決まった実施形態ではない＝勘で入れず、画面で知らせる。
-            $unknown[] = $value;
-
-            return '';
         }
 
-        return '';
+        return $found;
+    }
+
+    /**
+     * 「日程の上に書かれていた1つの印」を、ECS側の項目名と値に振り分ける。
+     * どれにも当てはまらないものは**入れずに知らせる**（勘で入れると集計が静かに狂う）。
+     */
+    private static function classifyMark(string $piece, array &$found, array &$unknown): void
+    {
+        // ① 実施形態（種別）＝「イベント東(リアル)」など。
+        $format = self::matchFormat($piece);
+        if ($format !== null) {
+            $found['種別'] ??= $format;
+
+            return;
+        }
+
+        // ② 拠点をまたいだ関わり＝「イベント他拠点東(巻き取り)」など。
+        $inner = self::insideParen($piece);
+        foreach (self::CROSS_OFFICE as $kind) {
+            if (self::norm($inner) === self::norm($kind)) {
+                $found['拠点間の関わり'] ??= $kind;
+
+                return;
+            }
+        }
+
+        // ③ そのほかの印（追加案件・キャンセル・ヨミ）。
+        foreach (self::MARKS as $mark => $set) {
+            if (self::norm($piece) === self::norm($mark)) {
+                foreach ($set as $name => $value) {
+                    $found[$name] ??= $value;
+                }
+
+                return;
+            }
+        }
+
+        // ④ 読むけれど入れる場所が要らない印。
+        foreach (self::IGNORED_MARKS as $mark) {
+            if (self::norm($piece) === self::norm($mark)) {
+                return;
+            }
+        }
+
+        $unknown[] = $piece;
+    }
+
+    /** 「イベント東(リアルロング)」→「リアルロング」。カッコが無ければそのまま。 */
+    private static function insideParen(string $value): string
+    {
+        return preg_match('/[（(]\s*([^）)]+?)\s*[）)]/u', $value, $m) ? $m[1] : $value;
     }
 
     /** 「イベント東(リアルロング)」→「リアルロング」。決まった実施形態でなければ null。 */
     private static function matchFormat(string $value): ?string
     {
-        $inner = $value;
-        if (preg_match('/[（(]\s*([^）)]+?)\s*[）)]/u', $value, $m)) {
-            $inner = $m[1];
-        }
+        $inner = self::insideParen($value);
 
         foreach (self::FORMATS as $format) {
             if (self::norm($inner) === self::norm($format)) {
