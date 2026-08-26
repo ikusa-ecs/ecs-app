@@ -242,10 +242,13 @@
           <button class="btn primary" onclick="saveStaffLinks()">リンク集を保存する</button>
           <span class="saved-msg" id="linkSaved">✓ 保存しました</span>
         </div>
+@endverbatim
+        {{-- 文字数の上限はコントローラから受け取るので、Bladeを解釈する区間に置く。--}}
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
           ※ URLは <code>https://</code> から始まるものだけ登録できます（安全のため）。「追加」だけでは保存されません。最後に「リンク集を保存する」を押してください。<br>
           ※ 文字数は<strong>名前 {{ $staffLinkLimits['title'] }}文字・ひとこと説明 {{ $staffLinkLimits['memo'] }}文字</strong>まで（スタッフのスマホ画面で折り返して崩れないようにするため）。それ以上は入力できません。
         </p>
+@verbatim
       </div>
 
       <!-- ② 通知設定は「個人ごとの設定」なので マイページ へ移動（2026-07-01 baba） -->

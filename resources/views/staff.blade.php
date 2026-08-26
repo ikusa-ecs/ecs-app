@@ -185,6 +185,8 @@
 
       <!-- ===================== 稼働状況タブ ===================== -->
       <div class="pane" id="pane-work">
+@endverbatim
+      {{-- 対象月（今月）を出すので、Bladeを解釈する区間に置く。--}}
       <div class="mock-note">稼働率・連勤・選ばれた率・ご無沙汰・活性度は、登録済みのアサイン・希望・応募データ（DB）から計算して表示しています（対象月＝{{ now()->format('Y年n月') }}）。データが無い場合は下の見本値を表示します。<br>※「気にかけたい人」のまとめは<b>アサインダッシュボード</b>に移動しました。</div>
 
       <!-- 数値カード -->
@@ -194,6 +196,7 @@
           <div class="value" id="cTotal">0</div>
           <div class="sub">{{ now()->format('Y年n月') }}</div>
         </div>
+@verbatim
         <div class="stat">
           <div class="label">平均稼働率</div>
           <div class="value" id="cAvg">0%</div>
