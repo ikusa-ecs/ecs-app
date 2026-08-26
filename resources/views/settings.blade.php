@@ -73,6 +73,12 @@
     .big-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
     .big-row .bdate { font-weight: 700; min-width: 70px; }
     .big-row .bname { flex: 1; color: var(--ink); word-break: break-word; }
+    /* 企業名・拠点（2026-08-26）。どの案件か見分けるための控えめな表示。 */
+    .big-row .bclient { color: #6b5c49; word-break: break-word; max-width: 34%; }
+    .big-row .boffice {
+      font-size: 11px; color: #6b5c49; background: #f3ece2; border: 1px solid var(--line);
+      border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+    }
     .big-row .badd { font-size: 12px; padding: 3px 10px; white-space: nowrap; }
     .big-row .badd.done { opacity: .6; }
     .mtg-chip.danger { background: #fdecec; border-color: #f1b5b5; color: #b91c1c; }
@@ -108,12 +114,29 @@
 @verbatim
       <div class="mock-note">ここはアサイン担当が触る「全員に効く設定」です。この画面の設定・マスタ件数はサーバ（DB）に保存され、全員・全画面に反映されます。</div>
 
+      <!-- 拠点の切り替え。MTG日と「その拠点だけの危険日」は拠点ごとに持つので、
+           どの拠点の設定を触っているかを必ず出す（選択肢は拠点マスタから作る）。 -->
+      <div class="panel settings-wrap" style="margin-bottom:16px;">
+        <div class="set-row" style="border-bottom:none;">
+          <div>
+            <span class="set-label">どの拠点の設定を編集しますか</span>
+            <span class="set-note">アサインMTG日と「その拠点だけの危険日」は拠点ごとです。切り替えると、その拠点の内容に入れ替わります。</span>
+          </div>
+          <div class="set-control">
+            <select id="setOffice" onchange="onSetOfficeChange()"
+                    style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;"></select>
+          </div>
+        </div>
+      </div>
+
       <!-- ① アサインMTG日の予定表 -->
       <div class="panel settings-wrap">
-        <div class="panel-head"><h2>アサインMTG日の予定表</h2></div>
+        <div class="panel-head"><h2>アサインMTG日の予定表（<span id="mtgOfficeName">—</span>）</h2></div>
         <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
           毎月のアサインMTGの日を、先の月ぶんもまとめて登録できます。システムは自動で
-          <strong>「今日までで一番新しいMTG日」</strong>を基準に使い、その日より後に登録された案件を「追加案件」として扱います（毎月手で直す必要はありません）。
+          <strong>「今日までで一番新しいMTG日」</strong>を基準に使い、その日より後に登録された案件を「追加案件」として扱います（毎月手で直す必要はありません）。<br>
+          <strong>MTGの日は拠点ごとに登録します。</strong>上の「どの拠点の設定を編集しますか」で切り替えてください。
+          案件登録の「追加案件」の自動判定は、その案件の<strong>登録拠点</strong>のMTG日で行います。
         </p>
 
         <div class="mtg-current">現在の基準日：<b id="mtgCurrent">—</b></div>
@@ -150,12 +173,14 @@
         <div class="danger-current">大型案件の開催日（これから）— 押すと危険日に追加できます</div>
         <div id="bigList" class="big-list"><!-- JSで大型案件日を描画 --></div>
 
-        <div style="font-size:12.5px; font-weight:700; color:var(--ink); margin:14px 0 4px;">いま設定されている危険日</div>
+        <div style="font-size:12.5px; font-weight:700; color:var(--ink); margin:14px 0 4px;">
+          ① この拠点だけの危険日（<span id="dangerOfficeName">—</span>）
+        </div>
         <div id="dangerList" class="mtg-empty"><!-- JSで危険日チップを描画 --></div>
 
         <div class="set-row" style="border-bottom:none;">
           <div>
-            <span class="set-label">危険日を手動で追加</span>
+            <span class="set-label">この拠点の危険日を追加</span>
             <span class="set-note">日付を選んで「追加」。上の大型案件日の「危険日にする」からも足せます。</span>
           </div>
           <div class="set-control" style="display:flex; gap:8px;">
@@ -165,11 +190,37 @@
         </div>
 
         <div class="save-bar">
-          <button class="btn primary" onclick="saveDangerDates()">危険日を保存する</button>
+          <button class="btn primary" onclick="saveDangerDates()">この拠点の危険日を保存する</button>
           <span class="saved-msg" id="dangerSaved">✓ 保存しました</span>
         </div>
+
+        <div style="font-size:12.5px; font-weight:700; color:var(--ink); margin:22px 0 4px;">
+          ② 全拠点の危険日（どの拠点の画面にも出ます）
+        </div>
+        <p class="muted" style="font-size:11.5px; margin:0 0 6px;">
+          全社的に人手が足りない日（大型連休・全拠点でイベントが重なる日 など）はこちらに入れてください。
+        </p>
+        <div id="dangerAllList" class="mtg-empty"><!-- JSで危険日チップを描画 --></div>
+
+        <div class="set-row" style="border-bottom:none;">
+          <div>
+            <span class="set-label">全拠点の危険日を追加</span>
+            <span class="set-note">日付を選んで「追加」。どの拠点の画面にも赤く出ます。</span>
+          </div>
+          <div class="set-control" style="display:flex; gap:8px;">
+            <input type="date" id="dangerAllAddDate" class="date-input">
+            <button class="line-btn" onclick="addDangerAllDate()">追加</button>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <button class="btn primary" onclick="saveDangerAllDates()">全拠点の危険日を保存する</button>
+          <span class="saved-msg" id="dangerAllSaved">✓ 保存しました</span>
+        </div>
         <p class="muted" style="font-size:11.5px; margin:12px 0 0;">
-          ※「追加」だけでは保存されません。最後に「危険日を保存する」を押してください。保存するとダッシュボードのカレンダーに反映されます。
+          ※「追加」だけでは保存されません。最後に保存ボタンを押してください。保存するとダッシュボードのカレンダーに反映されます。<br>
+          ※ ダッシュボードのカレンダーには「<b>全拠点の危険日 ＋ その拠点の危険日</b>」がまとめて出ます。<br>
+          ※ 以前に登録してあった危険日は、そのまま<b>全拠点の危険日</b>として残っています。
         </p>
       </div>
 
@@ -245,8 +296,12 @@
   window.ECS_MTG_DATES = @json($assignMtgDates ?? []);
   // 今日までで一番新しいMTG日＝現在の基準日（無ければ null）。
   window.ECS_MTG_CURRENT = @json($assignMtgCurrent ?? null);
-  // 危険日（手動指定）の一覧（YYYY-MM-DD の配列）。ダッシュボードのカレンダーに反映される。
-  window.ECS_DANGER_DATES = @json($dangerDates ?? []);
+  // 危険日（手動指定）。この拠点だけの分と、全拠点共通の分を分けて渡す（2026-08-26）。
+  window.ECS_DANGER_DATES = @json($dangerDatesOffice ?? []);
+  window.ECS_DANGER_ALL_DATES = @json($dangerDatesAll ?? []);
+  // どの拠点の設定を編集しているか＋拠点の選択肢（正本＝拠点マスタ）。
+  window.ECS_SETTINGS_OFFICE = @json($settingsOffice ?? '');
+  window.ECS_OFFICES = @json($offices ?? []);
   // 大型案件の開催日一覧（これから）＝危険日にワンクリックで足す候補。
   window.ECS_BIG_EVENTS = @json($bigEventDates ?? []);
   // スタッフ画面の便利リンク集（[{title,url,memo}, ...]）。
@@ -305,7 +360,37 @@
       : 'サーバーに繋がりませんでした。電波やネットワークを確認して、もう一度お試しください。');
   }
 
-  // --- ① アサインMTG日の予定表（DBに保存＝全員・全画面に効く）---
+  // --- 拠点の切り替え（この画面のMTG日・その拠点の危険日はここで決まる）---
+  function setEsc(x){
+    return String(x == null ? '' : x)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function settingsOffice(){
+    const sel = document.getElementById('setOffice');
+    return (sel && sel.value) ? sel.value : (window.ECS_SETTINGS_OFFICE || '');
+  }
+  function buildSetOffice(){
+    const sel = document.getElementById('setOffice');
+    if (!sel) return;
+    const mine = window.ECS_SETTINGS_OFFICE || '';
+    sel.innerHTML = (window.ECS_OFFICES || []).map(function(o){
+      return '<option value="' + setEsc(o) + '"' + (o === mine ? ' selected' : '') + '>'
+           + setEsc(o) + '</option>';
+    }).join('');
+    // 見出しにも拠点名を出す（どの拠点を触っているか取り違えないように）。
+    const name = settingsOffice() || '—';
+    ['mtgOfficeName', 'dangerOfficeName'].forEach(function(id){
+      const el = document.getElementById(id);
+      if (el) el.textContent = name;
+    });
+  }
+  // 拠点を変えたら、その拠点の内容を読み直す（画面を開き直す＝作業中の未保存分と混ざらない）。
+  function onSetOfficeChange(){
+    const v = settingsOffice();
+    location.href = '/settings?office=' + encodeURIComponent(v);
+  }
+
+  // --- ① アサインMTG日の予定表（拠点ごとにDB保存）---
   // 画面上の作業コピー。DB由来の一覧をコピーして持ち、追加/削除→最後にまとめて保存する。
   let MTG_DATES = Array.isArray(window.ECS_MTG_DATES) ? window.ECS_MTG_DATES.slice() : [];
 
@@ -359,7 +444,7 @@
   }
   function saveMtgDates() {
     // 第2引数に失敗処理を渡す＝保存成功後の画面更新でつまずいても「保存失敗」と誤表示しない。
-    postSave('/settings/mtg-dates', { dates: MTG_DATES }).then(
+    postSave('/settings/mtg-dates', { dates: MTG_DATES, office: settingsOffice() }).then(
       res => { if (Array.isArray(res.dates)) MTG_DATES = res.dates; renderMtg(); flashSaved('mtgSaved'); },
       saveFailed
     );
@@ -378,10 +463,16 @@
       return;
     }
     box.innerHTML = BIG_EVENTS.map(function (e) {
-      const done = DANGER_DATES.indexOf(e.date) !== -1;
+      // どちらか（この拠点／全拠点）に入っていれば「追加済み」にする。
+      const done = DANGER_DATES.indexOf(e.date) !== -1
+                || (typeof DANGER_ALL !== 'undefined' && DANGER_ALL.indexOf(e.date) !== -1);
+      // 企業名（クライアント）と拠点も出す＝同じコンテンツが並ぶとどの案件か分からないため
+      // （2026-08-26 baba要望）。未入力なら出さない。
+      const client = e.client ? ('<span class="bclient">' + setEsc(e.client) + '</span>') : '';
+      const office = e.office ? ('<span class="boffice">' + setEsc(e.office) + '</span>') : '';
       return '<div class="big-row">' +
         '<span class="bdate">' + e.label + '</span>' +
-        '<span class="bname">' + e.name + '</span>' +
+        '<span class="bname">' + setEsc(e.name) + '</span>' + client + office +
         '<button class="line-btn badd' + (done ? ' done' : '') + '" onclick="addDangerFromBig(\'' + e.date + '\')">' +
         (done ? '追加済み' : '危険日にする') + '</button>' +
         '</div>';
@@ -420,8 +511,48 @@
     renderDanger();
   }
   function saveDangerDates() {
-    postSave('/settings/danger-dates', { dates: DANGER_DATES }).then(
+    postSave('/settings/danger-dates',
+             { dates: DANGER_DATES, scope: 'office', office: settingsOffice() }).then(
       res => { if (Array.isArray(res.dates)) DANGER_DATES = res.dates; renderDanger(); flashSaved('dangerSaved'); },
+      saveFailed
+    );
+  }
+
+  // --- ①-2b 全拠点の危険日（どの拠点の画面にも出る）---
+  // ⚠ 保存先は今までのキーそのまま＝昔から登録してあった危険日はこちらに残っている。
+  let DANGER_ALL = Array.isArray(window.ECS_DANGER_ALL_DATES) ? window.ECS_DANGER_ALL_DATES.slice() : [];
+
+  function renderDangerAll() {
+    DANGER_ALL.sort();
+    const list = document.getElementById('dangerAllList');
+    if (!list) return;
+    if (!DANGER_ALL.length) {
+      list.className = 'mtg-empty';
+      list.textContent = 'まだ全拠点の危険日はありません。下の欄から追加してください。';
+    } else {
+      list.className = 'mtg-list';
+      list.innerHTML = DANGER_ALL.map(function (d, i) {
+        return '<span class="mtg-chip danger">' + mdLabel(d) +
+               ' <b class="rm" onclick="removeDangerAllDate(' + i + ')">×</b></span>';
+      }).join('');
+    }
+    renderBigEvents();   // ボタンの「追加済み」表示を更新
+  }
+  function addDangerAllDate() {
+    const el = document.getElementById('dangerAllAddDate');
+    const v = el.value;
+    if (!v) { alert('日付を選んでください。'); return; }
+    if (DANGER_ALL.indexOf(v) === -1) DANGER_ALL.push(v);
+    el.value = '';
+    renderDangerAll();
+  }
+  function removeDangerAllDate(i) {
+    DANGER_ALL.splice(i, 1);
+    renderDangerAll();
+  }
+  function saveDangerAllDates() {
+    postSave('/settings/danger-dates', { dates: DANGER_ALL, scope: 'all' }).then(
+      res => { if (Array.isArray(res.dates)) DANGER_ALL = res.dates; renderDangerAll(); flashSaved('dangerAllSaved'); },
       saveFailed
     );
   }
@@ -538,8 +669,10 @@
   }
 
   // 初期表示
+  buildSetOffice();   // 拠点の切り替え（見出しの拠点名もここで入れる）
   renderMtg();
   renderDanger();
+  renderDangerAll();
   renderStaffLinks();
   fillMasterCounts();
 </script>

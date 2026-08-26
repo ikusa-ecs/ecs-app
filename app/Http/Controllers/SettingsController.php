@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
 use App\Support\DangerDays;
+use App\Support\OfficeScope;
 use App\Support\StaffLinks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,7 +26,7 @@ use Illuminate\Support\Facades\Validator;
  */
 class SettingsController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         // 拠点＝事務所（people.office）の種類数。
         $offices = Person::whereNotNull('office')
@@ -35,6 +36,9 @@ class SettingsController extends Controller
 
         // ポジション（役割）＝正本 AssignmentRole の全コード。
         $positionLabels = array_values(AssignmentRole::LABELS);
+
+        // どの拠点の設定を編集しているか。既定は自分の拠点（管理者は ?office= で切り替え）。
+        $office = OfficeScope::filterSingle($request);
 
         return view('settings', [
             'masterCounts' => [
@@ -50,12 +54,17 @@ class SettingsController extends Controller
                     'examples' => implode('／', $positionLabels),
                 ],
             ],
-            // アサインMTG日の予定表（DB保存の一覧・昇順）。案件登録の「追加案件」自動判定に使う。
-            'assignMtgDates' => AssignMtg::dates(),
+            // ⚠ MTG日と「その拠点だけの危険日」は拠点ごとに持つ（2026-08-26 baba要望）。
+            //   どの拠点を編集しているかは ?office= で切り替える（画面の「拠点」で選ぶ）。
+            'settingsOffice' => $office,
+            'offices' => OfficeScope::options(),
+            // アサインMTG日の予定表（その拠点ぶん・昇順）。案件登録の「追加案件」自動判定に使う。
+            'assignMtgDates' => AssignMtg::dates($office),
             // 今日までで一番新しいMTG日＝現在の基準日（無ければ null）。表示用。
-            'assignMtgCurrent' => AssignMtg::current(),
-            // 危険日（手動指定）の一覧。ダッシュボードの危険日カレンダーに反映される。
-            'dangerDates' => DangerDays::dates(),
+            'assignMtgCurrent' => AssignMtg::current(null, $office),
+            // 危険日（手動指定）。全拠点共通と、その拠点だけ、を分けて渡す。
+            'dangerDatesAll' => DangerDays::allOfficesDates(),
+            'dangerDatesOffice' => DangerDays::officeDates($office),
             // 大型案件の開催日一覧（これから開催・完了/下書き以外）＝危険日にワンクリックで足す候補。
             'bigEventDates' => $this->bigEventDates(),
             // スタッフ画面に出す便利リンク集（Notion・アンケートフォーム等）。
@@ -82,32 +91,65 @@ class SettingsController extends Controller
             ->whereNotNull('start_date')
             ->whereNotIn('status', ['完了', '下書き'])
             ->orderBy('start_date')
-            ->get(['project_name', 'start_date'])
+            ->get(['project_name', 'client', 'office', 'start_date'])
             ->filter(fn (Project $p) => $p->start_date->gte($today))
             ->map(fn (Project $p) => [
                 'date' => $p->start_date->format('Y-m-d'),
                 'label' => (int) $p->start_date->format('n') . '/' . (int) $p->start_date->format('j')
                     . '（' . $weekdays[(int) $p->start_date->format('w')] . '）',
                 'name' => $p->project_name,
+                // 企業名（クライアント）も出す＝同じコンテンツが並ぶとどの案件か分からないため
+                // （2026-08-26 baba要望）。未入力の案件もあるので空のこともある。
+                'client' => (string) ($p->client ?? ''),
+                // どの拠点の案件か＝拠点ごとの危険日を足すときの目印。
+                'office' => (string) ($p->office ?? ''),
             ])
             ->values()
             ->all();
     }
 
     /**
+     * どの拠点の設定を保存するか。
+     * ⚠ 保存は fetch のJSON（body）で届くので、?office= を見る OfficeScope::filterSingle では
+     *   拾えない。画面から送られた拠点が拠点マスタにあればそれを使い、無ければ自分の拠点。
+     * ⚠ 一般社員は自分の拠点に固定される（filterSingle が他拠点を返さない）。
+     */
+    private function targetOffice(Request $request): string
+    {
+        $sent = trim((string) $request->input('office', ''));
+        if ($sent !== '' && in_array($sent, OfficeScope::options(), true)
+            && OfficeScope::canSeeAll()) {
+            return $sent;
+        }
+
+        return OfficeScope::filterSingle($request);
+    }
+
+    /**
      * 危険日（手動指定）を保存する（POST /settings/danger-dates）。
-     * 全員に効く共通設定なので settings テーブル（key='manual_danger_dates'）にまとめて保存する。
+     *
+     * scope で保存先が変わる（2026-08-26 baba要望）：
+     *   ・all    … 全拠点共通の危険日（どの拠点の画面にも出る）
+     *   ・office … その拠点だけの危険日
+     * ⚠ 全拠点共通は今までのキーそのままなので、昔からの危険日は「全拠点」として残る。
      */
     public function saveDangerDates(Request $request)
     {
         $data = $request->validate([
             'dates'   => ['present', 'array'],
             'dates.*' => ['date'],
+            'scope'   => ['nullable', 'in:all,office'],
+            'office'  => ['nullable', 'string'],
         ]);
+
+        $all = ($data['scope'] ?? 'office') === 'all';
 
         return response()->json([
             'ok'    => true,
-            'dates' => DangerDays::save($data['dates']),
+            'scope' => $all ? 'all' : 'office',
+            'dates' => $all
+                ? DangerDays::saveAllOffices($data['dates'])
+                : DangerDays::saveOffice($data['dates'], $this->targetOffice($request)),
         ]);
     }
 
@@ -122,14 +164,18 @@ class SettingsController extends Controller
         $data = $request->validate([
             'dates'   => ['present', 'array'],
             'dates.*' => ['date'],
+            'office'  => ['nullable', 'string'],
         ]);
 
-        $list = AssignMtg::save($data['dates']);
+        // ⚠ どの拠点のMTG日かを必ず決めて保存する（全国共通に書き戻さない）。
+        $office = $this->targetOffice($request);
+        $list = AssignMtg::save($data['dates'], $office);
 
         return response()->json([
             'ok'      => true,
+            'office'  => $office,
             'dates'   => $list,
-            'current' => AssignMtg::current(),
+            'current' => AssignMtg::current(null, $office),
         ]);
     }
 

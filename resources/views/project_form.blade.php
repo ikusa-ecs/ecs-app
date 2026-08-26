@@ -898,8 +898,10 @@
 {{-- 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）。正本＝App\Support\OfficeOptions。
      「登録拠点」を選び直すと、その拠点の内容にプルダウンを入れ替える。 --}}
 <script>window.ECS_OFFICE_OPTIONS = @json($officeOptionMap ?? new stdClass);</script>
-{{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。 --}}
-<script>window.ECS_ASSIGN_MTG_DATE = @json($assignMtgDate ?? null);</script>
+{{-- 直近のアサインMTG日（共通設定でDB保存）。「追加案件」自動判定に使う。未設定は null。
+     ⚠ MTG日は拠点ごとに違うので「拠点 → 基準日」の対応で渡す（2026-08-26 baba要望）。
+     画面で登録拠点を選び直すと、その拠点の基準日で判定し直す。 --}}
+<script>window.ECS_ASSIGN_MTG_BY_OFFICE = @json($assignMtgByOffice ?? []);</script>
 {{-- 危険日（高負荷日）の判定に使う「開催日 → その日の案件たち」（DBの実案件）。
      以前は凍結モック /ecs/data/cases.js を読んでいたため、実データでは警告が出なかった。 --}}
 <script>window.ECS_DAY_LOAD = @json($dayLoad ?? null);</script>
@@ -965,12 +967,21 @@
   // ===== 区分（通常／追加案件）：アサインMTG日を基準に自動判定＋手動修正 =====
   // アサインMTG日は共通設定（/settings）でDB保存された値を使う（window.ECS_ASSIGN_MTG_DATE）。
   // 未設定（null）のときは自動判定せず、手動で選んでもらう。
-  const MTG_DATE = window.ECS_ASSIGN_MTG_DATE
-    ? new Date(window.ECS_ASSIGN_MTG_DATE + 'T00:00:00')
-    : null;
-  const MTG_LABEL = MTG_DATE ? ((MTG_DATE.getMonth() + 1) + '/' + MTG_DATE.getDate()) : '';
+  // ⚠ MTG日は拠点ごとに違う（2026-08-26 baba要望）。いま選んでいる登録拠点の基準日を都度引く
+  //   ＝1つに固定すると、拠点を変えても追加案件の判定が変わらない。
+  const MTG_BY_OFFICE = window.ECS_ASSIGN_MTG_BY_OFFICE || {};
+  function mtgDate() {
+    const sel = document.getElementById('officeSel');
+    const iso = MTG_BY_OFFICE[sel ? sel.value : ''] || null;
+    return iso ? new Date(iso + 'T00:00:00') : null;
+  }
+  function mtgLabel() {
+    const d = mtgDate();
+    return d ? ((d.getMonth() + 1) + '/' + d.getDate()) : '';
+  }
   let manualAddtl = false;
   function initAddtl() {
+    const MTG_DATE = mtgDate();
     if (MTG_DATE) {
       const today = new Date();
       const isAddtl = today > MTG_DATE;
@@ -983,20 +994,31 @@
   function updateAddtlNote() {
     const note = document.getElementById('addtlNote');
     if (!note) return;
-    if (!MTG_DATE) {
-      note.innerHTML = 'アサインMTG日が<b>未設定</b>です（共通設定で登録できます）。区分は手動で選んでください。';
+    const officeSel = document.getElementById('officeSel');
+    const officeName = officeSel && officeSel.value ? officeSel.value : 'この拠点';
+    if (!mtgDate()) {
+      note.innerHTML = '<b>' + officeName + '</b>のアサインMTG日が<b>未設定</b>です'
+        + '（共通設定で拠点ごとに登録できます）。区分は手動で選んでください。';
       return;
     }
+    const MTG_LABEL = mtgLabel();
     const sel = document.querySelector('input[name="addtl"]:checked');
     if (!sel) return;
     const v = sel.value;
     if (manualAddtl) {
-      note.innerHTML = '手動で「<b>' + v + '</b>」に設定しています（既定は直近アサインMTG ' + MTG_LABEL + ' 基準の自動判定）。';
+      note.innerHTML = '手動で「<b>' + v + '</b>」に設定しています（既定は' + officeName
+        + 'の直近アサインMTG ' + MTG_LABEL + ' 基準の自動判定）。';
     } else if (v === '追加案件') {
-      note.innerHTML = '直近のアサインMTG（' + MTG_LABEL + '）より後の登録のため、自動で<b>追加案件</b>にしました。手動で変更できます。';
+      note.innerHTML = officeName + 'の直近のアサインMTG（' + MTG_LABEL
+        + '）より後の登録のため、自動で<b>追加案件</b>にしました。手動で変更できます。';
     } else {
-      note.innerHTML = '直近のアサインMTG（' + MTG_LABEL + '）までに登録された<b>通常案件</b>です。';
+      note.innerHTML = officeName + 'の直近のアサインMTG（' + MTG_LABEL
+        + '）までに登録された<b>通常案件</b>です。';
     }
+  }
+  // 登録拠点を選び直したら、その拠点のMTG日で判定し直す（手動で選んでいればそれを尊重）。
+  function refreshAddtlForOffice() {
+    if (manualAddtl) { updateAddtlNote(); } else { initAddtl(); }
   }
   initAddtl(); // 初期表示
 
@@ -1543,8 +1565,11 @@
     if (init && window.ECS_OFFICES.indexOf(init) !== -1) {
       sel.value = init;
     }
-    // 拠点を変えたら、その拠点の選択肢に入れ替える
-    sel.addEventListener('change', function () { fillOfficeOptions(sel.value); });
+    // 拠点を変えたら、その拠点の選択肢に入れ替える＋その拠点のMTG日で区分を判定し直す
+    sel.addEventListener('change', function () {
+      fillOfficeOptions(sel.value);
+      if (typeof refreshAddtlForOffice === 'function') refreshAddtlForOffice();
+    });
     fillOfficeOptions(sel.value);
   })();
 

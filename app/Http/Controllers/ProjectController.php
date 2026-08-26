@@ -409,7 +409,9 @@ class ProjectController extends Controller
             'officeOptionMap' => $officeOptionMap,
             // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
-            'assignMtgDate'  => \App\Support\AssignMtg::current(),
+            // ⚠ MTG日は拠点ごとに違うので「拠点 → 基準日」でまとめて渡す（2026-08-26 baba要望）。
+            //   画面で登録拠点を選び直すと、その拠点の基準日で判定し直す。
+            'assignMtgByOffice' => \App\Support\AssignMtg::currentByOffice($offices),
         ]);
     }
 

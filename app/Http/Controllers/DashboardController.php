@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Support\DangerDays;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
@@ -25,7 +26,7 @@ use Illuminate\Support\Carbon;
  */
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $today = Carbon::today();
 
@@ -76,7 +77,9 @@ class DashboardController extends Controller
             // 件数集計の「拠点」の並び。⚠ 画面に拠点名を直書きしない（正本＝拠点マスタ）。
             'offices' => OfficeScope::options(),
             // 危険日（手動指定）＝設定画面で足した日。カレンダーが自動判定に加えて赤くする。
-            'manualDanger' => DangerDays::dates(),
+            // ⚠ 拠点ごとの危険日に対応（2026-08-26）。出すのは「全拠点共通 ＋ 自分の拠点」。
+            //   管理者が「全拠点」で見ているとき（filter が null）は、どこかの拠点の危険日も出す。
+            'manualDanger' => DangerDays::dates(OfficeScope::filter($request)),
         ]);
     }
 
