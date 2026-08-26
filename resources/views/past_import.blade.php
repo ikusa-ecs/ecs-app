@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', '過去案件の取込')
-@section('h1', '過去案件の取込（アサイン込み）')
+@section('title', 'アサイン表の取込')
+@section('h1', 'アサイン表の取込（アサイン込み）')
 @php($active = 'past_import')
 
 @push('head')
@@ -83,7 +83,7 @@
   <div class="pj-card">
     <h2>この画面は何をするもの？</h2>
     <p class="pj-lead">
-      <b>終わった案件（過去の実績）を、アサインごとまとめて登録する画面です。</b>
+      <b>アサイン表を、アサインごとまとめて登録する画面です。</b>終わった案件（過去の実績）でも、これからの案件でも入れられます。
       アサイン表のシートを <b>CSVで保存してそのままアップロード</b>してください。
       <b>列を並べ替える必要はありません。</b>Excelでそのまま保存した（Shift_JISの）CSVでも読めます。
     </p>
@@ -97,9 +97,17 @@
               スプレッドシートの「ファイル → ダウンロード → カンマ区切り形式」で落としたファイル名のままお使いください。</span></li>
         </ul>
       </li>
-      <li><b>アサイン表に名前のある人は、アサインも「確定」で入ります。</b>
+      <li><b>アサイン表に名前のある人は、アサインも一緒に入ります。</b>
         （ふつうの案件取込は、その時点でDが決まっていないので取り込みません）</li>
-      <li>案件は<b>「確定」・スタッフに公開済み</b>で入ります＝本人が自分の過去の実績として見られます。<b>募集はしません</b>。</li>
+      <li><b>「終わった案件」と「これからの案件」を選べます。</b>入り方が正反対になるためです。
+        <ul style="padding-left:1.2em;">
+          <li><b>終わった案件（過去の実績）</b>… 案件は<b>「確定」・スタッフに公開済み・募集しない</b>、
+            アサインは<b>「確定」</b>。＝本人が自分の過去の実績として見られます。</li>
+          <li><b>これからの案件</b>… 案件は<b>「調整中」・未公開・募集する</b>、アサインは<b>「仮」</b>。
+            ＝まだ入れ替えられます。<b>未公開なのでスタッフにはまだ見えません。</b>
+            人数を整えてから<span class="menu">スタッフ公開ボード</span>で「公開する」を押すと出ます。</li>
+        </ul>
+      </li>
       <li><b>取り込む前に、この画面の表で直せます。</b>日程・コンテンツ・顧客名・運営人数はその場で書き換えられ、
         <b>「この件は取り込まない」</b>に印を付けた案件は飛ばせます。
         <span class="muted">＝CSVを作り直してアップロードし直す必要はありません（元のCSVは変わりません）。</span></li>
@@ -127,6 +135,22 @@
       <input type="hidden" name="edits" id="pjEdits" value="">
       {{-- ⚠ どの拠点の案件として入れるか。他拠点のアサイン表を代わりに取り込むことがあるため、
            取り込んだ人の拠点で決め打ちにしない（2026-08-25 baba）。 --}}
+      {{-- ⚠ この表は終わった案件か、これからの案件か。入り方（状態・公開・募集・アサイン）が
+           正反対になるので必ず選ぶ。既定は今までどおり「終わった案件」（2026-08-26 baba）。 --}}
+      <div style="margin-bottom:12px;">
+        <div style="font-size:13px; margin-bottom:6px;"><b>この表は？</b></div>
+        <label style="display:block; margin-bottom:4px; font-size:13.5px;">
+          <input type="radio" name="mode" value="{{ $modePast }}" checked onchange="pjModeChanged()">
+          <b>終わった案件（過去の実績）</b>
+          <span class="muted" style="font-size:11.5px;">… 案件＝確定・公開済み・募集しない／アサイン＝確定</span>
+        </label>
+        <label style="display:block; font-size:13.5px;">
+          <input type="radio" name="mode" id="pjModeFuture" value="{{ $modeFuture }}" onchange="pjModeChanged()">
+          <b>これからの案件</b>
+          <span class="muted" style="font-size:11.5px;">… 案件＝調整中・<b>未公開</b>・募集する／アサイン＝<b>仮</b></span>
+        </label>
+        <div class="muted" id="pjModeNote" style="font-size:11.5px; margin-top:6px;"></div>
+      </div>
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <label for="pjOffice" style="font-size:13px;"><b>どの拠点の案件として入れますか</b></label>
         <select name="office" id="pjOffice"
@@ -390,6 +414,23 @@
     });
   }
 
+  // 「これからの案件」が選ばれているか。
+  // ⚠ このJSは verbatim の中なので Blade の書き方は展開されない（既知の罠）。
+  //   値を埋め込まず、ラジオのidで見る。
+  function pjIsFuture() {
+    var el = document.getElementById('pjModeFuture');
+    return !!el && el.checked;
+  }
+
+  // 選んだ扱いの補足を出す（押す前に「スタッフに見えるのか」が分かるように）。
+  function pjModeChanged() {
+    document.getElementById('pjModeNote').innerHTML = pjIsFuture()
+      ? '※ <b>未公開</b>で入ります＝この取込だけではスタッフに見えません。人数を整えてから'
+        + '「スタッフ公開ボード」で公開してください。アサインは「仮」なので、あとで入れ替えられます。'
+      : '※ <b>公開済み</b>で入ります＝アサインされた本人が、自分の過去の実績としてすぐ見られます。';
+  }
+  pjModeChanged();
+
   function pjSubmit() {
     var f = document.getElementById('pjFile').files[0];
     if (!f) { alert('先にCSVファイルを選んでください。'); return; }
@@ -407,12 +448,19 @@
       if (touched) { edited++; }
     });
 
-    var lines = ['過去案件を「' + office + '」の案件として取り込みます。', ''];
+    var future = pjIsFuture();
+    var lines = [(future ? 'これからの案件' : '過去案件')
+                 + 'を「' + office + '」の案件として取り込みます。', ''];
     lines.push(edited ? '・この画面で直した ' + edited + ' 件は、直した内容で入ります'
                       : '・この画面では中身を直していません');
     if (skipped) { lines.push('・「取り込まない」にした ' + skipped + ' 件は入れません'); }
-    lines.push('・案件は「確定」・スタッフに公開済みで入ります');
-    lines.push('・アサイン表に名前のある人は「確定」のアサインで入ります');
+    if (future) {
+      lines.push('・案件は「調整中」・未公開・募集するで入ります（スタッフにはまだ見えません）');
+      lines.push('・アサイン表に名前のある人は「仮」のアサインで入ります');
+    } else {
+      lines.push('・案件は「確定」・スタッフに公開済みで入ります');
+      lines.push('・アサイン表に名前のある人は「確定」のアサインで入ります');
+    }
     lines.push('・同じ案件（日程・コンテンツ・顧客名・集合時間が同じ）は上書きします');
     lines.push('', 'よろしいですか？');
     var msg = lines.join(String.fromCharCode(10));

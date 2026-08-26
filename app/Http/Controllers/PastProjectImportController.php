@@ -39,6 +39,22 @@ use Illuminate\Support\Facades\DB;
  */
 class PastProjectImportController extends Controller
 {
+    /**
+     * この表の扱い（2026-08-26 baba要望）。
+     *
+     * 【なぜ2つ要るか】
+     * 同じ「アサイン表」を取り込むのに、終わった案件とこれからの案件で入れ方が正反対になる。
+     *   ・終わった案件 … 実績なので 確定・公開済み・募集しない／アサインも確定
+     *   ・これからの案件 … まだ動くので 調整中・未公開・募集する／アサインは仮
+     * これが選べないと「これからの10月のアサイン表を入れると全部確定になってしまう」か
+     * 「案件CSV取込では人が入らない」かの二択になる（baba指摘のジレンマ）。
+     *
+     * ⚠ CSVの読み取りは1か所のまま。切り替わるのは「入れるときの値」だけ。
+     */
+    public const MODE_PAST = '過去';
+
+    public const MODE_FUTURE = 'これから';
+
     /** 取込画面。 */
     public function show()
     {
@@ -49,6 +65,9 @@ class PastProjectImportController extends Controller
             //   取り込んだ人の拠点で決め打ちにすると、東北の案件が東京の案件として入ってしまう。
             'offices' => OfficeScope::options(),
             'myOffice' => OfficeScope::filterSingle(request()),
+            // 終わった案件か、これからの案件か（既定＝今までどおり「過去」）。
+            'modePast' => self::MODE_PAST,
+            'modeFuture' => self::MODE_FUTURE,
         ]);
     }
 
@@ -285,9 +304,12 @@ class PastProjectImportController extends Controller
             'office' => ['nullable', 'string'],
             // 画面の表で直した内容（JSON）。直していなければ空。
             'edits' => ['nullable', 'string'],
+            // 終わった案件（過去）か、これからの案件か。
+            'mode' => ['nullable', 'string'],
         ]);
 
         $office = $this->targetOffice($request);
+        $mode = $this->targetMode($request);
         $edits = $this->editsFromRequest($request);
 
         $read = $this->readCsv($request);
@@ -338,7 +360,13 @@ class PastProjectImportController extends Controller
             $client = $info['client'];
             $meetTime = $info['meetTime'];
 
-            $attrs = $this->projectAttributes($get, $name, $date, $info['count'], $client, $meetTime, $office);
+            // この案件に入れるアサイン（氏名＋役割コード）。案件の状態を決めるのに人数を使うので先に作る。
+            $assignments = $this->onePerPerson($entry['people'] === null
+                ? $this->assignmentsFromColumns($get, $people, $missingNames, $ambiguousNames)
+                : $this->assignmentsFromPeople($entry['people'], $people, $missingNames, $ambiguousNames, $unknownRoles));
+
+            $attrs = $this->projectAttributes($get, $name, $date, $info['count'], $client, $meetTime,
+                $office, $mode, $assignments !== []);
 
             // 同じ案件があるか＝開催日・コンテンツ名・顧客名・集合時間が全部同じ。
             // ⚠ 日付は「2026-01-20 00:00:00」の形で保存されるので、where ではなく whereDate で探す
@@ -349,12 +377,11 @@ class PastProjectImportController extends Controller
                 ->where('start_time', $meetTime)
                 ->first();
 
-            // この案件に入れるアサイン（氏名＋役割コード）を先に組み立てる。
-            $assignments = $this->onePerPerson($entry['people'] === null
-                ? $this->assignmentsFromColumns($get, $people, $missingNames, $ambiguousNames)
-                : $this->assignmentsFromPeople($entry['people'], $people, $missingNames, $ambiguousNames, $unknownRoles));
+            // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
+            $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
 
-            DB::transaction(function () use ($existing, $attrs, $date, $assignments, &$created, &$updated, &$assignCount) {
+            DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus,
+                &$created, &$updated, &$assignCount) {
                 if ($existing) {
                     $existing->fill($attrs)->save();
                     $project = $existing;
@@ -386,16 +413,16 @@ class PastProjectImportController extends Controller
                         ->whereDate('date', $date)
                         ->first();
                     if ($row) {
-                        $row->update(['role' => $a['role'], 'status' => '確定']
-                            + AssignmentStamp::forUpdate($row, '確定'));
+                        $row->update(['role' => $a['role'], 'status' => $assignStatus]
+                            + AssignmentStamp::forUpdate($row, $assignStatus));
                     } else {
                         Assignment::create([
                             'project_id' => $project->id,
                             'staff_id' => $a['id'],
                             'date' => $date,
                             'role' => $a['role'],
-                            'status' => '確定',
-                        ] + AssignmentStamp::forCreate('確定'));
+                            'status' => $assignStatus,
+                        ] + AssignmentStamp::forCreate($assignStatus));
                     }
                     $assignCount++;
                 }
@@ -403,7 +430,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode))
             ->with('past_missing', array_keys($missingNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
@@ -506,13 +533,17 @@ class PastProjectImportController extends Controller
 
     /**
      * 1行 → projects に入れる値。
-     * 通常の取込と同じ読み替えを使うが、状態は「確定」・公開済みにする（過去の実績なので）。
+     *
+     * 通常の取込と同じ読み替えを使う。「過去」と「これから」で変わるのは末尾の4つだけ
+     * （状態・公開・募集・確度）。読み取りは共通のまま。
      */
     private function projectAttributes(callable $get, string $name, string $date,
-        string $count, ?string $client, ?string $meetTime, string $office): array
+        string $count, ?string $client, ?string $meetTime, string $office,
+        string $mode = self::MODE_PAST, bool $hasPeople = false): array
     {
         $guests = $this->digits($get('お客様人数'));
         $teams = $this->digits($get('チーム数'));
+        $future = $mode === self::MODE_FUTURE;
 
         return [
             'project_name' => $name,
@@ -526,8 +557,10 @@ class PastProjectImportController extends Controller
             'category' => $get('区分') ?: null,
             'yomi' => $get('確度') ?: '確定',
             'scale' => $get('案件規模') ?: null,
-            // 過去案件なので募集はしない（スタッフ画面に「募集中」として出さないため）。
-            'is_recruiting' => false,
+            // 募集するか。過去案件はしない（スタッフ画面に「募集中」として出さないため）。
+            // これからの案件は募集する＝ただしシートに「メンバー募集なし」と書いてあれば しない。
+            // ⚠ 募集ONだけではスタッフに見えない（公開ボードで公開して初めて出る）。
+            'is_recruiting' => $future && $get('スタッフ募集') !== '募集しない',
             'is_multi' => $get('複数案件') === 'あり',
             'date_type' => $get('日程種別') ?: '本番',
             'sales_owners' => $get('営業担当') ? [$get('営業担当')] : null,
@@ -574,9 +607,14 @@ class PastProjectImportController extends Controller
             // ⚠ 案件の状態（status）は 未着手/調整中/確定/完了 の4つしか無いので、キャンセルは
             //   ここと備考で表す。数え方の正本は App\Support\EventCount（null＝自動／false＝数えない）。
             'count_as_event' => $get('キャンセル') !== '' ? false : null,
-            // 過去の実績＝確定・公開済み（本人が自分の履歴として見られるように）。
-            'status' => '確定',
-            'staff_published' => true,
+            // 案件の状態。過去の実績＝確定。これから＝まだ動くので「調整中」（人が1人も
+            // 入っていなければ「未着手」）＝アサインが必要な案件として日別ボードにも出る。
+            'status' => $future ? ($hasPeople ? '調整中' : '未着手') : '確定',
+            // スタッフに見せるか。過去の実績＝公開済み（本人が自分の履歴として見られるように）。
+            // ⚠ これからの案件は**未公開**で入れる（2026-08-26 baba選択）。取り込んだ瞬間に
+            //   クライアント名・会場までスタッフ全員に見えてしまうため。公開の入口は
+            //   公開ボードの「公開する」1つだけ、という決まりを崩さない（2026-08-20）。
+            'staff_published' => ! $future,
         ];
     }
 
@@ -663,6 +701,18 @@ class PastProjectImportController extends Controller
      * （知らない名前をそのまま入れると、案件一覧の拠点しぼりに引っかからず
      *   誰にも見えない案件になってしまうため）。
      */
+    /**
+     * この表の扱い（過去／これから）。
+     * ⚠ 知らない値が来たら「過去」にする＝今までの動きを既定にして、事故のときに
+     *   「未公開で入って誰にも見えない」より「今までどおり」に倒す。
+     */
+    private function targetMode(Request $request): string
+    {
+        return trim((string) $request->input('mode', '')) === self::MODE_FUTURE
+            ? self::MODE_FUTURE
+            : self::MODE_PAST;
+    }
+
     private function targetOffice(Request $request): string
     {
         $sent = trim((string) $request->input('office', ''));
@@ -774,16 +824,21 @@ class PastProjectImportController extends Controller
 
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
-        int $skipped, array $errors, array $unmapped): string
+        int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST): string
     {
+        $future = $mode === self::MODE_FUTURE;
         $msg = $isMonthly
             ? '月ごとのアサイン表として読みました。'
             : 'list形式（1案件＝1行）として読みました。';
-        $msg .= "過去案件を{$created}件 新しく登録しました";
+        $msg .= ($future ? 'これからの案件' : '過去案件')."を{$created}件 新しく登録しました";
         if ($updated > 0) {
             $msg .= "（同じ案件だった{$updated}件は上書きしました）";
         }
-        $msg .= "。アサインは{$assignCount}件を「確定」で入れました。";
+        $msg .= '。アサインは'.$assignCount.'件を「'.($future ? '仮' : '確定').'」で入れました。';
+        if ($future) {
+            $msg .= ' この案件はまだ未公開です＝スタッフには見えていません。'
+                .'公開ボードで人数を整えてから「公開する」を押してください。';
+        }
 
         if ($skipped > 0) {
             $msg .= " 「取り込まない」に印を付けた{$skipped}件は入れていません。";

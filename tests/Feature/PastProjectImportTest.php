@@ -539,6 +539,100 @@ class PastProjectImportTest extends TestCase
         $this->assertSame(0, ProjectShare::count());
     }
 
+    /**
+     * 「これからの案件」として取り込むと、案件は調整中・未公開・募集する／アサインは仮で入る
+     * （2026-08-26 baba要望）。
+     *
+     * ⚠ なぜこの形か＝アサイン表からしか人は取り込めないのに、過去あつかいだと全部「確定」で
+     *   入ってしまう（これからの10月のアサイン表が入れられない）。逆に案件CSV取込は人が入らない。
+     * ⚠ **未公開**で入れるのが要点。取り込んだ瞬間にクライアント名・会場がスタッフ全員に
+     *   見えないようにし、公開の入口は公開ボードの1つだけ、という決まりを崩さない。
+     */
+    public function test_future_mode_imports_as_tentative_and_unpublished(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'mode' => 'これから',
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202610.csv', '10月1日(木)', '会議室', 'イベント東(リアル)'),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertSame('2026-10-01', $p->start_date->format('Y-m-d'));
+        $this->assertSame('調整中', $p->status);
+        $this->assertFalse((bool) $p->staff_published, 'スタッフには見えないこと');
+        $this->assertTrue((bool) $p->is_recruiting, '募集する案件として入ること');
+
+        $a = Assignment::where('staff_id', 'S-001')->firstOrFail();
+        $this->assertSame('仮', $a->status);
+        $this->assertNull($a->confirmed_at, '仮なので確定の記録は付かないこと');
+        // 押す前に分かるよう、結果のメッセージにも「未公開」と出す。
+        $this->assertStringContainsString('未公開', (string) $res->getSession()->get('status'));
+    }
+
+    /** 「これからの案件」でも、シートに「メンバー募集なし」とあれば募集しない。 */
+    public function test_future_mode_respects_no_recruit_mark(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'mode' => 'これから',
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202610.csv', '10月1日(木)', '会議室',
+                'イベント東(リアル)', 'メンバー募集なし'),
+        ])->assertRedirect('/past-import');
+
+        $this->assertFalse((bool) Project::where('project_name', '会議室')->firstOrFail()->is_recruiting);
+    }
+
+    /**
+     * 扱いを指定しなければ今までどおり「過去の実績」（確定・公開済み）。
+     * ⚠ 知らない値が来たときも過去あつかいにする＝事故で「誰にも見えない案件」にしない。
+     */
+    public function test_mode_defaults_to_past(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'mode' => 'よく分からない値',
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertSame('確定', $p->status);
+        $this->assertTrue((bool) $p->staff_published);
+        $this->assertSame('確定', Assignment::where('staff_id', 'S-001')->firstOrFail()->status);
+    }
+
+    /**
+     * 「これから」で入れたあと「過去」で入れ直すと、案件もアサインも切り替わる
+     * （＝先に過去で入れてしまっても、入れ直しで直せる）。
+     */
+    public function test_reimport_switches_between_modes(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+        $people = [['name' => '鈴木 彩', 'role' => 'MC']];
+
+        $this->actingAsPerson($me)->post('/past-import',
+            ['csv' => $this->monthlyCsv($people)]);
+        $this->assertSame('確定', Assignment::where('staff_id', 'S-001')->firstOrFail()->status);
+
+        $this->actingAsPerson($me)->post('/past-import',
+            ['mode' => 'これから', 'csv' => $this->monthlyCsv($people)]);
+
+        $this->assertSame(1, Project::count(), '案件が二重にならないこと');
+        $this->assertSame(1, Assignment::count(), 'アサインも二重にならないこと');
+        $p = Project::firstOrFail();
+        $this->assertSame('調整中', $p->status);
+        $this->assertFalse((bool) $p->staff_published);
+        $this->assertSame('仮', Assignment::where('staff_id', 'S-001')->firstOrFail()->status);
+    }
+
     /** 月シートを取り込み直しても、案件もアサインも二重にならない。 */
     public function test_monthly_sheet_can_be_imported_twice(): void
     {
