@@ -257,10 +257,22 @@
     .add-row .mini { border: 1px dashed var(--brand); background: #fff; color: var(--brand-dark);
       border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
     .add-row .mini:hover { background: var(--brand-soft); }
-    /* M-9：名簿から追加プルダウン（日別ボード） */
-    .add-row .mini-sel { border: 1px solid var(--brand); background: #fff; color: var(--brand-dark);
-      border-radius: 8px; padding: 5px 8px; font-size: 12px; font-weight: 700; cursor: pointer;
-      font-family: inherit; max-width: 200px; }
+    /* メンバーの追加パネル（2026-08-26 baba要望）。
+       長いプルダウンをやめ、名前でしぼって**チェックした人をまとめて入れる**形にした。 */
+    .pick-box { border: 1px solid var(--brand); border-radius: 10px; background: #fff; padding: 8px; margin-top: 6px; }
+    .pick-box .pk-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--brand-dark); margin-bottom: 6px; }
+    .pick-box .pk-head .sp { flex: 1; }
+    .pick-box .pk-q { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; font-family: inherit; }
+    .pick-box .pk-list { max-height: 190px; overflow-y: auto; margin: 6px 0; border: 1px solid var(--line); border-radius: 8px; }
+    .pick-box .pk-item { display: flex; align-items: center; gap: 7px; padding: 4px 8px; font-size: 12.5px; cursor: pointer; }
+    .pick-box .pk-item:nth-child(even) { background: #fbf9f6; }
+    .pick-box .pk-item:hover { background: var(--brand-soft); }
+    .pick-box .pk-item input { width: auto; margin: 0; }
+    .pick-box .pk-item .lv { color: var(--muted, #8a7a6b); font-size: 11px; }
+    .pick-box .pk-none { padding: 10px 8px; font-size: 12px; color: var(--muted, #8a7a6b); }
+    .pick-box .pk-foot { display: flex; align-items: center; gap: 6px; }
+    .pick-box .pk-foot .sp { flex: 1; }
+    .pick-box .pk-spot { margin-top: 6px; padding: 8px; background: #fbf6ef; border: 1px dashed var(--brand); border-radius: 8px; font-size: 12px; }
 
     /* 希望者の色の凡例 */
     .legend { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 11.5px; color: var(--ink);
@@ -346,7 +358,7 @@
      いまは下の ECS_ROSTER（DBの名簿）を使う。 --}}
 <!-- DBのスタッフ名一覧（NAME_POOL の単一ソース）。空のときは下のべた書きにフォールバック。 -->
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
-<!-- 「名簿から追加…」に出す人（社員＋スタッフ・DBが元・五十音順・退職者は除く） -->
+<!-- 「＋社員を追加」「＋スタッフを追加」に出す人（DBが元・五十音順・退職者は除く） -->
 <script>window.ECS_ROSTER = @json($roster ?? []);</script>
 <!-- DBのボード用案件＋割当メンバー（実データ）。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_BOARD_CASES = @json($boardCases ?? []);</script>
@@ -788,20 +800,135 @@
     for (const k of order) { if (pos && pos[k]) return k; }
     return 'FC';
   }
-  // この案件カードの「名簿から追加」プルダウンの中身（すでに入っている人は除外＝重複防止）
-  function rosterOptions(c){
-    // 名簿はDBが元（window.ECS_ROSTER）。架空の名前は出さない。
+  // ===== メンバーの追加パネル（2026-08-26 baba要望）=====
+  // 以前は「名簿から追加…」の長いプルダウン1つに社員とスタッフが全部入っていて使いにくかった。
+  //  ・「＋社員を追加」「＋スタッフを追加」に分ける
+  //  ・名前でしぼって、**チェックした人をまとめて**入れる
+  //  ・スタッフ側で1人も見つからないときだけ「臨時スタッフとして名簿に追加」を出す
+  //    （名簿にいない人を入れる道。アサイン画面と同じやり方＝入れ口を増やしていない）
+  let PICK = { caseId: null, kind: 'staff', q: '', checked: new Set() };
+
+  function openPicker(caseId, kind){
+    // 同じボタンをもう一度押したら閉じる。
+    if (PICK.caseId === caseId && PICK.kind === kind) { closePicker(); return; }
+    closePicker();
+    PICK = { caseId: caseId, kind: kind, q: '', checked: new Set() };
+    renderPicker();
+  }
+  function closePicker(){
+    const el = PICK.caseId ? document.getElementById('pick-' + PICK.caseId) : null;
+    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    PICK = { caseId: null, kind: 'staff', q: '', checked: new Set() };
+  }
+  // しぼり込みの入力。リストだけ書き直す（入力欄を作り直すと文字が消える）。
+  function pickerQuery(v){ PICK.q = v; renderPickList(); }
+  function pickToggle(id, on){ if (on) PICK.checked.add(id); else PICK.checked.delete(id); renderPickFoot(); }
+
+  function pickCandidates(){
     const roster = window.ECS_ROSTER || [];
-    if (!roster.length) return '<option value="">名簿から追加…（名簿が空です）</option>';
-    const taken = new Set(c.assigned.map(m => m.name));
-    const optsFor = role => roster
-      .filter(pp => pp.role === role && !taken.has(pp.name))
-      .map(pp => `<option value="${pp.id}">${pp.name}（${pp.lvLabel || '—'}）</option>`)
-      .join('');
-    const emp = optsFor('employee'), stf = optsFor('staff');
-    return '<option value="">名簿から追加…</option>'
-      + (emp ? `<optgroup label="社員">${emp}</optgroup>` : '')
-      + (stf ? `<optgroup label="スタッフ">${stf}</optgroup>` : '');
+    const c = cases.find(x => x.id === PICK.caseId);
+    const taken = new Set(c ? c.assigned.map(m => m.name) : []);
+    const q = PICK.q.trim();
+    return roster.filter(pp => pp.role === PICK.kind && !taken.has(pp.name)
+      && (!q || String(pp.name).indexOf(q) !== -1));
+  }
+
+  function renderPicker(){
+    const el = document.getElementById('pick-' + PICK.caseId);
+    if (!el) return;
+    const label = PICK.kind === 'employee' ? '社員' : 'スタッフ';
+    el.style.display = 'block';
+    el.innerHTML =
+      '<div class="pk-head"><span>' + label + 'を追加</span><span class="sp"></span>'
+      + '<button class="mini" onclick="closePicker()">閉じる</button></div>'
+      + '<input class="pk-q" type="text" placeholder="名前でしぼる（例）山田" oninput="pickerQuery(this.value)">'
+      + '<div class="pk-list" id="pkList"></div>'
+      + '<div class="pk-foot" id="pkFoot"></div>'
+      + '<div id="pkSpot"></div>';
+    renderPickList();
+    const q = el.querySelector('.pk-q');
+    if (q) q.focus();
+  }
+
+  function renderPickList(){
+    const box = document.getElementById('pkList');
+    if (!box) return;
+    const list = pickCandidates();
+    if (!list.length) {
+      box.innerHTML = '<div class="pk-none">この名前の'
+        + (PICK.kind === 'employee' ? '社員' : 'スタッフ')
+        + 'は名簿にいません（すでにこの案件に入っている人は出ません）。</div>';
+    } else {
+      box.innerHTML = list.map(pp =>
+        '<label class="pk-item"><input type="checkbox" ' + (PICK.checked.has(pp.id) ? 'checked' : '')
+        + ' onchange="pickToggle(\'' + pp.id + '\', this.checked)">'
+        + '<span>' + escHtml(pp.name) + '</span>'
+        + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span></label>'
+      ).join('');
+    }
+    renderPickFoot();
+  }
+
+  function renderPickFoot(){
+    const foot = document.getElementById('pkFoot');
+    if (!foot) return;
+    const n = PICK.checked.size;
+    foot.innerHTML = '<span class="sp">' + (n ? n + '人を選んでいます' : '') + '</span>'
+      + '<button class="mini" ' + (n ? '' : 'disabled style="opacity:.5; cursor:default;"')
+      + ' onclick="addPicked()">チェックした人を追加</button>';
+
+    // 名簿にいない方（インターン・助っ人）を入れる道。
+    // ⚠ 社員はここから作らない（社員の登録はアカウント発行から）。
+    const spot = document.getElementById('pkSpot');
+    if (!spot) return;
+    const q = PICK.q.trim();
+    const none = pickCandidates().length === 0;
+    spot.innerHTML = (PICK.kind === 'staff' && q && none)
+      ? '<div class="pk-spot">「<b>' + escHtml(q) + '</b>」は名簿にいません。<br>'
+        + '<button class="mini" style="margin-top:6px;" onclick="addSpotFromPicker()">'
+        + '＋ 臨時スタッフとして名簿に追加して、この案件に入れる</button>'
+        + '<div style="margin-top:4px; color:#8a7a6b;">ログインは付きません。'
+        + '出勤数・稼働状況には、ふつうのスタッフと同じように数えます。</div></div>'
+      : '';
+  }
+
+  // チェックした人をまとめて入れる（入れ方は今までと同じ addRosterMember）。
+  function addPicked(){
+    const caseId = PICK.caseId;
+    const ids = Array.from(PICK.checked);
+    closePicker();
+    ids.forEach(id => addRosterMember(caseId, id));
+  }
+
+  // 名簿にいない方を臨時スタッフとして追加し、そのままこの案件に入れる。
+  function addSpotFromPicker(){
+    const name = PICK.q.trim();
+    const caseId = PICK.caseId;
+    if (!name || !caseId) return;
+    if (!confirm('「' + name + '」さんを臨時スタッフとして名簿に追加し、この案件に入れます。\n\n'
+      + '・ログインは付きません（メール・パスワードなし）\n'
+      + '・出勤数や稼働状況には、ふつうのスタッフと同じように数えます\n\nよろしいですか？')) return;
+    fetch('/people/spot', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      // いま見ている拠点の人として追加する（空のときは自分の拠点になる）。
+      body: JSON.stringify({ name: name, office: window.ECS_OFFICE_SCOPE || '' })
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(r => {
+        if (!r.ok || !r.data.ok) {
+          alert(r.data && r.data.message ? r.data.message : '臨時スタッフの追加に失敗しました。');
+          return;
+        }
+        // 画面が持っている名簿にも足す（開き直さなくても使えるように）。
+        window.ECS_ROSTER = (window.ECS_ROSTER || []).concat([
+          { id: r.data.id, name: name, role: 'staff', lv: '-', lvLabel: '臨時', pos: {} }
+        ]);
+        closePicker();
+        addRosterMember(caseId, r.data.id);
+      })
+      .catch(() => alert('通信エラーで臨時スタッフを追加できませんでした。'));
   }
   // プルダウンで選んだ人をこの案件のメンバーに追加（かぶり・月上限のチェックは addCandidate と同じ）
   function addRosterMember(caseId, id){
@@ -1225,7 +1352,12 @@
       `<div class="cc-col">
          <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span>${kariN ? `<span class="kari-warn" title="「仮」の人はスタッフの画面に出ません。名前の横の「仮」を押すと確定にできます。">仮 ${kariN}名</span>` : ''}</div>
          <div class="col-list">${memRows || '<div class="mem-none">メンバー未割当</div>'}</div>
-         ${editMode ? `<div class="add-row"><select class="mini-sel" title="名簿（社員・スタッフ）から選んで追加。LINEで入れると言われたスタッフもここから。" onchange="addRosterMember('${c.id}', this.value)">${rosterOptions(c)}</select><button class="mini" onclick="addHaken('${c.id}')">＋派遣</button></div>` : ''}
+         ${editMode ? `<div class="add-row">
+             <button class="mini" onclick="openPicker('${c.id}','employee')" title="社員を名前でしぼって、チェックした人をまとめて入れます">＋社員を追加</button>
+             <button class="mini" onclick="openPicker('${c.id}','staff')" title="スタッフを名前でしぼって、チェックした人をまとめて入れます。LINEで入れると言われた方もここから。">＋スタッフを追加</button>
+             <button class="mini" onclick="addHaken('${c.id}')">＋派遣</button>
+           </div>
+           <div class="pick-box" id="pick-${c.id}" style="display:none;"></div>` : ''}
        </div>`;
 
     // この日の希望者（応募＋カレンダー〇）＝色分け。手動編集中は ＋ でメンバーへ。
