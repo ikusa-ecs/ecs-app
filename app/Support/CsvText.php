@@ -55,12 +55,44 @@ class CsvText
      */
     public static function rows(string $raw): array
     {
+        return self::rowsWith($raw, ',');
+    }
+
+    /**
+     * スプレッドシートから**コピーして貼り付けた**中身 → 行（各行は列の配列）。
+     *
+     * なぜ別に要るか（2026-08-27 baba要望）：
+     *   Googleスプレッドシート／Excel からセルをコピーすると、**カンマではなくタブ区切り**で
+     *   クリップボードに入る。カンマとして読むと1行が1セルになってしまい、何も読めない。
+     *   ⚠ ただし「9月1日(火), 予備日」のように**セルの中にカンマが入っている**こともあるので、
+     *     カンマ区切りとして読み直すのも危ない。そこで**どちらの区切りかを数えて決める**。
+     *
+     * @return list<list<string>>
+     */
+    public static function rowsPasted(string $raw): array
+    {
+        $text = self::toUtf8($raw);
+
+        // 1行目でタブとカンマの数を比べる。タブが1つでもあれば、まず間違いなく表の貼り付け。
+        $firstLine = strtok($text, "\n") ?: '';
+        $delimiter = substr_count($firstLine, "\t") > 0 ? "\t" : ',';
+
+        return self::rowsWith($text, $delimiter);
+    }
+
+    /**
+     * 区切り文字を指定して読む。
+     *
+     * @return list<list<string>>
+     */
+    private static function rowsWith(string $raw, string $delimiter): array
+    {
         $handle = fopen('php://temp', 'r+');
         fwrite($handle, self::toUtf8($raw));
         rewind($handle);
 
         $rows = [];
-        while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
+        while (($row = fgetcsv($handle, 0, $delimiter, '"', '')) !== false) {
             // 完全な空行（全部 null / 空）は飛ばす
             if ($row === [null] || $row === ['']) {
                 continue;
