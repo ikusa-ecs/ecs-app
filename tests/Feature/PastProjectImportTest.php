@@ -1027,4 +1027,23 @@ class PastProjectImportTest extends TestCase
         $this->assertSame('14:00', $p->event_start_time);
         $this->assertSame('16:30', $p->event_end_time);
     }
+
+    /**
+     * 「営業案件」＝イベント数に数えないもの（体験会・EXPO と同じ扱い。2026-08-27 baba）。
+     * ⚠ 実施形態ではないので、実施形態は空のまま。数えない理由が分かるよう備考にも残す。
+     */
+    public function test_monthly_sheet_sales_case_is_not_counted_as_event(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '展示会', '営業案件'),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '展示会')->firstOrFail();
+        $this->assertFalse($p->count_as_event, 'イベント数に数えない');
+        $this->assertStringContainsString('営業案件', (string) $p->note);
+        $this->assertSame('', (string) $p->format, '実施形態は勘で決めない');
+    }
 }

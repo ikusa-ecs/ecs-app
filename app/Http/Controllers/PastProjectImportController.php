@@ -619,7 +619,8 @@ class PastProjectImportController extends Controller
             // キャンセルの案件は「イベント数に数えない」で入れる（実施していないため。2026-08-26 baba要望）。
             // ⚠ 案件の状態（status）は 未着手/調整中/確定/完了 の4つしか無いので、キャンセルは
             //   ここと備考で表す。数え方の正本は App\Support\EventCount（null＝自動／false＝数えない）。
-            'count_as_event' => $get('キャンセル') !== '' ? false : null,
+            // 「営業案件」もイベント数に数えない（体験会・EXPO と同じ扱い。2026-08-27 baba）。
+            'count_as_event' => ($get('キャンセル') !== '' || $get('イベント数') === '数えない') ? false : null,
             // 案件の状態。過去の実績＝確定。これから＝まだ動くので「調整中」（人が1人も
             // 入っていなければ「未着手」）＝アサインが必要な案件として日別ボードにも出る。
             'status' => $future ? ($hasPeople ? '調整中' : '未着手') : '確定',
@@ -652,6 +653,11 @@ class PastProjectImportController extends Controller
         }
         if ($get('拠点間の関わり') !== '') {
             $marks[] = '他拠点から'.$get('拠点間の関わり');
+        }
+        // 「営業案件」＝イベント数に数えないもの。数えない理由が案件を見て分かるように残す
+        // （実施形態が空で入るので、備考が無いと「入れ忘れ」に見える）。
+        if ($get('イベント数') === '数えない') {
+            $marks[] = '営業案件（イベント数に数えない）';
         }
 
         $note = $get('備考');
