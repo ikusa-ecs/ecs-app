@@ -8,6 +8,7 @@ use App\Models\StaffRelation;
 use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\Departments;
+use App\Support\ExperienceCount;
 use App\Support\LoginInvite;
 use App\Support\OfficeScope;
 use App\Support\SpotStaff;
@@ -97,6 +98,8 @@ class PersonController extends Controller
             'canManageAssignPool' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             'employees'      => $employees,
             'contentOptions' => $contentOptions,
+            // 経験回数（自動集計・2026-08-27）。社員も現場に出るので同じように出す。
+            'experience' => ExperienceCount::forMany($employees->pluck('id')->all()),
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
             // 拠点（事務所）を直せるか＝管理者以上（2026-08-27 baba選択）。
@@ -381,6 +384,10 @@ class PersonController extends Controller
         return view('staff', [
             'people' => $people,
             'status' => $status,
+            // 経験回数（自動集計・2026-08-27 baba要望）。正本＝App\Support\ExperienceCount。
+            // ⚠ 表に保存せず毎回数える（写しは必ず腐る）。一覧ぶんを1回のクエリでまとめて数える
+            //   ＝1人ずつ引くと人数ぶんSQLが走る。
+            'experience' => ExperienceCount::forMany($people->pluck('id')->all()),
             // 拠点で絞って見るための選択肢（2026-08-25 baba要望）。
             // 既定は自分の拠点。「すべての拠点」も選べる＝他拠点の人を探せなくならないように
             // （他拠点へヘルプに行く／来てもらう運用があるため）。

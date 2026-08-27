@@ -14,6 +14,7 @@
   {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
   window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
   window.ECS_CAN_MANAGE_OFFICE = @json($canManageOffice ?? false);   // 拠点を直せるか（管理者以上）
+  window.ECS_EXPERIENCE = @json($experience ?? new stdClass);   // 経験回数（アサインから自動集計）
   window.ECS_MY_ID = @json($myId ?? null);
   {{-- 所属の選択肢（実際の10種類）。氏名・ふりがな・所属を直す欄で使う。 --}}
   window.ECS_DEPT_ALL = @json(\App\Support\Departments::ALL);
@@ -219,6 +220,14 @@
               <h4>Dの経験があるコンテンツ</h4>
               ${expEditorHtml(idx, 'dexp')}
             </div>
+
+            <div class="exp-block">
+              <h4>経験回数（自動集計）</h4>
+              <p class="muted" style="font-size:11.5px; margin:0 0 6px;">
+                上の2つは<b>手で選ぶ申告</b>です。こちらは<b>アサインの実績から自動で数えたもの</b>で、直せません。
+              </p>
+              ${experienceAutoHtml(p)}
+            </div>
           </div>
           <div>
             ${identityEditorHtml(p, idx)}
@@ -328,6 +337,49 @@
         <span class="muted" style="font-size:12px;">※ CSVの見本行を消し忘れたときなど、本人以外が直す必要があるときに使います。</span>
       </div>
       <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+  }
+
+
+  // ===== 経験回数（自動集計・2026-08-27 baba要望）=====
+  // ⚠ 上の「経験のあるコンテンツ」は**手で選ぶ申告**。こちらは**アサインの実績を自動で数えたもの**で別物。
+  //   正本＝App\Support\ExperienceCount。数え方＝確定のアサインで開催日が過ぎたもの（キャンセルは除く）。
+  //   ここに数え方を書かないこと（サーバー側と食い違う）。
+  function experienceAutoHtml(p){
+    const e = (window.ECS_EXPERIENCE || {})[p.id];
+    if (!e || !e.projects) {
+      return '<span class="muted" style="font-size:12.5px;">まだありません'
+        + '（確定のアサインで開催日が過ぎたものを数えます）</span>';
+    }
+
+    const dayNote = (e.days > e.projects) ? '（出勤 ' + e.days + ' 日）' : '';
+    let html = '<div style="font-size:12.5px; margin-bottom:6px;">通算 <b>' + e.projects + ' 件</b> ' + dayNote + '</div>';
+
+    if (e.byRole && e.byRole.length) {
+      html += '<div style="margin-bottom:8px;">';
+      e.byRole.forEach(function(r){
+        html += '<span class="badge" style="margin:0 6px 4px 0;">' + escAttr(r.label) + ' ' + r.count + '回</span>';
+      });
+      html += '</div>';
+    }
+
+    if (e.byContent && e.byContent.length) {
+      html += '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+      e.byContent.forEach(function(c){
+        const cr = (e.byContentRole || {})[c.name] || {};
+        const parts = Object.keys(cr).map(function(k){ return k + ' ' + cr[k]; });
+        html += '<tr>'
+          + '<td style="padding:2px 6px 2px 0; border-bottom:1px solid #efe8dd;">' + escAttr(c.name) + '</td>'
+          + '<td style="padding:2px 6px; border-bottom:1px solid #efe8dd; white-space:nowrap;"><b>' + c.count + '回</b></td>'
+          + '<td style="padding:2px 6px; border-bottom:1px solid #efe8dd; color:#8a7a66; white-space:nowrap;">'
+          + (parts.length ? escAttr(parts.join(' / ')) : '') + '</td>'
+          + '<td style="padding:2px 0 2px 6px; border-bottom:1px solid #efe8dd; color:#8a7a66; white-space:nowrap;">'
+          + (c.last ? escAttr(c.last) : '') + '</td>'
+          + '</tr>';
+      });
+      html += '</table>';
+    }
+
+    return html;
   }
 
   // 拠点（事務所）を直す欄。2026-08-27 baba要望＝これまで画面から直せなかった。
