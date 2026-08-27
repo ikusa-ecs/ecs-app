@@ -10,7 +10,12 @@ use App\Models\ShiftPreference;
 use Illuminate\Support\Carbon;
 
 /**
- * 稼働状況（/staff-status）。スタッフごとの稼働指標を DB から計算して画面に渡す。
+ * 稼働状況（スタッフごとの稼働指標）を DB から計算する部品。
+ *
+ * ⚠ **これ自体の画面はもう無い**（2026-08-27 に削除）。稼働状況はスタッフ画面（/staff）の
+ *   タブに統合済みで、`/staff-status` は /staff へ転送するだけ。
+ *   使っているのは PersonController（稼働状況タブ）と AssignDashboardController。
+ *   ⚠ クラスごと消さないこと＝下の buildStatus() は生きている。
  *
  * 指標の出どころ（今日決めた定義）：
  *  ・稼働率 ＝ 今月アサイン日数 ÷ 希望日数（希望充足率と同一。1指標に統合）。希望0件は「—」。
@@ -26,11 +31,6 @@ use Illuminate\Support\Carbon;
  */
 class StaffStatusController extends Controller
 {
-    public function index()
-    {
-        return view('staff_status', ['status' => $this->buildStatus()]);
-    }
-
     /**
      * 稼働指標の一覧を組み立てて返す（スタッフ画面の「稼働状況」タブでも再利用する）。
      * 画面（view）に依存しないので、他のコントローラからも呼べる。

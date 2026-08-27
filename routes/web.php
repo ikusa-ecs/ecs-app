@@ -35,7 +35,6 @@ use App\Http\Controllers\ProjectHistoryController;
 use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
-use App\Http\Controllers\StaffStatusController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OtpController;
 use Illuminate\Support\Facades\Route;
@@ -45,11 +44,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 // ※ POST /login（ログイン実行）・POST /logout は Fortify が登録する。
 //   照合の中身（people 照合・active チェック・テストログイン）は FortifyServiceProvider を参照。
-// 新規登録画面（現状は見た目のみ。自己登録の扱いは Step 4 で確定＝管理者発行方針）
-Route::get('/register', function () {
-    return view('register');
-});
-
 // ── パスワード再設定（お忘れの方）＝ログイン前（ゲスト）──
 //   独自実装。メールで再設定リンクを送る（2段階認証のメールコードと同じ SES 基盤）。
 //   送信・保存は total 総当たり対策で軽く throttle をかける。

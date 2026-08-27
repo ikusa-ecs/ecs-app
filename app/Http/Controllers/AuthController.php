@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 /**
- * ログイン／ログアウト（Laravel標準機能を使用）。
+ * ログイン（Laravel標準機能を使用）。
+ * ※ ログアウト（POST /logout）は Fortify が持っている＝ここには無い。
  * ・照合先は people 名簿（config/auth.php で Person モデルを指定済み）。
  * ・メール＋パスワードで Auth::attempt。合えばセッションにログイン状態を持つ。
  * ・自己登録は廃止方針（管理者が発行）＝ここには登録処理を置かない。
@@ -47,16 +48,6 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended($this->homeFor(Auth::user()));
-    }
-
-    /** ログアウト。 */
-    public function logout(Request $request)
-    {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/');
     }
 
     /** ログイン後の行き先：スタッフはスタッフ画面、それ以外は社員ダッシュボード。 */
