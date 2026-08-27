@@ -208,6 +208,12 @@ class ProjectController extends Controller
             'canManageShare'  => $canManageShare,
             // 絞り込みの「拠点」プルダウンの並び（拠点マスタの順）。全拠点表示のときだけ画面に出す。
             'officeOptions'   => \App\Support\OfficeScope::options(),
+            // 一覧の中で直せる「移動・車両」「音響機材」の選択肢。正本＝App\Support\OfficeOptions。
+            // 案件ごとに登録拠点が違うので、全拠点ぶん渡して案件の拠点で引く（案件登録フォームと同じ渡し方）。
+            // ※ 以前はこの画面だけ選択肢を直書きしていて、マスタ管理で拠点ごとに変えても反映されなかった。
+            'officeOptionMap' => \App\Support\OfficeOptions::mapForAll(\App\Support\OfficeScope::options()),
+            // 拠点が空・拠点マスタが未登録のときの受け皿。ここも直書きせず OfficeOptions から取る。
+            'officeOptionDefaults' => \App\Support\OfficeOptions::DEFAULTS,
         ]);
     }
 

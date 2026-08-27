@@ -81,4 +81,27 @@ class OfficeOptionsTest extends TestCase
             ->assertOk()
             ->assertSee('ECS_OFFICE_OPTIONS');
     }
+
+    /**
+     * 案件一覧にも、全拠点ぶんの選択肢が渡っている（2026-08-27）。
+     * この画面だけ選択肢を直書きしていて、マスタ管理で拠点ごとに変えても反映されなかった。
+     * 直書きに戻したらここで落ちる。
+     */
+    public function test_project_list_receives_the_map(): void
+    {
+        OfficeOptions::put('東京', 'transport', "電車\nタクシー");
+
+        $emp = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+
+        $res = $this->actingAsPerson($emp)->get('/projects')->assertOk();
+
+        // マスタで足した「タクシー」が画面まで届いていること（＝直書きの一覧ではない）。
+        // ※ 画面のJSON（@json）では日本語が \uXXXX に変わるので、渡した中身そのものを見る。
+        $res->assertViewHas('officeOptionMap', function ($map) {
+            return isset($map['東京']['transport']) && in_array('タクシー', $map['東京']['transport'], true);
+        });
+        $res->assertSee('ECS_OFFICE_OPTIONS');
+        // 直書き時代の並びがそのまま残っていないこと。
+        $res->assertDontSee('const TRANSPORTS = [', false);
+    }
 }

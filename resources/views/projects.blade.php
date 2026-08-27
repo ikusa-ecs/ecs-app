@@ -14,6 +14,8 @@
   window.ECS_SHOW_OFFICE = @json($showOfficeBadge ?? false);   // 拠点バッジを出すか（全拠点表示のときだけ）
   window.ECS_CAN_SHARE = @json($canManageShare ?? false);      // コピー/巻き取り操作ができるか（管理者以上）
   window.ECS_OFFICE_LIST = @json($officeOptions ?? []);        // 絞り込み「拠点」の選択肢（拠点マスタの順）
+  window.ECS_OFFICE_OPTIONS = @json($officeOptionMap ?? new stdClass);   // 拠点ごとの「移動・車両」「音響機材」の選択肢（正本＝OfficeOptions）
+  window.ECS_OFFICE_OPTION_DEFAULTS = @json($officeOptionDefaults ?? new stdClass);   // 上に無いときの受け皿（同じく OfficeOptions から）
 </script>
 @verbatim
 <style>
@@ -695,9 +697,17 @@
   // ===== 選択肢（プルダウン） =====
   // ディレクター／SD／物品担当は「本物の社員一覧」（window.ECS_EMPLOYEES＝id,name）から作る。
   const EMPLOYEES = Array.isArray(window.ECS_EMPLOYEES) ? window.ECS_EMPLOYEES : [];
-  const TRANSPORTS = ['IKUSAカー', 'IKUSAカー2台', 'IKUSAカー3台', '電車', 'レンタカー',
-                      'IKUSAカー+レンタカー', '電車+IKUSAカー', '電車+レンタカー', '飛行機', '飛行機+レンタカー'];
-  const SOUND = ['会場音響', 'クラシックプロ大', 'クラシックプロ中', 'クラシックプロ小', 'CUBE', 'SANWA', 'TOA', '不要'];
+  // 移動・車両／音響機材の選択肢は「拠点ごと」＝マスタ管理で拠点別に変えられる（正本＝App\Support\OfficeOptions）。
+  // ここに直書きすると、東京にしか無い「IKUSAカー」が他拠点でも出てしまう（案件登録画面では2026-08-21 に解消済み）。
+  // 案件ごとに登録拠点が違うので、その案件の拠点で引く。拠点が空・拠点マスタが未登録のときは
+  // 既定の一覧（ECS_OFFICE_OPTION_DEFAULTS）で代用する＝選べる物がゼロになって直せなくなるのを防ぐ。
+  function officeOptsFor(office, kind) {
+    const all = window.ECS_OFFICE_OPTIONS || {};
+    const byOffice = all[office];
+    if (byOffice && Array.isArray(byOffice[kind])) return byOffice[kind];
+    const def = window.ECS_OFFICE_OPTION_DEFAULTS || {};
+    return Array.isArray(def[kind]) ? def[kind] : [];
+  }
   // ケータリングの選択肢（案件登録フォームと同じ並び）。詳細で選べる。
   // 制作・記録（ロゴ／カメラ／事例記事／動画）の選択肢。案件登録画面と同じ並び。
   const PUB_OPTS = ['不要', 'ほしい', 'OK', 'NG'];
@@ -1226,8 +1236,8 @@
             </div>
             <div class="d-item">
               <span class="d-label">移動・音響</span>
-              <div class="mini-field"><span class="mini-label">移動</span>${multiPickHtml(p._i, p.id, 'transport', TRANSPORTS, p.transport, 'ー（未設定）')}</div>
-              <div class="mini-field"><span class="mini-label">音響</span>${multiPickHtml(p._i, p.id, 'audio_equipment', SOUND, p.sound, '（未設定）')}</div>
+              <div class="mini-field"><span class="mini-label">移動</span>${multiPickHtml(p._i, p.id, 'transport', officeOptsFor(p.office, 'transport'), p.transport, 'ー（未設定）')}</div>
+              <div class="mini-field"><span class="mini-label">音響</span>${multiPickHtml(p._i, p.id, 'audio_equipment', officeOptsFor(p.office, 'audio_equipment'), p.sound, '（未設定）')}</div>
             </div>
             <div class="d-item" style="flex-basis:100%;">
               <span class="d-label">準備チェック・制作記録</span>
