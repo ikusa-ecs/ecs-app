@@ -461,11 +461,16 @@
           <div class="form-row full">
             <label>実施形態</label>
             <select id="format" name="format" onchange="onFormatChange()">
-              <option>リアル</option>
-              <option>リアルロング</option>
-              <option>オンライン</option>
-              <option>ARENA場所貸し</option>
-              <option>体験会</option>
+@endverbatim
+              {{-- 実施形態の選択肢の正本＝App\Support\ProjectFormats::ALL。
+                   ここに書き足さないこと（月シート取込・集計と食い違う）。
+                   ⚠ この数行だけ「Bladeを解釈しない区間」の外に出している（区間の中では差し込みがそのまま文字で出る）。
+                   ⚠ この説明に区間の開始・終了を表す字を書かないこと＝コメントの中でも命令として解釈され、
+                     そこから区間が始まって画面の一部が消える（2026-08-27 に実際に踏んだ・既知の罠）。 --}}
+              @foreach (App\Support\ProjectFormats::ALL as $fmt)
+                <option>{{ $fmt }}</option>
+              @endforeach
+@verbatim
             </select>
             <div class="hint">案件の形態を選びます（拠点は上の「登録拠点」で持ちます）。「オンライン」を選ぶとツールが選べます。<b>リアルロング＝スタッフの集合〜解散の拘束が9時間を超える案件</b>（社員の拘束時間ではありません。スタッフの手当が変わります）。</div>
             <div class="expand-box" id="toolBox">

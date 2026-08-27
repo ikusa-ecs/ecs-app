@@ -823,14 +823,11 @@
   }
   function kbnKey(dayType) { return dayType === '予備日' ? '予備日' : (dayType.indexOf('リハ') !== -1 ? 'リハ' : '本番'); }
 
-  // 実施形態 → 色分けクラス
-  function formatClass(fmt) {
-    if (fmt.indexOf('ARENA') !== -1)     return 'fmt-arena';
-    if (fmt.indexOf('オンライン') !== -1) return 'fmt-online';
-    if (fmt.indexOf('他拠点') !== -1)     return 'fmt-other';
-    if (fmt.indexOf('リアルロング') !== -1) return 'fmt-long';
-    if (fmt.indexOf('リアル') !== -1)     return 'fmt-real';
-    return 'fmt-etc';
+  // 実施形態 → 色分けクラス。
+  // ⚠ 判定はサーバーが済ませて p.fmtCls で渡している（正本＝App\Support\ProjectFormats::badgeCode）。
+  //   ここに同じ判定を書くと、実施形態を増やしたときに片方だけ直して色が食い違う。
+  function formatClass(p) {
+    return p.fmtCls || 'fmt-etc';
   }
 
   // 実施形態のバッジ。キャンセルの案件は「キャンセル」に差し替えて出す（2026-08-26 baba要望）。
@@ -841,7 +838,7 @@
       const was = p.format ? '<span class="fmt-was">' + p.format + '</span>' : '';
       return '<span class="fbadge fmt-cancel">キャンセル</span>' + was;
     }
-    return '<span class="fbadge ' + formatClass(p.format) + '">' + p.format + '</span>';
+    return '<span class="fbadge ' + formatClass(p) + '">' + p.format + '</span>';
   }
 
   // 社員ID → 名前（EMPLOYEES から引く）。無ければ空文字。

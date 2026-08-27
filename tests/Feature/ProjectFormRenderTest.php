@@ -57,4 +57,17 @@ class ProjectFormRenderTest extends TestCase
         $this->assertTrue($contains('現地'), '「現地」が選択肢にあること');
         $this->assertTrue($contains('北海道依頼'), '拠点マスタの拠点が「○○依頼」として選べること');
     }
+
+    /**
+     * 実施形態の選択肢は正本（App\Support\ProjectFormats::ALL）から出す（2026-08-27）。
+     * ⚠ それまで6か所に散っていて、1つ増やすと6か所直す必要があった。
+     */
+    public function test_format_options_come_from_the_single_source(): void
+    {
+        $html = $this->open()->assertOk()->getContent();
+
+        foreach (\App\Support\ProjectFormats::ALL as $fmt) {
+            $this->assertStringContainsString('<option>'.$fmt.'</option>', $html, "実施形態「{$fmt}」が選べること");
+        }
+    }
 }

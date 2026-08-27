@@ -478,19 +478,7 @@ class AssignSheetController extends Controller
      */
     private function classifyType(?string $format): string
     {
-        $f = (string) $format;
-
-        return match (true) {
-            str_contains($f, '場所貸し') || str_contains($f, 'ARENA') => 'basho',
-            str_contains($f, '他拠点→東') || str_contains($f, '他拠点⇒東') => 'tokyo',
-            str_contains($f, '東北') => 'tohoku',   // 東北の案件は専用色で区別する（baba 2026-07-24）
-            str_contains($f, 'ヘルプ') => 'help',
-            str_contains($f, '体験') => 'taiken',
-            str_contains($f, 'ロング') => 'long',
-            str_contains($f, 'オンライン') => 'online',
-            str_contains($f, 'リアル') => 'real',
-            default => 'other',
-        };
+        return \App\Support\ProjectFormats::typeCode($format);
     }
 
     /** 実体のない記号（—/ー/-）は空欄にそろえる。表示のノイズを消す。 */

@@ -85,18 +85,10 @@ class DashboardController extends Controller
 
     /**
      * 実施形態の文字列 → 種別コード（real / long / online）。
-     * cases.js の window.ECS_fmtCode と同じ規則（判定をDB側でも揃える）。
+     * 正本＝App\Support\ProjectFormats::countCode（cases.js の window.ECS_fmtCode と同じ規則）。
      */
     private function fmtCode(?string $formatText): string
     {
-        $t = (string) $formatText;
-        if (str_contains($t, 'オンライン') || str_contains($t, 'ヘルプのみ')) {
-            return 'online';
-        }
-        if (str_contains($t, 'リアルロング')) {
-            return 'long';
-        }
-
-        return 'real'; // リアル・ARENA・体験会・巻き取り 等はリアル系として扱う
+        return \App\Support\ProjectFormats::countCode($formatText);
     }
 }

@@ -113,10 +113,9 @@ final class MonthlySheetReader
 
     /**
      * 実施形態（＝月シートの「種別」）として認める書き方。
-     * 案件登録画面（`resources/views/project_form.blade.php` の実施形態）と同じ5つ。
-     * ⚠ ここに無い書き方は**入れずに知らせる**（勘で実施形態を決めると集計が狂う）。
+     * ⚠ 正本＝App\Support\ProjectFormats::ALL（案件登録の選択肢と同じもの）。ここには写しを持たない。
+     * ⚠ そこに無い書き方は**入れずに知らせる**（勘で実施形態を決めると集計が狂う）。
      */
-    private const FORMATS = ['リアル', 'リアルロング', 'オンライン', 'ARENA場所貸し', '体験会'];
 
     /** 種別のセルを、日程の項目名から何行ぶん上まで探すか。 */
     private const FORMAT_ROWS_ABOVE = 3;
@@ -610,7 +609,7 @@ final class MonthlySheetReader
     {
         $inner = self::insideParen($value);
 
-        foreach (self::FORMATS as $format) {
+        foreach (ProjectFormats::ALL as $format) {
             if (self::norm($inner) === self::norm($format)) {
                 return $format;
             }

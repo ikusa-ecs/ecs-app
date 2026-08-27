@@ -101,6 +101,8 @@ class ProjectController extends Controller
                 'toc'        => (bool) $p->is_toc,     // toC（一般消費者向け）＝一覧の絞り込み用
                 'yomi'       => $p->yomi ?? '',
                 'format'     => $p->format ?? '',
+                // 実施形態のバッジ色。判定はサーバー側の1か所で決める（正本＝ProjectFormats::badgeCode）。
+                'fmtCls'     => \App\Support\ProjectFormats::badgeCode($p->format),
                 'scale'      => $p->scale ?? '',
                 // セールス担当（複数あれば先頭）。未保存なら「—」。
                 'sales'      => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
@@ -475,17 +477,10 @@ class ProjectController extends Controller
         return $out;
     }
 
-    /** 実施形態の文字 → 判定コード（cases.js の ECS_fmtCode と同じ基準にそろえる）。 */
+    /** 実施形態の文字 → 判定コード。正本＝App\Support\ProjectFormats::countCode。 */
     private function formatCode(string $format): string
     {
-        if (mb_strpos($format, 'オンライン') !== false || mb_strpos($format, 'ヘルプのみ') !== false) {
-            return 'online';
-        }
-        if (mb_strpos($format, 'リアルロング') !== false) {
-            return 'long';
-        }
-
-        return 'real';
+        return \App\Support\ProjectFormats::countCode($format);
     }
 
     /**
