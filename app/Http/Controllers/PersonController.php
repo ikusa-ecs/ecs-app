@@ -99,6 +99,9 @@ class PersonController extends Controller
             'contentOptions' => $contentOptions,
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
+            // 拠点（事務所）を直せるか＝管理者以上（2026-08-27 baba選択）。
+            // ⚠ canManagePeople（氏名・所属＝Administratorのみ）とは別の線引きなので分けて渡す。
+            'canManageOffice' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             // ログイン案内メールを送れるか＝管理者以上（アカウント発行と同じ扱い）。
             'canInvite' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             // 自分自身には出さない（自分を消す・退職にするのは止めている）。
@@ -164,6 +167,8 @@ class PersonController extends Controller
             'departments.*' => ['string', 'max:50'],
             // アサインの候補に出すか（'1'/'0'）。
             'in_assign_pool' => ['nullable', 'boolean'],
+            // 拠点（事務所）。2026-08-27 baba要望＝これまで画面から直せなかった。
+            'office' => ['nullable', 'string', 'max:50'],
         ], [], [
             'name' => '氏名',
             'name_kana' => 'ふりがな',
@@ -190,6 +195,26 @@ class PersonController extends Controller
                 ], 403);
             }
             $person->in_assign_pool = (bool) $data['in_assign_pool'];
+        }
+
+        // 拠点（事務所）の付け替え＝管理者以上（2026-08-27 baba選択）。
+        // ⚠ 拠点は案件一覧・名簿・集計の絞り込みに効くので、間違えると別の拠点のデータが見える。
+        //   ⚠ 拠点マスタに無い名前は受け付けない（タイポで「どの拠点にも出てこない人」になるのを防ぐ）。
+        if ($request->has('office')) {
+            if (! in_array(optional(Auth::user())->permission, ['manager', 'admin'], true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => '拠点を直せるのは管理者以上です。',
+                ], 403);
+            }
+            $office = trim((string) ($data['office'] ?? ''));
+            if ($office !== '' && ! in_array($office, OfficeScope::options(), true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => "「{$office}」は拠点マスタにありません。マスタ管理で拠点を追加してから選んでください。",
+                ], 422);
+            }
+            $person->office = $office !== '' ? $office : null;
         }
 
         // ここから下は他人の氏名・ふりがな・所属の書き換え＝Administrator だけ。
@@ -363,6 +388,9 @@ class PersonController extends Controller
             'myOffice' => OfficeScope::filterSingle(request()),
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
+            // 拠点（事務所）を直せるか＝管理者以上（2026-08-27 baba選択）。
+            // ⚠ canManagePeople（氏名・所属＝Administratorのみ）とは別の線引きなので分けて渡す。
+            'canManageOffice' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             // ログイン案内メールを送れるか＝管理者以上（アカウント発行と同じ扱い）。
             'canInvite' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             'myId' => optional(Auth::user())->id,
@@ -392,7 +420,31 @@ class PersonController extends Controller
             'op_real'             => ['sometimes', 'boolean'],  // OPリアル(現地)可（B案）
             'ng'                  => ['nullable', 'string', 'max:2000'],
             'impression'          => ['nullable', 'string', 'max:1000'],
+            // 拠点（事務所）。2026-08-27 baba要望＝これまで画面から直せなかった。
+            'office'              => ['nullable', 'string', 'max:50'],
         ]);
+
+        // 拠点（事務所）の付け替え＝管理者以上（2026-08-27 baba選択）。
+        // ⚠ 拠点は案件一覧・名簿・集計の絞り込みに効くので、間違えると別の拠点のデータが見える。
+        // ⚠ 拠点マスタに無い名前は受け付けない（タイポで「どの拠点にも出てこない人」になるのを防ぐ）。
+        //   ※ people.office が空の人は自動で「東京」扱いになるため、空も許す（未設定に戻せる）。
+        if ($request->has('office')) {
+            if (! in_array(optional(Auth::user())->permission, ['manager', 'admin'], true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => '拠点を直せるのは管理者以上です。',
+                ], 403);
+            }
+            $office = trim((string) ($data['office'] ?? ''));
+            if ($office !== '' && ! in_array($office, OfficeScope::options(), true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => "「{$office}」は拠点マスタにありません。マスタ管理で拠点を追加してから選んでください。",
+                ], 422);
+            }
+            $person->office = $office !== '' ? $office : null;
+            $person->save();
+        }
 
         DB::transaction(function () use ($person, $request, $data) {
             // 1) できるポジション：正規コードだけ受け付ける。

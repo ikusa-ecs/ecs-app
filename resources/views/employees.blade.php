@@ -13,6 +13,7 @@
   window.ECS_DEPT_OPTIONS = @json(\App\Support\Departments::groupOptions());
   {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
   window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
+  window.ECS_CAN_MANAGE_OFFICE = @json($canManageOffice ?? false);   // 拠点を直せるか（管理者以上）
   window.ECS_MY_ID = @json($myId ?? null);
   {{-- 所属の選択肢（実際の10種類）。氏名・ふりがな・所属を直す欄で使う。 --}}
   window.ECS_DEPT_ALL = @json(\App\Support\Departments::ALL);
@@ -221,6 +222,7 @@
           </div>
           <div>
             ${identityEditorHtml(p, idx)}
+            ${officeEditorHtml(p, idx)}
             <h4>サイズ（当日の衣装・ユニフォーム準備の参考）</h4>
             <div class="size-row">
               <label class="size-item">身長(cm)：<input type="text" class="size-input" id="height-${idx}" value="${p.height || ''}" placeholder="例：170"></label>
@@ -326,6 +328,49 @@
         <span class="muted" style="font-size:12px;">※ CSVの見本行を消し忘れたときなど、本人以外が直す必要があるときに使います。</span>
       </div>
       <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+  }
+
+  // 拠点（事務所）を直す欄。2026-08-27 baba要望＝これまで画面から直せなかった。
+  // ⚠ 直せるのは管理者以上（氏名・所属の Administrator のみとは別の線引き）。
+  // ⚠ 拠点名は拠点マスタ（window.ECS_OFFICES）から作る＝画面に拠点名を直書きしない。
+  function officeEditorHtml(p, idx){
+    if (!window.ECS_CAN_MANAGE_OFFICE) return '';
+    const cur = p.office || '';
+    const opts = (window.ECS_OFFICES || []).map(function(o){
+      return '<option value="' + escAttr(o) + '"' + (o === cur ? ' selected' : '') + '>' + escAttr(o) + '</option>';
+    }).join('');
+    return `<h4>拠点（事務所）を直す</h4>
+      <div class="size-row" style="gap:10px;">
+        <label class="size-item">拠点：
+          <select class="size-input" style="width:150px;" id="ofc-${idx}"><option value="">未設定</option>${opts}</select>
+        </label>
+      </div>
+      <div class="save-row" style="margin-top:10px;">
+        <button class="btn primary sm" onclick="saveOffice(${idx}, this)">拠点を保存</button>
+        <span class="save-ok" id="ofcSaved-${idx}" style="display:none;">✓ 保存しました</span>
+        <span class="muted" style="font-size:12px;">※ 未設定のままだと「東京」として扱われます。拠点を間違えると別の拠点のデータが見えます。</span>
+      </div>
+      <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+  }
+
+  function saveOffice(idx, btn){
+    const p = employees[idx];
+    const office = (document.getElementById('ofc-' + idx) || {}).value || '';
+    const body = new URLSearchParams();
+    body.append('office', office);
+    if (btn) btn.disabled = true;
+    fetch('/employees/' + encodeURIComponent(p.id) + '/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: body.toString()
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      if (!ok) { alert((j && j.message) || '保存できませんでした。'); if (btn) btn.disabled = false; return; }
+      // 拠点で絞っている一覧に出る／出なくなるので読み込み直す。
+      location.reload();
+    })
+    .catch(() => { alert('保存に失敗しました。通信を確認して、もう一度お試しください。'); if (btn) btn.disabled = false; });
   }
 
   // 属性値に入れる文字をエスケープする（氏名に " や < が入っても壊れないように）。

@@ -11,6 +11,7 @@
   window.ECS_PEOPLE = @json($people);
   {{-- 「退職にする」「削除」を出すか＝Administratorだけ。自分自身には出さない。 --}}
   window.ECS_CAN_MANAGE_PEOPLE = @json($canManagePeople ?? false);
+  window.ECS_CAN_MANAGE_OFFICE = @json($canManageOffice ?? false);   // 拠点を直せるか（管理者以上）
   window.ECS_MY_ID = @json($myId ?? null);
   {{-- ログイン案内メールのボタンを出すか＝管理者以上。 --}}
   window.ECS_CAN_INVITE = @json($canInvite ?? false);
@@ -342,6 +343,25 @@
     return '<span class="muted" style="font-size:12px;">—</span>';
   }
 
+  // 拠点（事務所）の編集欄。2026-08-27 baba要望＝これまで画面から直せなかった。
+  // ⚠ 直せるのは管理者以上（拠点を間違えると別の拠点のデータが見えるため）。それ未満は表示だけ。
+  // ⚠ 拠点名は拠点マスタ（window.ECS_OFFICES）から作る＝画面に拠点名を直書きしない。
+  function officeEditor(p){
+    const cur = p.office || '';
+    if (!window.ECS_CAN_MANAGE_OFFICE) {
+      return '<span class="muted" style="font-size:12.5px;">'
+        + (cur ? escAttrS(cur) : '未設定（東京として扱われます）')
+        + '　※直せるのは管理者以上です</span>';
+    }
+    let opts = '<option value=""' + (cur === '' ? ' selected' : '') + '>未設定</option>';
+    (window.ECS_OFFICES || []).forEach(function(o){
+      opts += '<option value="' + escAttrS(o) + '"' + (o === cur ? ' selected' : '') + '>' + escAttrS(o) + '</option>';
+    });
+    return '<select class="edit-office" style="padding:5px 8px; font-family:inherit; font-size:13px;">' + opts + '</select>'
+      + '<span class="muted" style="font-size:11.5px; margin-left:8px;">'
+      + '未設定のままだと「東京」として扱われます</span>';
+  }
+
   function render(){
     tbody.innerHTML = '';
     staff.forEach((p, idx) => {
@@ -420,6 +440,9 @@
             <div class="trait">
               <label><input type="checkbox" class="edit-exclusive" ${p.exclusive?'checked':''}> 専属スタッフ</label>
             </div>
+
+            <h4 style="margin-top:16px;">拠点（事務所）</h4>
+            <div class="trait">${officeEditor(p)}</div>
 
             <h4 style="margin-top:16px;">人柄・育成メモ</h4>
             <div class="trait">
@@ -672,6 +695,9 @@
     if (atmosT)    body.append('atmos', '1');
     body.append('ng', ngText);
     body.append('impression', memo);
+    // 拠点（管理者以上だけ欄が出る）。欄が無いときは送らない＝勝手に空にしない。
+    const officeSel = dr.querySelector('.edit-office');
+    if (officeSel) body.append('office', officeSel.value);
     if (btn) btn.disabled = true;
     if (statusEl) { statusEl.textContent = '保存中…'; statusEl.style.color = 'var(--muted)'; }
     fetch(`/staff/${encodeURIComponent(p.id)}/edit`, {
