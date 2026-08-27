@@ -24,9 +24,19 @@ use Illuminate\Support\Collection;
 final class PersonLookup
 {
     /** 突き合わせ用に氏名をそろえる（全角・半角の空白を落とす）。 */
+    /**
+     * 氏名の飾り記号（★☆など）。
+     *
+     * アサイン表では、スタッフ（アルバイト）の名前の頭に「★」「☆」を付けて区別している
+     * （2026-08-27 baba）。名簿には付いていないので、そのまま照合すると
+     * **その人だけ「名簿に見つかりません」になり、アサインが丸ごと落ちる**。
+     * 照合のときだけ落とす（名簿に保存する名前は触らない）。
+     */
+    private const NAME_MARKS = ['★', '☆', '◎', '●', '○', '◯', '▲', '△', '▼', '▽', '■', '□', '◆', '◇', '※', '*'];
+
     public static function normName(string $name): string
     {
-        return ChatworkIds::normName($name);
+        return ChatworkIds::normName(str_replace(self::NAME_MARKS, '', $name));
     }
 
     /**

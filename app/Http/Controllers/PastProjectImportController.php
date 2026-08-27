@@ -134,6 +134,8 @@ class PastProjectImportController extends Controller
                     'header' => array_keys($case['fields']),
                     'row' => array_values($case['fields']),
                     'people' => $case['people'],
+                    // 「メンバー」と書いてあるだけの空き枠の数（運営人数が空のときに使う）。
+                    'slots' => $case['slots'] ?? 0,
                 ];
             }
             $unmapped = $read['unknownLabels'];
@@ -151,6 +153,7 @@ class PastProjectImportController extends Controller
                     'header' => $header,
                     'row' => $row,
                     'people' => null,     // null＝D/MC/OP/スタッフの列から作る
+                    'slots' => 0,
                 ];
             }
         }
@@ -167,7 +170,7 @@ class PastProjectImportController extends Controller
      * @return array{name:string, date:string, rawDate:string, count:string, client:?string,
      *               meetTime:?string, errors: list<string>}
      */
-    private function inspect(?array $period, callable $get, array $edit = []): array
+    private function inspect(?array $period, callable $get, array $edit = [], ?array $entry = null): array
     {
         // 画面で直した値があれば、そちらを使う（2026-08-25 baba要望）。
         // ⚠ 空にしたのも「直した」＝そのまま空として扱い、必須ならエラーにする
@@ -184,6 +187,16 @@ class PastProjectImportController extends Controller
             MonthlySheetReader::completeDate($rawDate, $period)
         );
         $count = $pick('count', $get('運営人数'));
+
+        // 運営人数がシートに書かれていないときは「アサインされている人＋『メンバー』の空き枠」で埋める
+        // （2026-08-27 baba選択）。名古屋のシートは運営人数の欄がほとんど空で、そのままだと全部0人になる。
+        // ⚠ 画面で人数を空にした場合はそれも「直した」＝勝手に埋め直さない（$edit を見ている $pick の後）。
+        if ($count === '' && ! array_key_exists('count', $edit) && $entry !== null && is_array($entry['people'] ?? null)) {
+            $auto = count($entry['people']) + (int) ($entry['slots'] ?? 0);
+            if ($auto > 0) {
+                $count = (string) $auto;
+            }
+        }
 
         // 必須は「案件名」と「開催日」の2つ。
         // ⚠ 運営人数は、これからの案件では必須だが過去案件では空のことがあるので必須にしない
@@ -244,7 +257,7 @@ class PastProjectImportController extends Controller
         foreach ($read['entries'] as $i => $entry) {
             $edit = $edits[$i] ?? [];
             $get = $this->cellReader($entry['header'], $entry['row']);
-            $info = $this->inspect($read['period'], $get, $edit);
+            $info = $this->inspect($read['period'], $get, $edit, $entry);
 
             // 誰が入るかも先に見せる（登録してから「名簿に無い」と分かると直すのに時間がかかるため）。
             $miss = [];
@@ -348,7 +361,7 @@ class PastProjectImportController extends Controller
 
             // 中身を取り出して、入れられるかどうかを見る（下見の画面とまったく同じ判定）。
             // 画面で直した値があれば、そちらを使う。
-            $info = $this->inspect($period, $get, $edit);
+            $info = $this->inspect($period, $get, $edit, $entry);
             if ($info['errors']) {
                 $errors[] = $entry['label']."（{$info['name']}）：".implode('／', $info['errors']);
 

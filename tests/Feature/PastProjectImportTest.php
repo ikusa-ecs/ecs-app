@@ -883,4 +883,148 @@ class PastProjectImportTest extends TestCase
         $this->assertStringContainsString('pjRecheck()', $html, '確かめ直すボタン');
         $this->assertStringContainsString('取込', $html);
     }
+
+    /**
+     * 名古屋のアサイン表の形（1案件＝横1ブロック）のCSVを作る。
+     *
+     * 東京との違いは3つ（2026-08-27 に実物で判明）。ここを間違えると案件がまるごと入らない。
+     *   ① 「日程」が「日」と「程」の2セルに割れていて、あいだに曜日を出すための値が入る
+     *   ② スタッフで埋める予定の枠に「メンバー」と書いて場所を取ってある
+     *   ③ 名前の頭に「★」「☆」が付く（スタッフの目印。名簿には付いていない）
+     *
+     * @param  list<array{name:string, role:string}>  $people
+     */
+    private function nagoyaCsv(array $people, string $filename = '名古屋アサイン表2026 - 202609.csv',
+        string $enterTime = ''): UploadedFile
+    {
+        $blank = fn () => array_fill(0, 24, '');
+        $put = function (array $row, array $cells) {
+            foreach ($cells as $i => $v) {
+                $row[$i] = $v;
+            }
+
+            return $row;
+        };
+
+        $rows = [];
+        $rows[] = $put($blank(), [13 => '1']);
+        $rows[] = $put($blank(), [13 => 'LINE登録済']);              // アサイン状況（ECSには入れない）
+        $rows[] = $put($blank(), [13 => 'イベント名（リアル）']);       // 種別＝カッコの中だけ使う
+        // ① 「日」＋（曜日用の値）＋「程」＋ 本当の日程
+        $rows[] = $put($blank(), [13 => '日', 14 => '1/2(火)', 15 => '程', 16 => '9月3日(木)']);
+        $rows[] = $put($blank(), [13 => 'コンテンツ', 16 => '水合戦']);
+        $rows[] = $put($blank(), [13 => '顧客名（代理店名）', 16 => '株式会社なごや']);
+        $rows[] = $put($blank(), [13 => '集合/解散/拘束時間', 16 => '8:00', 18 => '19:00', 20 => '11:00']);
+        // 入場が空でも、開始・終了がずれない（同じ表の集合/解散/拘束の位置から学習する）
+        $rows[] = $put($blank(), [13 => '入場 / 開始 / 終了', 16 => $enterTime, 18 => '14:00', 20 => '16:30']);
+        $rows[] = $put($blank(), [13 => '運営人数 / 形式']);          // ⚠ 名古屋はここが空のことが多い
+        $rows[] = $put($blank(), [13 => 'NO', 14 => '名前', 17 => 'P']);
+        foreach ($people as $i => $person) {
+            $rows[] = $put($blank(), [13 => (string) ($i + 1), 14 => $person['name'], 17 => $person['role']]);
+        }
+
+        $line = fn (array $r) => implode(',', array_map(
+            fn ($v) => str_contains((string) $v, ',')
+                ? '"'.str_replace('"', '""', (string) $v).'"'
+                : (string) $v,
+            $r
+        ));
+
+        return UploadedFile::fake()->createWithContent(
+            $filename, implode("\n", array_map($line, $rows))."\n"
+        );
+    }
+
+    /**
+     * 名古屋の形（「日」＋「程」に割れた日程）でも取り込める。
+     *
+     * ⚠ ここが読めないと**案件がまるごと入らない**。ECSは「日程・コンテンツ・顧客名」が
+     *   縦にそろう列を1件目の始まりにするので、割れていると1件目の位置を取り違え、
+     *   その左にある案件が全部無視される（実物の7月シートで12件が消えていた）。
+     */
+    public function test_nagoya_split_date_label_is_read(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+        $this->assertSame('2026-09-03', $p->start_date->format('Y-m-d'), '「日」「程」に割れていても日程を読む');
+        $this->assertSame('株式会社なごや', $p->client);
+        $this->assertSame('リアル', $p->format, '種別のカッコの中だけを実施形態にする');
+    }
+
+    /**
+     * 「メンバー」は人ではなく「スタッフで埋める空き枠」＝人として取り込まない。
+     * 運営人数がシートに無いときは「入っている人＋空き枠」で埋める（2026-08-27 baba選択）。
+     */
+    public function test_nagoya_member_slots_are_counted_not_imported_as_people(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->nagoyaCsv([
+                ['name' => '鈴木 彩', 'role' => 'MC'],
+                ['name' => 'メンバー', 'role' => ''],
+                ['name' => 'メンバー', 'role' => ''],
+            ]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+        // 人として入るのは1人だけ（「メンバー」は入らない）。
+        $this->assertSame(1, Assignment::where('project_id', $p->id)->count());
+        // 運営人数＝1人＋空き枠2＝3。
+        $this->assertSame(3, $p->required_count);
+    }
+
+    /** 名前の頭の「★」「☆」は目印なので、名簿と照合するときは無いものとして扱う。 */
+    public function test_star_marks_on_names_still_match_the_roster(): void
+    {
+        $staff = $this->staff('S-002', '永松 一子');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->nagoyaCsv([['name' => '★永松 一子', 'role' => 'FC']]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+        $this->assertDatabaseHas('assignments', [
+            'project_id' => $p->id,
+            'staff_id' => $staff->id,
+        ]);
+    }
+
+    /**
+     * 3つ並ぶ欄（入場／開始／終了）で途中が空でも、値が1つずつずれない。
+     * ⚠ ずれると**本番の時間が違って入る**（実物の名古屋7月シートで起きていた）。
+     */
+    public function test_missing_middle_time_does_not_shift_the_others(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']]),   // 入場は空
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+        $this->assertNull($p->event_enter_time, '入場は空のまま');
+        $this->assertSame('14:00', $p->event_start_time, '開始がずれて入場に入らない');
+        $this->assertSame('16:30', $p->event_end_time);
+    }
+
+    /** 入場も埋まっているときは、そのまま3つとも入る（学習した位置で壊れない）。 */
+    public function test_all_three_times_are_read_when_filled(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']], '名古屋アサイン表2026 - 202609.csv', '13:00'),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+        $this->assertSame('13:00', $p->event_enter_time);
+        $this->assertSame('14:00', $p->event_start_time);
+        $this->assertSame('16:30', $p->event_end_time);
+    }
 }
