@@ -142,6 +142,12 @@
           <!-- メールをもらった順に案内を送る運用のため、「まだの人」だけ出せるようにする。 -->
           <!-- 拠点で絞る。選択肢は拠点マスタから（ここに拠点名を書かない）。既定は自分の拠点。 -->
           <select id="fOffice" onchange="rosterFilter()"></select>
+          <!-- 並び替え（2026-08-27 baba要望）。既定は今までどおり「経験回数の多い順」。 -->
+          <select id="fRosterSort" onchange="rosterSort()">
+            <option value="total">並び：経験回数の多い順</option>
+            <option value="kana">並び：五十音順（あいうえお順）</option>
+            <option value="reg">並び：登録した順（番号順）</option>
+          </select>
           <select id="fLogin" onchange="rosterFilter()">
             <option value="">ログイン：すべて</option>
             <option value="none">まだアカウント無し</option>
@@ -697,7 +703,37 @@
     });
   }
 
+  // 並び替え（2026-08-27 baba要望）。
+  // ⚠ 行は「staff の何番目か（idx）」で詳細行とつないでいるので、並べ替えたら作り直す
+  //   （並べ替えだけして表示を入れ替えないと、名前と詳細がずれる）。
+  function sortRoster() {
+    const key = document.getElementById('fRosterSort').value;
+    if (key === 'kana') {
+      // ふりがな順。ふりがな未入力の人は末尾へ＝社員名簿の並び（Person::scopeByKana）と同じ考え方。
+      staff.sort(function (a, b) {
+        const ak = (a.kana || '').trim(), bk = (b.kana || '').trim();
+        if (!ak && !bk) return String(a.name).localeCompare(String(b.name), 'ja');
+        if (!ak) return 1;
+        if (!bk) return -1;
+        return ak.localeCompare(bk, 'ja') || String(a.name).localeCompare(String(b.name), 'ja');
+      });
+    } else if (key === 'reg') {
+      staff.sort(function (a, b) {
+        return String(a.id).localeCompare(String(b.id), 'ja', { numeric: true });
+      });
+    } else {
+      // 既定＝経験回数の多い順（サーバーが返す並びと同じ）。同じ回数なら番号順で毎回同じ並びにする。
+      staff.sort(function (a, b) {
+        return (b.total || 0) - (a.total || 0)
+          || String(a.id).localeCompare(String(b.id), 'ja', { numeric: true });
+      });
+    }
+    render();
+    applyFilter();
+  }
+
   // 名簿タブの中で、HTML内のクリックから呼ぶ関数だけ外に出す（名前は roster〜 で固有化）
+  window.rosterSort = sortRoster;
   window.rosterFilter = applyFilter;
   window.rosterToggle = toggleDetail;
   window.rosterSave = saveStaff;

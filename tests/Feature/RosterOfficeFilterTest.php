@@ -105,4 +105,27 @@ class RosterOfficeFilterTest extends TestCase
         $this->assertNotNull(collect($people)->firstWhere('id', 'S-202'),
             '他拠点の人も画面には渡っている（絞り込みで出し分けるだけ）');
     }
+
+    /**
+     * スタッフ名簿を五十音順（ふりがな順）でも並べられる（2026-08-27 baba要望）。
+     * 既定は今までどおり「経験回数の多い順」。
+     */
+    public function test_staff_roster_has_kana_sort(): void
+    {
+        $me = PersonFactory::new()->create([
+            'role' => 'employee', 'permission' => 'admin', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        PersonFactory::new()->staff()->create([
+            'id' => 'S-101', 'name' => '渡辺 花子', 'name_kana' => 'わたなべ はなこ', 'office' => '東京',
+        ]);
+
+        $html = $this->actingAsPerson($me)->get('/staff')->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="fRosterSort"', $html, '並びのプルダウン');
+        $this->assertStringContainsString('五十音順', $html);
+        $this->assertStringContainsString('rosterSort()', $html);
+        // ふりがなが画面まで渡っていること（渡っていないと並べられない）。
+        // ⚠ 画面のJSONでは列名 name_kana ではなく "kana" で渡している。
+        $this->assertStringContainsString('"kana"', $html);
+    }
 }
