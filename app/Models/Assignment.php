@@ -40,6 +40,20 @@ class Assignment extends Model
         return $this->belongsTo(Person::class, 'staff_id');
     }
 
+    /**
+     * Googleカレンダーの「直す必要がある」印（2026-08-27）。
+     *
+     * ⚠ これが要る理由＝**Dが決まったらカレンダーに招待を足す**決まりにしたため（baba選択）。
+     *   Dが変わる入口は5か所あるが（D決め画面／案件一覧のセル／保守コマンド／取込×2）、
+     *   どの入口も最後は assignments に書くので、ここ1か所で拾える。
+     * ⚠ ここで Google へは送らない（印を付けるだけ）。
+     */
+    protected static function booted(): void
+    {
+        static::saved(fn (Assignment $a) => \App\Support\CalendarSyncQueue::markAssignmentChanged($a));
+        static::deleted(fn (Assignment $a) => \App\Support\CalendarSyncQueue::markAssignmentChanged($a));
+    }
+
     /** 確定だけを取り出すクエリスコープ（回数集計などに使う）。 */
     public function scopeConfirmed($query)
     {

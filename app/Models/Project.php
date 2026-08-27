@@ -61,6 +61,13 @@ class Project extends Model
         static::created(fn (Project $project) => ProjectHistoryRecorder::recordCreated($project));
         static::updated(fn (Project $project) => ProjectHistoryRecorder::recordUpdated($project));
         static::deleted(fn (Project $project) => ProjectHistoryRecorder::recordDeleted($project));
+
+        // Googleカレンダーの「直す必要がある」印（2026-08-27）。中身は CalendarSyncQueue に置く。
+        // ⚠ ここで Google へは送らない。送るのは別のタイミング。
+        //   通信が遅い・失敗したときに案件の保存そのものが止まらないようにするため。
+        static::saved(fn (Project $project) => \App\Support\CalendarSyncQueue::markSaved($project));
+        // ⚠ 削除は「消えたあと」に呼ばれる。予定IDは待ち行列に残っているので、それを頼りに消す。
+        static::deleted(fn (Project $project) => \App\Support\CalendarSyncQueue::markDeleted($project));
     }
 
     /**
