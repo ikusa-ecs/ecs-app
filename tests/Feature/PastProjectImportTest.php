@@ -1046,4 +1046,152 @@ class PastProjectImportTest extends TestCase
         $this->assertStringContainsString('営業案件', (string) $p->note);
         $this->assertSame('', (string) $p->format, '実施形態は勘で決めない');
     }
+
+    /**
+     * スプレッドシートからコピーした中身（タブ区切り）を組み立てる。
+     * 実物と同じで、セルの中に改行が入っているものは引用符で囲まれる。
+     */
+    private function pastedSheet(array $people): string
+    {
+        $blank = fn () => array_fill(0, 24, '');
+        $put = function (array $row, array $cells) {
+            foreach ($cells as $i => $v) {
+                $row[$i] = $v;
+            }
+
+            return $row;
+        };
+
+        $rows = [];
+        $rows[] = $put($blank(), [13 => '1']);
+        $rows[] = $put($blank(), [13 => '']);
+        $rows[] = $put($blank(), [13 => 'イベント名（リアル）']);
+        $rows[] = $put($blank(), [13 => '日程', 16 => '9月5日(土)', 19 => '宿泊', 20 => '無']);
+        $rows[] = $put($blank(), [13 => 'コンテンツ', 16 => '謎解き']);
+        $rows[] = $put($blank(), [13 => '顧客名（代理店名）', 16 => '株式会社はりつけ']);
+        $rows[] = $put($blank(), [13 => '集合/解散/拘束時間', 16 => '9:00', 18 => '17:00', 20 => '8:00']);
+        $rows[] = $put($blank(), [13 => '運営人数 / 形式', 16 => '4名']);
+        // ⚠ セルの中にカンマと改行が入っていても壊れないこと（実物の備考はこうなっている）。
+        $rows[] = $put($blank(), [13 => '備考', 16 => "前泊あり, 前日設営あり\n集合は南口"]);
+        $rows[] = $put($blank(), [13 => 'NO', 14 => '名前', 17 => 'P']);
+        foreach ($people as $i => $person) {
+            $rows[] = $put($blank(), [13 => (string) ($i + 1), 14 => $person['name'], 17 => $person['role']]);
+        }
+
+        $cell = fn ($v) => (str_contains((string) $v, "\t") || str_contains((string) $v, "\n") || str_contains((string) $v, '"'))
+            ? '"'.str_replace('"', '""', (string) $v).'"'
+            : (string) $v;
+
+        return implode("\n", array_map(
+            fn (array $r) => implode("\t", array_map($cell, $r)),
+            $rows
+        ));
+    }
+
+    /**
+     * スプレッドシートからコピーして貼り付けても取り込める（2026-08-27 baba要望）。
+     * ⚠ 読み取りから先はファイルとまったく同じ道を通す＝読み取りを2つ持たない。
+     */
+    public function test_pasted_sheet_can_be_imported(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'paste' => $this->pastedSheet([['name' => '鈴木 彩', 'role' => 'MC']]),
+            // 貼り付けはファイル名が無いので、何年何月ぶんかを画面で選ぶ。
+            'period' => '2026-09',
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '謎解き')->firstOrFail();
+        $this->assertSame('2026-09-05', $p->start_date->format('Y-m-d'));
+        $this->assertSame('株式会社はりつけ', $p->client);
+        $this->assertSame('9:00', $p->start_time);
+        $this->assertSame(4, $p->required_count);
+        $this->assertSame('リアル', $p->format);
+        // セルの中のカンマ・改行で列がずれていないこと。
+        $this->assertStringContainsString('集合は南口', (string) $p->note);
+        $this->assertSame(1, Assignment::count());
+    }
+
+    /** 貼り付けの下見（判定だけ）も、ファイルと同じように返る。 */
+    public function test_pasted_sheet_preview_returns_rows(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($this->manager())->postJson('/past-import/preview', [
+            'paste' => $this->pastedSheet([['name' => '鈴木 彩', 'role' => 'MC']]),
+            'period' => '2026-09',
+        ])->assertOk();
+
+        $res->assertJsonPath('ok', true);
+        $this->assertSame('謎解き', $res->json('rows.0.name'));
+        $this->assertSame(0, Project::count(), '下見では登録しない');
+    }
+
+    /**
+     * 何年何月ぶんかを選ばずに貼り付けたら、勝手に決めずに知らせる。
+     * ⚠ アサイン表の日程には年が無い。勘で年を決めると、去年の案件として入る事故になる。
+     */
+    public function test_pasted_sheet_without_period_is_refused(): void
+    {
+        $res = $this->actingAsPerson($this->manager())->postJson('/past-import/preview', [
+            'paste' => $this->pastedSheet([['name' => '鈴木 彩', 'role' => 'MC']]),
+        ])->assertOk();
+
+        $res->assertJsonPath('ok', false);
+        $this->assertStringContainsString('何年何月', (string) $res->json('message'));
+    }
+
+    /** ファイルも貼り付けも無ければ、はっきり断る。 */
+    public function test_import_without_file_or_paste_is_rejected(): void
+    {
+        $this->actingAsPerson($this->manager())
+            ->post('/past-import', [])
+            ->assertSessionHasErrors('csv');
+    }
+
+    /** 取込画面に、貼り付けの入口がある。 */
+    public function test_screen_has_paste_area(): void
+    {
+        $html = $this->actingAsPerson($this->manager())->get('/past-import')->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="pjPaste"', $html, '貼り付ける場所');
+        $this->assertStringContainsString('id="pjPeriod"', $html, '何年何月ぶんか');
+        $this->assertStringContainsString('pjSetSource(', $html, '入れ方の切り替え');
+    }
+
+    /**
+     * 案件登録の「アサイン表から貼り付け」＝欄に入れる値を返すだけで、登録はしない
+     * （2026-08-27 baba要望「一部分だけECSに追加したい」）。
+     */
+    public function test_paste_one_fills_the_form_without_saving(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($this->manager())->postJson('/project-form/paste', [
+            'paste' => $this->pastedSheet([['name' => '鈴木 彩', 'role' => 'MC']]),
+            'period' => '2026-09',
+        ])->assertOk();
+
+        $res->assertJsonPath('ok', true);
+        $res->assertJsonPath('fields.start_date', '2026-09-05');
+        $res->assertJsonPath('fields.content_names', '謎解き');
+        $res->assertJsonPath('fields.client', '株式会社はりつけ');
+        $res->assertJsonPath('fields.start_time', '9:00');
+        $res->assertJsonPath('fields.format', 'リアル');
+        // ⚠ この入口は案件だけ。人は入らないので、名前は「知らせるだけ」で返す。
+        $this->assertSame(['鈴木 彩'], $res->json('people'));
+        $this->assertSame(0, Project::count(), '貼り付けただけでは登録しない');
+        $this->assertSame(0, Assignment::count());
+    }
+
+    /** 案件登録画面に、貼り付けの入口がある。 */
+    public function test_project_form_has_paste_panel(): void
+    {
+        $html = $this->actingAsPerson($this->manager())->get('/project-form')->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="pasteText"', $html);
+        $this->assertStringContainsString('pasteRead()', $html);
+        $this->assertStringContainsString('id="pasteMonth"', $html);
+    }
 }

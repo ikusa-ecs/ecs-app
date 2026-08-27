@@ -17,6 +17,22 @@
   .pj-drop { border: 2px dashed var(--line); border-radius: 10px; padding: 22px; text-align: center; color: #8a7a66; background: #fff; transition: .15s; }
   .pj-drop.drag { border-color: #4f8a63; background: #eef6f0; color: #2e7d4f; }
   .pj-file { font-size: 13px; color: #2e7d4f; font-weight: 700; margin-top: 10px; }
+  /* 入れ方の切り替え（ファイルを選ぶ／貼り付ける）。2026-08-27 baba要望 */
+  .pj-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .pj-tab {
+    border: 1px solid var(--line); background: #fff; color: #8a7a66;
+    border-radius: 8px 8px 0 0; padding: 7px 14px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .pj-tab.on { background: #f6f1ea; color: var(--ink); font-weight: 700; border-bottom-color: #f6f1ea; }
+  #pjPaste {
+    width: 100%; box-sizing: border-box; min-height: 150px; margin-top: 8px;
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.6;
+  }
+  .pj-period { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .pj-period input[type="month"] {
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 13px;
+  }
   .pj-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
   .pj-names { margin: 8px 0 0; padding-left: 1.2em; font-size: 12.5px; }
   .pj-names li { margin: 2px 0; }
@@ -84,7 +100,8 @@
     <h2>この画面は何をするもの？</h2>
     <p class="pj-lead">
       <b>アサイン表を、アサインごとまとめて登録する画面です。</b>終わった案件（過去の実績）でも、これからの案件でも入れられます。
-      アサイン表のシートを <b>CSVで保存してそのままアップロード</b>してください。
+      入れ方は2通り＝アサイン表のシートを <b>CSVで保存してアップロード</b>するか、
+      <b>スプレッドシートでコピーして貼り付ける</b>かです（<b>何件ぶんでもOK</b>）。
       <b>列を並べ替える必要はありません。</b>Excelでそのまま保存した（Shift_JISの）CSVでも読めます。
     </p>
     <ul class="pj-lead" style="padding-left:1.2em;">
@@ -126,7 +143,7 @@
   </div>
 
   <div class="pj-card">
-    <h2>① CSVを選ぶ</h2>
+    <h2>① アサイン表を読み込む（ファイル または 貼り付け）</h2>
     {{-- 実登録はこのフォームでCSVファイルそのものをPOSTし、サーバーが読み直して登録する。 --}}
     <form id="pjForm" method="POST" action="/past-import" enctype="multipart/form-data">
       @csrf
@@ -164,10 +181,37 @@
           ここが違うと、その拠点の案件一覧に出てきません。
         </span>
       </div>
-      <div class="pj-drop" id="pjDrop">
-        ここにCSVをドラッグ＆ドロップ、または<br>
-        <input type="file" name="csv" id="pjFile" accept=".csv,text/csv" style="margin-top:8px;">
-        <div class="pj-file" id="pjFileName"></div>
+      {{-- 入れ方は2通り（2026-08-27 baba要望）。読み取りから先は同じ道を通る。 --}}
+      <div class="pj-tabs">
+        <button type="button" class="pj-tab on" id="pjTabFile" onclick="pjSetSource('file')">📄 ファイルを選ぶ</button>
+        <button type="button" class="pj-tab" id="pjTabPaste" onclick="pjSetSource('paste')">📋 スプレッドシートから貼り付ける</button>
+      </div>
+
+      <div id="pjSrcFile">
+        <div class="pj-drop" id="pjDrop">
+          ここにCSVをドラッグ＆ドロップ、または<br>
+          <input type="file" name="csv" id="pjFile" accept=".csv,text/csv" style="margin-top:8px;">
+          <div class="pj-file" id="pjFileName"></div>
+        </div>
+      </div>
+
+      <div id="pjSrcPaste" style="display:none;">
+        <p class="pj-lead" style="margin:0 0 8px;">
+          スプレッドシートで<b>案件のかたまり（縦1列ぶん）を選んでコピー</b>し、下に貼り付けてください
+          （<b>何件ぶんでもOK</b>）。ファイルに落とさなくても取り込めます。
+        </p>
+        <div class="pj-period">
+          <label for="pjPeriod"><b>何年何月ぶんか</b></label>
+          <input type="month" name="period" id="pjPeriod" value="{{ now()->format('Y-m') }}">
+          <span class="muted" style="font-size:11.5px;">
+            ※ アサイン表の日程には<b>年が書かれていない</b>ので、ここで決めます（ファイルのときは名前から読んでいます）。
+          </span>
+        </div>
+        <textarea name="paste" id="pjPaste" placeholder="ここに貼り付け（Ctrl+V）"></textarea>
+        <div class="pj-actions" style="margin-top:8px;">
+          <button type="button" class="btn" onclick="pjPasteRead()">① 貼り付けた内容を読む</button>
+          <span class="muted" style="font-size:12px;">※ 読み込むと、下に確認の表が出ます。</span>
+        </div>
       </div>
     </form>
   </div>
@@ -369,13 +413,57 @@
     return document.getElementById('pjEdits').value;
   }
 
+  // 入れ方＝'file'（ファイルを選ぶ）か 'paste'（スプレッドシートから貼り付け）。
+  var pjSource = 'file';
+
+  function pjSetSource(mode) {
+    pjSource = mode;
+    var isFile = (mode === 'file');
+    document.getElementById('pjSrcFile').style.display = isFile ? '' : 'none';
+    document.getElementById('pjSrcPaste').style.display = isFile ? 'none' : '';
+    document.getElementById('pjTabFile').className = 'pj-tab' + (isFile ? ' on' : '');
+    document.getElementById('pjTabPaste').className = 'pj-tab' + (isFile ? '' : ' on');
+
+    // ⚠ 使わないほうは空にする。両方に中身が残っていると、どちらを取り込んだのか分からなくなる。
+    if (isFile) {
+      document.getElementById('pjPaste').value = '';
+    } else {
+      document.getElementById('pjFile').value = '';
+      document.getElementById('pjFileName').textContent = '';
+    }
+    // 入れ方を変えたら、前の読み込み結果と直しは持ち越さない。
+    pjEdits = {};
+    document.getElementById('pjEdits').value = '';
+    document.getElementById('pjResult').style.display = 'none';
+  }
+
+  // いま選ばれている入れ方に中身があるか。
+  function pjHasSource() {
+    return (pjSource === 'file')
+      ? !!document.getElementById('pjFile').files[0]
+      : document.getElementById('pjPaste').value.trim() !== '';
+  }
+
+  function pjNeedSourceMessage() {
+    return (pjSource === 'file')
+      ? '先にCSVファイルを選んでください。'
+      : 'スプレッドシートからコピーした中身を貼り付けてください。';
+  }
+
   // 直した内容で、判定だけやり直す（登録はしない）。
   // ⚠ 判定はサーバーにやらせる＝画面にもう1つ同じ判定を書かないため。
   function pjRecheck() {
-    var f = document.getElementById('pjFile').files[0];
-    if (!f) { alert('先にCSVファイルを選んでください。'); return; }
+    if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }
     pjSyncEdits();
-    pjPost(f, document.getElementById('pjEdits').value);
+    pjPost(document.getElementById('pjEdits').value);
+  }
+
+  // 貼り付けた中身を読む。
+  function pjPasteRead() {
+    if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }
+    pjEdits = {};
+    document.getElementById('pjEdits').value = '';
+    pjPost('');
   }
 
   function pjReadAndPreview(file) {
@@ -384,10 +472,10 @@
     pjEdits = {};
     document.getElementById('pjEdits').value = '';
     document.getElementById('pjFileName').textContent = '選んだファイル：' + file.name;
-    pjPost(file, '');
+    pjPost('');
   }
 
-  function pjPost(file, editsJson) {
+  function pjPost(editsJson) {
     document.getElementById('pjResult').style.display = '';
     document.getElementById('pjWarn').innerHTML = '<div class="pj-flash">読み込んでいます…</div>';
     pjClear();
@@ -396,7 +484,13 @@
     var form = document.getElementById('pjForm');
     var token = form.querySelector('input[name="_token"]').value;
     var fd = new FormData();
-    fd.append('csv', file);
+    if (pjSource === 'file') {
+      fd.append('csv', document.getElementById('pjFile').files[0]);
+    } else {
+      // 貼り付けは「中身」と「何年何月ぶんか」を送る（日程に年が書かれていないため）。
+      fd.append('paste', document.getElementById('pjPaste').value);
+      fd.append('period', document.getElementById('pjPeriod').value);
+    }
     fd.append('_token', token);
     fd.append('edits', editsJson || '');
 
@@ -432,8 +526,7 @@
   pjModeChanged();
 
   function pjSubmit() {
-    var f = document.getElementById('pjFile').files[0];
-    if (!f) { alert('先にCSVファイルを選んでください。'); return; }
+    if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }
     var office = document.getElementById('pjOffice').value;
     // ⚠ 押す直前に集め直す。表を直したまま「確かめ直す」を押していない人がいるため。
     pjSyncEdits();

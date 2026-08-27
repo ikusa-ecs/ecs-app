@@ -117,6 +117,9 @@ Route::get('/projects', [ProjectController::class, 'index']);
 Route::get('/project-form', [ProjectController::class, 'form']);
 // 案件登録フォームの保存先（IDが来れば上書き更新、無ければ新規作成）。
 Route::post('/project-form', [ProjectController::class, 'store']);
+// アサイン表からコピーした1案件ぶんを読んで、フォームの各欄に流し込む値を返す（登録はしない）。
+// ⚠ 読み取りは一括取込と同じ部品を使うので、置き場所も PastProjectImportController のまま。
+Route::post('/project-form/paste', [PastProjectImportController::class, 'pasteOne']);
 // 案件一覧の詳細から、ケータリングの種類・メモだけを保存する（公開ボードの時間保存と同じ方式）。
 Route::post('/projects/catering', [ProjectController::class, 'saveCatering']);
 // 案件一覧の詳細セル（D/SD/物品/移動/音響/準備チェック/備考）を保存する。

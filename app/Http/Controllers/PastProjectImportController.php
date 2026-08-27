@@ -99,30 +99,52 @@ class PastProjectImportController extends Controller
             'error' => $message, 'isMonthly' => false, 'period' => null, 'entries' => [], 'unmapped' => [],
         ];
 
-        // ⚠ 1行ずつ str_getcsv に渡さないこと。備考などのセルに改行が入っていると
-        //   行がずれて別の項目を読んでしまう（2026-08-25 に実際に踏んだ）。
-        //   CsvText::rows は引用符の中の改行を正しく扱う。文字コードも吸収する。
-        $rows = CsvText::rows((string) file_get_contents($request->file('csv')->getRealPath()));
+        // 入れ方は2通り（2026-08-27 baba要望）。
+        //   ①ファイルを選ぶ … スプレッドシートからCSVで落としたもの
+        //   ②貼り付ける   … スプレッドシートでセルをコピーして貼ったもの（タブ区切り）
+        // ⚠ 読み取りから先は**まったく同じ道**を通す。ここで分かれるのは「文字をどう取るか」と
+        //   「何年何月ぶんか」の決め方だけ＝2つの読み取りを持たない（食い違いの元）。
+        $pasted = trim((string) $request->input('paste', ''));
+        $isPaste = $pasted !== '' && $request->file('csv') === null;
+
+        if ($isPaste) {
+            // 貼り付けはタブ区切り。セルの中に改行やカンマが入っていても壊れない。
+            $rows = CsvText::rowsPasted($pasted);
+        } else {
+            // ⚠ 1行ずつ str_getcsv に渡さないこと。備考などのセルに改行が入っていると
+            //   行がずれて別の項目を読んでしまう（2026-08-25 に実際に踏んだ）。
+            //   CsvText::rows は引用符の中の改行を正しく扱う。文字コードも吸収する。
+            $rows = CsvText::rows((string) file_get_contents($request->file('csv')->getRealPath()));
+        }
 
         if (count($rows) < 2) {
-            return $fail('CSVにデータ行がありません（1行目の見出しのみ、または空です）。');
+            return $fail($isPaste
+                ? '貼り付けた中身が1行しかありません。アサイン表の案件のかたまり（縦1列ぶん）を選んでコピーしてください。'
+                : 'CSVにデータ行がありません（1行目の見出しのみ、または空です）。');
         }
 
         $isMonthly = MonthlySheetReader::looksLikeMonthlySheet($rows);
         $entries = [];
         $unmapped = [];
 
-        // 月シートの日程は「9月1日(火)」と年が書かれていないので、ファイル名から年を補う
-        // （スプレッドシートから落とすと「〇〇 - 202701.csv」のようにシート名が入る・2026-08-25 baba）。
-        $period = $isMonthly
-            ? MonthlySheetReader::periodFromFilename($request->file('csv')->getClientOriginalName())
-            : null;
+        // 月シートの日程は「9月1日(火)」と年が書かれていないので、年月を別に決める。
+        //   ファイル … 名前から読む（落とすと「〇〇 - 202701.csv」のようにシート名が入る・2026-08-25 baba）
+        //   貼り付け … 名前が無いので、画面で選んでもらう
+        $period = null;
+        if ($isMonthly) {
+            $period = $isPaste
+                ? MonthlySheetReader::periodFromFilename((string) $request->input('period'))
+                : MonthlySheetReader::periodFromFilename($request->file('csv')->getClientOriginalName());
+        }
 
         if ($isMonthly && $period === null) {
-            return $fail('このCSVは月ごとのアサイン表に見えますが、ファイル名から「何年何月ぶんか」が読み取れませんでした。'
-                .'日程に年が書かれていないため、年が分からないと取り込めません。'
-                .'ファイル名にシート名（例：202701）が入るように、スプレッドシートから'
-                .'「ファイル → ダウンロード → カンマ区切り形式」で落としたものをそのままお使いください。');
+            return $fail($isPaste
+                ? '「何年何月ぶんか」を選んでください。アサイン表の日程には年が書かれていないため、'
+                    .'年が分からないと取り込めません。'
+                : 'このCSVは月ごとのアサイン表に見えますが、ファイル名から「何年何月ぶんか」が読み取れませんでした。'
+                    .'日程に年が書かれていないため、年が分からないと取り込めません。'
+                    .'ファイル名にシート名（例：202701）が入るように、スプレッドシートから'
+                    .'「ファイル → ダウンロード → カンマ区切り形式」で落としたものをそのままお使いください。');
         }
 
         if ($isMonthly) {
@@ -162,6 +184,98 @@ class PastProjectImportController extends Controller
             'error' => null, 'isMonthly' => $isMonthly, 'period' => $period,
             'entries' => $entries, 'unmapped' => $unmapped,
         ];
+    }
+
+    /**
+     * 案件登録の「アサイン表から貼り付け」（POST /project-form/paste）。2026-08-27 baba要望。
+     *
+     * 【何をするか】
+     * スプレッドシートで**1案件ぶんのかたまり**を選んでコピーし、案件登録画面に貼ると、
+     * 各欄が埋まった状態になる。**登録はしない**（人が見て直してから保存を押す）。
+     *
+     * 【なぜ登録しないか】
+     * 一括取込（この画面）は「まとめて入れる」ためのもの。こちらは「1件だけ足したい」ときのもので、
+     * 貼ったあとに手で足す項目（ARENAの詳細など）があるため、フォームに流し込むところまでにする。
+     *
+     * ⚠ 読み取りは一括取込とまったく同じ道（readCsv → inspect → projectAttributes）を通す。
+     *   ここに別の読み取りを書くと、片方だけ直して食い違う（この取込で何度も踏んでいる事故）。
+     */
+    public function pasteOne(Request $request)
+    {
+        $request->validate([
+            'paste' => ['required', 'string'],
+            // 貼り付けはファイル名が無いので「何年何月ぶんか」を画面から受け取る（例 2026-09）。
+            'period' => ['nullable', 'string'],
+        ]);
+
+        $read = $this->readCsv($request);
+        if ($read['error'] !== null) {
+            return response()->json(['ok' => false, 'message' => $read['error']]);
+        }
+        if ($read['entries'] === []) {
+            return response()->json([
+                'ok' => false,
+                'message' => '貼り付けた中身から案件を読み取れませんでした。'
+                    .'アサイン表の「日程」「コンテンツ」「顧客名」が入っているかたまりごと選んでコピーしてください。',
+            ]);
+        }
+
+        // 複数貼られていても、この入口は先頭の1件だけを使う（案件登録は1件ぶんの画面のため）。
+        $entry = $read['entries'][0];
+        $get = $this->cellReader($entry['header'], $entry['row']);
+        $info = $this->inspect($read['period'], $get, [], $entry);
+
+        $attrs = $this->projectAttributes(
+            $get, $info['name'], $info['date'], $info['count'],
+            $info['client'], $info['meetTime'], OfficeScope::filterSingle($request) ?: '東京'
+        );
+
+        // 案件登録フォームの欄名 => 値。
+        // ⚠ ここに載せた欄だけが埋まる。案件に欄を足したときは、必要ならここにも1行足す。
+        $fields = [
+            'start_date' => $info['date'],
+            'client' => $attrs['client'] ?? '',
+            'location' => $attrs['location'] ?? '',
+            'start_time' => $attrs['start_time'] ?? '',
+            'end_time' => $attrs['end_time'] ?? '',
+            'event_enter_time' => $attrs['event_enter_time'] ?? '',
+            'event_start_time' => $attrs['event_start_time'] ?? '',
+            'event_end_time' => $attrs['event_end_time'] ?? '',
+            'required_count' => $info['count'],
+            'guest_count' => $attrs['guest_count'] ?? '',
+            'team_count' => $attrs['team_count'] ?? '',
+            'format' => $attrs['format'] ?? '',
+            'scale' => $attrs['scale'] ?? '',
+            'sales_owner' => $attrs['sales_owner'] ?? '',
+            'operation_place' => $attrs['operation_place'] ?? '',
+            'assembly_type' => $attrs['assembly_type'] ?? '',
+            'catering' => $attrs['catering'] ?? '',
+            'audio_equipment' => $attrs['audio_equipment'] ?? '',
+            'transport' => $attrs['transport'] ?? '',
+            'lodging' => $attrs['lodging'] ?? '',
+            'staff_role' => $attrs['staff_role'] ?? '',
+            'ops_sheet_url' => $attrs['ops_sheet_url'] ?? '',
+            'note' => $attrs['note'] ?? '',
+            // 名前の違う欄（DBの列名と画面の欄名が違うもの）。
+            'content_names' => $info['name'],
+            'addtl' => $attrs['category'] ?? '',
+            'yomi' => $attrs['yomi'] ?? '',
+            'multi' => ($attrs['is_multi'] ?? false) ? 'あり' : '',
+        ];
+
+        // 空のものは送らない（画面の既定値を空で上書きしないため）。
+        $fields = array_filter($fields, fn ($v) => $v !== null && $v !== '');
+
+        // 貼ったのに入らなかった項目は知らせる（黙って落とすと気づけない）。
+        return response()->json([
+            'ok' => true,
+            'fields' => $fields,
+            'people' => array_map(fn ($p) => $p['name'], $entry['people'] ?? []),
+            'slots' => $entry['slots'] ?? 0,
+            'unmapped' => $read['unmapped'],
+            'errors' => $info['errors'],
+            'more' => count($read['entries']) - 1,
+        ]);
     }
 
     /**
@@ -236,7 +350,11 @@ class PastProjectImportController extends Controller
     public function preview(Request $request)
     {
         $request->validate([
-            'csv' => ['required', 'file', 'mimes:csv,txt'],
+            // ファイルを選ぶか、貼り付けるかのどちらか（2026-08-27 baba要望）。
+            'csv' => ['required_without:paste', 'file', 'mimes:csv,txt'],
+            'paste' => ['required_without:csv', 'nullable', 'string'],
+            // 貼り付けのときだけ要る「何年何月ぶんか」（例 2026-09）。
+            'period' => ['nullable', 'string'],
             // 画面の表で直した内容（JSON）。直していなければ空。
             'edits' => ['nullable', 'string'],
         ]);
@@ -312,7 +430,11 @@ class PastProjectImportController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'csv' => ['required', 'file', 'mimes:csv,txt'],
+            // ファイルを選ぶか、貼り付けるかのどちらか（2026-08-27 baba要望）。
+            'csv' => ['required_without:paste', 'file', 'mimes:csv,txt'],
+            'paste' => ['required_without:csv', 'nullable', 'string'],
+            // 貼り付けのときだけ要る「何年何月ぶんか」（例 2026-09）。
+            'period' => ['nullable', 'string'],
             // どの拠点の案件として入れるか（画面で選ぶ）。未指定は自分の拠点。
             'office' => ['nullable', 'string'],
             // 画面の表で直した内容（JSON）。直していなければ空。

@@ -66,6 +66,33 @@
       border-radius: 8px; font-size: 14px; color: var(--muted);
     }
 
+    /* アサイン表からの貼り付け（2026-08-27） */
+    .paste-panel { margin: 0 0 16px; }
+    .paste-toggle {
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 14px; font-size: 13px; cursor: pointer; font-family: inherit; color: var(--ink);
+    }
+    .paste-toggle:hover { background: #f7f4ee; }
+    #pasteBox {
+      margin-top: 10px; border: 1px solid var(--line); border-radius: 10px;
+      padding: 14px 16px; background: #fbf8f3;
+    }
+    .paste-lead { font-size: 12.5px; color: #6b5c49; line-height: 1.8; margin: 0 0 10px; }
+    .paste-lead b { color: var(--ink); }
+    .paste-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+    .paste-row input[type="month"] {
+      border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 13px;
+    }
+    #pasteText {
+      width: 100%; box-sizing: border-box; min-height: 130px; margin-top: 8px;
+      border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+      font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.6;
+    }
+    #pasteMsg { font-size: 12.5px; line-height: 1.8; margin-top: 10px; }
+    #pasteMsg .ok { color: #166534; }
+    #pasteMsg .ng { color: #b91c1c; }
+    #pasteMsg .warn { color: #8a5a10; }
+
     /* 「▼ 社員と同じ時間を入れる」ボタン（スタッフの集合・解散） */
     .btn-same-time {
       width: 100%; padding: 9px 11px; cursor: pointer;
@@ -231,6 +258,34 @@
 @endif
 {{-- CSV取込のエラー行から来たときの案内（JSで表示）。 --}}
 <div class="mock-note" id="csvPrefillNote" style="display:none;background:#fff7e6;border-color:#f0d9a8;color:#b45309;"></div>
+
+{{-- アサイン表からコピーして貼り付け（2026-08-27 baba要望）。
+     「アサイン表の一部だけをECSに足したい」ときの入口。ファイルに落とさなくてよい。
+     ⚠ 読み取りはサーバー（POST /project-form/paste）にやらせる＝一括取込とまったく同じ道を通す。
+       画面にもう1つ読み取りを書くと、片方だけ直して食い違う（この取込で何度も踏んでいる事故）。 --}}
+<div class="paste-panel">
+  <button type="button" class="paste-toggle" id="pasteToggle" onclick="togglePasteBox()">
+    📋 アサイン表からコピーして貼り付ける（1件ぶん）
+  </button>
+  <div id="pasteBox" style="display:none;">
+    <p class="paste-lead">
+      スプレッドシートでアサイン表の<b>1案件ぶんのかたまり（縦1列ぶん）</b>を選んでコピーし、下に貼り付けて
+      <b>「読み込む」</b>を押すと、下の各欄が埋まります。<br>
+      <b>この時点では登録されません。</b>中身を見て直してから、いちばん下の「確定」を押してください。
+    </p>
+    <div class="paste-row">
+      <label for="pasteMonth"><b>何年何月ぶんか</b></label>
+      <input type="month" id="pasteMonth" value="{{ now()->format('Y-m') }}">
+      <span class="muted" style="font-size:11.5px;">※ アサイン表の日程には<b>年が書かれていない</b>ので、ここで決めます。</span>
+    </div>
+    <textarea id="pasteText" placeholder="ここに貼り付け（Ctrl+V）"></textarea>
+    <div class="paste-row">
+      <button type="button" class="btn primary" onclick="pasteRead()">読み込む</button>
+      <button type="button" class="btn" onclick="togglePasteBox()">閉じる</button>
+    </div>
+    <div id="pasteMsg"></div>
+  </div>
+</div>
 @verbatim
       <!-- 1件ずつ / CSV取込 の切替タブ -->
       <div class="mode-tabs">
@@ -1027,6 +1082,127 @@
     if (sm) sm.value = s;
     if (sl) sl.value = e;
     updateDuration();
+  }
+
+  // ===== アサイン表からコピーして貼り付け（2026-08-27 baba要望）=====
+  // ⚠ 読み取りはサーバー（POST /project-form/paste）にやらせる＝一括取込とまったく同じ道を通す。
+  //   画面にもう1つ読み取りを書くと、片方だけ直して食い違う（この取込で何度も踏んでいる事故）。
+  function togglePasteBox() {
+    var b = document.getElementById('pasteBox');
+    var open = (b.style.display === 'none');
+    b.style.display = open ? '' : 'none';
+    if (open) document.getElementById('pasteText').focus();
+  }
+
+  function pasteMsg(html) { document.getElementById('pasteMsg').innerHTML = html; }
+
+  function pasteRead() {
+    var text = document.getElementById('pasteText').value;
+    if (!text.trim()) { pasteMsg('<span class="ng">先に貼り付けてください。</span>'); return; }
+
+    pasteMsg('読み込んでいます…');
+    var token = document.querySelector('#projForm input[name="_token"]').value;
+    var fd = new FormData();
+    fd.append('paste', text);
+    fd.append('period', document.getElementById('pasteMonth').value);
+    fd.append('_token', token);
+
+    fetch('/project-form/paste', {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': token }
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) {
+          pasteMsg('<span class="ng">' + escHtml((d && d.message) || '読み込めませんでした。') + '</span>');
+          return;
+        }
+        pasteFill(d);
+      })
+      .catch(function () {
+        pasteMsg('<span class="ng">読み込みに失敗しました。通信を確認して、もう一度お試しください。</span>');
+      });
+  }
+
+  // 欄に値を入れる。入れられたら true。
+  // ⚠ プルダウンは「その選択肢が無ければ入れない」＝知らない値を勝手に足すと、
+  //   マスタに無いものが選ばれた状態になり、保存してから気づくことになる。
+  function pasteSet(name, value) {
+    var radios = document.querySelectorAll('#projForm input[type="radio"][name="' + name + '"]');
+    if (radios.length) {
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].value === value) { radios[i].checked = true; pasteFire(radios[i]); return true; }
+      }
+      return false;
+    }
+    var el = document.querySelector('#projForm [name="' + name + '"]');
+    if (!el) return false;
+    if (el.tagName === 'SELECT') {
+      for (var j = 0; j < el.options.length; j++) {
+        if (el.options[j].value === value || el.options[j].text === value) {
+          el.value = el.options[j].value; pasteFire(el); return true;
+        }
+      }
+      return false;
+    }
+    el.value = value;
+    pasteFire(el);
+    return true;
+  }
+
+  // 値を入れたあと、その欄の「変わったときの処理」を動かす（拘束時間の計算など）。
+  function pasteFire(el) {
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+  }
+
+  function pasteFill(d) {
+    var ok = [], ng = [];
+
+    Object.keys(d.fields).forEach(function (name) {
+      var v = String(d.fields[name]);
+      if (name === 'content_names') {
+        // コンテンツはタグで持っているので、手で足すときと同じ道（addContent）を通す。
+        v.split(',').forEach(function (c) {
+          c = c.trim();
+          if (c) addContent(c, CONTENTS.indexOf(c) === -1);
+        });
+        ok.push('コンテンツ');
+        return;
+      }
+      (pasteSet(name, v) ? ok : ng).push(name + (v.length > 12 ? '' : '＝' + v));
+    });
+
+    updateDuration();
+
+    var out = [];
+    out.push('<span class="ok"><b>' + ok.length + ' 項目を入れました。</b></span>'
+             + ' <b>まだ登録されていません。</b>中身を見て直してから、いちばん下の「確定」を押してください。');
+
+    if (d.errors && d.errors.length) {
+      out.push('<span class="ng">⚠ ' + escHtml(d.errors.join('／')) + '</span>');
+    }
+    if (ng.length) {
+      out.push('<span class="warn">⚠ 入れられなかった欄：' + escHtml(ng.join('、'))
+               + '<br>（選択肢に無い書き方でした。手で選んでください）</span>');
+    }
+    if (d.unmapped && d.unmapped.length) {
+      out.push('<span class="warn">⚠ ECSに置き場所が無い項目：' + escHtml(d.unmapped.join('、')) + '</span>');
+    }
+    if (d.people && d.people.length) {
+      // ⚠ この画面は案件だけ。人（アサイン）は入らないので、はっきり伝える。
+      out.push('<span class="warn">⚠ 貼り付けの中に <b>' + d.people.length + ' 名</b>の名前がありましたが、'
+               + '<b>この画面では人は入りません</b>（' + escHtml(d.people.join('、')) + '）。<br>'
+               + '人ごと入れたいときは <a href="/past-import">アサイン表の取込</a> をお使いください。</span>');
+    }
+    if (d.slots) {
+      out.push('<span class="warn">※「メンバー」の空き枠が ' + d.slots + ' 件ありました（運営人数に数えています）。</span>');
+    }
+    if (d.more > 0) {
+      out.push('<span class="warn">⚠ 貼り付けの中に案件が <b>' + (d.more + 1) + ' 件</b>ありました。'
+               + '<b>この画面は先頭の1件だけ</b>を入れています。<br>'
+               + 'まとめて入れたいときは <a href="/past-import">アサイン表の取込</a> をお使いください。</span>');
+    }
+
+    pasteMsg(out.join('<br>'));
   }
 
   // ===== 区分（通常／追加案件）：アサインMTG日を基準に自動判定＋手動修正 =====
