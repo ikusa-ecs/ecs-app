@@ -14,7 +14,8 @@ use Illuminate\Http\Request;
  * BOM除去 → 改行で分割 → str_getcsv（第4引数=エスケープ無効・PHP8.4対応）→
  * 見出しを「列名→位置」表にして値を引く → 行ごとに必須チェック → OK行だけ登録。
  *
- * ・コンテンツ … コンテンツ名／分類／体力系／紙が必要／1チーム枚数／利用中。IDは CT-### を自動採番。
+ * ・コンテンツ … コンテンツ名／略称／分類／体力系／紙が必要／1チーム枚数／利用中。IDは CT-### を自動採番。
+ *   ⚠ 「略称」の列が無いCSVでもそのまま読める（略称が空になるだけ）。
  * ※拠点はそう増えないため CSV取込は設けず、共通設定のマスタ管理で手入力する。
  */
 class MasterImportController extends Controller
@@ -67,6 +68,8 @@ class MasterImportController extends Controller
             $row = str_getcsv($line, ',', '"', '');
 
             $name = $get($row, 'コンテンツ名');
+            // 略称（2026-08-27）。列が無いCSVでも読める（空になるだけ）。
+            $shortName = $get($row, '略称');
             $category = $get($row, '分類');
             $physical = $this->truthy($get($row, '体力系'));
             $paper = $this->truthy($get($row, '紙が必要'));
@@ -96,6 +99,7 @@ class MasterImportController extends Controller
             Content::create([
                 'id' => 'CT-' . str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT),
                 'content_name' => $name,
+                'short_name' => $shortName ?: null,
                 'category' => $category ?: null,
                 'is_physical' => $physical,
                 'needs_paper' => $paper,

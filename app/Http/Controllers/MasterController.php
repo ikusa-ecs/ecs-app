@@ -73,6 +73,9 @@ class MasterController extends Controller
         $data = $request->validate([
             'id' => ['nullable', 'string'],
             'content_name' => ['required', 'string', 'max:100'],
+            // 略称（2026-08-27 baba要望）。カレンダーの予定名などで正式名のかわりに使う。
+            // ⚠ 空でよい＝空のときは正式名を使う。
+            'short_name' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:100'],
             'sheets_per_team' => ['nullable', 'integer', 'min:1', 'max:99'],
         ]);
@@ -86,6 +89,7 @@ class MasterController extends Controller
         }
 
         $content->content_name = $data['content_name'];
+        $content->short_name = trim((string) ($data['short_name'] ?? '')) ?: null;
         $content->category = $data['category'] ?? null;
         $content->is_physical = $request->boolean('is_physical');
         $content->needs_paper = $request->boolean('needs_paper');
@@ -120,6 +124,10 @@ class MasterController extends Controller
                 continue;
             }
             $content->content_name = trim($vals['content_name'] ?? $content->content_name) ?: $content->content_name;
+            // 略称は空にできる（空＝正式名を使う）ので、送られてきたら空でもそのまま保存する。
+            if (array_key_exists('short_name', $vals)) {
+                $content->short_name = trim((string) $vals['short_name']) ?: null;
+            }
             $content->category = $vals['category'] ?? null;
             $content->needs_paper = ! empty($vals['needs_paper']);
             $content->sheets_per_team = max(1, (int) ($vals['sheets_per_team'] ?? 1));

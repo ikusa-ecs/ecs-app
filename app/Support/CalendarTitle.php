@@ -2,8 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Content;
 use App\Models\Project;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * カレンダーの予定名（タイトル）の付け方＝命名規則の正本（2026-08-27 baba要望）。
@@ -13,7 +15,7 @@ use App\Models\Setting;
  *   差し込みタグでテンプレートを組み、共通設定の画面から直せるようにする。
  *
  * 【使えるタグ】
- *   {日付} {月日} {コンテンツ} {顧客名} {顧客名様} {お客様人数} {拠点} {拠点略}
+ *   {日付} {月日} {コンテンツ} {コンテンツ略} {顧客名} {顧客名様} {お客様人数} {拠点} {拠点略}
  *   {実施形態} {運営人数} {イベント時間} {集合解散} {D} {D姓} {営業担当} {営業担当姓}
  *   {案件ID} {区分} {確度}
  *
@@ -31,13 +33,14 @@ final class CalendarTitle
      * 既定のテンプレート＝いま実際に使っている命名規則（2026-08-27 baba提供）。
      *   例）【確定東】会議室_コニカミノルタジャパン様45名_1540-1740_横山
      */
-    public const DEFAULT = '【{確度}{拠点略}】{コンテンツ}_{顧客名様}{お客様人数}_{イベント時間}_{営業担当姓}';
+    public const DEFAULT = '【{確度}{拠点略}】{コンテンツ略}_{顧客名様}{お客様人数}_{イベント時間}_{営業担当姓}';
 
     /** 画面の説明に出すタグの一覧（タグ => 何が入るか）。 */
     public const TAGS = [
         '{日付}' => '2026-09-01',
         '{月日}' => '9/1',
-        '{コンテンツ}' => '会議室',
+        '{コンテンツ}' => '会議室（正式名）',
+        '{コンテンツ略}' => '会議室（コンテンツ台帳の略称。空なら正式名）',
         '{顧客名}' => 'コニカミノルタジャパン（ECSは「様」を外して保存しています）',
         '{顧客名様}' => 'コニカミノルタジャパン様（「様」を付け直したもの）',
         '{お客様人数}' => '45名',
@@ -145,7 +148,9 @@ final class CalendarTitle
             '{日付}' => $date ? $date->format('Y-m-d') : '',
             '{月日}' => $date ? ($date->month.'/'.$date->day) : '',
             // コンテンツが複数あれば「・」でつなぐ（案件名と同じつなぎ方）。
-            '{コンテンツ}' => implode('・', array_filter(array_map('trim', $contents))) ?: (string) $project->project_name,
+            '{コンテンツ}' => self::contentNames($project, short: false),
+            // 略称（コンテンツ台帳の short_name）。空のコンテンツは正式名を使う。
+            '{コンテンツ略}' => self::contentNames($project, short: true),
             '{顧客名}' => $client,
             // ⚠ ECSは末尾の「様・御中」を外して保存している（同じお客様が別々に数えられないように）。
             //   予定名では付け直す。すでに付いている場合は二重にしない。
@@ -166,6 +171,51 @@ final class CalendarTitle
             '{区分}' => (string) ($project->category ?? ''),
             '{確度}' => (string) ($project->yomi ?? ''),
         ];
+    }
+
+    /**
+     * その案件のコンテンツ名（複数あれば「・」でつなぐ＝案件名と同じつなぎ方）。
+     *
+     * @param  bool  $short  true＝コンテンツ台帳の略称を使う（略称が空のものは正式名）
+     */
+    private static function contentNames(Project $project, bool $short): string
+    {
+        $names = is_array($project->content_names) ? $project->content_names : [];
+        $names = array_values(array_filter(array_map('trim', $names), fn ($n) => $n !== ''));
+
+        if ($names === []) {
+            return (string) $project->project_name;
+        }
+
+        if ($short) {
+            // ⚠ 略称の正本はコンテンツ台帳（contents.short_name）。ここに変換表を持たない。
+            //   台帳に無い名前（単発コンテンツ）はそのまま使う。
+            $map = self::shortNameMap($names);
+            $names = array_map(fn ($n) => $map[$n] ?? $n, $names);
+        }
+
+        return implode('・', $names);
+    }
+
+    /**
+     * コンテンツ名 => 略称（略称が入っているものだけ）。
+     * ⚠ 1回のクエリでまとめて引く（コンテンツごとに引かない）。
+     *
+     * @param  list<string>  $names
+     * @return array<string, string>
+     */
+    private static function shortNameMap(array $names): array
+    {
+        if (! Schema::hasColumn('contents', 'short_name')) {
+            // まだ migrate していないサーバーでも予定名が作れるようにする（正式名になるだけ）。
+            return [];
+        }
+
+        return Content::whereIn('content_name', $names)
+            ->whereNotNull('short_name')
+            ->where('short_name', '!=', '')
+            ->pluck('short_name', 'content_name')
+            ->all();
     }
 
     /** 拠点名 → 予定名に出す短い形（載っていない拠点は頭1文字）。 */

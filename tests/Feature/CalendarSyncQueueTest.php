@@ -238,4 +238,62 @@ class CalendarSyncQueueTest extends TestCase
         $this->assertSame(0, $counts['delete']);
         $this->assertSame(0, $counts['error']);
     }
+
+    /**
+     * コンテンツの略称が台帳に入っていれば、予定名では略称を使う（2026-08-27 baba要望）。
+     * ⚠ 略称の正本はコンテンツ台帳（contents.short_name）。カレンダー用の変換表は持たない。
+     */
+    public function test_title_uses_the_content_short_name(): void
+    {
+        \App\Models\Content::create([
+            'id' => 'CT-001',
+            'content_name' => '先が見えない防災訓練',
+            'short_name' => '防災訓練',
+        ]);
+
+        $p = $this->project([
+            'project_name' => '先が見えない防災訓練',
+            'content_names' => ['先が見えない防災訓練'],
+        ]);
+
+        $this->assertStringContainsString('防災訓練_', CalendarTitle::for($p));
+        $this->assertStringNotContainsString('先が見えない', CalendarTitle::for($p));
+    }
+
+    /** 略称が空のコンテンツは正式名を使う（一部だけ略称があってもよい）。 */
+    public function test_title_falls_back_to_the_full_content_name(): void
+    {
+        \App\Models\Content::create([
+            'id' => 'CT-001',
+            'content_name' => '会議室',
+            'short_name' => null,
+        ]);
+
+        $p = $this->project();
+
+        $this->assertStringContainsString('会議室_', CalendarTitle::for($p));
+    }
+
+    /** 台帳に無いコンテンツ（単発）はそのままの名前を使う。 */
+    public function test_title_keeps_unknown_content_name(): void
+    {
+        $p = $this->project(['content_names' => ['この案件だけの企画']]);
+
+        $this->assertStringContainsString('この案件だけの企画_', CalendarTitle::for($p));
+    }
+
+    /** マスタ管理から略称を保存できる。 */
+    public function test_short_name_can_be_saved_from_masters(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'role' => 'employee', 'permission' => 'admin', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        $c = \App\Models\Content::create(['id' => 'CT-001', 'content_name' => '先が見えない防災訓練']);
+
+        $this->actingAsPerson($admin)->post('/masters/contents/bulk', [
+            'rows' => [$c->id => ['content_name' => '先が見えない防災訓練', 'short_name' => '防災訓練', 'active' => '1']],
+        ])->assertRedirect('/masters#contents');
+
+        $this->assertSame('防災訓練', $c->fresh()->short_name);
+    }
 }
