@@ -40,6 +40,17 @@ final class PersonLookup
     }
 
     /**
+     * 人に見せる／名簿に登録するときの氏名。飾り記号（★☆）だけを外し、空白はそのまま残す。
+     *
+     * ⚠ 突き合わせ用の normName とは別物。normName は空白まで落とすので、
+     *   そのまま名簿に登録すると「永松一子」のように空白の無い名前で登録されてしまう。
+     */
+    public static function displayName(string $name): string
+    {
+        return trim(str_replace(self::NAME_MARKS, '', $name));
+    }
+
+    /**
      * 「そろえた氏名 → その名前の人たち」の辞書を作る。
      * 何度も引くので、呼ぶ側で1回作って使い回す。
      *
@@ -82,9 +93,11 @@ final class PersonLookup
             if (count($hits) === 1) {
                 $ids[] = $hits[0]['id'];
             } elseif (count($hits) > 1) {
-                $ambiguous[] = $name;
+                // ⚠ 知らせる名前は飾り記号を外したもの。そのまま名簿に登録できるようにするため
+                //   （名古屋のアサイン表は「★永松 一子」のように印が付いている・2026-08-27 baba）。
+                $ambiguous[] = self::displayName($name);
             } else {
-                $missing[] = $name;
+                $missing[] = self::displayName($name);
             }
         }
 

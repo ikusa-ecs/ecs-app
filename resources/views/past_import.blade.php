@@ -36,6 +36,20 @@
   .pj-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
   .pj-names { margin: 8px 0 0; padding-left: 1.2em; font-size: 12.5px; }
   .pj-names li { margin: 2px 0; }
+  /* 名簿に無かった人を、その場で名簿に足せるようにする（2026-08-27 baba要望） */
+  #pjMissing li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 5px 0; }
+  .pj-miss-name {
+    border: 1px solid #d7cec2; border-radius: 5px; padding: 3px 6px;
+    font-size: 12.5px; font-family: inherit; min-width: 190px; background: #fff;
+  }
+  .pj-miss-add { font-size: 12px; padding: 4px 10px; }
+  .pj-miss-msg { font-size: 12px; }
+  .pj-miss-msg.ok { color: #166534; font-weight: 700; }
+  .pj-miss-msg.ng { color: #b91c1c; }
+  .pj-miss-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .pj-miss-foot select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: 12.5px;
+  }
   .pj-summary { font-size: 13px; margin: 10px 2px; }
   .pj-summary .ok { color: #2e9e6b; font-weight: 700; }
   .pj-summary .ng { color: #d9534f; font-weight: 700; }
@@ -75,13 +89,32 @@
   @if (session('past_missing') && count(session('past_missing')))
     <div class="pj-flash warn">
       <b>⚠ 次の方は名簿に見つからなかったので、アサインを入れていません。</b><br>
-      名簿に登録してから、同じCSVをもう一度取り込むと入ります（案件は上書きされ、二重にはなりません）。
+      名簿に登録してから、<b>同じアサイン表をもう一度取り込む</b>と入ります（案件は上書きされ、二重にはなりません）。
       辞められた方の場合は、名簿に登録して「退職にする」を押しておくと履歴として残せます。
-      <ul class="pj-names">
+      {{-- その場で名簿に足せるようにする（2026-08-27 baba要望）。
+           入口は臨時スタッフと同じ POST /people/spot ＝作り方を2つ持たない。
+           ⚠ 名前の「★」「☆」は外した状態で出している（PersonLookup::displayName）。 --}}
+      <ul class="pj-names" id="pjMissing">
         @foreach (session('past_missing') as $n)
-          <li>{{ $n }}</li>
+          <li>
+            <input type="text" class="pj-miss-name" value="{{ $n }}" data-orig="{{ $n }}">
+            <button type="button" class="btn pj-miss-add" onclick="pjAddMissing(this)">＋ この名前で名簿に追加</button>
+            <span class="pj-miss-msg"></span>
+          </li>
         @endforeach
       </ul>
+      <div class="pj-miss-foot">
+        <label for="pjMissOffice"><b>どの拠点の人として追加しますか</b></label>
+        <select id="pjMissOffice">
+          @foreach ($offices as $o)
+            <option value="{{ $o }}" @selected($o === $myOffice)>{{ $o }}</option>
+          @endforeach
+        </select>
+        <span class="muted" style="font-size:11.5px;">
+          ※ <b>ログイン無し・「臨時」の印つき</b>で名簿に入ります（メールアドレスは要りません）。
+          あとから名簿でアカウントを発行できます。
+        </span>
+      </div>
     </div>
   @endif
   @if (session('past_ambiguous') && count(session('past_ambiguous')))
@@ -411,6 +444,49 @@
     document.getElementById('pjEdits').value = (json === '{}') ? '' : json;
 
     return document.getElementById('pjEdits').value;
+  }
+
+  // ===== 名簿に無かった人を、その場で名簿に足す（2026-08-27 baba要望）=====
+  // ⚠ 作り方は臨時スタッフと同じ入口（POST /people/spot）を使う＝人の作り方を2つ持たない。
+  //   足したあとは「同じアサイン表をもう一度取り込む」とアサインが入る（案件は上書きなので二重にならない）。
+  function pjAddMissing(btn) {
+    var li = btn.closest('li');
+    var input = li.querySelector('.pj-miss-name');
+    var msg = li.querySelector('.pj-miss-msg');
+    var name = input.value.trim();
+    if (!name) { msg.className = 'pj-miss-msg ng'; msg.textContent = '名前を入れてください。'; return; }
+
+    btn.disabled = true;
+    msg.className = 'pj-miss-msg';
+    msg.textContent = '登録しています…';
+
+    var token = document.querySelector('#pjForm input[name="_token"]').value;
+    var fd = new FormData();
+    fd.append('name', name);
+    fd.append('office', document.getElementById('pjMissOffice').value);
+    fd.append('_token', token);
+
+    fetch('/people/spot', {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': token }
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.d.ok) {
+          btn.disabled = false;
+          msg.className = 'pj-miss-msg ng';
+          msg.textContent = res.d.message || '登録できませんでした。';
+          return;
+        }
+        input.disabled = true;
+        btn.style.display = 'none';
+        msg.className = 'pj-miss-msg ok';
+        msg.textContent = '✓ 名簿に追加しました（' + res.d.id + '）';
+      })
+      .catch(function () {
+        btn.disabled = false;
+        msg.className = 'pj-miss-msg ng';
+        msg.textContent = '登録に失敗しました。通信を確認して、もう一度お試しください。';
+      });
   }
 
   // 入れ方＝'file'（ファイルを選ぶ）か 'paste'（スプレッドシートから貼り付け）。

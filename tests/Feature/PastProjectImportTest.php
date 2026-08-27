@@ -1194,4 +1194,41 @@ class PastProjectImportTest extends TestCase
         $this->assertStringContainsString('pasteRead()', $html);
         $this->assertStringContainsString('id="pasteMonth"', $html);
     }
+
+    /**
+     * 名簿に無かった人の一覧は「★」を外した名前で出す（2026-08-27 baba要望）。
+     * ⚠ そのままだと「★永松 一子」で名簿に登録されてしまい、次の取込でも突き合わない。
+     */
+    public function test_missing_names_are_shown_without_star_marks(): void
+    {
+        $res = $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->nagoyaCsv([['name' => '★永松 一子', 'role' => 'FC']]),
+        ])->assertRedirect('/past-import');
+
+        $res->assertSessionHas('past_missing', ['永松 一子']);
+    }
+
+    /** 「名簿に無かった人」の一覧から、その場で名簿に足せる。 */
+    public function test_missing_list_has_add_buttons(): void
+    {
+        $html = $this->actingAsPerson($this->manager())
+            ->withSession(['past_missing' => ['永松 一子']])
+            ->get('/past-import')->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="pjMissing"', $html);
+        $this->assertStringContainsString('pjAddMissing(this)', $html);
+        $this->assertStringContainsString('永松 一子', $html);
+        $this->assertStringContainsString('id="pjMissOffice"', $html, 'どの拠点の人として足すか');
+    }
+
+    /** その場の追加は、臨時スタッフと同じ入口（/people/spot）で名簿に入る。 */
+    public function test_adding_a_missing_person_creates_a_roster_entry(): void
+    {
+        $this->actingAsPerson($this->manager())->postJson('/people/spot', [
+            'name' => '永松 一子',
+            'office' => '東京',
+        ])->assertOk()->assertJsonPath('ok', true);
+
+        $this->assertDatabaseHas('people', ['name' => '永松 一子', 'role' => 'staff']);
+    }
 }

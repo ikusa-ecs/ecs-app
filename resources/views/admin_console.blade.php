@@ -3,6 +3,19 @@
 @section('h1', 'Administrator（管理）')
 @php($active = 'admin_console')
 
+@push('head')
+<style>
+  /* 所属バッジ。色の正本＝App\Support\Departments（ここに色を直書きしない）。 */
+  .ac-dept {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  {!! App\Support\Departments::badgeCss('.ac-dept') !!}
+  .ac-dept.none { background: #efeae3; color: #8a7a66; }
+  .ac-sub { color: #a08a73; font-size: 11px; }
+</style>
+@endpush
+
 @section('content')
       {{-- なぜ／使い方：Administrator（全権）だけができる作業を、この1画面に集約しています。 --}}
       <div class="mock-note">
@@ -38,6 +51,7 @@
               <tr style="text-align:left; color:#6e5b49; border-bottom:2px solid #e6dccf;">
                 <th style="padding:8px 6px;">社員番号</th>
                 <th style="padding:8px 6px;">氏名</th>
+                <th style="padding:8px 6px;">所属</th>
                 <th style="padding:8px 6px;">現在の権限</th>
                 <th style="padding:8px 6px;">変更</th>
               </tr>
@@ -47,6 +61,20 @@
                 <tr style="border-bottom:1px solid #f0e8dd;">
                   <td style="padding:8px 6px; color:#a08a73; white-space:nowrap;">{{ $emp->id }}</td>
                   <td style="padding:8px 6px; font-weight:600; color:#3a2d20; white-space:nowrap;">{{ $emp->name }}</td>
+                  {{-- 所属（2026-08-27 baba要望）。誰を昇格させるか決めるとき、氏名だけだと分かりにくいため。
+                       兼務がある人は2つめ以降も小さく出す（主な所属が先頭）。 --}}
+                  <td style="padding:8px 6px; white-space:nowrap;">
+                    @php($depts = $emp->departmentList())
+                    <span class="ac-dept {{ App\Support\Departments::code($depts[0] ?? null) }}">
+                      {{ App\Support\Departments::label($depts[0] ?? null) }}
+                    </span>
+                    @if (count($depts) > 1)
+                      <span class="ac-sub">＋{{ implode('・', array_slice($depts, 1)) }}</span>
+                    @endif
+                    @if ($emp->office)
+                      <div class="ac-sub">{{ $emp->office }}</div>
+                    @endif
+                  </td>
                   <td style="padding:8px 6px; white-space:nowrap;">
                     <span style="font-size:11px; font-weight:700; color:#fff; background:{{ $permBadgeColor[$emp->permission] ?? '#6e5b49' }}; padding:2px 9px; border-radius:999px;">
                       {{ $permLabels[$emp->permission] ?? $emp->permission }}
