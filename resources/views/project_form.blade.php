@@ -66,6 +66,14 @@
       border-radius: 8px; font-size: 14px; color: var(--muted);
     }
 
+    /* 「▼ 社員と同じ時間を入れる」ボタン（スタッフの集合・解散） */
+    .btn-same-time {
+      width: 100%; padding: 9px 11px; cursor: pointer;
+      background: #fff; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 14px; color: var(--ink);
+    }
+    .btn-same-time:hover { background: #f7f4ee; }
+
     /* 下部アクションバー */
     .form-actions {
       position: sticky; bottom: 0;
@@ -404,7 +412,7 @@
               <option>ARENA場所貸し</option>
               <option>体験会</option>
             </select>
-            <div class="hint">案件の形態を選びます（拠点は上の「登録拠点」で持ちます）。「オンライン」を選ぶとツールが選べます。リアルロング＝集合〜解散の拘束が9時間を超える案件。</div>
+            <div class="hint">案件の形態を選びます（拠点は上の「登録拠点」で持ちます）。「オンライン」を選ぶとツールが選べます。<b>リアルロング＝スタッフの集合〜解散の拘束が9時間を超える案件</b>（社員の拘束時間ではありません。スタッフの手当が変わります）。</div>
             <div class="expand-box" id="toolBox">
               <div class="form-row" style="margin-bottom:0;">
                 <label>オンラインツール</label>
@@ -578,11 +586,14 @@
             </select>
           </div>
 
-          <!-- 集合 ｜ 解散 ｜ 拘束時間（横3列） -->
+          <!-- 集合 ｜ 解散 ｜ 拘束時間（横3列）
+               ⚠ ここは「社員」の集合・解散（DBの start_time / end_time）。
+               2026-08-27 まで欄名が「（スタッフ）」になっていたが、公開ボードもスタッフ画面も
+               この値を「社員の時間」として扱っていた＝名前だけが違っていた。 -->
           <div class="full">
             <div class="triple">
               <div class="form-row">
-                <label>集合時間（スタッフ）<span class="req-mark yellow">必須</span></label>
+                <label>集合時間（社員）<span class="req-mark yellow">必須</span></label>
                 <input type="time" id="startTime" name="start_time" data-need="later" onchange="updateDuration()">
                 <div class="hint">移動時間を含む時間を記載ください。</div>
                 <div class="tbd-row">
@@ -591,7 +602,7 @@
                 </div>
               </div>
               <div class="form-row">
-                <label>解散時間（スタッフ）<span class="req-mark yellow">必須</span></label>
+                <label>解散時間（社員）<span class="req-mark yellow">必須</span></label>
                 <input type="time" id="endTime" name="end_time" data-need="later" onchange="updateDuration()">
                 <div class="tbd-row">
                   <input type="checkbox" id="endTimeTbd" class="tbd-check" data-tbd-for="endTime">
@@ -601,6 +612,29 @@
               <div class="form-row">
                 <label>拘束時間（自動計算）</label>
                 <div class="readonly-field" id="durationField">—</div>
+                <div class="readonly-field" id="staffDurationField" style="margin-top:6px;">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- スタッフの集合・解散（DBの staff_meet_time / staff_leave_time）。
+               空のままなら社員の時間がそのままスタッフ画面に出る＝いつもと同じ案件は入れなくてよい。
+               公開ボードでも直せる（保存先は同じ列なので食い違わない）。 -->
+          <div class="full">
+            <div class="triple">
+              <div class="form-row">
+                <label>集合時間（スタッフ）</label>
+                <input type="time" id="staffMeetTime" name="staff_meet_time" onchange="updateDuration()">
+                <div class="hint">社員と同じなら空のままでOK（社員の時間がそのまま出ます）。</div>
+              </div>
+              <div class="form-row">
+                <label>解散時間（スタッフ）</label>
+                <input type="time" id="staffLeaveTime" name="staff_leave_time" onchange="updateDuration()">
+              </div>
+              <div class="form-row">
+                <label>社員と同じとき</label>
+                <button type="button" class="btn-same-time" onclick="copyEmployeeTimeToStaff()">▼ 社員と同じ時間を入れる</button>
+                <div class="hint">社員の集合・解散をそのままコピーします。</div>
               </div>
             </div>
           </div>
@@ -943,18 +977,26 @@
   onFormatChange(); // 初期表示
 
   // ===== 集合〜解散の拘束時間を計算（9時間超でリアルロングの目安）=====
-  function updateDuration() {
-    const s = document.getElementById('startTime').value;
-    const e = document.getElementById('endTime').value;
-    const f = document.getElementById('durationField');
-    if (!s || !e) { f.textContent = '—'; f.style.color = ''; return; }
-    const [sh, sm] = s.split(':').map(Number);
-    const [eh, em] = e.split(':').map(Number);
+  // 拘束時間は「社員」と「スタッフ」の2つ出す（2026-08-27 baba）。
+  // スタッフの欄が空のときは社員の時間がそのまま使われるので、同じ数字を出す。
+  // judgeLong … この行で「9時間超＝リアルロング」の目安を出すか。
+  // ⚠ 目安を出すのは【スタッフの時間】だけ（2026-08-27 baba）。
+  //   社員は前泊・積み込み・撤収で長くなることがあり、社員が9時間を超えていても
+  //   スタッフが9時間以内なら案件としては「リアル」。社員の時間で判定すると
+  //   本来リアルの案件がリアルロングに見えてしまう。
+  //   ⚠ ここは見た目の話ではない＝リアル／リアルロングは【スタッフの手当（当日スタッフ費）】が
+  //   変わるところなので、間違えるとお金が変わる（App\Support\FinanceItems の staff / staff_long）。
+  function fillDuration(fieldId, startVal, endVal, who, judgeLong) {
+    const f = document.getElementById(fieldId);
+    if (!f) return;
+    if (!startVal || !endVal) { f.textContent = who + ' —'; f.style.color = ''; return; }
+    const [sh, sm] = startVal.split(':').map(Number);
+    const [eh, em] = endVal.split(':').map(Number);
     const mins = (eh * 60 + em) - (sh * 60 + sm);
-    if (mins <= 0) { f.textContent = '時間の指定を確認してください'; f.style.color = 'var(--danger)'; return; }
+    if (mins <= 0) { f.textContent = who + ' 時間の指定を確認してください'; f.style.color = 'var(--danger)'; return; }
     const h = Math.floor(mins / 60), m = mins % 60;
-    let txt = h + '時間' + (m ? m + '分' : '');
-    if (mins > 9 * 60) {
+    let txt = who + ' ' + h + '時間' + (m ? m + '分' : '');
+    if (judgeLong && mins > 9 * 60) {
       txt += '（9時間超 → リアルロングの目安）';
       f.style.color = 'var(--warn)';
     } else {
@@ -962,7 +1004,30 @@
     }
     f.textContent = txt;
   }
+
+  function updateDuration() {
+    const s = document.getElementById('startTime').value;
+    const e = document.getElementById('endTime').value;
+    const sm = document.getElementById('staffMeetTime');
+    const sl = document.getElementById('staffLeaveTime');
+    fillDuration('durationField', s, e, '社員', false);
+    // スタッフ欄が空＝社員と同じ時間が出るので、社員の値で計算する。
+    fillDuration('staffDurationField', (sm && sm.value) || s, (sl && sl.value) || e, 'スタッフ', true);
+  }
   updateDuration(); // 初期表示
+
+  // 「▼ 社員と同じ時間を入れる」＝社員の集合・解散をスタッフ欄にコピーする。
+  // ※ 空のままでも社員の時間が出るが、「見て確かめた」ことが残るように入れられるようにした（2026-08-27 baba要望）。
+  function copyEmployeeTimeToStaff() {
+    const s = document.getElementById('startTime').value;
+    const e = document.getElementById('endTime').value;
+    if (!s && !e) { alert('先に社員の集合・解散時間を入れてください。'); return; }
+    const sm = document.getElementById('staffMeetTime');
+    const sl = document.getElementById('staffLeaveTime');
+    if (sm) sm.value = s;
+    if (sl) sl.value = e;
+    updateDuration();
+  }
 
   // ===== 区分（通常／追加案件）：アサインMTG日を基準に自動判定＋手動修正 =====
   // アサインMTG日は共通設定（/settings）でDB保存された値を使う（window.ECS_ASSIGN_MTG_DATE）。
@@ -1405,6 +1470,8 @@
     setVal('venue', E.location);
     setVal('startTime', E.start_time);
     setVal('endTime', E.end_time);
+    setVal('staffMeetTime', E.staff_meet_time);
+    setVal('staffLeaveTime', E.staff_leave_time);
     setVal('requiredCount', E.required_count);
     setVal('guestNum', E.guest_count);
     setVal('teamCount', E.team_count);

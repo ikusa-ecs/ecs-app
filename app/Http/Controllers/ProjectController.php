@@ -288,6 +288,8 @@ class ProjectController extends Controller
                     'start_date'       => optional($p->start_date)->format('Y-m-d'),
                     'start_time'       => $p->start_time,
                     'end_time'         => $p->end_time,
+                    'staff_meet_time'  => $p->staff_meet_time,    // 空＝社員と同じ
+                    'staff_leave_time' => $p->staff_leave_time,
                     'event_enter_time' => $p->event_enter_time,
                     'event_start_time' => $p->event_start_time,
                     'event_end_time'   => $p->event_end_time,
@@ -629,6 +631,10 @@ class ProjectController extends Controller
             'start_date' => $request->input('start_date'),
             'start_time' => $request->input('start_time'),
             'end_time' => $request->input('end_time'),
+            // スタッフに見せる集合・解散。空＝社員と同じ（スタッフ画面が start_time / end_time に落ちる）。
+            // 空文字ではなく null で持つ＝「未入力」と「たまたま同じ時刻を入れた」を混ぜない。
+            'staff_meet_time' => $request->input('staff_meet_time') ?: null,
+            'staff_leave_time' => $request->input('staff_leave_time') ?: null,
             'event_enter_time' => $request->input('event_enter_time'),
             'event_start_time' => $request->input('event_start_time'),
             'event_end_time' => $request->input('event_end_time'),

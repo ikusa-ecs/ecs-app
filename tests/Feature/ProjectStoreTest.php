@@ -135,6 +135,54 @@ class ProjectStoreTest extends TestCase
         $this->assertSame('会場内は飲食禁止', $project->staff_notes);
     }
 
+    /**
+     * スタッフの集合・解散を案件登録から保存できる（2026-08-27 baba要望）。
+     * それまで入れられるのは公開ボードだけだった。保存先の列は同じ（staff_meet_time / staff_leave_time）。
+     */
+    public function test_staff_meet_and_leave_times_are_saved_from_the_form(): void
+    {
+        $employee = PersonFactory::new()->create();
+
+        $this->actingAsPerson($employee)->post('/project-form', [
+            'content_names'    => '運動会',
+            'start_date'       => '2026-09-10',
+            'required_count'   => '10',
+            'start_time'       => '07:00',
+            'end_time'         => '19:00',
+            'staff_meet_time'  => '08:30',
+            'staff_leave_time' => '17:30',
+            'intent'           => 'publish',
+        ])->assertRedirect('/projects');
+
+        $project = Project::where('project_name', '運動会')->first();
+        $this->assertSame('08:30', $project->staff_meet_time);
+        $this->assertSame('17:30', $project->staff_leave_time);
+    }
+
+    /**
+     * スタッフの時間を空で送ったら null で持つ（＝「社員と同じ」）。
+     * 空文字で入れると「入力済み」と見分けが付かず、スタッフ画面が社員の時間に落ちなくなる。
+     */
+    public function test_blank_staff_times_are_stored_as_null(): void
+    {
+        $employee = PersonFactory::new()->create();
+
+        $this->actingAsPerson($employee)->post('/project-form', [
+            'content_names'    => '謎解き',
+            'start_date'       => '2026-09-11',
+            'required_count'   => '8',
+            'start_time'       => '09:00',
+            'end_time'         => '18:00',
+            'staff_meet_time'  => '',
+            'staff_leave_time' => '',
+            'intent'           => 'publish',
+        ])->assertRedirect('/projects');
+
+        $project = Project::where('project_name', '謎解き')->first();
+        $this->assertNull($project->staff_meet_time);
+        $this->assertNull($project->staff_leave_time);
+    }
+
     /** 権限：スタッフは案件登録画面に入れず、自分のスタッフ画面へ戻される。 */
     public function test_staff_cannot_register_a_project(): void
     {
