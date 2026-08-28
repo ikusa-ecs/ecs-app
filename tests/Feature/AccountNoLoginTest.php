@@ -40,7 +40,7 @@ class AccountNoLoginTest extends TestCase
             ])
             ->assertRedirect('/account-new');
 
-        $p = Person::where('name', '新井 みなみ')->first();
+        $p = Person::where('name', '新井みなみ')->first();
         $this->assertNotNull($p, '名簿に入ること');
         $this->assertNull($p->email, 'メールは持たない');
         $this->assertNull($p->password, 'パスワードも持たない（発行済みに見せない）');
@@ -57,7 +57,7 @@ class AccountNoLoginTest extends TestCase
             ])
             ->assertSessionHasErrors('email');
 
-        $this->assertNull(Person::where('name', '新井 みなみ')->first());
+        $this->assertNull(Person::where('name', '新井みなみ')->first());
     }
 
     /** あとでメールが来たら、名簿から案内メールを送って発行できる（既存の入口）。 */
@@ -69,7 +69,7 @@ class AccountNoLoginTest extends TestCase
             'office' => '東京', 'no_login' => '1',
         ])->assertRedirect('/account-new');
 
-        $p = Person::where('name', '新井 みなみ')->first();
+        $p = Person::where('name', '新井みなみ')->first();
 
         $this->actingAsPerson($me)
             ->post('/people/' . $p->id . '/invite', ['email' => 'minami@example.com'])

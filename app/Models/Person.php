@@ -34,6 +34,21 @@ class Person extends Model implements AuthenticatableContract
         'two_factor_recovery_codes',
     ];
 
+    /**
+     * 保存のたびに氏名の書き方をそろえる（2026-08-28 baba要望）。
+     *
+     * スタッフ＝苗字と名前をつめる／社員＝半角スペースで空ける、という運用の決まり。
+     * ⚠ ここ1か所に置く理由＝名前が入る入口が多い（アカウント発行・名簿CSV取込・
+     *   臨時スタッフ・アサイン表の取込・本人の初期設定・マイプロフィール）。
+     *   入口ごとに書くと必ず付け忘れる。中身は App\Support\StaffName が正本。
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Person $person) {
+            $person->name = \App\Support\StaffName::tidy($person->name, $person->role);
+        });
+    }
+
     protected function casts(): array
     {
         return [

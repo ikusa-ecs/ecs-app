@@ -44,7 +44,9 @@ class DirectorBoardNamesTest extends TestCase
             ->assertOk()->viewData('others');
 
         $this->assertArrayHasKey('S-015', $others->all(), 'IDでなく名前を引けるように渡していること');
-        $this->assertSame('渡辺', $others['S-015']['surname']);
+        // ⚠ スタッフの氏名は空白を詰めて保存する運用（2026-08-28）。
+        //   苗字だけを出す画面では、スタッフは氏名まるごとが出る（区切りが無いため）。
+        $this->assertSame('渡辺さくら', $others['S-015']['surname']);
         $this->assertSame('スタッフ', $others['S-015']['kind'], '社員でないことが分かるように出す');
     }
 

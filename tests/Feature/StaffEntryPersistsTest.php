@@ -74,7 +74,7 @@ class StaffEntryPersistsTest extends TestCase
 
         $this->assertNotNull($c, 'エントリー一覧にその案件が出ていない');
         $names = collect($c['entrants'] ?? [])->pluck('name')->all();
-        $this->assertContains('応募 花子', $names, 'エントリー一覧にその人が出ていない');
+        $this->assertContains('応募花子', $names, 'エントリー一覧にその人が出ていない');   // 詰めて保存される
     }
 
     /**

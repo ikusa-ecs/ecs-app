@@ -347,6 +347,21 @@
   // 拠点（事務所）の編集欄。2026-08-27 baba要望＝これまで画面から直せなかった。
   // ⚠ 直せるのは管理者以上（拠点を間違えると別の拠点のデータが見えるため）。それ未満は表示だけ。
   // ⚠ 拠点名は拠点マスタ（window.ECS_OFFICES）から作る＝画面に拠点名を直書きしない。
+  // 氏名を直す（Administratorだけ・2026-08-28 baba要望）。
+  // ⚠ スタッフは「苗字と名前をつめる」運用なので、保存すると空白は自動で取り除かれる
+  //   （社員は「姓 名」と空ける）。中身は App\Support\StaffName が正本。
+  function nameEditor(p){
+    if (!window.ECS_CAN_MANAGE_PEOPLE) return '';
+    return `<h4 style="margin-top:16px;">氏名</h4>
+      <div class="trait">
+        <input type="text" class="edit-name" value="${escAttrS(p.name)}"
+               style="padding:5px 8px; font-family:inherit; font-size:13px; width:220px;">
+        <div class="muted" style="font-size:12px; margin-top:4px;">
+          スタッフは<b>苗字と名前をつめて</b>保存します（空白は自動で取り除きます）。
+        </div>
+      </div>`;
+  }
+
   function officeEditor(p){
     const cur = p.office || '';
     if (!window.ECS_CAN_MANAGE_OFFICE) {
@@ -484,6 +499,8 @@
             <div class="trait">
               <label><input type="checkbox" class="edit-exclusive" ${p.exclusive?'checked':''}> 専属スタッフ</label>
             </div>
+
+            ${nameEditor(p)}
 
             <h4 style="margin-top:16px;">拠点（事務所）</h4>
             <div class="trait">${officeEditor(p)}</div>
@@ -779,6 +796,10 @@
     // 拠点（管理者以上だけ欄が出る）。欄が無いときは送らない＝勝手に空にしない。
     const officeSel = dr.querySelector('.edit-office');
     if (officeSel) body.append('office', officeSel.value);
+    // 氏名（Administratorだけ欄が出る）。同じく、欄が無いときは送らない。
+    const nameEl = dr.querySelector('.edit-name');
+    const nameChanged = !!(nameEl && nameEl.value.trim() !== '' && nameEl.value.trim() !== p.name);
+    if (nameEl) body.append('name', nameEl.value);
     if (btn) btn.disabled = true;
     if (statusEl) { statusEl.textContent = '保存中…'; statusEl.style.color = 'var(--muted)'; }
     fetch(`/staff/${encodeURIComponent(p.id)}/edit`, {
@@ -803,6 +824,9 @@
       }
       if (statusEl) { statusEl.textContent = '✓ 保存しました'; statusEl.style.color = '#15803d'; }
       if (btn) btn.disabled = false;
+      // 氏名を変えたときは、表・詳細・並び順のあちこちに出るので画面を読み込み直す
+      // （直した名前が一部だけ古いまま残ると、直っていないように見えるため）。
+      if (nameChanged) { location.reload(); }
     })
     .catch(err => {
       if (statusEl) { statusEl.textContent = '保存に失敗しました（' + err + '）'; statusEl.style.color = 'var(--danger)'; }

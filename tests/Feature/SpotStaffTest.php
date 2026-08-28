@@ -54,7 +54,7 @@ class SpotStaffTest extends TestCase
         $this->assertNotNull($id);
 
         $p = Person::findOrFail($id);
-        $this->assertSame('田中 花子', $p->name);
+        $this->assertSame('田中花子', $p->name, 'スタッフの氏名は空白を詰めて保存する');
         $this->assertSame('staff', $p->role);
         $this->assertSame('staff', $p->permission);
         $this->assertTrue((bool) $p->is_spot, '臨時の印が付くこと');
@@ -135,7 +135,7 @@ class SpotStaffTest extends TestCase
             ->get('/project-assign?project='.urlencode($project->id))
             ->assertOk()->getContent();
 
-        $this->assertStringContainsString('助っ人 三郎', $html);
+        $this->assertStringContainsString('助っ人三郎', $html);
         $this->assertStringContainsString('臨時', $html);
     }
 

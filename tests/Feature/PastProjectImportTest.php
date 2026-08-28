@@ -1251,10 +1251,11 @@ class PastProjectImportTest extends TestCase
     public function test_adding_a_missing_person_creates_a_roster_entry(): void
     {
         $this->actingAsPerson($this->manager())->postJson('/people/spot', [
-            'name' => '永松 一子',
+            'name' => '永松 一子',   // ★や空白入りで届く（保存時に空白は詰まる）
             'office' => '東京',
         ])->assertOk()->assertJsonPath('ok', true);
 
-        $this->assertDatabaseHas('people', ['name' => '永松 一子', 'role' => 'staff']);
+        // スタッフの氏名は空白を詰めて保存する運用（2026-08-28）。照合は元から空白を無視するので突き合う。
+        $this->assertDatabaseHas('people', ['name' => '永松一子', 'role' => 'staff']);
     }
 }

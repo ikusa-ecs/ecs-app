@@ -462,7 +462,31 @@ class PersonController extends Controller
             'impression' => ['nullable', 'string', 'max:1000'],
             // 拠点（事務所）。2026-08-27 baba要望＝これまで画面から直せなかった。
             'office' => ['nullable', 'string', 'max:50'],
+            // 氏名。2026-08-28 baba要望＝スタッフが自分で書いた名前に空白が入っていて直したい。
+            // ⚠ nullable にしておく＝空欄で送られると Laravel が null に変えるため、
+            //   ここで弾くと画面用のリダイレクトが返り、fetch している画面が受け取れない。
+            //   空かどうかは下で見て、はっきりしたお知らせを返す。
+            'name' => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
+
+        // 氏名の変更＝Administratorだけ（baba選択）。呼び名は名簿・アサイン表・出勤の
+        // すべてに出るので、直せる人を絞る。
+        // ⚠ 空白は保存のときに自動で取り除かれる（スタッフは苗字と名前をつめる運用）。
+        //   正本＝App\Support\StaffName（Person の saving で通る）。
+        if ($request->has('name')) {
+            if (optional(Auth::user())->permission !== 'admin') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => '氏名を直せるのは Administrator だけです。',
+                ], 403);
+            }
+            $newName = trim((string) ($data['name'] ?? ''));
+            if ($newName === '') {
+                return response()->json(['ok' => false, 'message' => '氏名は空にできません。'], 422);
+            }
+            $person->name = $newName;
+            $person->save();
+        }
 
         // 拠点（事務所）の付け替え＝管理者以上（2026-08-27 baba選択）。
         // ⚠ 拠点は案件一覧・名簿・集計の絞り込みに効くので、間違えると別の拠点のデータが見える。

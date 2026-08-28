@@ -146,7 +146,7 @@ class ExperienceScreenTest extends TestCase
         $res = $this->actingAsPerson($admin)->get('/experience/export.csv')->assertOk();
         $csv = $res->streamedContent();
 
-        $this->assertStringContainsString('山田 太郎', $csv);
+        $this->assertStringContainsString('山田太郎', $csv);   // スタッフは詰めて保存される
         $this->assertStringContainsString('水合戦', $csv);
         $this->assertStringContainsString('コンテンツ', $csv);
         // ⚠ Excelで開いたときに文字化けしないよう BOM を付けている。
