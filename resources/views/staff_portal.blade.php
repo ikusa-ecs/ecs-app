@@ -1050,6 +1050,9 @@
       rows.push('<div class="ad-row"><span class="ad-l">スタッフに伝えること</span><span class="ad-v">'
         + (String(j.staffNotes || '').trim() !== '' ? escLines(j.staffNotes) : '特になし') + '</span></div>');
       add('担当からの連絡', j.myNote, true);
+      // ⚠ 上の「担当からの連絡」（運営→あなた）とは別物。こちらは**あなたが応募のときに書いた一言**。
+      //   確定になると見返せなくなっていたので出すようにした（2026-08-28 baba要望）。
+      add('応募のときに書いた一言', j.entryNote, true);
       return '<div class="ad-box">' + rows.join('')
         + '<div class="ad-note">当日の連絡・集合の合図は、これまでどおり LINE・チャットワークで行います。'
         + '内容に変更があると、この画面の表示も自動で新しくなります。</div></div>';

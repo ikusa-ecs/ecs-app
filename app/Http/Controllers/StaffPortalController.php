@@ -69,8 +69,20 @@ class StaffPortalController extends Controller
                 ->get()
                 ->keyBy('id');
 
+        // 本人がエントリーのときに書いた一言（applications.note）。案件ID => 本文。
+        // ⚠ 2026-08-28 baba要望：確定したあとも「自分が何と書いて応募したか」を見返せるようにする。
+        //   前は募集中タブに残っている間しか見られず、確定になると消えていた。
+        // ⚠ 下の 'myNote'（assignments.remark＝担当が本人に向けて書いた一言）とは**別物**。
+        //   同じ名前にすると入れ違うので、こちらは 'entryNote' で渡す。
+        $myEntryNotes = ($me && ! $projects->isEmpty())
+            ? Application::where('staff_id', $me->id)
+                ->whereIn('project_id', $projects->keys()->all())
+                ->pluck('note', 'project_id')
+                ->all()
+            : [];
+
         $published = $mine
-            ->map(function (Assignment $a) use ($today, $projects) {
+            ->map(function (Assignment $a) use ($today, $projects, $myEntryNotes) {
                 $p = $projects->get($a->project_id);
                 if (! $p) {
                     return null;   // 未公開／下書き／完了の案件は出さない
@@ -117,8 +129,11 @@ class StaffPortalController extends Controller
                     'belongings' => (string) ($p->staff_belongings ?? ''),
                     'dresscode' => (string) ($p->staff_dresscode ?? ''),
                     'staffNotes' => (string) ($p->staff_notes ?? ''),
-                    // 担当がこの人だけに向けて書いた一言（assignments.remark）
+                    // 担当がこの人だけに向けて書いた一言（assignments.remark）＝運営→本人。
                     'myNote' => trim((string) ($a->remark ?? '')),
+                    // ⚠ 本人がエントリーのときに書いた一言（applications.note）＝本人→運営。
+                    //   上の myNote とは向きが逆の別物なので、名前を分けている。
+                    'entryNote' => trim((string) ($myEntryNotes[$p->id] ?? '')),
                 ];
             })
             ->filter()

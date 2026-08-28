@@ -214,6 +214,24 @@
           ここが違うと、その拠点の案件一覧に出てきません。
         </span>
       </div>
+      {{-- 巻き取り・ヘルプの相手の拠点（2026-08-28 baba要望）。
+           ⚠ シートには「巻き取り」「ヘルプ」としか書かれておらず、**どの拠点からかが書かれていない**。
+              勘で決めると拠点別の集計が狂うので、ここで選んでもらう。
+              選ばなければ、これまでどおり備考に文字を残すだけ。 --}}
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+        <label for="pjShareOffice" style="font-size:13px;"><b>「巻き取り・ヘルプ」の相手の拠点</b></label>
+        <select name="share_office" id="pjShareOffice"
+                style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+          <option value="">（記録しない）</option>
+          @foreach ($offices as $o)
+            <option value="{{ $o }}">{{ $o }}</option>
+          @endforeach
+        </select>
+        <span class="muted" style="font-size:11.5px;">
+          ※ シートの日程の上に<b>「巻き取り」「ヘルプ」</b>と書かれた案件に、<b>どの拠点との関わりか</b>を記録します。<br>
+          ※ シートには「どこから」が書かれていないので、ここで選んでください。<b>選ばなければ備考に文字が残るだけ</b>です（今までどおり）。
+        </span>
+      </div>
       {{-- 入れ方は2通り（2026-08-27 baba要望）。読み取りから先は同じ道を通る。 --}}
       <div class="pj-tabs">
         <button type="button" class="pj-tab on" id="pjTabFile" onclick="pjSetSource('file')">📄 ファイルを選ぶ</button>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
+use App\Models\ProjectShare;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\ClientName;
@@ -16,6 +17,7 @@ use App\Support\PersonLookup;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -461,9 +463,13 @@ class PastProjectImportController extends Controller
         // 名簿の索引は1回だけ作って使い回す（案件ごとに引くと重いため）。
         $people = PersonLookup::index();
 
+        // 巻き取り・ヘルプの相手の拠点（画面で選ぶ）。空＝これまでどおり備考の文字だけ。
+        $shareOffice = $this->shareOffice($request, $office);
+
         $created = 0;
         $updated = 0;
         $assignCount = 0;
+        $shared = 0;
         $skipped = 0;
         $errors = [];
         $missingNames = [];     // 名簿に無かった人
@@ -515,8 +521,11 @@ class PastProjectImportController extends Controller
             // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
             $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
 
+            // シートの「巻き取り／ヘルプ」の印（無ければ空文字）。
+            $crossKind = $get('拠点間の関わり');
+
             DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus,
-                &$created, &$updated, &$assignCount) {
+                $crossKind, $shareOffice, $office, &$created, &$updated, &$assignCount, &$shared) {
                 if ($existing) {
                     $existing->fill($attrs)->save();
                     $project = $existing;
@@ -524,6 +533,18 @@ class PastProjectImportController extends Controller
                 } else {
                     $project = Project::create($attrs + ['id' => $this->nextProjectId($date)]);
                     $created++;
+                }
+
+                // 巻き取り・ヘルプを「拠点間の関わり」として記録する（2026-08-28 baba要望）。
+                // ⚠ シートには「どの拠点から」が書かれていないので、画面で選んだ相手の拠点を使う。
+                //   選んでいなければ、これまでどおり備考の文字だけ（勘で拠点を決めない）。
+                if ($crossKind !== '' && $shareOffice !== '' && $shareOffice !== $office) {
+                    $kind = str_contains($crossKind, '巻き取り') ? '巻き取り' : 'ヘルプ';
+                    ProjectShare::updateOrCreate(
+                        ['project_id' => $project->id, 'office' => $shareOffice],
+                        ['kind' => $kind, 'created_by' => Auth::id()]
+                    );
+                    $shared++;
                 }
 
                 // その案件のこの取込ぶんは作り直す（取り込み直しで二重にならないように）。
@@ -565,7 +586,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared))
             ->with('past_missing', array_keys($missingNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
@@ -654,6 +675,7 @@ class PastProjectImportController extends Controller
                 $role = AssignmentRole::fromLabel($raw);
                 if ($role === null) {
                     $unknownRoles[] = $raw;      // 知らない書き方＝入れずに知らせる
+
                     continue;
                 }
             }
@@ -866,6 +888,25 @@ class PastProjectImportController extends Controller
     }
 
     /**
+     * 巻き取り・ヘルプの「相手の拠点」（2026-08-28 baba要望）。
+     *
+     * ⚠ シートには「巻き取り」「ヘルプ」としか書かれておらず、**どの拠点からかが書かれていない**。
+     *   勘で決めると拠点別の集計が狂うので、取込の画面で選んでもらう。
+     *   選んでいなければ空を返す＝これまでどおり備考に文字を残すだけにする。
+     * ⚠ 取込先の拠点と同じものは受け付けない（自分に頼む印は作らない）。
+     */
+    private function shareOffice(Request $request, string $ownOffice): string
+    {
+        $sent = trim((string) $request->input('share_office', ''));
+
+        if ($sent === '' || $sent === $ownOffice) {
+            return '';
+        }
+
+        return in_array($sent, OfficeScope::options(), true) ? $sent : '';
+    }
+
+    /**
      * 同じ人が同じ案件に2回出てきたら1行にまとめる（後に書かれている役割を採用）。
      *
      * なぜ要るか＝assignments は「案件×人×日」で1行と決まっている（unique）。
@@ -965,7 +1006,7 @@ class PastProjectImportController extends Controller
 
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
-        int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST): string
+        int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST, int $shared = 0): string
     {
         $future = $mode === self::MODE_FUTURE;
         $msg = $isMonthly
@@ -979,6 +1020,10 @@ class PastProjectImportController extends Controller
         if ($future) {
             $msg .= ' この案件はまだ未公開です＝スタッフには見えていません。'
                 .'公開ボードで人数を整えてから「公開する」を押してください。';
+        }
+
+        if ($shared > 0) {
+            $msg .= " 巻き取り・ヘルプの印が付いていた{$shared}件に、拠点間の関わりを記録しました。";
         }
 
         if ($skipped > 0) {
