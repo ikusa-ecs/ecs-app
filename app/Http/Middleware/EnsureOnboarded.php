@@ -29,6 +29,16 @@ class EnsureOnboarded
             && ! $request->is('onboarding')
             && ! $request->is('logout')
         ) {
+            // ⚠ 画面の中からの保存は JSON を待っている。HTML を返すと画面側が中身を読めず、
+            //   意味の分からないお知らせになる（EnsureTwoFactor と同じ理由・2026-08-28）。
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'reauth' => true,
+                    'message' => '初回の設定がまだ終わっていません。画面を読み込み直して、初期設定を終えてください。',
+                ], 409);
+            }
+
             return redirect('/onboarding');
         }
 

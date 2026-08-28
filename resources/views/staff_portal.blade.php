@@ -918,9 +918,9 @@
         headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString()
       })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(readJson)
       .then(res => {
-        if (!res || !res.ok) { alert('保存できませんでした。もう一度お試しください。'); return; }
+        if (!res || !res.ok) { alert((res && res.message) || '保存できませんでした。もう一度お試しください。'); return; }
         if (res.saved === false) {
           alert(res.message || 'このアカウントは体験用のため、コメントは保存されません（見本）。');
           return;
@@ -928,7 +928,7 @@
         const ok = document.getElementById('cmtok-' + id);
         if (ok) { ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 2000); }
       })
-      .catch(err => alert('保存に失敗しました（' + err + '）。'));
+      .catch(err => alert(saveErrorMessage(err)));
     }
 
     // コメント欄の開け閉め（ふだんは隠し、押したら開いて入力できる）
@@ -971,9 +971,11 @@
         headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString()
       })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      // ⚠ 中身が JSON でないときは「ログインの画面（HTML）に飛ばされた」＝有効期限切れ。
+      //   そのまま読もうとすると SyntaxError になり、意味の分からないお知らせになる。
+      .then(readJson)
       .then(res => {
-        if (!res || !res.ok) { entryFailed(j, before, '保存できませんでした。'); return; }
+        if (!res || !res.ok) { entryFailed(j, before, (res && res.message) || '保存できませんでした。'); return; }
         j.saveError = '';   // 前に失敗していたら消す
         // ⚠ 体験用（見本）アカウントは保存されない。これまでは画面だけ「エントリー済み」に
         //   変わってしまい、担当の画面には出ないので「エントリーしたのに出ない」と見えた
@@ -985,14 +987,35 @@
           alert(res.message || 'このアカウントは体験用のため、エントリーは保存されません（見本）。実際に試すときは、発行されたスタッフのアカウントでログインしてください。');
         }
       })
-      .catch(err => {
-        // ⚠ 419＝ページを開いたまま時間が経って、ログインの有効期限が切れた状態。
-        //   数字だけ出しても分からないので、何をすればよいかを書く。
-        const msg = (String(err) === '419')
-          ? 'ログインの有効期限が切れています。画面を読み込み直してから、もう一度押してください。'
-          : '保存に失敗しました（' + err + '）。通信を確認して、もう一度押してください。';
-        entryFailed(j, before, msg);
+      .catch(err => entryFailed(j, before, saveErrorMessage(err)));
+    }
+
+    /**
+     * サーバーの返事を JSON として読む。
+     * ⚠ ログインの有効期限が切れていると、保存の宛先ではなく**ログインの画面（HTML）**が返る。
+     *   そのまま JSON として読むと「SyntaxError: Unexpected token '<' …」という
+     *   意味の分からないお知らせになる（2026-08-28 baba報告）。ここで見分けて言い換える。
+     */
+    function readJson(r) {
+      const type = (r.headers.get('content-type') || '');
+      if (type.indexOf('application/json') < 0) {
+        return Promise.reject(r.status === 200 ? 'session' : r.status);
+      }
+      return r.json().then(j => {
+        // サーバーが「ログインし直して」と言っている場合（401/409）。
+        if (!r.ok && j && j.reauth) return { ok: false, message: j.message };
+        if (!r.ok) return Promise.reject(r.status);
+        return j;
       });
+    }
+
+    /** 失敗の中身を、何をすればよいかが分かる日本語にする。 */
+    function saveErrorMessage(err) {
+      const code = String(err);
+      if (code === 'session' || code === '401' || code === '419' || code === '409') {
+        return 'ログインの有効期限が切れています。画面を読み込み直して、ログインし直してから、もう一度押してください。';
+      }
+      return '保存に失敗しました（' + code + '）。通信を確認して、もう一度押してください。';
     }
 
     // エントリーが保存できなかったとき。
@@ -1232,13 +1255,13 @@
         headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString()
       })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(readJson)
       .then(res => {
         if (!msg) return;
         msg.textContent = (res && res.ok) ? '✓ 希望を保存しました' : ('⚠ ' + ((res && res.message) || '保存できませんでした'));
         msg.style.display = 'block';
       })
-      .catch(err => { if (msg) { msg.textContent = '保存に失敗しました（' + err + '）'; msg.style.display = 'block'; } });
+      .catch(err => { if (msg) { msg.textContent = '⚠ ' + saveErrorMessage(err); msg.style.display = 'block'; } });
     }
 
     // ===== タブ切り替え =====

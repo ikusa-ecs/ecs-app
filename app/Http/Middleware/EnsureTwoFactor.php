@@ -27,6 +27,19 @@ class EnsureTwoFactor
         if ($user
             && ! TestAccounts::isTest($user)
             && ! $request->session()->get('twofa_ok')) {
+            // ⚠ 画面の中からの保存（エントリー・稼働希望など）は JSON を待っている。
+            //   そこへログインの画面（HTML）を返すと、画面側は中身を読めず
+            //   「保存に失敗しました（SyntaxError: Unexpected token '<' …）」という
+            //   意味の分からないお知らせになる（2026-08-28 baba報告：スタッフ画面で発生）。
+            //   何が起きたのかを日本語で返して、画面が案内を出せるようにする。
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'reauth' => true,
+                    'message' => 'ログインの有効期限が切れました。画面を読み込み直して、ログインし直してください。',
+                ], 401);
+            }
+
             return redirect()->route('otp.challenge');
         }
 
