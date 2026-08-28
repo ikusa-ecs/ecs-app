@@ -640,6 +640,10 @@
   <script>
     window.ECS_MY_PROFILE = @json($myProfile ?? null);
     window.ECS_CSRF = '{{ csrf_token() }}';
+    {{-- 体験用（見本）アカウントか。⚠ true のときはエントリー・稼働希望が保存されない。
+         押したあとに知らせるだけだと「エントリーしたのに担当の一覧に無い」に見えるので、
+         ボタンの文字でも先に知らせる（2026-08-28 baba報告）。 --}}
+    window.ECS_MOCK_ONLY = @json(! empty($mockOnly));
     window.ECS_MY_PREFS = @json($myPrefs ?? []);
     window.ECS_PREF_PERIOD = @json($prefPeriod ?? '');
     window.ECS_MY_PREF_MEMO = @json($myPrefMemo ?? '');
@@ -806,6 +810,11 @@
           btn = `<button class="apply-btn-sm disabled" disabled>締切・満員</button>`;
         } else if (j.state === 'applied') {
           btn = `<button class="apply-btn-sm cancel" onclick="toggleApply(${j._i})">エントリーを取り消す</button>`;
+        } else if (window.ECS_MOCK_ONLY) {
+          // ⚠ 体験用（見本）アカウントはエントリーが保存されない。押したあとに注意を出すだけだと
+          //   「エントリーしたのに担当の一覧に無い」に見えるので、押す前にボタンで分かるようにする
+          //   （2026-08-28 baba報告）。上の赤い注意と合わせて二重に知らせる。
+          btn = `<button class="apply-btn-sm" onclick="toggleApply(${j._i})" title="体験用アカウントのため保存されません。実際に応募するときは、発行されたスタッフのアカウントでログインしてください。">エントリーする（体験用・保存されません）</button>`;
         } else {
           btn = `<button class="apply-btn-sm" onclick="toggleApply(${j._i})">エントリーする</button>`;
         }
