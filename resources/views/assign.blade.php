@@ -52,9 +52,10 @@
     .day-head .d-pool .remain.bad { color: var(--danger); }
     .day-head .d-warn { font-size: 12px; font-weight: 700; color: #fff; background: var(--danger); padding: 2px 9px; border-radius: 999px; }
     /* その日をまとめて確定・まとめて公開（2026-08-28 baba要望）。1件ずつ押す手間をなくす。
-       ⚠ 押し間違えないよう日付の数字からは少し離し、確定（白）と公開（緑）で色を分ける。 */
+       ⚠ 「候補◯名」のすぐ横に置く（baba指摘：右端に離すと見つけられない）。
+          確定（白）と公開（緑）で色を分けて、押し間違いを防ぐ。 */
     .day-head .day-bulk {
-      margin-left: auto; font-size: 12px; font-weight: 700; cursor: pointer;
+      font-size: 12px; font-weight: 700; cursor: pointer;
       border: 1px solid var(--line); background: #fff; color: #6b5544;
       padding: 3px 11px; border-radius: 999px; white-space: nowrap;
     }
@@ -126,6 +127,9 @@
     .sb.adj  { background: #e3edf7;            color: #2c6ca0; }
     .sb.fix  { background: var(--ok-soft);     color: #15803d; }
     .sb.pub  { background: #16a34a;            color: #fff; }
+    /* 締切＝人数が埋まってスタッフ画面では「締切・満員」になっている（2026-08-28 baba指摘）。
+       ⚠ 募集中（緑）と見間違えないよう灰色にする。 */
+    .sb.full { background: #8a7a66;            color: #fff; }
 
     /* 充足バー */
     .cc-fill { display: flex; align-items: center; gap: 9px; }
@@ -325,6 +329,8 @@
         <span style="display:inline-block;">※ 本人の画面に出るのは「確定」の人だけです。</span><br>
         <b>「募集中」の印は「スタッフ公開ボードでエントリーを募っている」という意味</b>で、アサインとは別のことです。
         <b>募集中でも「✓確定にする」は押せます</b>（募集して人が集まってから確定にするのが普通の流れです）。<br>
+        <b>人数が埋まると印は「締切」に変わります</b>＝スタッフの画面でも「締切・満員」になっていてエントリーできません。
+        また募集したいときは<b>「＋ 追加募集する」</b>で運営人数を増やしてください（<b>公開し直す必要はありません</b>）。<br>
         <b>日付の横のボタンから、その日をまとめて確定・まとめて公開できます</b>（対象がある日だけ出ます。押す前に案件名を出して確認します）。<br>
         <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
@@ -429,6 +435,7 @@
       //   ここで詰め替えを忘れると、ボタンの出し分けが効かなくなる。
       stat:c.stat, pubOn:c.pubOn,
       yomi:c.yomi,   // 確度（Aヨミ/Bヨミ/Cヨミ）。詰め替え忘れるとカードに出ない。
+      needStaff:c.needStaff,   // スタッフ画面で使っている必要人数（未入力なら既定）。締切の判定に使う。
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
@@ -1372,8 +1379,8 @@
             <span class="remain ${remain > 0 ? 'bad' : 'ok'}">${remain >= 0 ? 'あと' : '超過'} <b>${Math.abs(remain)}</b>名</span>
             <span title="稼働希望で〇を出した人＋この日の案件にエントリーした人（すでに入っている人は除く）">候補 <b>${cand}</b>名</span>
           </span>
-          ${warnHtml}
           ${dayBulkHtml(off, dayCases)}
+          ${warnHtml}
         </div>
         <div class="case-row" id="row-${off}"></div>`;
       body.appendChild(block);
@@ -1402,6 +1409,27 @@
   }
   // 募集中か（古いデータには pubOn が無いので state からも読めるようにする）。
   function bPubOn(c){ return (c.pubOn !== undefined) ? !!c.pubOn : (c.state === 'pub'); }
+
+  // ===== スタッフの画面でどう見えているか（2026-08-28 baba指摘）=====
+  // ⚠ 公開しているだけで「募集中」と出していたが、**スタッフの画面では人数が埋まると
+  //   「締切・満員」になっていてエントリーできない**。同じ案件なのに社員とスタッフで
+  //   言うことが違っていた。ここは必ずスタッフ画面と同じ数で判定する。
+  // ⚠ 判定の数（運営人数が未入力のときの既定）はサーバー（App\Support\RecruitStatus）から
+  //   needStaff で受け取る。ここに数字を書かないこと（片方だけ直すと必ず食い違う）。
+  function needStaffOf(c){ return (c.needStaff && c.needStaff > 0) ? c.needStaff : (c.need || 0); }
+  function isFullForStaff(c){ return filledOf(c) >= needStaffOf(c); }
+  function remainForStaff(c){ return Math.max(0, needStaffOf(c) - filledOf(c)); }
+
+  // カードに出す「いまスタッフからどう見えているか」の印。公開していない案件には出さない。
+  function recruitBadge(c){
+    if (!bPubOn(c)) return '';
+    if (isFullForStaff(c)) {
+      return '<span class="sb full" title="人数が埋まっているので、スタッフの画面では「締切・満員」に見えています。'
+        + '運営人数を増やすと、その場でまた募集中に戻ります（公開し直す必要はありません）。">締切</span>';
+    }
+    return '<span class="sb pub" title="スタッフの画面に募集として出ています。やめるのは公開ボードから。">募集中 あと'
+      + remainForStaff(c) + '名</span>';
+  }
 
   // 案件名を確認の文にする（何をまとめて変えるのか必ず見せる）。
   function bulkNames(list){
@@ -1480,6 +1508,39 @@
         return confirmAllMembers(c);
       })
       .then(() => { c.state = 'pub'; c.pubOn = true; });
+  }
+
+  // 追加募集＝運営人数を増やす（2026-08-28 baba要望）。
+  // ⚠ 公開の状態は触らない。スタッフ画面の「締切・満員」は人数から毎回決まるので、
+  //   人数を増やせばそれだけでまた募集中に戻る。
+  // ⚠ 保存はアサイン表と同じ入口（/assign-sheet/project）を使う＝運営人数の直し方を2つ作らない。
+  //   「6〜8」のような範囲もそのまま入れられる（Headcount が読む）。
+  function addRecruit(id){
+    const c = cases.find(x => x.id === id);
+    if (!c) return;
+    const now = needStaffOf(c);
+    const input = prompt('「' + c.name + '」の運営人数を増やします。\n'
+      + 'いまの運営人数：' + now + '名（' + filledOf(c) + '名が入っていて満員です）\n\n'
+      + '新しい運営人数を入れてください（「6〜8」のような範囲でも入れられます）。', String(now + 1));
+    if (input === null) return;
+    const value = input.trim();
+    if (value === '') return;
+    if (!USING_DB){ c.need = parseInt(value, 10) || c.need; c.needStaff = c.need; render(); return; }
+    fetch('/assign-sheet/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: id, field: 'required_count', value: value })
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!res || !res.ok) { alert((res && res.message) || '運営人数を変えられませんでした。'); return; }
+        // 画面を開き直さなくても分かるように、その場で数字を入れ替える。
+        const max = Math.max.apply(null, (value.match(/\d+/g) || ['0']).map(Number));
+        if (max > 0) { c.need = max; c.needStaff = max; }
+        render();
+        alert('運営人数を「' + value + '」にしました。\nスタッフの画面でまた募集中になります。');
+      })
+      .catch(e => alert('運営人数を変えられませんでした（' + e + '）。もう一度お試しください。'));
   }
 
   function buildCard(c, dayCases, dupNames, amap){
@@ -1603,6 +1664,11 @@
     }
     // 公開をやめる・締切や伝えることを直すのは公開ボードに任せる
     // （公開のON/OFFの入口を増やすと、どこで切ったか分からなくなるため）。
+    // 締切（満員）のときは「追加募集する」＝運営人数を増やす道を出す（2026-08-28 baba要望）。
+    // ⚠ 公開し直す必要はない。人数を増やせば、その場でまたスタッフ画面に「募集中」で出る。
+    if (pubOn && isFullForStaff(c)) {
+      stateBtn += `<button class="edit-btn" onclick="addRecruit('${c.id}')" title="運営人数を増やすと、スタッフの画面でまた募集中になります（公開し直す必要はありません）">＋ 追加募集する</button>`;
+    }
     // ⚠ 「?project=案件ID」を付けて、公開ボードの**その案件の行**まで飛ばす（2026-08-28 baba要望）。
     //   前はただ公開ボードを開くだけで、どの案件だったか探し直す必要があった。
     if (pubOn) {
@@ -1622,7 +1688,7 @@
         </div>
         <!-- ⚠ 案件の進み具合と「募集中（公開）」は別のことなので、印も分けて出す。
              前は公開すると進み具合が「公開済」で隠れ、確定なのか調整中なのか分からなかった。 -->
-        <span class="sb ${stat}" title="案件の進み具合">${stateLabel[stat] || ''}</span>${pubOn ? `<span class="sb pub" title="スタッフに公開して募集中です。やめるのは公開ボードから。">募集中</span>` : ''}
+        <span class="sb ${stat}" title="案件の進み具合">${stateLabel[stat] || ''}</span>${recruitBadge(c)}
         <div class="cc-actions">
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
           ${filled < c.need ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}

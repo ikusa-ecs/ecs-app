@@ -13,6 +13,7 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -381,6 +382,10 @@ class AssignBoardController extends Controller
                 // 確度（Aヨミ/Bヨミ/Cヨミ）。⚠ 確度が低い案件は無くなることがあるので、
                 //   アサインを詰める前に気づけるようカードにも出す（2026-08-28 baba要望）。
                 'yomi' => (string) ($p->yomi ?? ''),
+                // ⚠ スタッフの画面で使っている必要人数（未入力なら既定の人数）。正本＝RecruitStatus。
+                //   これで「締切（満員）／募集中」を判定する＝社員とスタッフで言うことを合わせる。
+                //   運営人数を増やせば、その場でまた「募集中」に戻る（公開し直さなくてよい）。
+                'needStaff' => RecruitStatus::need($p->required_count),
                 'mine' => $mine,
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',

@@ -12,6 +12,7 @@ use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectFormats;
+use App\Support\RecruitStatus;
 use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
@@ -37,8 +38,11 @@ class StaffPortalController extends Controller
      * 募集人数が未定（空欄・0）のときにスタッフ画面へ見せる既定の人数。
      * 人数はセールスが案件登録で入れるのが正しいが、未定のまま公開されても
      * 「満員＝エントリーできない」にならないようにするための保険（2026-08-20 baba 指示）。
+     *
+     * ⚠ 数の正本は App\Support\RecruitStatus。社員側の画面（日別ボード）も同じ数で
+     *   「締切／募集中」を判定するので、ここに別の数を書かないこと（2026-08-28）。
      */
-    private const DEFAULT_NEED = 5;
+    private const DEFAULT_NEED = RecruitStatus::DEFAULT_NEED;
 
     public function index()
     {
