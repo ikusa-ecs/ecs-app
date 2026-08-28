@@ -766,6 +766,22 @@
       })
       .catch(() => { alert('通信エラーでメンバーを確定にできませんでした。'); return 0; });
   }
+  // 公開ずみの案件で、あとから足した「仮」の人をまとめて確定にする（2026-08-28 baba指摘）。
+  // ⚠ スタッフの画面に出るのは「確定」の人だけ。仮のままだと本人に伝わらない。
+  //   公開のときと同じ入口（confirmAllMembers）を使う＝確定のやり方を2つ作らない。
+  function fixMembers(id){
+    const c = cases.find(x => x.id === id);
+    if (!c) return;
+    const kari = c.assigned.filter(m => m.status === '仮');
+    if (!kari.length) { alert('「仮」の人はいません。'); return; }
+    if (!confirm('「' + c.name + '」の「仮」の ' + kari.length + '名を「確定」にします。\n'
+      + '確定にすると、その人の画面にこの案件が出ます。\n\nよろしいですか？')) return;
+    if (!USING_DB){ kari.forEach(m => { m.status = '確定'; }); render(); return; }  // 見本データのときは画面だけ
+    confirmAllMembers(c).then(n => {
+      render();
+      if (n) alert('✓ メンバー ' + n + '名を「確定」にしました（本人の画面に出ます）。');
+    });
+  }
   function markPub(id){
     const c = cases.find(x => x.id === id);
     if (!c) return;
@@ -1417,7 +1433,15 @@
     if (c.state === 'todo' || c.state === 'adj') stateBtn = `<button class="edit-btn" onclick="markFix('${c.id}')" title="案件を確定にし、あわせてメンバー全員を「確定」にします">✓ 確定にする</button>`;
     else if (c.state === 'fix')                  stateBtn = `<button class="auto-btn" onclick="markPub('${c.id}')">📣 スタッフに公開</button>`;
     // 公開をやめる操作は公開ボードに任せる（公開のON/OFFの入口を増やしすぎないため）。
-    else if (c.state === 'pub')                  stateBtn = `<span style="font-size:12px; font-weight:700; color:#15803d;">公開中 ✓</span><a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;
+    // ⚠ 公開ずみの案件は「✓ 確定にする」「📣 スタッフに公開」が消える＝もう一度やる必要が無いため。
+    //   ただし**公開したあとで足した人は「仮」から始まる**ので、その人たちをまとめて確定にする
+    //   ボタンだけは出す（2026-08-28 baba指摘。前は名前の横の「仮」を1人ずつ押すしかなかった）。
+    else if (c.state === 'pub') {
+      const kari = c.assigned.filter(m => m.status === '仮').length;
+      stateBtn = `<span style="font-size:12px; font-weight:700; color:#15803d;" title="すでにスタッフに公開しています。もう一度公開する必要はありません。">公開中 ✓</span>`
+        + (kari ? `<button class="edit-btn" onclick="fixMembers('${c.id}')" title="公開したあとで足した人は「仮」で入ります。押すと全員「確定」になり、本人の画面に出ます。">✓ 仮の${kari}名を確定にする</button>` : '')
+        + `<a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;
+    }
 
     card.innerHTML = `
       <div class="cc-head">

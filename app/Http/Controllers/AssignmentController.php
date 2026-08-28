@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\ContentRoleRequirement;
@@ -12,8 +13,8 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
 use App\Support\AssignmentStamp;
 use App\Support\Headcount;
-use App\Support\ProjectAccess;
 use App\Support\OfficeScope;
+use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -73,7 +74,7 @@ class AssignmentController extends Controller
         // この案件に「エントリーする」を押した人（applications）。スタッフID => 本人の一言。
         // 稼働希望（下の $wish）とは別物。エントリー＝この案件を名指しで希望している人なので、
         // アサインするときに一番の手がかりになる（2026-08-21 baba指摘：この画面に出ていなかった）。
-        $entries = \App\Models\Application::where('project_id', $project->id)
+        $entries = Application::where('project_id', $project->id)
             ->pluck('note', 'staff_id')
             ->all();
 
@@ -166,8 +167,10 @@ class AssignmentController extends Controller
                 $posLabels = array_map(function ($k) use ($p) {
                     if ($k === 'OP') {
                         $fl = $this->opFlavor($p);
-                        return $fl !== '' ? ('OP' . $fl) : AssignmentRole::label('OP');
+
+                        return $fl !== '' ? ('OP'.$fl) : AssignmentRole::label('OP');
                     }
+
                     return AssignmentRole::label($k);
                 }, $canShown);
                 $eval = $scorer->evaluate($p);
@@ -317,7 +320,7 @@ class AssignmentController extends Controller
             if ($note === '' && $patrol === null) {
                 continue;   // 指定なしの枠は内訳に出さない（枠の数字で十分）
             }
-            $key = $note . '|' . ($patrol ?? '');
+            $key = $note.'|'.($patrol ?? '');
             if (! isset($agg[$r->position][$key])) {
                 $agg[$r->position][$key] = ['note' => $note, 'patrol' => $patrol, 'count' => 0];
             }
@@ -387,7 +390,7 @@ class AssignmentController extends Controller
         // 拠点チェック（他拠点の案件をURL直打ちで書き換えられないようにする）。
         ProjectAccess::authorize($project);
         if (! $project->start_date) {
-            return redirect('/project-assign?project=' . urlencode($project->id))
+            return redirect('/project-assign?project='.urlencode($project->id))
                 ->with('status', '⚠ この案件は開催日が未設定です。先に案件登録で日付を入れてからアサインしてください。');
         }
 
@@ -401,7 +404,7 @@ class AssignmentController extends Controller
         $now = Carbon::now();
 
         // 「いま選ばれている人」で、その案件×その日 を上書き保存する（外した人は削除）。
-        DB::transaction(function () use ($project, $date, $staffIds, $roles, $roles2, $notes, $patrols, $remarks, $data, $now) {
+        DB::transaction(function () use ($project, $date, $staffIds, $roles, $roles2, $notes, $patrols, $remarks, $data) {
             // date は 'date' キャストで時刻付き保存になり得るため、日付部分だけで照合する
             // （quickToggle と同じ考え方。where('date',$date) だと空振りして再登録が unique 制約で 500 になる）。
             //
@@ -439,7 +442,7 @@ class AssignmentController extends Controller
 
         $n = count($staffIds);
 
-        return redirect('/project-assign?project=' . urlencode($project->id))
+        return redirect('/project-assign?project='.urlencode($project->id))
             ->with('status', "「{$project->project_name}」に {$n}名を「{$data['status']}」で保存しました（{$date}）。");
     }
 
@@ -596,7 +599,9 @@ class AssignmentController extends Controller
      *
      * ・対象＝その案件・その開催日の、キャンセル以外で「仮」のアサインだけ
      * ・すでに確定の人は触らない（確定した日時の記録を上書きしないため）
-     * ・公開したあとで足した人は「仮」から始まる＝名前の横の「仮」を押して確定にする
+     * ・公開したあとで足した人は「仮」から始まる。日別ボードの公開ずみカードに出る
+     *   「✓ 仮の◯名を確定にする」からもここを呼ぶ（2026-08-28。前は名前の横の「仮」を
+     *   1人ずつ押すしかなかった）。1人だけ確定にしたいときは従来どおり名前の横の「仮」。
      */
     public function confirmMembers(Request $request)
     {
