@@ -386,25 +386,22 @@
       html += '</div>';
     }
 
+    // ⚠ コンテンツごとの表は「経験回数」の画面（/experience）に移した（2026-08-28 baba要望）。
+    //   ここは1人ずつしか見られないので「このコンテンツをやれる人は誰か」を探せなかった。
+    //   ここには「よくやったコンテンツ」だけ出して、詳しくは向こうで見てもらう。
     if (e.byContent && e.byContent.length) {
-      html += '<div style="font-size:12.5px; margin-bottom:4px;"><b>コンテンツごと</b>'
-        + '<span class="muted" style="font-size:11px;">（多い順・最後にやった日）</span></div>';
-      html += '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
-      e.byContent.forEach(function(c){
-        // コンテンツ×ポジション＝そのコンテンツで何をやったか。
-        const cr = (e.byContentRole || {})[c.name] || {};
-        const parts = Object.keys(cr).map(function(k){ return k + ' ' + cr[k]; });
-        html += '<tr>'
-          + '<td style="padding:2px 6px 2px 0; border-bottom:1px solid #efe8dd;">' + escAttrS(c.name) + '</td>'
-          + '<td style="padding:2px 6px; border-bottom:1px solid #efe8dd; white-space:nowrap;"><b>' + c.count + '回</b></td>'
-          + '<td style="padding:2px 6px; border-bottom:1px solid #efe8dd; color:#8a7a66; white-space:nowrap;">'
-          + (parts.length ? escAttrS(parts.join(' / ')) : '') + '</td>'
-          + '<td style="padding:2px 0 2px 6px; border-bottom:1px solid #efe8dd; color:#8a7a66; white-space:nowrap;">'
-          + (c.last ? escAttrS(c.last) : '') + '</td>'
-          + '</tr>';
+      html += '<div style="font-size:12.5px; margin-bottom:4px;"><b>よくやったコンテンツ</b></div><div>';
+      e.byContent.slice(0, 5).forEach(function(c){
+        html += '<span class="badge" style="margin:0 6px 4px 0;">' + escAttrS(c.name) + ' ' + c.count + '回</span>';
       });
-      html += '</table>';
+      if (e.byContent.length > 5) {
+        html += '<span class="muted" style="font-size:11.5px;">ほか' + (e.byContent.length - 5) + '種類</span>';
+      }
+      html += '</div>';
     }
+
+    html += '<div style="margin-top:8px; font-size:12px;">'
+      + '<a href="/experience" style="color:#6b5544;">🏅 経験回数の画面で見る（コンテンツごと・ポジションごとに人を探せます）→</a></div>';
 
     return html;
   }

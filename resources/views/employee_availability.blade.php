@@ -191,6 +191,14 @@
       font-size: 9px; color: #1d4e89; margin-top: 1px; max-width: 74px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    /* 本人が書いた「その日のメモ」。⚠ カレンダーと同じ茶の破線にそろえる。 */
+    table.ov-tbl td.ovnote { background: #fdfaf4; }
+    table.ov-tbl tr.me td.ovnote { background: #fdf8ef; }
+    table.ov-tbl td.ovbusy.ovnote { background: #f4f4f6; }
+    table.ov-tbl td .ovnote-txt {
+      font-size: 9px; color: #6b5544; margin-top: 1px; max-width: 74px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help;
+    }
     table.ov-tbl tfoot td { background: #faf5ee; font-weight: 700; color: #5a4a38; }
     table.ov-tbl tfoot td.few { background: #fbe3e3; color: #b91c1c; }
     .ov-note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
@@ -367,6 +375,8 @@
             ※ 一番下の「〇の人数」が少ない日（赤）は、イベントがあるのに出られる社員が少ない＝注意したい日です。<br>
             ※ <b style="color:#1d4e89;">薄い青のマス</b>は、その人の<b>アサインがもう確定している日</b>です（案件名を小さく出します。マウスを乗せると詳しく出ます）。
             そのため「<b>うち空いている人数</b>」＝〇のうち、まだ案件が入っていない人＝<b>これから頼める人数</b>です。<br>
+            ※ 本人が <b>✎ で書いたその日のメモ</b>（「午後だけ可」「前泊」など）も、その日のマスに小さく出ます。
+            <b>平日など列になっていない日のメモは、右はしの「備考」に「◯日：〜」の形でまとめて出します。</b><br>
             ※ 上の<b>拠点</b>で絞れます（はじめは自分の拠点）。<b>「〇の人数」も、いま表に出ている人だけで数えます</b>
             ＝その拠点で何人出られるかが分かります。他拠点の人も見たいときは「拠点：すべて」にしてください。
           </p>
@@ -785,6 +795,31 @@
       ? (shown + '名を表示中（すべての拠点）')
       : (shown + '名を表示中（<b>' + ovEsc(want) + '</b>の社員だけ）');
   }
+  // 社員index・日 → その人がその日に書いたメモ。
+  // ⚠ 自分は入力タブの内容（myNotes）を使う＝保存前に書いた内容も一覧に出るように。
+  //   他の人はDBに保存された内容（PREFS[].dayNote）。
+  function empDayNote(idx, y, m, d){
+    const k = keyOf(y,m,d);
+    if (idx === 0) return (myNotes[k] || '').trim();
+    const e = EMP_LIST[idx];
+    if (!e || !PREFS[e.id]) return '';
+    return ((PREFS[e.id].dayNote || {})[k] || '').trim();
+  }
+  // 表の列になっていない日（＝平日）に書いたメモ。備考の欄にまとめて出す。
+  // ⚠ 一覧の列は土日祝・大型だけなので、ここに出さないと平日のメモが誰にも見えない。
+  function otherDayNotes(idx, y, m, cols){
+    const isCol = {};
+    cols.forEach(function(c){ isCol[c.d] = true; });
+    const days = new Date(y, m, 0).getDate();
+    const out = [];
+    for (let d=1; d<=days; d++){
+      if (isCol[d]) continue;
+      const note = empDayNote(idx, y, m, d);
+      if (note) out.push('<div style="font-size:11px; color:#6b5544; margin-top:2px;">'
+        + d + '日：' + ovEsc(note) + '</div>');
+    }
+    return out.join('');
+  }
   // 社員index → その社員の登録済み state（DBから）。先頭(自分)は myState を使うので別扱い。
   function empState(idx){
     if (idx===0) return null;                         // 自分は myState を使う
@@ -826,11 +861,25 @@
   function ovCell(idx, name, y, m, d){
     const v = markFor(idx, name, y, m, d);
     const list = ovAssigned(idx, y, m, d);
-    if (list.length === 0) return '<td>' + markHtml(v) + '</td>';
-    const tip = ovEsc(assignedTitle(list));
-    const names = ovEsc(list.map(function(a){ return a.name; }).join('・'));
-    return '<td class="ovbusy" title="' + tip + '">' + markHtml(v)
-         + '<div class="ovbusy-txt">' + names + '</div></td>';
+    const note = empDayNote(idx, y, m, d);
+
+    let inner = markHtml(v);
+    let tips = [];
+    // もう決まっている案件（薄い青）。
+    if (list.length){
+      tips.push(assignedTitle(list));
+      inner += '<div class="ovbusy-txt">' + ovEsc(list.map(function(a){ return a.name; }).join('・')) + '</div>';
+    }
+    // ⚠ その日のメモも出す。ここに出さないと、本人が書いたメモをアサイン担当が見られない
+    //   （2026-08-28 baba指摘。前は自分のカレンダーにしか出ていなかった）。
+    if (note){
+      tips.push('メモ：' + note);
+      inner += '<div class="ovnote-txt" title="' + ovEsc(note) + '">✎ ' + ovEsc(note) + '</div>';
+    }
+    if (tips.length === 0) return '<td>' + inner + '</td>';
+
+    const cls = (list.length ? 'ovbusy' : '') + (note ? ' ovnote' : '');
+    return '<td class="' + cls.trim() + '" title="' + ovEsc(tips.join('\n')) + '">' + inner + '</td>';
   }
   // 平日のうち希望休にしている日を配列で返す（自分＝myState、他＝その人が登録した内容）。
   // ⚠ 未登録の人は空のまま。架空の希望休を作らない。
@@ -907,8 +956,11 @@
       const offTxt = offs.length ? offs.map(d=>d+'日').join('・') : '<span style="color:#c7bba9;">なし</span>';
       // 備考：自分＝入力タブ／他＝その月に本人が書いた内容。未登録は「―」（架空の備考は出さない）。
       const realMemo = empMemo(idx, y, m);
-      const memo = me ? (myMemo || '<span style="color:#c7bba9;">（未入力）</span>')
-                      : ((realMemo || '') || '<span style="color:#c7bba9;">―</span>');
+      let memo = me ? (myMemo || '<span style="color:#c7bba9;">（未入力）</span>')
+                    : ((realMemo || '') || '<span style="color:#c7bba9;">―</span>');
+      // ⚠ 平日など「列になっていない日」に書いたメモは、ここに出さないと誰にも見えない。
+      const others = otherDayNotes(idx, y, m, cols);
+      if (others) memo += others;
       body += '<td class="offcol">' + offTxt + '</td><td class="memocol">' + memo + '</td>';
       body += '</tr>';
     });

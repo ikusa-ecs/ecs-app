@@ -331,6 +331,30 @@ class AvailabilityConfirmedProjectsTest extends TestCase
             ->assertSee('class="bigclient"', false);
     }
 
+    /**
+     * ⚠ 他の人が書いた「その日のメモ」も一覧タブに渡す（2026-08-28 baba指摘）。
+     * 前は自分のカレンダーにしか出ておらず、アサイン担当が見られなかった。
+     */
+    public function test_other_peoples_day_notes_reach_the_overview(): void
+    {
+        $me = $this->employee();
+        $other = $this->employee('E-103', '鈴木 一郎');
+        $day = Carbon::today()->copy()->addDays(22);
+        $key = $day->year.'-'.$day->month.'-'.$day->day;
+
+        ShiftPreference::create([
+            'staff_id' => $other->id, 'period' => $day->format('Y-m'),
+            'date' => $day->toDateString(), 'availability' => '未定', 'day_note' => '午後だけ可',
+        ]);
+
+        $this->actingAsPerson($me)->get('/employee-availability')
+            ->assertOk()
+            ->assertViewHas('prefs', fn ($p) => ($p[$other->id]['dayNote'][$key] ?? null) === '午後だけ可')
+            // 一覧タブがそれを読む関数が残っているか（@verbatim の切れ目対策）。
+            ->assertSee('function empDayNote', false)
+            ->assertSee('function otherDayNotes', false);
+    }
+
     /** 他人の確定案件も一覧タブ用に渡す（アサイン担当が空いている人を見るため）。 */
     public function test_other_employees_are_included(): void
     {
