@@ -231,6 +231,7 @@
           </div>
           <div>
             ${identityEditorHtml(p, idx)}
+            ${hireDateHtml(p, idx)}
             ${officeEditorHtml(p, idx)}
             <h4>サイズ（当日の衣装・ユニフォーム準備の参考）</h4>
             <div class="size-row">
@@ -402,6 +403,59 @@
         <span class="muted" style="font-size:12px;">※ 未設定のままだと「東京」として扱われます。拠点を間違えると別の拠点のデータが見えます。</span>
       </div>
       <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+  }
+
+  // 入社年月日（2026-08-28 baba要望）。
+  // ⚠ 区分（新人／中堅／ベテラン）は**この日付からその場で計算**している（保存していない）。
+  //   新人＝1年未満／中堅＝1年以上3年未満／ベテラン＝3年以上。
+  //   入社日が間違っていると新入社員がベテランに見えるので、日付と区分を並べて出す。
+  // ⚠ 数え方をここに書かないこと（正本は Person::getSkillLevelAttribute）。区分はサーバーの値をそのまま出す。
+  function hireDateHtml(p, idx){
+    const date = p.hireDate || '';
+    const level = p.level || '';
+    const shown = date
+      ? `${escAttr(date)}${level ? '（いまの区分：<b>' + escAttr(level) + '</b>）' : ''}`
+      : '<span class="muted">未入力（区分が決まりません）</span>';
+
+    // 直せない人には「見るだけ」で出す＝原因が分かるように。
+    if (!window.ECS_CAN_MANAGE_OFFICE) {
+      return `<h4>入社年月日</h4><div style="font-size:13px; margin-bottom:6px;">${shown}</div>
+        <div class="muted" style="font-size:12px;">※ 区分（新人／中堅／ベテラン）はこの日付から自動で決まります。直せるのは管理者以上です。</div>
+        <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+    }
+    return `<h4>入社年月日</h4>
+      <div style="font-size:13px; margin-bottom:6px;">いまの登録：${shown}</div>
+      <div class="size-row" style="gap:10px;">
+        <label class="size-item">入社年月日：
+          <input type="date" class="size-input" style="width:170px;" id="hire-${idx}" value="${escAttr(date)}">
+        </label>
+      </div>
+      <div class="save-row" style="margin-top:10px;">
+        <button class="btn primary sm" onclick="saveHireDate(${idx}, this)">入社年月日を保存</button>
+        <span class="save-ok" id="hireSaved-${idx}" style="display:none;">✓ 保存しました</span>
+        <span class="muted" style="font-size:12px;">※ 区分（新人＝1年未満／中堅＝1〜3年／ベテラン＝3年以上）は、この日付から自動で決まります。</span>
+      </div>
+      <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
+  }
+
+  function saveHireDate(idx, btn){
+    const p = employees[idx];
+    const el = document.getElementById('hire-' + idx);
+    const body = new URLSearchParams();
+    body.append('hire_date', el ? el.value : '');
+    if (btn) btn.disabled = true;
+    fetch('/employees/' + encodeURIComponent(p.id) + '/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: body.toString()
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      if (!ok) { alert((j && j.message) || '保存できませんでした。'); if (btn) btn.disabled = false; return; }
+      // 区分（新人／中堅／ベテラン）や新人バッジが変わるので読み込み直す。
+      location.reload();
+    })
+    .catch(() => { alert('保存に失敗しました。通信を確認して、もう一度お試しください。'); if (btn) btn.disabled = false; });
   }
 
   function saveOffice(idx, btn){

@@ -378,6 +378,9 @@ class AssignBoardController extends Controller
                 //   別のことなので別々に持つ（2026-08-28 baba指摘）。
                 'stat' => $this->boardStatus($p),
                 'pubOn' => (bool) $p->staff_published,
+                // 確度（Aヨミ/Bヨミ/Cヨミ）。⚠ 確度が低い案件は無くなることがあるので、
+                //   アサインを詰める前に気づけるようカードにも出す（2026-08-28 baba要望）。
+                'yomi' => (string) ($p->yomi ?? ''),
                 'mine' => $mine,
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',

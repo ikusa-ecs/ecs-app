@@ -186,6 +186,8 @@
     /* 月見出しジャンプの点滅 */
     @keyframes pubFlash { 0% { background: var(--warn-soft); } 100% { background: var(--brand-soft); } }
     tr.group-row.flash td { animation: pubFlash 1.4s ease-out; }
+    /* 他の画面から名指しで開いた案件の行を光らせる（どれのことか分かるように）。 */
+    tr.flash td { animation: pubFlash 1.4s ease-out; }
   </style>
 @endverbatim
 @endpush
@@ -614,6 +616,10 @@
     const extra = (c.category === '追加案件');
 
     const tr = document.createElement('tr');
+    // 他の画面から「この案件」を名指しで開けるようにする（2026-08-28 baba要望）。
+    // ⚠ 日別ボードの「公開ボード →」は、前はただ公開ボードを開くだけで、
+    //   どの案件だったか探し直す必要があった。
+    tr.id = 'case-' + c.id;
     if (extra) tr.className = 'extra-row';
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
@@ -870,10 +876,44 @@
   window.addEventListener('storage', render);
   window.addEventListener('focus', render);
 
+  /**
+   * 他の画面から「?project=案件ID」で開かれたら、その案件の行まで移動して光らせる。
+   * ⚠ 畳んである月・過去（アーカイブ）タブに入っている案件でも見つかるようにする
+   *   ＝見つからないまま「何も起きない」のがいちばん困るため。
+   */
+  function jumpToCaseFromUrl(){
+    const want = new URLSearchParams(location.search).get('project');
+    if (!want) return;
+
+    const tryFind = () => document.getElementById('case-' + want);
+    let row = tryFind();
+    if (!row){
+      // 畳んでいる月があるかもしれないので、ぜんぶ開いて描き直す。
+      collapsedMonths.clear();
+      render();
+      row = tryFind();
+    }
+    if (!row && currentView !== 'archive'){
+      // 過去の案件はアーカイブのタブにいる。そちらも探す。
+      setView('archive');
+      collapsedMonths.clear();
+      render();
+      row = tryFind();
+    }
+    if (!row){
+      alert('この案件は公開ボードに出ていません（過去の案件・キャンセル・他の拠点の可能性があります）。');
+      return;
+    }
+    row.scrollIntoView({ behavior:'smooth', block:'center' });
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+    setTimeout(() => row.classList.remove('flash'), 1600);
+  }
+
   loadNotice();
   loadDeadline();
   buildYmTree();
   render();
+  jumpToCaseFromUrl();   // 他の画面から「この案件」を名指しで開かれたとき
 </script>
 @endverbatim
 @endpush

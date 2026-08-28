@@ -13,10 +13,10 @@ use App\Support\LoginInvite;
 use App\Support\OfficeScope;
 use App\Support\SpotStaff;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * 人名簿（people テーブル）の画面。社員・スタッフは同じ1テーブル（role で区別）。
@@ -45,33 +45,38 @@ class PersonController extends Controller
                     : 0;
 
                 return [
-                    'id'           => $p->id,
-                    'name'         => $p->name,
-                    'kana'         => $p->name_kana ?? '',   // ふりがな（五十音順の並び・未入力の人を見つける用）
-                    'dept'         => Departments::code($p->department),   // 主な所属の色コード（絞り込みにも使う）
-                    'deptName'     => Departments::label($p->department),  // 画面に出す文字（未設定は「未設定」）
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'kana' => $p->name_kana ?? '',   // ふりがな（五十音順の並び・未入力の人を見つける用）
+                    'dept' => Departments::code($p->department),   // 主な所属の色コード（絞り込みにも使う）
+                    'deptName' => Departments::label($p->department),  // 画面に出す文字（未設定は「未設定」）
                     // 兼務を含めた所属すべて（先頭＝主な所属）。バッジを複数出すのに使う。
-                    'depts'        => collect($p->departmentList())
+                    'depts' => collect($p->departmentList())
                         ->map(fn ($d) => ['name' => $d, 'code' => Departments::code($d)])
                         ->values(),
-                    'cwid'         => $p->chatwork_id ?? '',   // チャットワークID（未登録を見つける用）
-                    'active'       => (bool) $p->active,      // 在籍中か（false＝退職）
-                    'email'        => $p->email ?? '',
+                    'cwid' => $p->chatwork_id ?? '',   // チャットワークID（未登録を見つける用）
+                    'active' => (bool) $p->active,      // 在籍中か（false＝退職）
+                    'email' => $p->email ?? '',
                     // ログインの状態（none=アカウント無し／temp=仮パスワード発行済み／
                     // invited=案内メール送信済み／ready=本人が設定済み）
-                    'login'        => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
-                    'invitedAt'    => optional($p->invited_at)->format('Y-m-d'),
-                    'deptMain'     => $p->department ?? '',   // 主な所属（編集欄の初期値）
-                    'office'       => $p->office ?? '',   // 事務所（地域オフィス）
+                    'login' => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
+                    'invitedAt' => optional($p->invited_at)->format('Y-m-d'),
+                    'deptMain' => $p->department ?? '',   // 主な所属（編集欄の初期値）
+                    'office' => $p->office ?? '',   // 事務所（地域オフィス）
                     'joinedMonths' => $months,
-                    'exp'          => $p->experienced_contents ?? [],
-                    'dexp'         => $p->director_contents ?? [],
-                    'wear'         => $p->shirt_size ?? '',
-                    'shoe'         => $p->shoe_size ?? '',
+                    // 入社年月日と、そこから計算した区分（2026-08-28 baba要望）。
+                    // ⚠ 区分は保存していない＝入社日から毎回計算する。だから入社日が間違っていると
+                    //   新入社員がベテランに見える。原因が分かるよう、両方を並べて出す。
+                    'hireDate' => $p->hire_date?->format('Y-m-d') ?? '',
+                    'level' => $p->skill_level ?? '',
+                    'exp' => $p->experienced_contents ?? [],
+                    'dexp' => $p->director_contents ?? [],
+                    'wear' => $p->shirt_size ?? '',
+                    'shoe' => $p->shoe_size ?? '',
                     // サイズ編集パネルの初期値（今の登録値をそのまま表示・空欄なら空文字）。
-                    'height'       => $p->height ?? '',
-                    'shoeSize'     => $p->shoe_size ?? '',
-                    'shirtSize'    => $p->shirt_size ?? '',
+                    'height' => $p->height ?? '',
+                    'shoeSize' => $p->shoe_size ?? '',
+                    'shirtSize' => $p->shirt_size ?? '',
                     // アサインの候補に出すか（2026-08-26 baba要望）。false＝出勤可能日の一覧・
                     // D決め・D/SD/物品担当のプルダウンに出さない。名簿には今までどおり出る。
                     'inAssignPool' => (bool) $p->in_assign_pool,
@@ -96,7 +101,7 @@ class PersonController extends Controller
             'myOffice' => OfficeScope::filterSingle(request()),
             // 「アサイン表に出す／出さない」を切り替えられるか＝管理者以上（アサイン担当）。
             'canManageAssignPool' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
-            'employees'      => $employees,
+            'employees' => $employees,
             'contentOptions' => $contentOptions,
             // 経験回数（自動集計・2026-08-27）。社員も現場に出るので同じように出す。
             'experience' => ExperienceCount::forMany($employees->pluck('id')->all()),
@@ -108,7 +113,7 @@ class PersonController extends Controller
             // ログイン案内メールを送れるか＝管理者以上（アカウント発行と同じ扱い）。
             'canInvite' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             // 自分自身には出さない（自分を消す・退職にするのは止めている）。
-            'myId'            => optional(Auth::user())->id,
+            'myId' => optional(Auth::user())->id,
         ]);
     }
 
@@ -120,10 +125,10 @@ class PersonController extends Controller
     public function saveExperience(Request $request)
     {
         $data = $request->validate([
-            'id'     => ['required', 'string'],
-            'exp'    => ['sometimes', 'array'],
-            'exp.*'  => ['string', 'max:100'],
-            'dexp'   => ['sometimes', 'array'],
+            'id' => ['required', 'string'],
+            'exp' => ['sometimes', 'array'],
+            'exp.*' => ['string', 'max:100'],
+            'dexp' => ['sometimes', 'array'],
             'dexp.*' => ['string', 'max:100'],
         ]);
 
@@ -160,11 +165,11 @@ class PersonController extends Controller
         }
 
         $data = $request->validate([
-            'height'     => ['nullable', 'string', 'max:20'],  // 身長（cm）
-            'shoe_size'  => ['nullable', 'string', 'max:20'],  // 靴のサイズ
+            'height' => ['nullable', 'string', 'max:20'],  // 身長（cm）
+            'shoe_size' => ['nullable', 'string', 'max:20'],  // 靴のサイズ
             'shirt_size' => ['nullable', 'string', 'max:20'],  // 服のサイズ
-            'name'       => ['sometimes', 'required', 'string', 'max:255'],
-            'name_kana'  => ['nullable', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name_kana' => ['nullable', 'string', 'max:255'],
             'department' => ['nullable', 'string', 'max:50'],
             'departments' => ['nullable', 'array'],
             'departments.*' => ['string', 'max:50'],
@@ -172,10 +177,14 @@ class PersonController extends Controller
             'in_assign_pool' => ['nullable', 'boolean'],
             // 拠点（事務所）。2026-08-27 baba要望＝これまで画面から直せなかった。
             'office' => ['nullable', 'string', 'max:50'],
+            // 入社年月日。2026-08-28 baba要望＝これまで画面のどこにも出ておらず、
+            // 「新入社員がベテランになっている」の原因を確認も修正もできなかった。
+            'hire_date' => ['nullable', 'date'],
         ], [], [
             'name' => '氏名',
             'name_kana' => 'ふりがな',
             'department' => '主な所属',
+            'hire_date' => '入社年月日',
         ]);
 
         // 送られてきた項目だけ更新（空文字は「クリア」として保存する）。
@@ -218,6 +227,19 @@ class PersonController extends Controller
                 ], 422);
             }
             $person->office = $office !== '' ? $office : null;
+        }
+
+        // 入社年月日＝管理者以上（2026-08-28 baba要望）。
+        // ⚠ 区分（新人／中堅／ベテラン）はこの日付から**その場で計算**している（保存していない）。
+        //   なので入社日が間違っていると、新入社員がベテランに見える。直せる場所がここまで無かった。
+        if ($request->has('hire_date')) {
+            if (! in_array(optional(Auth::user())->permission, ['manager', 'admin'], true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => '入社年月日を直せるのは管理者以上です。',
+                ], 403);
+            }
+            $person->hire_date = ($data['hire_date'] ?? null) ?: null;
         }
 
         // ここから下は他人の氏名・ふりがな・所属の書き換え＝Administrator だけ。
@@ -266,17 +288,27 @@ class PersonController extends Controller
 
             // 「できる役割」は D / MC / OP / 軍師 の4つだけを対象に表示する。
             $roleParts = [];
-            if (in_array(AssignmentRole::D, $can, true))  { $roleParts[] = 'D'; }
-            if (in_array(AssignmentRole::MC, $can, true)) { $roleParts[] = 'MC'; }
+            if (in_array(AssignmentRole::D, $can, true)) {
+                $roleParts[] = 'D';
+            }
+            if (in_array(AssignmentRole::MC, $can, true)) {
+                $roleParts[] = 'MC';
+            }
             if (in_array(AssignmentRole::OP, $can, true)) {
                 // OP はオンライン/リアルの別があれば付記する。
                 $flavor = '';
-                if ($p->op_online && $p->op_real) { $flavor = '（オンライン/リアル）'; }
-                elseif ($p->op_online)            { $flavor = '（オンライン）'; }
-                elseif ($p->op_real)              { $flavor = '（リアル）'; }
-                $roleParts[] = 'OP' . $flavor;
+                if ($p->op_online && $p->op_real) {
+                    $flavor = '（オンライン/リアル）';
+                } elseif ($p->op_online) {
+                    $flavor = '（オンライン）';
+                } elseif ($p->op_real) {
+                    $flavor = '（リアル）';
+                }
+                $roleParts[] = 'OP'.$flavor;
             }
-            if (in_array(AssignmentRole::SP, $can, true)) { $roleParts[] = '軍師'; }
+            if (in_array(AssignmentRole::SP, $can, true)) {
+                $roleParts[] = '軍師';
+            }
 
             return [
                 $p->id,
@@ -300,11 +332,11 @@ class PersonController extends Controller
         $csv = stream_get_contents($handle);
         fclose($handle);
 
-        $filename = 'staff_' . now()->format('Y-m-d') . '.csv';
+        $filename = 'staff_'.now()->format('Y-m-d').'.csv';
 
         return response($csv, 200, [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -325,54 +357,54 @@ class PersonController extends Controller
                 }
 
                 return [
-                    'id'        => $p->id,
-                    'role'      => 'staff',
-                    'name'      => $p->name,
-                    'kana'      => $p->name_kana ?? '',
-                    'active'    => (bool) $p->active,   // 在籍中か（false＝退職）
-                    'email'     => $p->email ?? '',
+                    'id' => $p->id,
+                    'role' => 'staff',
+                    'name' => $p->name,
+                    'kana' => $p->name_kana ?? '',
+                    'active' => (bool) $p->active,   // 在籍中か（false＝退職）
+                    'email' => $p->email ?? '',
                     // ログインの状態（2026-08-25 baba要望＝名簿で「登録済み／まだ」が分かるように）
                     //   none    … アカウントがまだ無い（パスワードが空）
                     //   invited … 案内メールを送ったが、本人がまだパスワードを決めていない
                     //   ready   … 本人がパスワードを決めた＝ログインできる
-                    'login'     => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
+                    'login' => $p->password_set_at ? 'ready' : ($p->invited_at ? 'invited' : ($p->password ? 'temp' : 'none')),
                     // 臨時スタッフ（インターン・知り合いの助っ人など）。ログインしない（2026-08-25 baba）。
-                    'spot'      => (bool) $p->is_spot,
+                    'spot' => (bool) $p->is_spot,
                     'invitedAt' => optional($p->invited_at)->format('Y-m-d'),
-                    'office'    => $p->office ?? '',   // 事務所（地域オフィス）
+                    'office' => $p->office ?? '',   // 事務所（地域オフィス）
                     // joinDate ＝ 区分（新人/中堅/ベテラン）計算の元。people.js と同じく文字列で渡す。
-                    'joinDate'  => $p->hire_date?->format('Y-m-d'),
+                    'joinDate' => $p->hire_date?->format('Y-m-d'),
                     'exclusive' => (bool) $p->is_exclusive,
-                    'total'     => $p->experience_count ?? 0,
-                    'pos'       => $pos,
+                    'total' => $p->experience_count ?? 0,
+                    'pos' => $pos,
                     // OPの区別（B案）：オンライン可／リアル可。null=未設定は false 扱いで渡す。
-                    'opOnline'  => (bool) $p->op_online,
-                    'opReal'    => (bool) $p->op_real,
-                    'ng'        => $p->ngRelations->pluck('partner_name')->all(),
-                    'dnote'     => $p->planner_impression ?? '',
-                    'traits'    => [
-                        'follow'  => (bool) $p->can_follow_newbie,
+                    'opOnline' => (bool) $p->op_online,
+                    'opReal' => (bool) $p->op_real,
+                    'ng' => $p->ngRelations->pluck('partner_name')->all(),
+                    'dnote' => $p->planner_impression ?? '',
+                    'traits' => [
+                        'follow' => (bool) $p->can_follow_newbie,
                         'starter' => (bool) $p->self_starter,
-                        'atmos'   => (bool) $p->improves_atmosphere,
+                        'atmos' => (bool) $p->improves_atmosphere,
                     ],
                     // 本人プロフィール（公開ボードの設定／初回設定で本人が入力・people の実列）。
                     // これまで名簿詳細は擬似ランダムの見本を出していたが、実データ表示に切り替える。
-                    'profile'   => [
-                        'appeal'   => $p->appeal ?? '',
-                        'likeC'    => $p->liked_contents ?? '',
+                    'profile' => [
+                        'appeal' => $p->appeal ?? '',
+                        'likeC' => $p->liked_contents ?? '',
                         'dislikeC' => $p->disliked_contents ?? '',
-                        'strong'   => $p->strong_positions ?? '',
-                        'weak'     => $p->weak_positions ?? '',
-                        'height'   => $p->height ?? '',
-                        'shoe'     => $p->shoe_size ?? '',
-                        'shirt'    => $p->shirt_size ?? '',
-                        'pref'     => $p->prefecture ?? '',
-                        'station'  => $p->nearest_station ?? '',
-                        'mcPass'   => (bool) $p->mc_audition_passed,
+                        'strong' => $p->strong_positions ?? '',
+                        'weak' => $p->weak_positions ?? '',
+                        'height' => $p->height ?? '',
+                        'shoe' => $p->shoe_size ?? '',
+                        'shirt' => $p->shirt_size ?? '',
+                        'pref' => $p->prefecture ?? '',
+                        'station' => $p->nearest_station ?? '',
+                        'mcPass' => (bool) $p->mc_audition_passed,
                         'kigurumi' => (bool) $p->can_kigurumi,
-                        'stay'     => (bool) $p->can_stay_over,
-                        'drive'    => $p->driving_level ?? '',
-                        'english'  => $p->english_level ?? '',
+                        'stay' => (bool) $p->can_stay_over,
+                        'drive' => $p->driving_level ?? '',
+                        'english' => $p->english_level ?? '',
                     ],
                 ];
             })
@@ -415,20 +447,21 @@ class PersonController extends Controller
             if ($request->expectsJson()) {
                 return response()->json(['ok' => false, 'message' => 'スタッフが見つかりませんでした。'], 404);
             }
+
             return redirect('/staff')->with('status', 'スタッフが見つかりませんでした。一覧から選び直してください。');
         }
 
         $data = $request->validate([
-            'positions'           => ['sometimes', 'array'],
-            'positions.*'         => ['string'],
-            'managed_positions'   => ['sometimes', 'array'],   // このフォームが扱うポジションの範囲（未指定＝全件置換）
+            'positions' => ['sometimes', 'array'],
+            'positions.*' => ['string'],
+            'managed_positions' => ['sometimes', 'array'],   // このフォームが扱うポジションの範囲（未指定＝全件置換）
             'managed_positions.*' => ['string'],
-            'op_online'           => ['sometimes', 'boolean'],  // OPオンライン可（B案）
-            'op_real'             => ['sometimes', 'boolean'],  // OPリアル(現地)可（B案）
-            'ng'                  => ['nullable', 'string', 'max:2000'],
-            'impression'          => ['nullable', 'string', 'max:1000'],
+            'op_online' => ['sometimes', 'boolean'],  // OPオンライン可（B案）
+            'op_real' => ['sometimes', 'boolean'],  // OPリアル(現地)可（B案）
+            'ng' => ['nullable', 'string', 'max:2000'],
+            'impression' => ['nullable', 'string', 'max:1000'],
             // 拠点（事務所）。2026-08-27 baba要望＝これまで画面から直せなかった。
-            'office'              => ['nullable', 'string', 'max:50'],
+            'office' => ['nullable', 'string', 'max:50'],
         ]);
 
         // 拠点（事務所）の付け替え＝管理者以上（2026-08-27 baba選択）。
@@ -484,19 +517,19 @@ class PersonController extends Controller
             StaffRelation::where('staff_id', $person->id)->delete();
             foreach ($names as $name) {
                 StaffRelation::create([
-                    'staff_id'      => $person->id,
-                    'partner_name'  => $name,
-                    'partner_id'    => Person::where('name', $name)->value('id'),
+                    'staff_id' => $person->id,
+                    'partner_name' => $name,
+                    'partner_id' => Person::where('name', $name)->value('id'),
                     'relation_type' => 'NG',
                 ]);
             }
 
             // 3) 専属・人柄・メモ（people の実在カラム）。
-            $person->is_exclusive        = $request->boolean('exclusive');
-            $person->can_follow_newbie   = $request->boolean('follow');
-            $person->self_starter        = $request->boolean('starter');
+            $person->is_exclusive = $request->boolean('exclusive');
+            $person->can_follow_newbie = $request->boolean('follow');
+            $person->self_starter = $request->boolean('starter');
             $person->improves_atmosphere = $request->boolean('atmos');
-            $person->planner_impression  = $data['impression'] ?? null;
+            $person->planner_impression = $data['impression'] ?? null;
             // OPのオンライン/リアル可（B案）：送られてきたときだけ更新する。
             if ($request->has('op_online')) {
                 $person->op_online = $request->boolean('op_online');
@@ -507,7 +540,7 @@ class PersonController extends Controller
             $person->save();
         });
 
-        $message = $person->name . ' さんの情報を保存しました。';
+        $message = $person->name.' さんの情報を保存しました。';
         if ($request->expectsJson()) {
             return response()->json(['ok' => true, 'message' => $message]);
         }
@@ -610,7 +643,7 @@ class PersonController extends Controller
         return response()->json([
             'ok' => true,
             'active' => $active,
-            'message' => $person->name . ' さんを' . ($active ? '在籍に戻しました。' : '退職（在籍なし）にしました。'),
+            'message' => $person->name.' さんを'.($active ? '在籍に戻しました。' : '退職（在籍なし）にしました。'),
         ]);
     }
 
@@ -660,16 +693,16 @@ class PersonController extends Controller
         ];
         foreach ($counts as $label => $n) {
             if ($n > 0) {
-                $blockers[] = $label . ' ' . $n . '件';
+                $blockers[] = $label.' '.$n.'件';
             }
         }
         if ($blockers) {
             return response()->json([
                 'ok' => false,
-                'message' => $person->name . ' さんには記録が残っているため削除できません（'
-                    . implode('・', $blockers) . '）。'
-                    . '辞められた方の場合は「退職にする」を押してください。'
-                    . '名簿には残りますが、アサインの候補には出なくなります。',
+                'message' => $person->name.' さんには記録が残っているため削除できません（'
+                    .implode('・', $blockers).'）。'
+                    .'辞められた方の場合は「退職にする」を押してください。'
+                    .'名簿には残りますが、アサインの候補には出なくなります。',
             ], 422);
         }
 
@@ -693,6 +726,6 @@ class PersonController extends Controller
             $person->delete();
         });
 
-        return response()->json(['ok' => true, 'message' => $name . ' さんを名簿から削除しました。']);
+        return response()->json(['ok' => true, 'message' => $name.' さんを名簿から削除しました。']);
     }
 }

@@ -221,8 +221,19 @@
     .m-type { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
     .m-type.emp   { background: #e3edf7; color: #2c6ca0; }   /* 社員 */
     .m-type.haken { background: #efe6f6; color: #6d28d9; }   /* 派遣 */
+    /* 確度（Aヨミ/Bヨミ/Cヨミ）の印。⚠ 案件一覧と同じ見た目にそろえる（画面ごとに変えない）。 */
+    .ymk { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
+    .ymk.a { background: var(--brand-soft); color: var(--brand-dark); }
+    .ymk.b { background: var(--warn-soft);  color: #b45309; }
+    .ymk.c { background: #ece3d4;           color: #7a6a58; }
+
+    /* 社員は名前も色を変える（2026-08-28 baba要望）＝ぱっと見でスタッフと見分けられるように。
+       色は横に出るバッジと同じにそろえる（社員＝青／派遣＝紫）。 */
+    .m-name.emp   { color: #2c6ca0; font-weight: 700; }
+    .m-name.haken { color: #6d28d9; font-weight: 700; }
     /* メンバーを外す × ／ 希望者を入れる ＋追加 */
-    /* 同じ日に複数案件でかぶっている人＝赤文字 */
+    /* 同じ日に複数案件でかぶっている人＝赤文字。
+       ⚠ 社員の青より後ろに書く＝かぶりの赤を優先する（気づかないと事故になるため）。 */
     .m-name.dup { color: var(--danger); font-weight: 700; }
     .m-x   { color: var(--danger); font-weight: 700; cursor: pointer; padding: 0 4px; }
     .m-x:hover { background: var(--danger-soft); border-radius: 6px; }
@@ -405,6 +416,7 @@
       // ⚠ 「案件の進み具合(stat)」と「募集中か(pubOn)」は別のこと。
       //   ここで詰め替えを忘れると、ボタンの出し分けが効かなくなる。
       stat:c.stat, pubOn:c.pubOn,
+      yomi:c.yomi,   // 確度（Aヨミ/Bヨミ/Cヨミ）。詰め替え忘れるとカードに出ない。
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
@@ -738,7 +750,9 @@
     if (!c) return;
     if (filledOf(c) < c.need
       && !confirm('必要人数（' + c.need + '名）に対して ' + filledOf(c) + '名です。\nこのまま確定にしますか？')) return;
-    if (!USING_DB){ c.state = 'fix'; c.stat = 'fix'; render(); return; }   // 見本データのときは画面だけ
+    // ⚠ 確定にするだけ。公開（staff_published）は触らない＝「確定」と「公開」は別の操作。
+    //   すでに募集中の案件は 'pub' のままにする（上書きすると募集中の印が消えてしまう）。
+    if (!USING_DB){ c.stat = 'fix'; if (!c.pubOn) c.state = 'fix'; render(); return; }   // 見本データのときは画面だけ
     fetch('/projects/cells', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
@@ -748,7 +762,7 @@
       // メンバーも全員「確定」にする（2026-08-26 baba要望）。
       // ⚠ 案件だけ確定にしても、メンバーが「仮」のままではスタッフの画面に出ない。
       .then(() => confirmAllMembers(c))
-      .then(() => { c.state = 'fix'; c.stat = 'fix'; render(); })
+      .then(() => { c.stat = 'fix'; if (!c.pubOn) c.state = 'fix'; render(); })
       .catch(e => alert('確定にできませんでした（' + e + '）。もう一度お試しください。'));
   }
 
@@ -1039,6 +1053,15 @@
 
   // 案件カードのタイトル部分のHTML。タイトルは1行省略（長い分は「…」・ホバーで全文）。
   // コンテンツ未登録の案件は先頭に小さな「⚠未登録」バッジを付け、案件名で仮表示する。
+  // 確度（Aヨミ/Bヨミ/Cヨミ）の印。⚠ 印も色も案件一覧と同じにそろえる（画面ごとに変えない）。
+  //   「確定」は数が多いので印を出さない＝印が付いている＝まだ確定していない、と読める。
+  const yomiMark = { 'Aヨミ':{ t:'A', c:'a' }, 'Bヨミ':{ t:'B', c:'b' }, 'Cヨミ':{ t:'C', c:'c' } };
+  function yomiHtml(c){
+    const y = yomiMark[c.yomi];
+    if (!y) return '';
+    return `<span class="ymk ${y.c}" title="確度：${c.yomi}（まだ確定していない案件です）">${y.t}</span>`;
+  }
+
   function titleBlockHtml(c){
     const name = c.name || '';
     const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツがマスタに未登録です。案件名で仮表示しています。">⚠未登録</span> ' : '';
@@ -1046,7 +1069,7 @@
     const inner = USING_DB
       ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く">${badge}${name}</a>`
       : `${badge}${name}`;
-    return `<div class="cc-name" title="${name}">${inner}</div>`;
+    return `<div class="cc-name" title="${name}">${inner}${yomiHtml(c)}</div>`;
   }
 
   // メンバーのポジション欄。手動編集中でスタッフIDがあればプルダウン（選ぶとDB保存）、それ以外は表示のみ。
@@ -1405,7 +1428,10 @@
         ? `<span class="renkin-badge ${dayN >= 4 ? 'hi' : ''}" title="連勤の内訳（この期間に ${dayN}日ぶん）：\n${renkinList}">連${dayN}日</span>`
         : '';
       const capb = m.type === 'staff' ? capBadge(m.name, amap) : '';
-      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
+      // 名前の色でも区別する（2026-08-28 baba要望）＝社員は青・派遣は紫。横に出るバッジと同じ色。
+      // ⚠ かぶり(dup)の赤が勝つようにCSS側で書く順番を決めている。
+      const kindCls = m.type === 'emp' ? ' emp' : (m.type === 'haken' ? ' haken' : '');
+      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}${kindCls}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
     // 「仮」の人数（この人たちはスタッフの画面に出ないので、見出しで気づけるようにする・2026-08-21 baba）
     const kariN = members.filter(m => m.status === '仮').length;
@@ -1466,8 +1492,10 @@
     }
     // 公開をやめる・締切や伝えることを直すのは公開ボードに任せる
     // （公開のON/OFFの入口を増やすと、どこで切ったか分からなくなるため）。
+    // ⚠ 「?project=案件ID」を付けて、公開ボードの**その案件の行**まで飛ばす（2026-08-28 baba要望）。
+    //   前はただ公開ボードを開くだけで、どの案件だったか探し直す必要があった。
     if (pubOn) {
-      stateBtn += `<a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;
+      stateBtn += `<a class="open-btn" href="/assign-publish?project=${encodeURIComponent(c.id)}" title="この案件の行を公開ボードで開きます（公開をやめる・締切や伝えることを直すのはそこから）">公開ボードで開く →</a>`;
     }
 
     card.innerHTML = `

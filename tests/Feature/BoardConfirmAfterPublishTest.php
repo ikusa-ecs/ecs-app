@@ -81,8 +81,44 @@ class BoardConfirmAfterPublishTest extends TestCase
             // 募集中でも「✓ 確定にする」を出す仕掛け（stat と pubOn を分けて見ている）。
             ->assertSee("if (stat === 'todo' || stat === 'adj')", false)
             ->assertSee('募集中', false)
+            // 公開ボードへは「その案件」を名指しで開く（ただ開くだけにしない）。
+            ->assertSee('/assign-publish?project=', false)
+            // 確度（Aヨミ/Bヨミ/Cヨミ）の印。
+            ->assertSee('function yomiHtml', false)
             // いちばん最後の方の関数も残っているか。
             ->assertSee('function markPub', false);
+    }
+
+    /** 公開ボード側に、名指しで開かれたときに行まで飛ぶ仕掛けがあること。 */
+    public function test_publish_board_can_jump_to_one_case(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAsPerson($admin)->get('/assign-publish')
+            ->assertOk()
+            ->assertSee('function jumpToCaseFromUrl', false)
+            ->assertSee("tr.id = 'case-' + c.id", false);
+    }
+
+    /** 日別ボードのカードに確度（Aヨミ等）が渡っていること。 */
+    public function test_board_receives_yomi(): void
+    {
+        $admin = $this->admin();
+        $day = Carbon::today()->copy()->addDays(8);
+
+        Project::create([
+            'id' => 'P-YOMI', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => $day->toDateString(), 'office' => '東京',
+            'status' => '調整中', 'yomi' => 'Bヨミ',
+        ]);
+
+        $this->actingAsPerson($admin)->get('/assign')
+            ->assertOk()
+            ->assertViewHas('boardCases', function ($cases) {
+                $c = collect($cases)->firstWhere('id', 'P-YOMI');
+
+                return $c && $c['yomi'] === 'Bヨミ';
+            });
     }
 
     /**
