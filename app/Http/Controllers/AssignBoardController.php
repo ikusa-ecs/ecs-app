@@ -16,6 +16,7 @@ use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -357,9 +358,9 @@ class AssignBoardController extends Controller
             // 「自分の案件」印＝営業担当かディレクターが自分かどうか。
             // ⚠ 以前は in_array('baba', ...) と名前を直書きしていたため、誰がログインしても
             //   baba さんの案件だけに印が付いていた（2026-08-24 修正）。
-            $myName = trim((string) (\Illuminate\Support\Facades\Auth::user()->name ?? ''));
+            $myName = trim((string) (Auth::user()->name ?? ''));
             $mine = $myName !== ''
-                && (in_array($myName, $salesOwners, true) || ($p->director_id ?? '') === (\Illuminate\Support\Facades\Auth::id() ?? '~'));
+                && (in_array($myName, $salesOwners, true) || ($p->director_id ?? '') === (Auth::id() ?? '~'));
 
             return [
                 'id' => $p->id,
@@ -372,6 +373,11 @@ class AssignBoardController extends Controller
                 'need' => $p->required_count ?? 0,
                 'filled' => count($assigned),
                 'state' => $state,
+                // ⚠ ボタンの出し分けはこの2つで行う（state ではなく）。
+                //   stat＝案件の進み具合だけ／pubOn＝スタッフに公開して募集中かどうか。
+                //   別のことなので別々に持つ（2026-08-28 baba指摘）。
+                'stat' => $this->boardStatus($p),
+                'pubOn' => (bool) $p->staff_published,
                 'mine' => $mine,
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',
@@ -609,7 +615,7 @@ class AssignBoardController extends Controller
         foreach (ShiftPreference::whereIn('staff_id', $staffIds->all())
             ->whereIn('availability', ['稼働可', '希望'])
             ->get(['staff_id', 'date']) as $pref) {
-            $availSet[$pref->staff_id . '|' . $pref->date->format('Y-m-d')] = true;
+            $availSet[$pref->staff_id.'|'.$pref->date->format('Y-m-d')] = true;
         }
 
         $appsByProject = $apps->groupBy('project_id')->map(fn ($r) => $r->pluck('staff_id')->all());
@@ -652,7 +658,7 @@ class AssignBoardController extends Controller
                     'name' => $person->name ?? $sid,
                     'pos' => $this->primaryPos($person),
                     'roleCode' => $this->primaryPosCode($person),  // 担当役割の初期値
-                    'cal' => $dateStr ? isset($availSet[$sid . '|' . $dateStr]) : false,
+                    'cal' => $dateStr ? isset($availSet[$sid.'|'.$dateStr]) : false,
                 ];
             })->all();
 
@@ -750,12 +756,35 @@ class AssignBoardController extends Controller
             ->keyBy('id');
     }
 
-    /** 案件のDB状態 → ボードの4状態（todo/adj/fix/pub）。 */
+    /**
+     * 案件のDB状態 → ボードの4状態（todo/adj/fix/pub）。
+     *
+     * ⚠ 絞り込みと色分けのために残しているが、**これは2つのことを1つにまとめてしまっている**。
+     *   ボタンの出し分けには使わないこと（下の boardStatus / staff_published を使う）。
+     *   理由は boardStatus のコメント。
+     */
     private function boardState(Project $p): string
     {
         if ($p->staff_published) {
             return 'pub';
         }
+
+        return $this->boardStatus($p);
+    }
+
+    /**
+     * 案件の進み具合だけ（todo＝未着手 / adj＝調整中 / fix＝確定）。公開は見ない。
+     *
+     * ⚠ 【なぜ分けるか（2026-08-28 baba指摘）】
+     * 「スタッフに公開」は**募集をかける操作**で、メンバーのアサインとは別のこと。
+     * ところが以前は「公開ずみなら pub」で他をぜんぶ隠していたため、
+     * **募集をかけた瞬間に「✓ 確定にする」（＝メンバーを確定にする）ボタンが消えて**いた。
+     * 実際の流れは 公開して募集 → エントリーが集まる → アサイン → **そこで確定**、
+     * なので、いちばん必要なときにボタンが無い状態だった。
+     * 公開（募集中かどうか）と、案件の進み具合は**別々に持つ**。
+     */
+    private function boardStatus(Project $p): string
+    {
         if ($p->status === '確定') {
             return 'fix';
         }

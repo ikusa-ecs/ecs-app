@@ -298,9 +298,11 @@
       <div class="mock-note">
         案件・割当メンバー・希望者・その日の稼働可・件数バッジは、登録済みのデータ（DB）を表示しています。<br>
         <b>※この画面での操作（メンバーの追加・⚡自動アサイン・仮／確定の切替・✓確定にする・📣スタッフに公開・備考の編集）は、押した時点で保存されます。</b>
-        追加した人は<b>「仮」で入ります</b>。<b>「✓確定にする」「📣スタッフに公開」を押すと、そのカードのメンバーは全員「確定」になります</b>（2026-08-26）。<br>
-        <b>そのあとで足した人は また「仮」から始まります</b>ので、名前の横の<b>「仮」を押して確定</b>にしてください。
+        追加した人は<b>「仮」で入ります</b>。<b>「✓確定にする」を押すと、そのカードのメンバーは全員「確定」になります</b>（2026-08-26）。<br>
+        <b>そのあとで足した人は また「仮」から始まります</b>ので、<b>「✓ 仮の◯名を確定にする」</b>（1人だけなら名前の横の<b>「仮」</b>）を押してください。
         <span style="display:inline-block;">※ 本人の画面に出るのは「確定」の人だけです。</span><br>
+        <b>「募集中」の印は「スタッフ公開ボードでエントリーを募っている」という意味</b>で、アサインとは別のことです。
+        <b>募集中でも「✓確定にする」は押せます</b>（募集して人が集まってから確定にするのが普通の流れです）。<br>
         <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
       </div>
@@ -321,8 +323,8 @@
           <option value="todo">未着手のみ</option>
           <option value="adj">調整中のみ</option>
           <option value="fix">確定のみ</option>
-          <option value="pub">公開済のみ</option>
-          <option value="unpub">未公開のみ（未着手・調整中・確定）</option>
+          <option value="pub">募集中のみ（スタッフに公開ずみ）</option>
+          <option value="unpub">まだ募集していないもののみ</option>
         </select>
         <label class="chk"><input type="checkbox" id="mineOnly" onchange="render()"> 自分の担当のみ</label>
         <button class="btn" onclick="openWishlist()" style="margin-left:8px;">👥 スタッフ一覧（別ウィンドウ）</button>
@@ -400,6 +402,9 @@
     .map(c => ({
       id:c.id, off:c.off, name:c.name, contentMissing:c.contentMissing, client:c.client, cat:c.cat,
       need:c.need, filled:c.filled, state:c.state, mine:c.mine,
+      // ⚠ 「案件の進み具合(stat)」と「募集中か(pubOn)」は別のこと。
+      //   ここで詰め替えを忘れると、ボタンの出し分けが効かなくなる。
+      stat:c.stat, pubOn:c.pubOn,
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
@@ -626,6 +631,7 @@
         .filter(p => { if (seenPick.has(p.id)) return false; seenPick.add(p.id); return true; });
       const picked = pool.slice(0, room);
       if (c.state === 'todo') c.state = 'adj';
+      if ((c.stat || c.state) === 'todo') c.stat = 'adj';
       // 基本1案件につきDは1名。すでにDがいる／2人目以降のDは役割を付けずに追加（あとで手動指定）。
       let dCount = c.assigned.filter(m => m.roleCode === 'D').length;
       picked.forEach(p => {
@@ -657,6 +663,7 @@
       .slice(0, c.need);
     c.assigned = picked.map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:'staff' }));
     if (c.state === 'todo') c.state = 'adj';
+    if ((c.stat || c.state) === 'todo') c.stat = 'adj';
     render();
     if (picked.length < c.need) {
       alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に ' + picked.length + '名を割り当てました（必要 ' + c.need + '名に ' + (c.need - picked.length) + '名 不足）。');
@@ -712,6 +719,7 @@
     const m = { id: id, name: name, lv: (lv || '-'), pos: posLabel, roleCode: rc, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: 'staff' };
     c.assigned.push(m);
     if (c.state === 'todo') c.state = 'adj';
+    if ((c.stat || c.state) === 'todo') c.stat = 'adj';
     fetch(window.ECS_QUICK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
@@ -730,7 +738,7 @@
     if (!c) return;
     if (filledOf(c) < c.need
       && !confirm('必要人数（' + c.need + '名）に対して ' + filledOf(c) + '名です。\nこのまま確定にしますか？')) return;
-    if (!USING_DB){ c.state = 'fix'; render(); return; }   // 見本データのときは画面だけ
+    if (!USING_DB){ c.state = 'fix'; c.stat = 'fix'; render(); return; }   // 見本データのときは画面だけ
     fetch('/projects/cells', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
@@ -740,7 +748,7 @@
       // メンバーも全員「確定」にする（2026-08-26 baba要望）。
       // ⚠ 案件だけ確定にしても、メンバーが「仮」のままではスタッフの画面に出ない。
       .then(() => confirmAllMembers(c))
-      .then(() => { c.state = 'fix'; render(); })
+      .then(() => { c.state = 'fix'; c.stat = 'fix'; render(); })
       .catch(e => alert('確定にできませんでした（' + e + '）。もう一度お試しください。'));
   }
 
@@ -792,7 +800,7 @@
       + '\n\n公開すると、この案件が募集としてスタッフ画面に出ます。'
       + (kari ? '\nいま「仮」の ' + kari + '名も、あわせて「確定」にします（確定にしないと本人の画面に出ません）。' : '')
       + '\n公開してよろしいですか？')) return;
-    if (!USING_DB){ c.state = 'pub'; render(); return; }   // 見本データのときは画面だけ
+    if (!USING_DB){ c.state = 'pub'; c.pubOn = true; render(); return; }   // 見本データのときは画面だけ
     // 公開の処理はスタッフ公開ボードと同じ入口を使う（staff_published を立てる＝編集履歴にも残る）。
     const body = { ids: [id], publish: true };
     if (window.ECS_OFFICE_SCOPE) body.office = window.ECS_OFFICE_SCOPE;
@@ -808,6 +816,7 @@
         // ⚠ 公開しても仮の人は本人の画面に出ないため、ここで揃える。
         confirmAllMembers(c).then(n => {
           c.state = 'pub';
+          c.pubOn = true;
           render();
           alert('📣 スタッフに公開しました。'
             + (n ? '\nメンバー ' + n + '名を「確定」にしました（本人の画面に出ます）。' : '')
@@ -1269,8 +1278,12 @@
     const list = cases.filter(c => {
       if (mine && !c.mine) return false;
       if (!sf) return true;
-      if (sf === 'unpub') return c.state !== 'pub';
-      return c.state === sf;
+      // ⚠ 「募集中か」と「案件の進み具合」は別々に見る。
+      //   前は1つの状態にまとめていたので、公開ずみの案件は「確定のみ」で絞っても出てこなかった。
+      const pubOn = (c.pubOn !== undefined) ? !!c.pubOn : (c.state === 'pub');
+      if (sf === 'pub')   return pubOn;
+      if (sf === 'unpub') return !pubOn;
+      return (c.stat || c.state) === sf;
     });
 
     // 開催日（off）ごとにまとめる
@@ -1428,19 +1441,33 @@
          <div class="col-list">${candRows || '<div class="mem-none">希望者はいません。</div>'}</div>
        </div>`;
 
-    // 状態を進めるボタン（ボード上で完結：未着手/調整中→確定→公開）
+    // ===== 状態を進めるボタン =====
+    // ⚠ 「公開（＝募集をかける）」と「案件の進み具合（未着手→調整中→確定）」は**別のこと**。
+    //   以前は公開ずみを最優先の状態にしていたため、**募集をかけた瞬間に
+    //   「✓ 確定にする」（＝メンバーを確定にする）ボタンが消えて**いた。
+    //   実際は 公開して募集 → エントリーが集まる → アサイン → **そこで確定**、なので
+    //   いちばん必要なときにボタンが無かった（2026-08-28 baba指摘）。
+    //   いまは公開していても、案件が確定になるまで「✓ 確定にする」を出し続ける。
+    const stat  = c.stat  || c.state;              // 案件の進み具合だけ（todo/adj/fix）
+    const pubOn = (c.pubOn !== undefined) ? !!c.pubOn : (c.state === 'pub');  // 募集中か
+    const kari  = c.assigned.filter(m => m.status === '仮').length;
+
     let stateBtn = '';
-    if (c.state === 'todo' || c.state === 'adj') stateBtn = `<button class="edit-btn" onclick="markFix('${c.id}')" title="案件を確定にし、あわせてメンバー全員を「確定」にします">✓ 確定にする</button>`;
-    else if (c.state === 'fix')                  stateBtn = `<button class="auto-btn" onclick="markPub('${c.id}')">📣 スタッフに公開</button>`;
-    // 公開をやめる操作は公開ボードに任せる（公開のON/OFFの入口を増やしすぎないため）。
-    // ⚠ 公開ずみの案件は「✓ 確定にする」「📣 スタッフに公開」が消える＝もう一度やる必要が無いため。
-    //   ただし**公開したあとで足した人は「仮」から始まる**ので、その人たちをまとめて確定にする
-    //   ボタンだけは出す（2026-08-28 baba指摘。前は名前の横の「仮」を1人ずつ押すしかなかった）。
-    else if (c.state === 'pub') {
-      const kari = c.assigned.filter(m => m.status === '仮').length;
-      stateBtn = `<span style="font-size:12px; font-weight:700; color:#15803d;" title="すでにスタッフに公開しています。もう一度公開する必要はありません。">公開中 ✓</span>`
-        + (kari ? `<button class="edit-btn" onclick="fixMembers('${c.id}')" title="公開したあとで足した人は「仮」で入ります。押すと全員「確定」になり、本人の画面に出ます。">✓ 仮の${kari}名を確定にする</button>` : '')
-        + `<a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;
+    if (stat === 'todo' || stat === 'adj') {
+      stateBtn += `<button class="edit-btn" onclick="markFix('${c.id}')" title="案件を確定にし、あわせてメンバー全員を「確定」にします">✓ 確定にする</button>`;
+    } else if (!pubOn) {
+      // 確定ずみ・まだ募集をかけていない＝ここから公開できる。
+      stateBtn += `<button class="auto-btn" onclick="markPub('${c.id}')">📣 スタッフに公開</button>`;
+    }
+    // 確定ずみでも、あとから足した人は「仮」で入る。まとめて確定にできるようにする。
+    // ⚠ スタッフの画面に出るのは「確定」の人だけ＝仮のままだと本人に伝わらない。
+    if (stat === 'fix' && kari) {
+      stateBtn += `<button class="edit-btn" onclick="fixMembers('${c.id}')" title="あとから足した人は「仮」で入ります。押すと全員「確定」になり、本人の画面に出ます。">✓ 仮の${kari}名を確定にする</button>`;
+    }
+    // 公開をやめる・締切や伝えることを直すのは公開ボードに任せる
+    // （公開のON/OFFの入口を増やすと、どこで切ったか分からなくなるため）。
+    if (pubOn) {
+      stateBtn += `<a class="open-btn" href="/assign-publish" title="公開をやめる・締切や伝えることを直すのは公開ボードから">公開ボード →</a>`;
     }
 
     card.innerHTML = `
@@ -1454,7 +1481,9 @@
             ${c.meetPlace ? `<span><span class="ic">🚩</span> 集合場所：${c.meetPlace}</span>` : ''}
           </div>
         </div>
-        <span class="sb ${c.state}">${stateLabel[c.state]}</span>
+        <!-- ⚠ 案件の進み具合と「募集中（公開）」は別のことなので、印も分けて出す。
+             前は公開すると進み具合が「公開済」で隠れ、確定なのか調整中なのか分からなかった。 -->
+        <span class="sb ${stat}" title="案件の進み具合">${stateLabel[stat] || ''}</span>${pubOn ? `<span class="sb pub" title="スタッフに公開して募集中です。やめるのは公開ボードから。">募集中</span>` : ''}
         <div class="cc-actions">
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
           ${filled < c.need ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}

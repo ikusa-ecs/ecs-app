@@ -78,9 +78,40 @@ class BoardConfirmAfterPublishTest extends TestCase
             ->assertOk()
             ->assertSee('function fixMembers', false)
             ->assertSee('仮の${kari}名を確定にする', false)
-            // 公開ずみのカードで出す表示（ここが消えると何の案内も出なくなる）。
-            ->assertSee('公開中 ✓', false)
+            // 募集中でも「✓ 確定にする」を出す仕掛け（stat と pubOn を分けて見ている）。
+            ->assertSee("if (stat === 'todo' || stat === 'adj')", false)
+            ->assertSee('募集中', false)
             // いちばん最後の方の関数も残っているか。
             ->assertSee('function markPub', false);
+    }
+
+    /**
+     * ⚠ ここが本題（2026-08-28 baba指摘）。
+     * スタッフ公開ボードの「公開」は**エントリーを募る操作**で、その時点では誰が入れるかも分からない。
+     * なのに以前は「公開ずみ」を最優先の状態にしていたため、
+     * **募集をかけた瞬間に「✓ 確定にする」（＝メンバーを確定にする）ボタンが消えて**いた。
+     * 公開（募集中か）と案件の進み具合を別々に渡していることを見張る。
+     */
+    public function test_published_project_still_reports_its_own_status(): void
+    {
+        $admin = $this->admin();
+        $day = Carbon::today()->copy()->addDays(7);
+
+        // 募集をかけたが、案件はまだ調整中＝人はこれから決める、という普通の状態。
+        Project::create([
+            'id' => 'P-REC', 'project_name' => '謎解き', 'content_names' => ['謎解き'],
+            'start_date' => $day->toDateString(), 'office' => '東京',
+            'status' => '調整中', 'staff_published' => true, 'is_recruiting' => true,
+        ]);
+
+        $this->actingAsPerson($admin)->get('/assign')
+            ->assertOk()
+            ->assertViewHas('boardCases', function ($cases) {
+                $c = collect($cases)->firstWhere('id', 'P-REC');
+
+                return $c
+                    && $c['pubOn'] === true      // 募集中
+                    && $c['stat'] === 'adj';     // でも案件はまだ調整中＝確定ボタンが要る
+            });
     }
 }
