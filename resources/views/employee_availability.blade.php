@@ -53,7 +53,14 @@
 
     /* ===== その日にもう決まっている案件（自動・消せない）とその日のメモ（手入力・消せる） ===== */
     /* ⚠ 入れ物は幅いっぱいにする。しないと中身の長さで枠からはみ出す。 */
-    .cell .autos, .cell .dnotes { width: 100%; }
+    .cell .bigs, .cell .autos, .cell .dnotes { width: 100%; }
+    /* 大型案件のお客様の会社名。黄色＝上の「大型」バッジと同じ色にそろえる。 */
+    .cell .bigname {
+      max-width: calc(100% - 6px); box-sizing: border-box; margin: 2px 3px 0;
+      font-size: 9px; line-height: 1.3; padding: 1px 3px; border-radius: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+      background: #fde68a; color: #7a5200; border: 1px solid #e0b84a; font-weight: 700;
+    }
     .cell .auto, .cell .dnote {
       max-width: calc(100% - 6px); box-sizing: border-box; margin: 2px 3px 0;
       font-size: 9px; line-height: 1.3; padding: 1px 3px; border-radius: 3px;
@@ -160,6 +167,13 @@
     .ov-mark.maybe { color: #b45309; font-weight: 700; }
     .ov-mark.none  { color: #c7bba9; }
     table.ov-tbl th.we.big, table.ov-tbl th.holi.big { color: #7a5200; }
+    /* 大型案件のお客様の会社名（見出し）。⚠ 幅を決めて省略しないと列が横に伸びる。 */
+    table.ov-tbl th .bigclient {
+      display: block; max-width: 84px; margin: 3px auto 0; padding: 1px 3px;
+      font-size: 9px; font-weight: 700; color: #7a5200;
+      background: #fde68a; border: 1px solid #e0b84a; border-radius: 3px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     table.ov-tbl td.offcol, table.ov-tbl th.offcol,
     table.ov-tbl td.memocol, table.ov-tbl th.memocol {
       text-align: left; white-space: normal; min-width: 130px; max-width: 220px;
@@ -286,7 +300,7 @@
             <span><i class="lg-ng"></i>× 不可</span>
             <span><i class="lg-maybe"></i>△ 条件つき・未定</span>
             <span><i class="lg-off"></i>平日の希望休</span>
-            <span><i style="background:#fde68a;border-color:#e0b84a;"></i>大型＝大型案件の日</span>
+            <span><i style="background:#fde68a;border-color:#e0b84a;"></i>大型案件の日（お客様の会社名を出します）</span>
             <span><i style="background:#f3e3c8;border-color:#f0d79a;"></i>祝／お盆・正月＝祝日・長期休暇</span>
           </div>
         </div>
@@ -392,7 +406,8 @@
   function isNewYear(m,d){ return (m===12 && d>=29) || (m===1 && d<=3); } // 年末年始
 
   // ===== 大型案件のある日（DBの案件から、表示中の月だけ集計） =====
-  const bigDayMap = {}; // { 日(数値): コンテンツ名 }
+  // ⚠ 同じ日に大型が2件あることがあるので、1件だけ覚えるのではなく全部持つ。
+  const bigDayMap = {}; // { 日(数値): [ { content, client }, ... ] }
   function computeBig(){
     for (const k in bigDayMap) delete bigDayMap[k];
     const y = cursor.getFullYear(), mo = cursor.getMonth(); // mo=0..11
@@ -402,9 +417,27 @@
       const dt = new Date(base); dt.setDate(dt.getDate() + c.off);
       if (dt.getFullYear()===y && dt.getMonth()===mo){
         const d = dt.getDate();
-        if (!bigDayMap[d]) bigDayMap[d] = c.content;
+        if (!bigDayMap[d]) bigDayMap[d] = [];
+        bigDayMap[d].push({ content: c.content || '', client: (c.client || '').trim() });
       }
     });
+  }
+  // マスに出す文字。⚠ お客様の会社名を出す（2026-08-28 baba要望＝
+  //   前はマウスを乗せないと分からなかった）。会社名が空の案件はコンテンツ名で代用する。
+  function bigLabel(a){
+    if (a.client === '') return a.content || '大型案件';
+    // ⚠ ECSは末尾の「様・御中」を外して保存しているので付け直す。すでに付いている人は二重にしない。
+    return /(様|御中)$/.test(a.client) ? a.client : (a.client + '様');
+  }
+  // マウスを乗せたときに出す詳しい文字（会社名＋コンテンツ名）。
+  function bigTitle(list){
+    return list.map(function(a){
+      return '大型案件：' + bigLabel(a) + (a.content && a.client !== '' ? '／' + a.content : '');
+    }).join('\n');
+  }
+  // その日の大型案件をまとめて短く（一覧タブの見出し用）。
+  function bigNames(list){
+    return list.map(bigLabel).join('・');
   }
 
   // その日の種類を判定。input=true なら 〇×△ の入力対象（土日祝・長期休暇・大型案件の日）
@@ -501,9 +534,9 @@
       cell.innerHTML = '<div class="dnum">' + d + '</div>'
         + (kind.badge ? '<div class="badge' + (kind.badge==='大型'?' big':'') + '">' + kind.badge + '</div>' : '')
         + '<div class="st"></div><div class="stsub"></div>'
-        + '<div class="autos"></div><div class="dnotes"></div>'
+        + '<div class="bigs"></div><div class="autos"></div><div class="dnotes"></div>'
         + '<button type="button" class="memobtn" title="この日のメモを書く">✎</button>';
-      if (kind.big) cell.title = '大型案件：' + kind.big;
+      if (kind.big) cell.title = bigTitle(kind.big);
       const k = keyOf(y,m,d);
       if (kind.input){
         applyEvent(cell, myState[k]);
@@ -555,6 +588,13 @@
   function applyExtras(cell, y, m, d){
     const k = keyOf(y,m,d);
     const list = assignedFor(ME ? ME.id : null, y, m, d);
+
+    // 大型案件のお客様の会社名。⚠ マウスを乗せなくても読めるようにマスに出す（2026-08-28 baba要望）。
+    const bigs = cell.querySelector('.bigs');
+    const bigList = bigDayMap[d] || [];
+    bigs.innerHTML = bigList.map(function(a){
+      return '<div class="bigname" title="' + ovEsc(bigTitle([a])) + '">' + ovEsc(bigLabel(a)) + '</div>';
+    }).join('');
 
     // 決まっている案件（自動）。ここは書き換えられない＝正本はアサインのデータ。
     const autos = cell.querySelector('.autos');
@@ -802,7 +842,8 @@
       const kind = dayMeta(y,m,d);
       if (kind.input){
         const w = ['日','月','火','水','木','金','土'][new Date(y,m-1,d).getDay()];
-        cols.push({ d, w, badge:kind.badge });
+        // 大型案件はお客様の会社名も見出しに出す（2026-08-28 baba要望）。
+        cols.push({ d, w, badge:kind.badge, big: kind.big || null });
       }
     }
     const tbl = document.getElementById('ovTbl');
@@ -828,7 +869,13 @@
     let head = '<thead><tr class="vh"><th class="namecol">社員</th>';
     cols.forEach(c=>{
       const cls = (c.badge ? 'holi' : 'we') + (c.badge==='大型' ? ' big' : '');
-      head += '<th class="' + cls + '">' + c.d + '<br><small>(' + c.w + ')' + (c.badge?'<br>'+c.badge:'') + '</small></th>';
+      // ⚠ 会社名は長いことがあるので幅を決めて省略する（列が横に伸びて表が読めなくなるため）。
+      //   全部見たいときはマウスを乗せると出る。
+      const bigTxt = c.big
+        ? '<span class="bigclient" title="' + ovEsc(bigTitle(c.big)) + '">' + ovEsc(bigNames(c.big)) + '</span>'
+        : '';
+      head += '<th class="' + cls + '">' + c.d + '<br><small>(' + c.w + ')' + (c.badge?'<br>'+c.badge:'') + '</small>'
+            + bigTxt + '</th>';
     });
     head += '<th class="offcol">平日の希望休</th><th class="memocol">備考</th></tr></thead>';
     // 本体

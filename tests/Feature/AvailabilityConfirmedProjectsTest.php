@@ -308,6 +308,29 @@ class AvailabilityConfirmedProjectsTest extends TestCase
         $this->assertSame('前泊', $row->day_note);
     }
 
+    /**
+     * 大型案件の日には、お客様の会社名を（マウスを乗せなくても）出す（2026-08-28 baba要望）。
+     * 画面がその会社名を受け取っているか＝案件に client が入って渡っているかを見る。
+     */
+    public function test_big_project_client_is_available_to_the_screen(): void
+    {
+        $me = $this->employee();
+        $day = Carbon::today()->copy()->addDays(21);
+        $this->project('P-10', $day->toDateString(), ['scale' => '大型']);
+
+        $this->actingAsPerson($me)->get('/employee-availability')
+            ->assertOk()
+            ->assertViewHas('cases', function ($cases) {
+                $c = collect($cases)->firstWhere('id', 'P-10');
+
+                return $c && $c['scale'] === '大型' && $c['client'] === 'コニカミノルタジャパン';
+            })
+            // ⚠ 会社名を出す関数がスクリプトに残っているか（@verbatim の切れ目でスクリプトが
+            //   途中から消えても画面は真っ白にならない＝気づけないため見張る）。
+            ->assertSee('function bigLabel', false)
+            ->assertSee('class="bigclient"', false);
+    }
+
     /** 他人の確定案件も一覧タブ用に渡す（アサイン担当が空いている人を見るため）。 */
     public function test_other_employees_are_included(): void
     {
