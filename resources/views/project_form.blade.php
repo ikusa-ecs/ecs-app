@@ -454,7 +454,28 @@
           <div class="form-row">
             <label>登録拠点</label>
             <select id="officeSel" name="office"></select>
-            <div class="hint">この案件を担当する拠点です。既定はあなたの拠点になります。（全拠点で使うときに、拠点別の集計や他拠点への依頼の基準になります）</div>
+            <div class="hint">この案件を<b>取ってきた（担当する）拠点</b>です。既定はあなたの拠点になります。（拠点別の集計の基準になります）</div>
+          </div>
+
+          <!-- 他の拠点にお願いする（ヘルプ／巻き取り）。2026-08-28 baba要望。
+               ⚠ これまでは案件一覧の「📥自拠点にコピー」からしか記録できず、しかも
+                  「押した人の拠点」に固定だったため、東京の人が『福岡に巻き取ってもらう』を
+                  登録できなかった。ここで拠点と区分の両方を選べるようにする。
+               ⚠ 案件は複製しない。projects.office はそのままで、project_shares に印だけ残す。
+               選択肢はJSで入れる（@verbatim 区間のため）。 -->
+          <div class="form-row">
+            <label>他の拠点にお願いする</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <select id="shareOffice" name="share_office" onchange="onShareChange()"></select>
+              <select id="shareKind" name="share_kind" onchange="onShareChange()">
+                <option value="巻き取り">巻き取り（その拠点が実施する）</option>
+                <option value="ヘルプ">ヘルプ（人を出してもらう）</option>
+              </select>
+            </div>
+            <div class="hint" id="shareHint">
+              例：東京で取った案件を<b>福岡に巻き取ってもらう</b>ときは、登録拠点＝東京のまま、ここで「福岡／巻き取り」を選びます。<br>
+              ⚠ 案件は<b>コピーされません</b>。相手の拠点からもこの案件が見えるようになり、拠点別の集計に「関わった」として数えられます。
+            </div>
           </div>
 
           <!-- 6. 実施形態 -->
@@ -1819,7 +1840,36 @@
       if (typeof refreshAddtlForOffice === 'function') refreshAddtlForOffice();
     });
     fillOfficeOptions(sel.value);
+    buildShareOptions();
+    sel.addEventListener('change', buildShareOptions);   // 登録拠点を変えたら相手の選択肢も入れ替える
   })();
+
+  // ===== 他の拠点にお願いする（ヘルプ／巻き取り）＝2026-08-28 baba要望 =====
+  // ⚠ 相手の拠点に「登録拠点そのもの」は出さない（自分に頼むことはないので）。
+  //   拠点名は拠点マスタ（window.ECS_OFFICES）から作る＝画面に拠点名を直書きしない。
+  function buildShareOptions() {
+    const sel = document.getElementById('shareOffice');
+    const own = (document.getElementById('officeSel') || {}).value || '';
+    if (!sel || !Array.isArray(window.ECS_OFFICES)) return;
+    const cur = sel.value || (window.ECS_EDIT && window.ECS_EDIT.shareOffice) || '';
+    let html = '<option value="">（お願いしない）</option>';
+    window.ECS_OFFICES.forEach(function (name) {
+      if (name === own) return;
+      html += '<option value="' + name + '"' + (name === cur ? ' selected' : '') + '>' + name + '</option>';
+    });
+    sel.innerHTML = html;
+    const kind = document.getElementById('shareKind');
+    if (kind && window.ECS_EDIT && window.ECS_EDIT.shareKind) kind.value = window.ECS_EDIT.shareKind;
+    onShareChange();
+  }
+  // 相手の拠点を選んでいないときは区分を触れないようにする（意味のない組み合わせを作らない）。
+  function onShareChange() {
+    const sel = document.getElementById('shareOffice');
+    const kind = document.getElementById('shareKind');
+    if (!sel || !kind) return;
+    kind.disabled = (sel.value === '');
+    kind.style.opacity = kind.disabled ? '.5' : '';
+  }
 
   // 拠点ごとの選択肢（集合形式・音響機材・移動車両・運営場所）をプルダウンに入れる。
   // ここは Blade を解釈しない区間なので、中身は JS で入れる（window.ECS_OFFICE_OPTIONS）。

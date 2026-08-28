@@ -605,7 +605,9 @@ class AssignBoardController extends Controller
 
         $projectIds = $projects->pluck('id');
 
-        $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']);
+        // ⚠ note＝本人がエントリーのときに書いた一言。人を選ぶ画面なのに届いていなかった
+        //   （2026-08-28 baba指摘。/assign や /entries には出ていたが、この画面だけ抜けていた）。
+        $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id', 'note']);
         $assignedRows = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id', 'role', 'role2', 'status', 'note', 'patrol', 'remark']);
@@ -622,6 +624,8 @@ class AssignBoardController extends Controller
         }
 
         $appsByProject = $apps->groupBy('project_id')->map(fn ($r) => $r->pluck('staff_id')->all());
+        // 案件 → 人 → その人が書いた一言（エントリーのコメント）。
+        $entryNoteByProject = $apps->groupBy('project_id')->map(fn ($r) => $r->pluck('note', 'staff_id')->all());
         $assignedByProject = $assignedRows->groupBy('project_id')
             ->map(fn ($r) => $r->pluck('staff_id')->unique()->all());
         // 案件×人 → 割当の詳細（役割・担当メモ・巡回・状態）。メンバー行の初期値に使う。
@@ -643,9 +647,10 @@ class AssignBoardController extends Controller
 
         $contentNames = Content::pluck('content_name', 'id');
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $entryNoteByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $applicantIds = $appsByProject->get($p->id, []);
+            $entryNotes = $entryNoteByProject->get($p->id, []);
             $assignInfo = $assignInfoByProject->get($p->id, []);
             $off = $this->offDays($p->start_date ?? $today, $today);
 
@@ -653,7 +658,7 @@ class AssignBoardController extends Controller
             $candIds = collect($applicantIds)->merge($assignedIds)->unique()->values();
             $dateStr = $p->start_date ? $p->start_date->format('Y-m-d') : null;
 
-            $entrants = $candIds->map(function ($sid) use ($people, $availSet, $dateStr) {
+            $entrants = $candIds->map(function ($sid) use ($people, $availSet, $dateStr, $entryNotes) {
                 $person = $people->get($sid);
 
                 return [
@@ -662,6 +667,8 @@ class AssignBoardController extends Controller
                     'pos' => $this->primaryPos($person),
                     'roleCode' => $this->primaryPosCode($person),  // 担当役割の初期値
                     'cal' => $dateStr ? isset($availSet[$sid.'|'.$dateStr]) : false,
+                    // 本人がエントリーのときに書いた一言（アサインの判断材料）。
+                    'note' => trim((string) ($entryNotes[$sid] ?? '')),
                 ];
             })->all();
 

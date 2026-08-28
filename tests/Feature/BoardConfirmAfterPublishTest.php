@@ -85,6 +85,10 @@ class BoardConfirmAfterPublishTest extends TestCase
             ->assertSee('/assign-publish?project=', false)
             // 確度（Aヨミ/Bヨミ/Cヨミ）の印。
             ->assertSee('function yomiHtml', false)
+            // その日をまとめて確定・まとめて公開（日付の横のボタン）。
+            ->assertSee('function bulkFixDay', false)
+            ->assertSee('function bulkPubDay', false)
+            ->assertSee('function dayBulkHtml', false)
             // いちばん最後の方の関数も残っているか。
             ->assertSee('function markPub', false);
     }

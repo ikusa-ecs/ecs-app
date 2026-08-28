@@ -51,6 +51,17 @@
     .day-head .d-pool .remain.ok  { color: #15803d; }
     .day-head .d-pool .remain.bad { color: var(--danger); }
     .day-head .d-warn { font-size: 12px; font-weight: 700; color: #fff; background: var(--danger); padding: 2px 9px; border-radius: 999px; }
+    /* その日をまとめて確定・まとめて公開（2026-08-28 baba要望）。1件ずつ押す手間をなくす。
+       ⚠ 押し間違えないよう日付の数字からは少し離し、確定（白）と公開（緑）で色を分ける。 */
+    .day-head .day-bulk {
+      margin-left: auto; font-size: 12px; font-weight: 700; cursor: pointer;
+      border: 1px solid var(--line); background: #fff; color: #6b5544;
+      padding: 3px 11px; border-radius: 999px; white-space: nowrap;
+    }
+    .day-head .day-bulk + .day-bulk { margin-left: 6px; }
+    .day-head .day-bulk:hover { background: #f7f1e8; }
+    .day-head .day-bulk.pub { background: #16a34a; border-color: #15803d; color: #fff; }
+    .day-head .day-bulk.pub:hover { background: #15803d; }
 
     /* その日の案件カードを横に並べる */
     .case-row { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -314,6 +325,7 @@
         <span style="display:inline-block;">※ 本人の画面に出るのは「確定」の人だけです。</span><br>
         <b>「募集中」の印は「スタッフ公開ボードでエントリーを募っている」という意味</b>で、アサインとは別のことです。
         <b>募集中でも「✓確定にする」は押せます</b>（募集して人が集まってから確定にするのが普通の流れです）。<br>
+        <b>日付の横のボタンから、その日をまとめて確定・まとめて公開できます</b>（対象がある日だけ出ます。押す前に案件名を出して確認します）。<br>
         <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
       </div>
@@ -1361,6 +1373,7 @@
             <span title="稼働希望で〇を出した人＋この日の案件にエントリーした人（すでに入っている人は除く）">候補 <b>${cand}</b>名</span>
           </span>
           ${warnHtml}
+          ${dayBulkHtml(off, dayCases)}
         </div>
         <div class="case-row" id="row-${off}"></div>`;
       body.appendChild(block);
@@ -1369,6 +1382,104 @@
       const row = block.querySelector('.case-row');
       dayCases.forEach(c => row.appendChild(buildCard(c, dayCases, dupNames, amap)));
     });
+  }
+
+  // ===== その日をまとめて確定・まとめて公開（2026-08-28 baba要望）=====
+  // ⚠ 1件ずつ押すのが手間なので、日付の横から一括でできるようにする。
+  //   ただし「まとめて」は取り返しがつきにくいので、必ず**件数と案件名を見せて確認**する。
+  //   確定と公開は別のボタンにする（1回で公開まで進めない＝いまの2段階のままにする）。
+  function dayBulkHtml(off, dayCases){
+    const toFix = dayCases.filter(c => (c.stat || c.state) !== 'fix');
+    const toPub = dayCases.filter(c => (c.stat || c.state) === 'fix' && !bPubOn(c));
+    let html = '';
+    if (toFix.length) {
+      html += `<button class="day-bulk" onclick="bulkFixDay(${off})" title="この日の「未着手・調整中」の案件を、まとめて確定にします（メンバーも全員「確定」になります）">✓ この日の${toFix.length}件を確定にする</button>`;
+    }
+    if (toPub.length) {
+      html += `<button class="day-bulk pub" onclick="bulkPubDay(${off})" title="この日の「確定・まだ募集していない」案件を、まとめてスタッフに公開します">📣 この日の${toPub.length}件を公開する</button>`;
+    }
+    return html;
+  }
+  // 募集中か（古いデータには pubOn が無いので state からも読めるようにする）。
+  function bPubOn(c){ return (c.pubOn !== undefined) ? !!c.pubOn : (c.state === 'pub'); }
+
+  // 案件名を確認の文にする（何をまとめて変えるのか必ず見せる）。
+  function bulkNames(list){
+    return list.map(c => '・' + c.name).join('\n');
+  }
+
+  function bulkFixDay(off){
+    const list = cases.filter(c => c.off === off && (c.stat || c.state) !== 'fix');
+    if (!list.length) { alert('この日に確定にできる案件はありません。'); return; }
+    // 人数が足りない案件は先に知らせる（1件ずつのときと同じ気づきを残す）。
+    const short = list.filter(c => filledOf(c) < c.need);
+    const shortMsg = short.length
+      ? '\n\n⚠ 人数が足りない案件が ' + short.length + '件あります：\n' + bulkNames(short) : '';
+    if (!confirm('この日の ' + list.length + '件を「確定」にします。\n' + bulkNames(list)
+      + '\n\nメンバーの「仮」も全員「確定」になります（確定にしないと本人の画面に出ません）。'
+      + shortMsg + '\n\nよろしいですか？')) return;
+    bulkRun(list, c => oneFix(c), '確定にしました');
+  }
+
+  function bulkPubDay(off){
+    const list = cases.filter(c => c.off === off && (c.stat || c.state) === 'fix' && !bPubOn(c));
+    if (!list.length) { alert('この日に公開できる案件はありません（確定していないか、すでに募集中です）。'); return; }
+    if (!confirm('この日の ' + list.length + '件をスタッフに公開します。\n' + bulkNames(list)
+      + '\n\n公開すると、この案件が募集としてスタッフ画面に出ます。'
+      + '\nいま「仮」の人も、あわせて「確定」にします。\n\nよろしいですか？')) return;
+    bulkRun(list, c => onePub(c), '公開しました');
+  }
+
+  // まとめて実行する共通部分。⚠ 1件ずつ順に流す（同時に送るとサーバーが取りこぼす）。
+  //   途中で失敗しても止めず、最後に「◯件できた／◯件できなかった」を出す。
+  function bulkRun(list, fn, doneWord){
+    let ok = 0; const ng = [];
+    const step = (i) => {
+      if (i >= list.length){
+        render();
+        alert(ok + '件を' + doneWord + '。'
+          + (ng.length ? '\n\n⚠ 次の ' + ng.length + '件はできませんでした：\n' + ng.map(n => '・' + n).join('\n') : ''));
+        return;
+      }
+      const c = list[i];
+      Promise.resolve(fn(c))
+        .then(() => { ok++; })
+        .catch(() => { ng.push(c.name); })
+        .then(() => step(i + 1));
+    };
+    step(0);
+  }
+
+  // 1件を確定にする（確認は出さない＝まとめての確認で済ませているため）。
+  // ⚠ 保存の中身は markFix と同じ道を通す（確定のやり方を2つ作らない）。
+  function oneFix(c){
+    if (!USING_DB){ c.stat = 'fix'; if (!c.pubOn) c.state = 'fix'; return Promise.resolve(); }
+    return fetch('/projects/cells', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ id: c.id, status: '確定' })
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(() => confirmAllMembers(c))
+      .then(() => { c.stat = 'fix'; if (!c.pubOn) c.state = 'fix'; });
+  }
+
+  // 1件を公開する。公開の入口は公開ボードと同じ（staff_published を立てる＝編集履歴に残る）。
+  function onePub(c){
+    if (!USING_DB){ c.state = 'pub'; c.pubOn = true; return Promise.resolve(); }
+    const body = { ids: [c.id], publish: true };
+    if (window.ECS_OFFICE_SCOPE) body.office = window.ECS_OFFICE_SCOPE;
+    return fetch('/assign-publish/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(res => {
+        if (!res || !res.updated) return Promise.reject('公開できませんでした');
+        return confirmAllMembers(c);
+      })
+      .then(() => { c.state = 'pub'; c.pubOn = true; });
   }
 
   function buildCard(c, dayCases, dupNames, amap){

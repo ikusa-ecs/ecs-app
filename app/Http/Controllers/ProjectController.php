@@ -8,10 +8,17 @@ use App\Models\Office;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectHistory;
+use App\Models\ProjectShare;
+use App\Support\AssignMtg;
+use App\Support\ClientName;
 use App\Support\CsvText;
 use App\Support\DirectorSync;
 use App\Support\Headcount;
+use App\Support\OfficeOptions;
+use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ProjectFormats;
+use App\Support\ProjectHistoryRecorder;
 use App\Support\ProjectImportColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -41,15 +48,15 @@ class ProjectController extends Controller
 
         // 拠点の表示範囲（全拠点運用・設計書19.2）。管理者以上はスイッチで選んだ拠点、
         // 一般社員は自拠点固定。null＝全拠点（絞らない）。現状は全員東京なので実質全件。
-        $officeScope = \App\Support\OfficeScope::filter($request);
+        $officeScope = OfficeScope::filter($request);
 
         // ログイン中の拠点と、コピー/巻き取りを操作できるか（＝アサイン担当＝管理者以上）。
         $myOffice = Auth::user()->office ?: '東京';
-        $canManageShare = \App\Support\OfficeScope::canSeeAll();
+        $canManageShare = OfficeScope::canSeeAll();
 
         // ディレクター・SD・物品担当の名前は people を一緒に読む（毎回引かないようにする）。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」も含める（アサイン表と同じ）。
-        $projects = \App\Support\OfficeScope::applyToProjects(
+        $projects = OfficeScope::applyToProjects(
             Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name']),
             $officeScope
         )
@@ -59,7 +66,7 @@ class ProjectController extends Controller
         // この一覧に出る案件の「拠点間共有」（ヘルプ/巻き取り）をまとめて引く。
         $sharesByProject = $projects->isEmpty()
             ? collect()
-            : \App\Models\ProjectShare::whereIn('project_id', $projects->pluck('id')->all())->get()->groupBy('project_id');
+            : ProjectShare::whereIn('project_id', $projects->pluck('id')->all())->get()->groupBy('project_id');
 
         // cases.js と同じ項目名に詰め替える（既存の表示JSをそのまま動かすため）。
         $cases = $projects->map(function (Project $p) use ($today, $contentNames, $sharesByProject, $myOffice, $canManageShare) {
@@ -87,84 +94,84 @@ class ProjectController extends Controller
                 : (bool) $p->is_archived;
 
             return [
-                'id'         => $p->id,
-                'content'    => $content,
-                'name'       => $p->project_name,
-                'client'     => $p->client ?? '',
-                'place'      => $p->location ?? '',
+                'id' => $p->id,
+                'content' => $content,
+                'name' => $p->project_name,
+                'client' => $p->client ?? '',
+                'place' => $p->location ?? '',
                 'placeShort' => $p->location ?? '',
-                'area'       => $p->operation_place ?? '',   // 運営場所（エリア）。アサイン表書き出し用
-                'meetPlace'  => $p->assembly_type ?? '',      // 集合形式。アサイン表書き出し用
+                'area' => $p->operation_place ?? '',   // 運営場所（エリア）。アサイン表書き出し用
+                'meetPlace' => $p->assembly_type ?? '',      // 集合形式。アサイン表書き出し用
                 // 運営人数。「6〜8」のような範囲もそのまま出せる形にして渡す（2026-08-25 baba）。
-                'need'       => Headcount::label($p->required_count_min, $p->required_count),
-                'category'   => $p->category ?? '',
-                'toc'        => (bool) $p->is_toc,     // toC（一般消費者向け）＝一覧の絞り込み用
-                'yomi'       => $p->yomi ?? '',
-                'format'     => $p->format ?? '',
+                'need' => Headcount::label($p->required_count_min, $p->required_count),
+                'category' => $p->category ?? '',
+                'toc' => (bool) $p->is_toc,     // toC（一般消費者向け）＝一覧の絞り込み用
+                'yomi' => $p->yomi ?? '',
+                'format' => $p->format ?? '',
                 // 実施形態のバッジ色。判定はサーバー側の1か所で決める（正本＝ProjectFormats::badgeCode）。
-                'fmtCls'     => \App\Support\ProjectFormats::badgeCode($p->format),
-                'scale'      => $p->scale ?? '',
+                'fmtCls' => ProjectFormats::badgeCode($p->format),
+                'scale' => $p->scale ?? '',
                 // セールス担当（複数あれば先頭）。未保存なら「—」。
-                'sales'      => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
-                'dir'        => $p->director->name ?? '未定',
-                'goods'      => $p->goodsOwner->name ?? '未定',
-                'sd'         => $p->subDirector->name ?? '未設定',   // SD担当（DB保存）。未登録なら「未設定」
-                'sdName'     => $p->subDirector->name ?? '',        // SDの名前（空＝未設定）
+                'sales' => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '—') : '—',
+                'dir' => $p->director->name ?? '未定',
+                'goods' => $p->goodsOwner->name ?? '未定',
+                'sd' => $p->subDirector->name ?? '未設定',   // SD担当（DB保存）。未登録なら「未設定」
+                'sdName' => $p->subDirector->name ?? '',        // SDの名前（空＝未設定）
                 // 詳細のプルダウンの現在値に使う社員ID（担当なしは null）。
-                'director_id'    => $p->director_id,
-                'sd_id'          => $p->sd_id,
+                'director_id' => $p->director_id,
+                'sd_id' => $p->sd_id,
                 'goods_owner_id' => $p->goods_owner_id,
                 'audio_equipment' => $p->audio_equipment ?? '',    // 音響（プルダウン初期値用）
-                'meet'       => $p->start_time ?? '—',
-                'leave'      => $p->end_time ?? '—',
-                'enter'      => $p->event_enter_time ?? '—',
-                'evStart'    => $p->event_start_time ?? '—',
-                'evEnd'      => $p->event_end_time ?? '—',
-                'evTbd'      => (bool) $p->event_time_tbd,   // 本番時間未定
-                'guests'     => $p->guest_count ?? '—',
-                'teams'      => $p->team_count ?? '—',
-                'transport'  => $p->transport ?? 'ー',
-                'sound'      => $p->audio_equipment ?? '',
-                'lodging'    => $p->lodging ?? '無',
-                'dayType'    => $p->date_type ?? '本番',
-                'parentId'   => $p->parent_project_id,
-                'recruit'    => (bool) $p->is_recruiting,
-                'published'  => (bool) $p->staff_published,   // スタッフ公開ボードで「公開する」を押したか
-                'status'     => $p->status ?? '未着手',
-                'tentative'  => (bool) $p->count_tentative,
-                'repeat'     => (bool) $p->is_repeat,      // 手で入れた「リピート案件」の印
-                'lineSent'   => (bool) $p->prep_line_sent,
-                'lineMade'   => (bool) $p->prep_line_created,
+                'meet' => $p->start_time ?? '—',
+                'leave' => $p->end_time ?? '—',
+                'enter' => $p->event_enter_time ?? '—',
+                'evStart' => $p->event_start_time ?? '—',
+                'evEnd' => $p->event_end_time ?? '—',
+                'evTbd' => (bool) $p->event_time_tbd,   // 本番時間未定
+                'guests' => $p->guest_count ?? '—',
+                'teams' => $p->team_count ?? '—',
+                'transport' => $p->transport ?? 'ー',
+                'sound' => $p->audio_equipment ?? '',
+                'lodging' => $p->lodging ?? '無',
+                'dayType' => $p->date_type ?? '本番',
+                'parentId' => $p->parent_project_id,
+                'recruit' => (bool) $p->is_recruiting,
+                'published' => (bool) $p->staff_published,   // スタッフ公開ボードで「公開する」を押したか
+                'status' => $p->status ?? '未着手',
+                'tentative' => (bool) $p->count_tentative,
+                'repeat' => (bool) $p->is_repeat,      // 手で入れた「リピート案件」の印
+                'lineSent' => (bool) $p->prep_line_sent,
+                'lineMade' => (bool) $p->prep_line_created,
                 'lineDouble' => (bool) $p->prep_line_double_check,
-                'handover'   => (bool) $p->prep_handover,
-                'script'     => (bool) $p->prep_script,
-                'opSheet'    => $p->ops_sheet_url ?? '',
-                'note'       => $p->note ?? '',
+                'handover' => (bool) $p->prep_handover,
+                'script' => (bool) $p->prep_script,
+                'opSheet' => $p->ops_sheet_url ?? '',
+                'note' => $p->note ?? '',
                 // 開いた詳細で条件表示するための項目（第1弾）。
-                'catering'   => $p->catering ?? '',        // 「無し」以外のとき詳細に表示
+                'catering' => $p->catering ?? '',        // 「無し」以外のとき詳細に表示
                 'cateringNote' => $p->catering_note ?? '', // ケータリングの内容・時間・食数などのメモ
-                'agency'     => $p->agency ?? '',          // 代理店ありのとき「企業名（代理店名）」表示
-                'logo'       => $p->pub_logo ?? '',        // 「−」以外のとき詳細に表示
-                'camera'     => $p->pub_camera ?? '',
-                'article'    => $p->pub_article ?? '',
-                'video'      => $p->pub_video ?? '',
+                'agency' => $p->agency ?? '',          // 代理店ありのとき「企業名（代理店名）」表示
+                'logo' => $p->pub_logo ?? '',        // 「−」以外のとき詳細に表示
+                'camera' => $p->pub_camera ?? '',
+                'article' => $p->pub_article ?? '',
+                'video' => $p->pub_video ?? '',
                 // cases.js では下書き・アーカイブは別フラグ。下書きは status から、
                 // アーカイブは上で出した実効アーカイブ状態（自動＝開催日／手動＝is_archived）を渡す。
-                'draft'      => $p->status === '下書き',
-                'archived'   => $effectiveArchived,
+                'draft' => $p->status === '下書き',
+                'archived' => $effectiveArchived,
                 'is_archived' => $p->is_archived,   // 生の手動状態（null=自動／true/false=手動）。参考用
                 // キャンセル（2026-08-26）。実施形態のバッジを「キャンセル」に差し替えて出し、
                 // チェックボックスで一覧から隠せる。実施形態の値は消していない（戻せる）。
-                'cancelled'  => (bool) $p->is_cancelled,
-                'off'        => $off,
+                'cancelled' => (bool) $p->is_cancelled,
+                'off' => $off,
                 // ---- 拠点まわり（全拠点運用・設計書19.2）----
-                'office'        => $p->office ?? '',                          // 登録拠点
+                'office' => $p->office ?? '',                          // 登録拠点
                 'sharedOffices' => $sharesByProject->get($p->id, collect())
                     ->map(fn ($s) => ['office' => $s->office, 'kind' => $s->kind])->values()->all(),
-                'isOwn'         => ($p->office ?? '') === $myOffice,
-                'sharedToMe'    => (bool) $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
-                'myKind'        => optional($sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice))->kind ?? 'ヘルプ',
-                'canCopy'       => $canManageShare && ($p->office ?? '') !== '' && ($p->office ?? '') !== $myOffice
+                'isOwn' => ($p->office ?? '') === $myOffice,
+                'sharedToMe' => (bool) $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
+                'myKind' => optional($sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice))->kind ?? 'ヘルプ',
+                'canCopy' => $canManageShare && ($p->office ?? '') !== '' && ($p->office ?? '') !== $myOffice
                     && ! $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
             ];
         })->values();
@@ -201,21 +208,21 @@ class ProjectController extends Controller
             ->values();
 
         return view('projects', [
-            'cases'         => $cases,
+            'cases' => $cases,
             'repeatClients' => $repeatClients,
-            'employees'     => $employees,
+            'employees' => $employees,
             // 拠点バッジは「全拠点」表示のときだけ出す（単体拠点なら自明・baba 2026-07-29）。
             'showOfficeBadge' => $officeScope === null,
             // コピー/巻き取り操作ができるか（アサイン担当＝管理者以上）。
-            'canManageShare'  => $canManageShare,
+            'canManageShare' => $canManageShare,
             // 絞り込みの「拠点」プルダウンの並び（拠点マスタの順）。全拠点表示のときだけ画面に出す。
-            'officeOptions'   => \App\Support\OfficeScope::options(),
+            'officeOptions' => OfficeScope::options(),
             // 一覧の中で直せる「移動・車両」「音響機材」の選択肢。正本＝App\Support\OfficeOptions。
             // 案件ごとに登録拠点が違うので、全拠点ぶん渡して案件の拠点で引く（案件登録フォームと同じ渡し方）。
             // ※ 以前はこの画面だけ選択肢を直書きしていて、マスタ管理で拠点ごとに変えても反映されなかった。
-            'officeOptionMap' => \App\Support\OfficeOptions::mapForAll(\App\Support\OfficeScope::options()),
+            'officeOptionMap' => OfficeOptions::mapForAll(OfficeScope::options()),
             // 拠点が空・拠点マスタが未登録のときの受け皿。ここも直書きせず OfficeOptions から取る。
-            'officeOptionDefaults' => \App\Support\OfficeOptions::DEFAULTS,
+            'officeOptionDefaults' => OfficeOptions::DEFAULTS,
         ]);
     }
 
@@ -265,67 +272,70 @@ class ProjectController extends Controller
                 $oneOffNames = array_values(array_diff($contentNames, $inMaster));
 
                 $editProject = [
-                    'id'               => $p->id,
-                    'content_names'    => $contentNames,
+                    'id' => $p->id,
+                    'content_names' => $contentNames,
                     'oneoff_content_names' => $oneOffNames,
-                    'category'         => $p->category,
-                    'is_toc'           => (bool) $p->is_toc,
-                    'yomi'             => $p->yomi,
-                    'yomi_expected'    => $p->yomi_expected,
-                    'scale'            => $p->scale,
-                    'is_recruiting'    => (bool) $p->is_recruiting,
-                    'is_multi'         => (bool) $p->is_multi,
-                    'date_type'        => $p->date_type,
+                    'category' => $p->category,
+                    'is_toc' => (bool) $p->is_toc,
+                    'yomi' => $p->yomi,
+                    'yomi_expected' => $p->yomi_expected,
+                    'scale' => $p->scale,
+                    'is_recruiting' => (bool) $p->is_recruiting,
+                    'is_multi' => (bool) $p->is_multi,
+                    'date_type' => $p->date_type,
                     'parent_project_id' => $p->parent_project_id,
-                    'sales_owner'      => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '') : '',
-                    'agency'           => $p->agency,
-                    'office'           => $p->office,
-                    'format'           => $p->format,
-                    'online_tool'      => $p->online_tool,
-                    'base_locations'   => is_array($p->base_locations) ? $p->base_locations : [],
-                    'broadcast'        => $p->broadcast,
-                    'operation_place'  => $p->operation_place,
-                    'arena_options'    => $p->arena_options,   // {setup_prev:..,...} or null
-                    'client'           => $p->client,
-                    'start_date'       => optional($p->start_date)->format('Y-m-d'),
-                    'start_time'       => $p->start_time,
-                    'end_time'         => $p->end_time,
-                    'staff_meet_time'  => $p->staff_meet_time,    // 空＝社員と同じ
+                    'sales_owner' => is_array($p->sales_owners) ? ($p->sales_owners[0] ?? '') : '',
+                    'agency' => $p->agency,
+                    'office' => $p->office,
+                    // 他の拠点にお願いしている印（2026-08-28）。1案件につきひとつ。
+                    'shareOffice' => optional($p->shares->first())->office ?? '',
+                    'shareKind' => optional($p->shares->first())->kind ?? '',
+                    'format' => $p->format,
+                    'online_tool' => $p->online_tool,
+                    'base_locations' => is_array($p->base_locations) ? $p->base_locations : [],
+                    'broadcast' => $p->broadcast,
+                    'operation_place' => $p->operation_place,
+                    'arena_options' => $p->arena_options,   // {setup_prev:..,...} or null
+                    'client' => $p->client,
+                    'start_date' => optional($p->start_date)->format('Y-m-d'),
+                    'start_time' => $p->start_time,
+                    'end_time' => $p->end_time,
+                    'staff_meet_time' => $p->staff_meet_time,    // 空＝社員と同じ
                     'staff_leave_time' => $p->staff_leave_time,
                     'event_enter_time' => $p->event_enter_time,
                     'event_start_time' => $p->event_start_time,
-                    'event_end_time'   => $p->event_end_time,
-                    'event_time_tbd'   => (bool) $p->event_time_tbd,
-                    'location'         => $p->location,
-                    'is_outdoor'       => $p->is_outdoor,   // true=屋外 / false=屋内 / null=未設定
-                    'lodging'          => $p->lodging,
+                    'event_end_time' => $p->event_end_time,
+                    'event_time_tbd' => (bool) $p->event_time_tbd,
+                    'location' => $p->location,
+                    'is_outdoor' => $p->is_outdoor,   // true=屋外 / false=屋内 / null=未設定
+                    'lodging' => $p->lodging,
                     // 3択（自動/数える/数えない）は画面のラジオに合わせて文字で渡す。
-                    'count_as_event'   => $p->count_as_event === null ? 'auto' : ($p->count_as_event ? 'yes' : 'no'),
-                    'assembly_type'    => $p->assembly_type,
-                    'assembly_detail'  => $p->assembly_detail,
+                    'count_as_event' => $p->count_as_event === null ? 'auto' : ($p->count_as_event ? 'yes' : 'no'),
+                    'assembly_type' => $p->assembly_type,
+                    'assembly_detail' => $p->assembly_detail,
                     'staff_belongings' => $p->staff_belongings,
-                    'staff_dresscode'  => $p->staff_dresscode,
-                    'staff_notes'      => $p->staff_notes,
-                    'staff_role'       => $p->staff_role,
+                    'staff_dresscode' => $p->staff_dresscode,
+                    'staff_notes' => $p->staff_notes,
+                    'staff_role' => $p->staff_role,
                     // 編集フォームには「6〜8」の形で戻す（入れたとおりに直せるように）。
-                    'required_count'   => Headcount::label($p->required_count_min, $p->required_count),
-                    'count_tentative'  => (bool) $p->count_tentative,
-                    'guest_count'      => $p->guest_count,
+                    'required_count' => Headcount::label($p->required_count_min, $p->required_count),
+                    'count_tentative' => (bool) $p->count_tentative,
+                    'guest_count' => $p->guest_count,
                     'guest_count_type' => $p->guest_count_type,
-                    'team_count'       => $p->team_count,
-                    'team_tentative'   => (bool) $p->team_tentative,
-                    'is_repeat'        => (bool) $p->is_repeat,
-                    'alcohol'          => $p->alcohol,      // true=あり / false=なし / null=未設定
-                    'catering'         => $p->catering,
-                    'audio_equipment'  => $p->audio_equipment,
-                    'transport'        => $p->transport,
-                    'pub_logo'         => $p->pub_logo,
-                    'pub_camera'       => $p->pub_camera,
-                    'pub_article'      => $p->pub_article,
-                    'pub_video'        => $p->pub_video,
-                    'ops_sheet_url'    => $p->ops_sheet_url,
-                    'note'             => $p->note,
-                    'status'           => $p->status,
+                    'team_count' => $p->team_count,
+                    'team_tentative' => (bool) $p->team_tentative,
+                    'is_repeat' => (bool) $p->is_repeat,
+                    'alcohol' => $p->alcohol,      // true=あり / false=なし / null=未設定
+                    'catering' => $p->catering,
+                    'audio_equipment' => $p->audio_equipment,
+                    'transport' => $p->transport,
+                    'pub_logo' => $p->pub_logo,
+                    'pub_camera' => $p->pub_camera,
+                    'pub_article' => $p->pub_article,
+                    'pub_video' => $p->pub_video,
+                    'ops_sheet_url' => $p->ops_sheet_url,
+                    'note' => $p->note,
+                    'status' => $p->status,
                 ];
 
                 // ── 複製のときだけ、新規登録として開き直す ──
@@ -336,7 +346,7 @@ class ProjectController extends Controller
                 // ※ ステータスは持ち回らなくてよい。新規は「下書き保存」か「確定」かで store() が決めるため。
                 if (! $projectId) {
                     $copyFrom = [
-                        'id'   => $p->id,
+                        'id' => $p->id,
                         'name' => $p->project_name ?: '（名称未定）',
                     ];
                     $editProject['id'] = null;
@@ -353,9 +363,9 @@ class ProjectController extends Controller
             ->orderBy('start_date')
             ->get()
             ->map(fn (Project $p) => [
-                'id'    => $p->id,
+                'id' => $p->id,
                 'label' => trim(($p->project_name ?: '（名称未定）')
-                    . ($p->start_date ? '（' . $p->start_date->format('n/j') . '）' : '')),
+                    .($p->start_date ? '（'.$p->start_date->format('n/j').'）' : '')),
             ])
             ->values();
 
@@ -391,7 +401,7 @@ class ProjectController extends Controller
         // 画面には全拠点ぶん渡す＝「登録拠点」を選び直した瞬間にプルダウンの中身を入れ替えるため。
         // ※ 以前は画面に直書きで、東京にしか無い「大住」「広宣」「IKUSAカー」が
         //   他拠点でも出ていた（2026-08-21 baba）。
-        $officeOptionMap = \App\Support\OfficeOptions::mapForAll(\App\Support\OfficeScope::options());
+        $officeOptionMap = OfficeOptions::mapForAll(OfficeScope::options());
 
         // 既定の拠点＝編集ならその案件の拠点／新規ならログイン中の社員の拠点（無ければ東京）。
         $defaultOffice = $editProject['office']
@@ -400,7 +410,7 @@ class ProjectController extends Controller
         // 編集で開いたときだけ、この案件の変更履歴（先-1）を新しい順に少しだけ添える。
         // 全部見たいときは専用画面（/project-history）へ。複製で開いたときは元案件の履歴なので出さない。
         // ※ 保存先テーブルがまだ無いサーバー（migrate 未実行）でも、この画面が開けなくならないようにする。
-        $canShowHistory = $projectId && \App\Support\ProjectHistoryRecorder::available();
+        $canShowHistory = $projectId && ProjectHistoryRecorder::available();
         $histories = $canShowHistory
             ? ProjectHistory::where('project_id', $projectId)
                 ->orderByDesc('id')
@@ -418,24 +428,24 @@ class ProjectController extends Controller
         $dayLoad = $this->dayLoad($projectId);
 
         return view('project_form', [
-            'editProject'    => $editProject,
-            'dayLoad'        => $dayLoad,
-            'histories'      => $histories,
-            'historyTotal'   => $historyTotal,
-            'historyLimit'   => self::FORM_HISTORY_LIMIT,
+            'editProject' => $editProject,
+            'dayLoad' => $dayLoad,
+            'histories' => $histories,
+            'historyTotal' => $historyTotal,
+            'historyLimit' => self::FORM_HISTORY_LIMIT,
             // 複製で開いたときだけ中身が入る（元になった案件の ID と名前）。画面の案内文に使う。
-            'copyFrom'       => $copyFrom,
+            'copyFrom' => $copyFrom,
             'parentProjects' => $parentProjects,
-            'salesOwners'    => $salesOwners,
-            'offices'        => $offices,
-            'defaultOffice'  => $defaultOffice,
+            'salesOwners' => $salesOwners,
+            'offices' => $offices,
+            'defaultOffice' => $defaultOffice,
             'contentOptions' => $contentOptions,
             'officeOptionMap' => $officeOptionMap,
             // アサインMTG日の予定表（/settings で保存）から計算した「基準日」＝今日までで一番新しいMTG日。
             // 開催日がこの日より後の登録を自動で「追加案件」に。予定が無ければ null（自動判定しない）。
             // ⚠ MTG日は拠点ごとに違うので「拠点 → 基準日」でまとめて渡す（2026-08-26 baba要望）。
             //   画面で登録拠点を選び直すと、その拠点の基準日で判定し直す。
-            'assignMtgByOffice' => \App\Support\AssignMtg::currentByOffice($offices),
+            'assignMtgByOffice' => AssignMtg::currentByOffice($offices),
         ]);
     }
 
@@ -468,9 +478,9 @@ class ProjectController extends Controller
             $out[$key][] = [
                 'scale' => (string) ($p->scale ?? ''),
                 // 実施形態 → 画面の判定コード（online / long / real）。cases.js の ECS_fmtCode と同じ基準。
-                'fmt'   => $this->formatCode((string) ($p->format ?? '')),
-                'need'  => (int) ($p->required_count ?? 0),
-                'name'  => (string) $p->project_name,
+                'fmt' => $this->formatCode((string) ($p->format ?? '')),
+                'need' => (int) ($p->required_count ?? 0),
+                'name' => (string) $p->project_name,
             ];
         }
 
@@ -480,7 +490,7 @@ class ProjectController extends Controller
     /** 実施形態の文字 → 判定コード。正本＝App\Support\ProjectFormats::countCode。 */
     private function formatCode(string $format): string
     {
-        return \App\Support\ProjectFormats::countCode($format);
+        return ProjectFormats::countCode($format);
     }
 
     /**
@@ -576,13 +586,13 @@ class ProjectController extends Controller
         // ARENA場所貸しのときだけ、IKUSA側で対応する7項目（あり/なし）をまとめて保存する。
         $isArena = str_contains((string) $request->input('format'), 'ARENA');
         $arenaOptions = $isArena ? [
-            'setup_prev'  => $request->input('arenaSetupPrev'),
+            'setup_prev' => $request->input('arenaSetupPrev'),
             'light_setup' => $request->input('arenaLightSetup'),
-            'mc'          => $request->input('arenaMc'),
-            'av_staff'    => $request->input('arenaAvStaff'),
-            'layout'      => $request->input('arenaLayout'),
-            'broadcast'   => $request->input('arenaBroadcast'),
-            'meal'        => $request->input('arenaMeal'),
+            'mc' => $request->input('arenaMc'),
+            'av_staff' => $request->input('arenaAvStaff'),
+            'layout' => $request->input('arenaLayout'),
+            'broadcast' => $request->input('arenaBroadcast'),
+            'meal' => $request->input('arenaMeal'),
         ] : null;
 
         // 紐づく本番案件は「予備日・リハ日として登録する」にチェックがあるときだけ意味を持つ。
@@ -609,8 +619,9 @@ class ProjectController extends Controller
             'agency' => $request->input('agency'),
             // 登録拠点＝案件がどの拠点のものか（設計書19.2）。送信値を優先し、
             // 無ければ編集時は既存を維持／新規はログイン者の拠点（無ければ東京）。
-            'office' => $request->input('office')
-                ?: ($editing->office ?? (Auth::user()->office ?? '東京')),
+            // ⚠ 拠点マスタに無い名前は受け付けない（タイポで「どの拠点からも見えない案件」になるため）。
+            'office' => $this->validOffice($request->input('office'))
+                ?: ($editing->office ?? (Auth::user()->office ?? OfficeScope::DEFAULT_OFFICE)),
             'format' => $request->input('format'),
             // オンラインツールは実施形態が「オンライン」のときだけ保存（それ以外は初期値zoomが残らないよう null）。
             'online_tool' => str_contains((string) $request->input('format'), 'オンライン')
@@ -622,7 +633,7 @@ class ProjectController extends Controller
             'arena_options' => $arenaOptions,
             // クライアント名は書き方をそろえて保存する（末尾の「様」「御中」と前後の空白を落とす）。
             // 混ざると同じお客様が別々に数えられ、リピート判定と履歴が分かれるため。
-            'client' => \App\Support\ClientName::normalize($request->input('client')),
+            'client' => ClientName::normalize($request->input('client')),
             'start_date' => $request->input('start_date'),
             'start_time' => $request->input('start_time'),
             'end_time' => $request->input('end_time'),
@@ -641,8 +652,8 @@ class ProjectController extends Controller
             // イベント数として数えるか（先-2）。auto＝null／yes＝true／no＝false。
             // 数え方の正本は App\Support\EventCount（自動のルールもそこに置く）。
             'count_as_event' => match ((string) $request->input('count_as_event', 'auto')) {
-                'yes'   => true,
-                'no'    => false,
+                'yes' => true,
+                'no' => false,
                 default => null,   // auto（未指定も自動あつかい）
             },
             'assembly_type' => $request->input('assembly_type'),
@@ -689,15 +700,95 @@ class ProjectController extends Controller
             $message = "案件「{$projectName}」を{$label}保存しました。（ID: {$id}）";
         }
 
+        // 他の拠点にお願いする（ヘルプ／巻き取り）。2026-08-28 baba要望。
+        $shared = $this->saveShare($id, $attributes['office'] ?? null, $request);
+        if ($shared !== '') {
+            $message .= ' '.$shared;
+        }
+
         // 「同じ内容で次の日程を追加」＝保存したあと、同じ内容を入れた新規フォームをもう一度開く。
         // 中身は複製（?copy=）と同じ仕組みで、開催日と運営シートURLだけ空になる
         // （これまでは案件一覧に戻ってしまい、続けて登録できなかった・2026-08-21 baba）。
         if ($intent === 'next') {
-            return redirect('/project-form?copy=' . urlencode($id))
-                ->with('status', $message . ' 続けて次の日程を登録できます（開催日を入れてください）。');
+            return redirect('/project-form?copy='.urlencode($id))
+                ->with('status', $message.' 続けて次の日程を登録できます（開催日を入れてください）。');
         }
 
         return redirect('/projects')->with('status', $message);
+    }
+
+    /**
+     * 拠点マスタにある名前なら返す。無ければ null（＝呼び出し側の既定にまかせる）。
+     * ⚠ タイポや古い拠点名をそのまま保存すると、その案件がどの拠点からも見えなくなる。
+     */
+    private function validOffice(?string $office): ?string
+    {
+        $office = trim((string) $office);
+
+        return ($office !== '' && in_array($office, OfficeScope::options(), true)) ? $office : null;
+    }
+
+    /**
+     * 案件登録の「他の拠点にお願いする（ヘルプ／巻き取り）」を保存する。2026-08-28 baba要望。
+     *
+     * 【なぜ要るか】
+     * 「東京で取った案件を福岡に巻き取ってもらう」ができなかった。
+     * ⚠ これまで project_shares に書ける唯一の入口（アサイン表の「自拠点にコピー」）が
+     *   共有先を**押した人の拠点に固定**していたため、相手の拠点の人が自分で押すのを待つしかなかった。
+     *   全拠点で使い始める前は、東京と名古屋しか ECS を触っていないので、それでは記録できない。
+     *
+     * 【決まり】
+     *  ・案件は**複製しない**。projects.office（取ってきた拠点）はそのままで、印だけ残す。
+     *  ・1案件につき相手はひとつ（unique(project_id, office)）。選び直したら前のものは消す。
+     *  ・空（「お願いしない」）を選んだら、この案件の共有をすべて消す。
+     *  ・⚠ 相手に自分の拠点は選べない（画面側で外しているが、ここでも弾く）。
+     *
+     * @return string 画面に足すお知らせ（何もしなければ空文字）
+     */
+    private function saveShare(string $projectId, ?string $ownOffice, Request $request): string
+    {
+        // 欄そのものが送られてこない画面（取込・APIなど）からは触らない＝勝手に消さない。
+        if (! $request->has('share_office')) {
+            return '';
+        }
+
+        $office = trim((string) $request->input('share_office', ''));
+        $kind = trim((string) $request->input('share_kind', ''));
+
+        $existing = ProjectShare::where('project_id', $projectId)->get();
+
+        if ($office === '') {
+            if ($existing->isEmpty()) {
+                return '';
+            }
+            ProjectShare::where('project_id', $projectId)->delete();
+
+            return '他の拠点へのお願いは外しました。';
+        }
+
+        // 拠点マスタに無い名前は受け付けない（タイポでどこにも出てこない印を作らない）。
+        if (! in_array($office, OfficeScope::options(), true)) {
+            return '';
+        }
+        // 自分の拠点には頼めない。
+        if ($ownOffice !== null && $office === $ownOffice) {
+            return '';
+        }
+        if (! in_array($kind, ['ヘルプ', '巻き取り'], true)) {
+            $kind = '巻き取り';
+        }
+
+        // 相手はひとつ。選び直したら前のものは消す。
+        ProjectShare::where('project_id', $projectId)
+            ->where('office', '!=', $office)
+            ->delete();
+
+        ProjectShare::updateOrCreate(
+            ['project_id' => $projectId, 'office' => $office],
+            ['kind' => $kind, 'created_by' => Auth::id()]
+        );
+
+        return "{$office}に「{$kind}」でお願いする印を付けました。";
     }
 
     /**
@@ -708,8 +799,8 @@ class ProjectController extends Controller
     public function saveCatering(Request $request)
     {
         $data = $request->validate([
-            'id'            => ['required', 'string'],
-            'catering'      => ['sometimes', 'nullable', 'string', 'max:50'],
+            'id' => ['required', 'string'],
+            'catering' => ['sometimes', 'nullable', 'string', 'max:50'],
             'catering_note' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
@@ -735,29 +826,29 @@ class ProjectController extends Controller
     public function saveCells(Request $request)
     {
         $request->validate([
-            'id'             => ['required', 'string', 'exists:projects,id'],
-            'director_id'    => ['nullable', 'string'],
-            'sd_id'          => ['nullable', 'string'],
+            'id' => ['required', 'string', 'exists:projects,id'],
+            'director_id' => ['nullable', 'string'],
+            'sd_id' => ['nullable', 'string'],
             'goods_owner_id' => ['nullable', 'string'],
             // 複数選べるようにしたので、つないだ文字（電車+IKUSAカー+...）が入る（2026-08-25 baba）。
-            'transport'      => ['nullable', 'string', 'max:200'],
+            'transport' => ['nullable', 'string', 'max:200'],
             'audio_equipment' => ['nullable', 'string', 'max:200'],
             // 備考（社員だけが見るメモ）。アサイン系の画面からもその場で直せるようにした（2026-08-21 baba）。
-            'note'            => ['nullable', 'string', 'max:2000'],
+            'note' => ['nullable', 'string', 'max:2000'],
             // アサイン状況。日別ボードの「✓ 確定にする」から保存する（2026-08-21 baba）。
             // 下書き・キャンセルはここでは扱わない（案件登録・削除の流れで決まるものなので混ぜない）。
-            'status'          => ['nullable', 'in:未着手,調整中,確定,完了'],
+            'status' => ['nullable', 'in:未着手,調整中,確定,完了'],
             // 制作・記録（案件一覧の詳細でその場保存）
-            'pub_logo'       => ['nullable', 'string', 'max:20'],
-            'pub_camera'     => ['nullable', 'string', 'max:20'],
-            'pub_article'    => ['nullable', 'string', 'max:20'],
-            'pub_video'      => ['nullable', 'string', 'max:20'],
+            'pub_logo' => ['nullable', 'string', 'max:20'],
+            'pub_camera' => ['nullable', 'string', 'max:20'],
+            'pub_article' => ['nullable', 'string', 'max:20'],
+            'pub_video' => ['nullable', 'string', 'max:20'],
             // 準備チェック（案件一覧の詳細で付け外し・その場保存）
-            'prep_line_created'      => ['nullable', 'boolean'],
-            'prep_line_sent'         => ['nullable', 'boolean'],
+            'prep_line_created' => ['nullable', 'boolean'],
+            'prep_line_sent' => ['nullable', 'boolean'],
             'prep_line_double_check' => ['nullable', 'boolean'],
-            'prep_handover'          => ['nullable', 'boolean'],
-            'prep_script'            => ['nullable', 'boolean'],
+            'prep_handover' => ['nullable', 'boolean'],
+            'prep_script' => ['nullable', 'boolean'],
         ]);
 
         $project = Project::findOrFail($request->input('id'));
@@ -830,7 +921,7 @@ class ProjectController extends Controller
     public function setArchive(Request $request)
     {
         $request->validate([
-            'id'       => ['required', 'string', 'exists:projects,id'],
+            'id' => ['required', 'string', 'exists:projects,id'],
             'archived' => ['required', 'boolean'],
         ]);
 
@@ -853,7 +944,7 @@ class ProjectController extends Controller
     public function setCancelled(Request $request)
     {
         $request->validate([
-            'id'        => ['required', 'string', 'exists:projects,id'],
+            'id' => ['required', 'string', 'exists:projects,id'],
             'cancelled' => ['required', 'boolean'],
         ]);
 
@@ -983,7 +1074,8 @@ class ProjectController extends Controller
                 $rowErrors[] = '運営人数が空または不正です（例 16 ／ 6〜8）';
             }
             if ($rowErrors) {
-                $errors[] = "{$lineNo}行目（{$name}）：" . implode('／', $rowErrors);
+                $errors[] = "{$lineNo}行目（{$name}）：".implode('／', $rowErrors);
+
                 continue;
             }
 
@@ -1008,7 +1100,7 @@ class ProjectController extends Controller
                 'format' => $get($row, '実施形態') ?: null,
                 'broadcast' => $get($row, '配信種別') ?: null,
                 'operation_place' => $get($row, '運営場所') ?: null,
-                'client' => \App\Support\ClientName::normalize($get($row, 'クライアント')),
+                'client' => ClientName::normalize($get($row, 'クライアント')),
                 'agency' => $get($row, '代理店名') ?: null,
                 'staff_role' => $get($row, '担当体制') ?: null,
                 'start_date' => $date,
@@ -1051,13 +1143,13 @@ class ProjectController extends Controller
 
         $msg = "CSVから{$okCount}件の案件を取り込みました。";
         if ($errors) {
-            $msg .= ' エラー' . count($errors) . '件は取り込みませんでした：' . implode(' / ', $errors);
+            $msg .= ' エラー'.count($errors).'件は取り込みませんでした：'.implode(' / ', $errors);
         }
         // どの列を無視したかを必ず知らせる（アサイン表のCSVをそのまま入れたときに
         // 「入ったつもりで入っていない項目」に気づけるようにするため）。
         if ($unmappedColumns) {
-            $msg .= ' ※ 取り込まなかった列：' . implode('・', $unmappedColumns)
-                . '（ECSに対応する項目がありません。必要なら教えてください）';
+            $msg .= ' ※ 取り込まなかった列：'.implode('・', $unmappedColumns)
+                .'（ECSに対応する項目がありません。必要なら教えてください）';
         }
 
         return redirect('/projects')->with('status', $msg);
@@ -1088,7 +1180,7 @@ class ProjectController extends Controller
             $maxNum = Content::all()
                 ->map(fn ($c) => (int) preg_replace('/\D/', '', $c->id))
                 ->max() ?? 0;
-            $newId = 'CT-' . str_pad($maxNum + 1, 3, '0', STR_PAD_LEFT);
+            $newId = 'CT-'.str_pad($maxNum + 1, 3, '0', STR_PAD_LEFT);
             Content::create([
                 'id' => $newId,
                 'content_name' => $name,
@@ -1107,12 +1199,12 @@ class ProjectController extends Controller
     private function nextProjectId(?string $startDate): string
     {
         $year = $startDate ? Carbon::parse($startDate)->year : Carbon::now()->year;
-        $prefix = 'P-' . $year . '-';
-        $maxSeq = Project::where('id', 'like', $prefix . '%')->get()
+        $prefix = 'P-'.$year.'-';
+        $maxSeq = Project::where('id', 'like', $prefix.'%')->get()
             ->map(fn ($p) => (int) substr($p->id, strlen($prefix)))
             ->max() ?? 0;
 
-        return $prefix . str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
     }
 
     /** 名前 → people のID（社員・スタッフ問わず先頭一致1件）。無ければ null。 */
@@ -1133,4 +1225,3 @@ class ProjectController extends Controller
         return checkdate((int) $m, (int) $d, (int) $y);
     }
 }
-

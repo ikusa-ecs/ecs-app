@@ -105,6 +105,9 @@
     .pk-mem.multi { background:#fbf1da; }
     .pk-mem.multi .m-name { color:#3a2d20; }
     .pk-mem .multi-flag { color:#b07d1a; font-size:10.5px; font-weight:700; margin-left:6px; }
+    /* 本人がエントリーのときに書いた一言。行の下に折り返して出す（2026-08-28 baba指摘）。 */
+    .pk-mem.has-note { flex-wrap:wrap; }
+    .pk-mem .pk-entnote { flex-basis:100%; font-size:11px; color:#6b5544; margin-top:2px; line-height:1.5; overflow-wrap:anywhere; }
 
     /* 稼働バッジ（日別ボードと統一） */
     .cstat { font-size:10px; font-weight:700; padding:1px 7px; border-radius:999px; white-space:nowrap; }
@@ -607,13 +610,18 @@
         const avail = e.cal
           ? '<span class="cstat cal1">終日〇</span>'
           : '<span class="cstat only">この案件のみ</span>';
+        // 本人がエントリーのときに書いた一言。⚠ 人を選ぶ画面なのに、ここだけ届いていなかった
+        //   （2026-08-28 baba指摘）。判断材料なので必ず見せる。
+        const note = (e.note || '').trim();
+        const noteHtml = note ? `<div class="pk-entnote" title="本人からの一言">💬 ${esc(note)}</div>` : '';
         return `
-          <div class="pk-mem">
+          <div class="pk-mem${note ? ' has-note' : ''}">
             <span class="m-name">${esc(e.name)}</span>
             <span class="${posClass}">${esc(e.pos)}</span>
             <span class="m-spacer"></span>
             ${avail}
             <button class="pk-btn add" onclick="toggleMember('${escAttr(c.id)}','${escAttr(entId(e))}')">＋ 追加</button>
+            ${noteHtml}
           </div>`;
       };
 
