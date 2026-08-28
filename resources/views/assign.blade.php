@@ -329,7 +329,8 @@
         <span style="display:inline-block;">※ 本人の画面に出るのは「確定」の人だけです。</span><br>
         <b>「募集中」の印は「スタッフ公開ボードでエントリーを募っている」という意味</b>で、アサインとは別のことです。
         <b>募集中でも「✓確定にする」は押せます</b>（募集して人が集まってから確定にするのが普通の流れです）。<br>
-        <b>人数が埋まると印は「締切」に変わります</b>＝スタッフの画面でも「締切・満員」になっていてエントリーできません。
+        <b>「確定」の人数が運営人数に達すると、印は「締切」に変わります</b>＝スタッフの画面でも「締切・満員」になってエントリーできません。
+        <b>「仮」の人は数えません</b>（まだ決まっていないので募集を続けます）。
         また募集したいときは<b>「＋ 追加募集する」</b>で運営人数を増やしてください（<b>公開し直す必要はありません</b>）。<br>
         <b>日付の横のボタンから、その日をまとめて確定・まとめて公開できます</b>（対象がある日だけ出ます。押す前に案件名を出して確認します）。<br>
         <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
@@ -1417,17 +1418,23 @@
   // ⚠ 判定の数（運営人数が未入力のときの既定）はサーバー（App\Support\RecruitStatus）から
   //   needStaff で受け取る。ここに数字を書かないこと（片方だけ直すと必ず食い違う）。
   function needStaffOf(c){ return (c.needStaff && c.needStaff > 0) ? c.needStaff : (c.need || 0); }
-  function isFullForStaff(c){ return filledOf(c) >= needStaffOf(c); }
-  function remainForStaff(c){ return Math.max(0, needStaffOf(c) - filledOf(c)); }
+  // ⚠ 締切の判定に数えるのは「確定」の人だけ（2026-08-28 baba決定）。
+  //   「仮」＝まだ声掛け中で決まっていないので、その枠は募集を続ける。
+  //   （取込でシートのメンバーが仮で入った瞬間に締切になり、スタッフがエントリー
+  //     できなくなっていたため。カードの「割当済」は今までどおり仮も入れて数える）。
+  function confirmedOf(c){ return c.assigned.filter(m => m.status === '確定').length; }
+  function isFullForStaff(c){ return confirmedOf(c) >= needStaffOf(c); }
+  function remainForStaff(c){ return Math.max(0, needStaffOf(c) - confirmedOf(c)); }
 
   // カードに出す「いまスタッフからどう見えているか」の印。公開していない案件には出さない。
   function recruitBadge(c){
     if (!bPubOn(c)) return '';
     if (isFullForStaff(c)) {
-      return '<span class="sb full" title="人数が埋まっているので、スタッフの画面では「締切・満員」に見えています。'
+      return '<span class="sb full" title="「確定」の人数が運営人数に達しているので、スタッフの画面では「締切・満員」に見えています。'
         + '運営人数を増やすと、その場でまた募集中に戻ります（公開し直す必要はありません）。">締切</span>';
     }
-    return '<span class="sb pub" title="スタッフの画面に募集として出ています。やめるのは公開ボードから。">募集中 あと'
+    return '<span class="sb pub" title="スタッフの画面に募集として出ています。'
+      + '「仮」の人は数えていません（まだ決まっていないので募集を続けます）。やめるのは公開ボードから。">募集中 あと'
       + remainForStaff(c) + '名</span>';
   }
 
@@ -1520,7 +1527,7 @@
     if (!c) return;
     const now = needStaffOf(c);
     const input = prompt('「' + c.name + '」の運営人数を増やします。\n'
-      + 'いまの運営人数：' + now + '名（' + filledOf(c) + '名が入っていて満員です）\n\n'
+      + 'いまの運営人数：' + now + '名（確定 ' + confirmedOf(c) + '名で満員です）\n\n'
       + '新しい運営人数を入れてください（「6〜8」のような範囲でも入れられます）。', String(now + 1));
     if (input === null) return;
     const value = input.trim();

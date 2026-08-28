@@ -562,8 +562,12 @@ class StaffPortalController extends Controller
         }
 
         // 充足数＝確定/仮アサイン（キャンセル除く）の人数。案件ごとにまとめて数える。
+        // 充足数＝**「確定」のアサインだけ**を数える（2026-08-28 baba決定）。
+        // ⚠ 以前は「仮」も数えていたため、アサイン表を取り込んでシートのメンバーが
+        //   仮で入った瞬間に「締切・満員」になり、**スタッフがエントリーできなくなっていた**。
+        //   仮＝まだ声掛け中で決まっていないので、その枠は募集を続ける。
         $filledByProject = Assignment::whereIn('project_id', $projects->pluck('id'))
-            ->where('status', '!=', 'キャンセル')
+            ->where('status', '確定')
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
             ->map(fn ($rows) => $rows->pluck('staff_id')->unique()->count());
