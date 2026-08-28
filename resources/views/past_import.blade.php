@@ -67,6 +67,9 @@
     padding: 3px 5px; font-size: 12px; background: #fff; font-family: inherit;
   }
   table.pj-table input.edited { border-color: #4f8a63; background: #f2faf5; font-weight: 700; }
+  /* 運営人数が空＝入れてほしい欄（2026-08-28 baba要望：勝手に埋めずに聞く）。 */
+  table.pj-table input.pj-need { border-color: #e0b84a; background: #fffaf0; }
+  table.pj-table input.pj-need::placeholder { color: #b08a2a; }
   table.pj-table tr.row-skip td { background: #f1efec; color: #9a8f80; }
   table.pj-table tr.row-skip input { opacity: .55; }
   .pj-col-date { width: 140px; } .pj-col-name { width: 220px; }
@@ -161,6 +164,10 @@
       <li><b>取り込む前に、この画面の表で直せます。</b>日程・コンテンツ・顧客名・運営人数はその場で書き換えられ、
         <b>「この件は取り込まない」</b>に印を付けた案件は飛ばせます。
         <span class="muted">＝CSVを作り直してアップロードし直す必要はありません（元のCSVは変わりません）。</span></li>
+      <li><b>運営人数がシートに書かれていない案件は、空のまま（黄色い枠）で出します。</b>
+        メンバー欄に並んでいる人数を<b>目安として薄字で出します</b>が、<b>勝手には入れません</b>。
+        <span class="muted">⚠ 以前は黙って「並んでいる人数」で埋めていたため、シートに人数が書いてある案件と書いていない案件が
+        混ざったときに気づけませんでした（2026-08-28 変更）。空のまま取り込むこともできますが、そのときは一度確認します。</span></li>
       <li><b>同じ案件は上書き</b>します。同じかどうかは<b>「日程・コンテンツ・顧客名・集合時間」が全部同じか</b>で見ます。
         1つでも違えば別案件として新しく作ります（同じ日・同じコンテンツでも顧客が違えば別案件）。<br>
         <span class="muted">＝失敗しても、直してもう一度入れれば大丈夫です（案件が二重に増えません）。</span></li>
@@ -404,7 +411,7 @@
         + '<td>' + pjInput('date', r.date, 'date') + '</td>'
         + '<td>' + pjInput('name', r.name, 'text') + '</td>'
         + '<td>' + pjInput('client', r.client, 'text') + '</td>'
-        + '<td>' + pjInput('count', r.count, 'text') + '</td>'
+        + '<td>' + pjCountInput(r) + '</td>'
         + '<td>' + pjEsc(r.people) + ' 名</td>'
         + '<td class="' + (ok ? 'pj-miss' : 'pj-reason') + '">' + pjEsc(notes.join(' / ')) + '</td>'
         + '</tr>';
@@ -420,6 +427,25 @@
 
   // 表の中の入力欄。data-orig にはサーバーが読んだ値を入れておき、
   // それと違えば「直した」と分かるようにする。
+  /**
+   * 運営人数の欄。
+   * ⚠ シートに書かれていないときに**勝手に埋めない**（2026-08-28 baba）。
+   *   前は「並んでいる人数」で黙って埋めていたので、書いてある案件と書いていない案件が
+   *   混ざったときに気づけなかった。ここでは空のままにして、目安を薄字で見せる。
+   */
+  function pjCountInput(r) {
+    var v = pjEsc(r.count == null ? '' : r.count);
+    var guess = pjEsc(r.countGuess == null ? '' : r.countGuess);
+    var ph = guess ? ('例：' + guess) : '例：5';
+    var title = guess
+      ? 'シートに運営人数が書かれていません。メンバー欄には ' + guess + '名ぶん並んでいます。'
+      : 'シートに運営人数が書かれていません。';
+    return '<input type="text" data-f="count" value="' + v + '" data-orig="' + v + '"'
+      + ' placeholder="' + ph + '"'
+      + (v === '' ? ' class="pj-need" title="' + title + '"' : '')
+      + ' oninput="pjMarkEdited()" onchange="pjMarkEdited()">';
+  }
+
   function pjInput(field, value, type) {
     var v = pjEsc(value == null ? '' : value);
 
@@ -652,7 +678,46 @@
     lines.push('', 'よろしいですか？');
     var msg = lines.join(String.fromCharCode(10));
     if (!confirm(msg)) return;
+
+    // ⚠ 運営人数が空のまま取り込もうとしたら、必ず聞く（2026-08-28 baba要望）。
+    //   前は「並んでいる人数」で黙って埋めていたので、書いてある案件と書いていない案件が
+    //   混ざったときに気づけなかった。空のまま入れることもできるが、必ず一度確認する。
+    if (!pjConfirmEmptyCounts()) return;
+
     document.getElementById('pjForm').submit();
+  }
+
+  /**
+   * 運営人数が空の案件があれば知らせる。true＝そのまま進めてよい。
+   * ⚠ 空のまま入れると、スタッフの画面では既定の5名として扱われる（募集人数の目安）。
+   */
+  function pjConfirmEmptyCounts() {
+    var empty = [];
+    document.querySelectorAll('#pjBody tr').forEach(function (tr) {
+      var skip = tr.querySelector('[data-f="skip"]');
+      if (skip && !skip.checked) return;                    // 取り込まない件は数えない
+      if (tr.classList.contains('row-ng')) return;           // エラーの件はもともと入らない
+      var count = tr.querySelector('[data-f="count"]');
+      if (count && count.value.trim() === '') {
+        var name = tr.querySelector('[data-f="name"]');
+        empty.push((name ? name.value : '') || tr.cells[0].textContent);
+      }
+    });
+    if (empty.length === 0) return true;
+
+    var head = empty.slice(0, 10).map(function (n) { return '・' + n; });
+    if (empty.length > 10) { head.push('・ほか ' + (empty.length - 10) + ' 件'); }
+    return confirm([
+      '⚠ 運営人数が空の案件が ' + empty.length + ' 件あります。',
+      '',
+      head.join(String.fromCharCode(10)),
+      '',
+      '空のまま取り込むと、スタッフの画面では「5名」として扱われます',
+      '（募集人数の目安。あとから案件登録や日別ボードで直せます）。',
+      '',
+      '表の「運営人数」に入れてから取り込むこともできます。',
+      'このまま取り込みますか？',
+    ].join(String.fromCharCode(10)));
   }
 
   // ファイルを選んだら、その場で中身を出す。

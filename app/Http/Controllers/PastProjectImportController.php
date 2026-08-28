@@ -304,13 +304,17 @@ class PastProjectImportController extends Controller
         );
         $count = $pick('count', $get('運営人数'));
 
-        // 運営人数がシートに書かれていないときは「アサインされている人＋『メンバー』の空き枠」で埋める
-        // （2026-08-27 baba選択）。名古屋のシートは運営人数の欄がほとんど空で、そのままだと全部0人になる。
-        // ⚠ 画面で人数を空にした場合はそれも「直した」＝勝手に埋め直さない（$edit を見ている $pick の後）。
-        if ($count === '' && ! array_key_exists('count', $edit) && $entry !== null && is_array($entry['people'] ?? null)) {
+        // 運営人数がシートに書かれていないときの「目安」＝アサインされている人＋『メンバー』の空き枠。
+        // ⚠ 2026-08-28 baba変更：**この目安で勝手に埋めない。人に聞く。**
+        //   以前は黙って埋めていたため、シートに人数が書かれている案件と書かれていない案件が
+        //   混ざったときに、書かれていないほうが「並んでいる人数」になってしまい、
+        //   気づかないまま取り込まれていた（名古屋の運用として一度は入れたが、やめる）。
+        //   画面には目安として出し、空のまま取り込もうとしたら確認する。
+        $countGuess = '';
+        if ($entry !== null && is_array($entry['people'] ?? null)) {
             $auto = count($entry['people']) + (int) ($entry['slots'] ?? 0);
             if ($auto > 0) {
-                $count = (string) $auto;
+                $countGuess = (string) $auto;
             }
         }
 
@@ -336,6 +340,9 @@ class PastProjectImportController extends Controller
             'date' => $date,
             'rawDate' => $rawDate,
             'count' => $count,
+            // 運営人数が空のときの目安（並んでいる人＋空き枠）。画面のプレースホルダに出す。
+            // ⚠ これで勝手に埋めない＝人が見て入れる（2026-08-28 baba）。
+            'countGuess' => $countGuess,
             'client' => ClientName::normalize($pick('client', $get('クライアント'))),
             'meetTime' => $get('集合時間') ?: null,
             'errors' => $errors,
@@ -407,6 +414,8 @@ class PastProjectImportController extends Controller
                 'name' => $info['name'],
                 'client' => $info['client'],
                 'count' => $info['count'],
+                // 運営人数が空のときの目安（並んでいる人＋空き枠）。⚠ 勝手には入れない。
+                'countGuess' => $info['countGuess'] ?? '',
                 'people' => count($assignments),
                 'missing' => array_keys($miss),
                 'ambiguous' => array_keys($dup),

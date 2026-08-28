@@ -958,7 +958,11 @@ class PastProjectImportTest extends TestCase
 
     /**
      * 「メンバー」は人ではなく「スタッフで埋める空き枠」＝人として取り込まない。
-     * 運営人数がシートに無いときは「入っている人＋空き枠」で埋める（2026-08-27 baba選択）。
+     *
+     * ⚠ 運営人数がシートに無いときの扱いは 2026-08-28 に変えた（baba要望）。
+     *   以前は「入っている人＋空き枠」で**黙って埋めて**いたが、シートに人数が書いてある案件と
+     *   書いていない案件が混ざったときに気づけなかったので、**埋めずに空のまま入れて、人に聞く**。
+     *   目安（入っている人＋空き枠）は取込画面に薄字で出す。
      */
     public function test_nagoya_member_slots_are_counted_not_imported_as_people(): void
     {
@@ -975,8 +979,30 @@ class PastProjectImportTest extends TestCase
         $p = Project::where('project_name', '水合戦')->firstOrFail();
         // 人として入るのは1人だけ（「メンバー」は入らない）。
         $this->assertSame(1, Assignment::where('project_id', $p->id)->count());
-        // 運営人数＝1人＋空き枠2＝3。
-        $this->assertSame(3, $p->required_count);
+        // ⚠ 運営人数は**空のまま**（勝手に埋めない）。取込画面で人に入れてもらう。
+        $this->assertNull($p->required_count, '運営人数を勝手に埋めてしまっている');
+    }
+
+    /**
+     * 運営人数がシートに無いときは、下見の画面で「目安」だけ出す（勝手に入れない）。
+     * ⚠ 目安＝入っている人＋「メンバー」の空き枠。画面では薄字のプレースホルダに出る。
+     */
+    public function test_missing_headcount_is_offered_as_a_guess_only(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+
+        $json = $this->actingAsPerson($this->manager())->post('/past-import/preview', [
+            'csv' => $this->nagoyaCsv([
+                ['name' => '鈴木 彩', 'role' => 'MC'],
+                ['name' => 'メンバー', 'role' => ''],
+                ['name' => 'メンバー', 'role' => ''],
+            ]),
+        ])->assertOk()->json();
+
+        $row = collect($json['rows'])->firstWhere('name', '水合戦');
+        $this->assertNotNull($row);
+        $this->assertSame('', $row['count'], '運営人数を勝手に埋めてしまっている');
+        $this->assertSame('3', $row['countGuess'], '目安（1人＋空き枠2）が出ていない');
     }
 
     /** 名前の頭の「★」「☆」は目印なので、名簿と照合するときは無いものとして扱う。 */
