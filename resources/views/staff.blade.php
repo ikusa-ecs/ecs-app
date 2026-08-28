@@ -639,8 +639,7 @@
                  '・いまのアサイン・出勤の記録はそのまま残ります',
                  '・このあと「ログイン案内メールを送る」でログインを作れます',
                  '',
-                 'よろしいですか？'].join('
-');
+                 'よろしいですか？'].join(String.fromCharCode(10));
     if (!confirm(msg)) return;
     fetch('/people/' + encodeURIComponent(id) + '/unspot', {
       method: 'POST',
