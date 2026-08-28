@@ -32,12 +32,18 @@
     .ea-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
     .ea-card h3 { margin: 0 0 4px; font-size: 15px; }
     .ea-card .sub { font-size: 12px; color: var(--muted); margin: 0 0 14px; line-height: 1.6; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; max-width: 640px; margin: 0 auto; }
+    /* ⚠ 列は minmax(0, 1fr) にする。ただの 1fr だと、中身（長い会社名など）に押されて
+       列そのものが横に広がり、マスの大きさがバラバラになる（2026-08-28 修正）。 */
+    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; max-width: 640px; margin: 0 auto; }
     .cal-grid .dow { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 4px; font-weight: 600; }
     .cal-grid .dow.sat { color: var(--brand); }
     .cal-grid .dow.sun { color: var(--danger); }
+    /* ⚠ 高さは min-height ではなく height で固定する。min-height だと
+       案件名・メモが入ったマスだけ縦に伸びて、カレンダーがガタガタになる（2026-08-28 修正）。
+       入りきらないぶんは「＋n件」でまとめる（切り捨てない）。 */
     .cell {
-      min-height: 70px; border-radius: 10px; border: 1px solid var(--line);
+      height: 110px; box-sizing: border-box; overflow: hidden;
+      border-radius: 10px; border: 1px solid var(--line);
       display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
       padding: 5px 2px 4px; font-size: 13px; background: #fff; position: relative;
     }
@@ -51,25 +57,23 @@
     .cell .st { font-size: 16px; font-weight: 700; margin-top: 4px; }
     .cell .stsub { font-size: 9px; margin-top: 1px; }
 
-    /* ===== その日にもう決まっている案件（自動・消せない）とその日のメモ（手入力・消せる） ===== */
-    /* ⚠ 入れ物は幅いっぱいにする。しないと中身の長さで枠からはみ出す。 */
-    .cell .bigs, .cell .autos, .cell .dnotes { width: 100%; }
-    /* 大型案件のお客様の会社名。黄色＝上の「大型」バッジと同じ色にそろえる。 */
-    .cell .bigname {
-      max-width: calc(100% - 6px); box-sizing: border-box; margin: 2px 3px 0;
-      font-size: 9px; line-height: 1.3; padding: 1px 3px; border-radius: 3px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
-      background: #fde68a; color: #7a5200; border: 1px solid #e0b84a; font-weight: 700;
-    }
-    .cell .auto, .cell .dnote {
-      max-width: calc(100% - 6px); box-sizing: border-box; margin: 2px 3px 0;
-      font-size: 9px; line-height: 1.3; padding: 1px 3px; border-radius: 3px;
+    /* ===== マスに出す帯（大型案件の会社名／決まっている案件／その日のメモ） ===== */
+    /* ⚠ 帯はぜんぶ同じ大きさ・同じ入れ物にする。別々の入れ物にすると、
+       入っている中身の組み合わせでマスの高さが変わってしまう。 */
+    .cell .chips { width: 100%; min-width: 0; }
+    .cell .chip {
+      max-width: calc(100% - 6px); box-sizing: border-box; margin: 2px auto 0;
+      height: 14px; font-size: 9px; line-height: 12px; padding: 0 3px; border-radius: 3px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
     }
+    /* 黄色＝大型案件のお客様の会社名（上の「大型」バッジと同じ色）。 */
+    .cell .chip.big  { background: #fde68a; color: #7a5200; border: 1px solid #e0b84a; font-weight: 700; }
     /* 青＝ECSが自動で出したもの（アサインが確定した案件）。手では消せない。 */
-    .cell .auto  { background: #e2edfb; color: #1d4e89; border: 1px solid #bcd6f2; font-weight: 700; }
+    .cell .chip.auto { background: #e2edfb; color: #1d4e89; border: 1px solid #bcd6f2; font-weight: 700; }
     /* 茶の破線＝自分で書いたメモ。消せる。 */
-    .cell .dnote { background: #faf5ec; color: #6b5544; border: 1px dashed #d9cbb4; }
+    .cell .chip.note { background: #faf5ec; color: #6b5544; border: 1px dashed #d9cbb4; }
+    /* 入りきらなかったぶん（マウスを乗せると全部出る）。 */
+    .cell .chip.more { background: #f1ece4; color: #7a6a56; border: 1px solid #ded4c6; cursor: help; }
     /* 案件が決まっている日に「〇（出勤可）」のままのとき出す注意の印。自動では直さない。 */
     .cell .warn { position: absolute; left: 3px; top: 3px; font-size: 11px; line-height: 1; cursor: help; }
     /* その日のメモを書くボタン（マスをクリックすると〇×△が変わってしまうので別のボタンにする） */
@@ -216,14 +220,15 @@
          代わりに すき間と文字を小さくして、375pxでも1マス約44px＝指で押せる大きさを確保する。 */
       .cal-grid { gap: 3px; }
       .cal-grid .dow { font-size: 11px; }
-      .cell { min-height: 52px; padding: 3px 1px; font-size: 12px; border-radius: 8px; }
+      /* ⚠ スマホでも高さは固定（PCと同じ理由＝マスの高さが揃っていないと日付が追いにくい）。 */
+      .cell { height: 92px; padding: 3px 1px; font-size: 12px; border-radius: 8px; }
       .cell .dnum { font-size: 11px; margin-left: 3px; }
       .cell .badge { font-size: 8px; padding: 1px 2px; top: 2px; right: 2px; }
       .cell .st { font-size: 15px; margin-top: 2px; }
       .cell .stsub { font-size: 8px; }
       .cell.weekday.off .st { font-size: 11px; }
-      /* スマホでは案件名・メモを出すと1マスが潰れるので、印だけにする（詳しくは長押しで出る）。 */
-      .cell .auto, .cell .dnote { font-size: 8px; margin: 1px 1px 0; padding: 0 2px; }
+      /* 画面が狭いので帯も小さくする（詳しくは長押しで出る）。 */
+      .cell .chip { height: 12px; font-size: 8px; line-height: 10px; margin-top: 1px; padding: 0 2px; }
       .cell .memobtn { font-size: 9px; right: 1px; bottom: 0; }
 
       /* 凡例は項目が多いので、すき間をつめて2〜3段に折り返す。 */
@@ -534,7 +539,7 @@
       cell.innerHTML = '<div class="dnum">' + d + '</div>'
         + (kind.badge ? '<div class="badge' + (kind.badge==='大型'?' big':'') + '">' + kind.badge + '</div>' : '')
         + '<div class="st"></div><div class="stsub"></div>'
-        + '<div class="bigs"></div><div class="autos"></div><div class="dnotes"></div>'
+        + '<div class="chips"></div>'
         + '<button type="button" class="memobtn" title="この日のメモを書く">✎</button>';
       if (kind.big) cell.title = bigTitle(kind.big);
       const k = keyOf(y,m,d);
@@ -589,24 +594,35 @@
     const k = keyOf(y,m,d);
     const list = assignedFor(ME ? ME.id : null, y, m, d);
 
-    // 大型案件のお客様の会社名。⚠ マウスを乗せなくても読めるようにマスに出す（2026-08-28 baba要望）。
-    const bigs = cell.querySelector('.bigs');
-    const bigList = bigDayMap[d] || [];
-    bigs.innerHTML = bigList.map(function(a){
-      return '<div class="bigname" title="' + ovEsc(bigTitle([a])) + '">' + ovEsc(bigLabel(a)) + '</div>';
-    }).join('');
-
-    // 決まっている案件（自動）。ここは書き換えられない＝正本はアサインのデータ。
-    const autos = cell.querySelector('.autos');
-    autos.innerHTML = list.map(function(a){
-      return '<div class="auto" title="' + ovEsc(assignedTitle([a])) + '">' + ovEsc(a.name) + '</div>';
-    }).join('');
-    cell.classList.toggle('has-auto', list.length > 0);
-
-    // その日のメモ（手入力）。
-    const notes = cell.querySelector('.dnotes');
+    // マスに出す帯を1本の並びにまとめる。⚠ まとめるのは、入れ物を分けると
+    //   中身の組み合わせでマスの高さが変わって、カレンダーがガタガタになるため。
+    const chips = [];
+    // ① 大型案件のお客様の会社名（マウスを乗せなくても読めるように・2026-08-28 baba要望）。
+    (bigDayMap[d] || []).forEach(function(a){
+      chips.push({ cls: 'big', text: bigLabel(a), title: bigTitle([a]) });
+    });
+    // ② 決まっている案件（自動）。ここは書き換えられない＝正本はアサインのデータ。
+    list.forEach(function(a){
+      chips.push({ cls: 'auto', text: a.name, title: assignedTitle([a]) });
+    });
+    // ③ その日のメモ（手入力）。
     const note = (myNotes[k] || '').trim();
-    notes.innerHTML = note ? '<div class="dnote" title="' + ovEsc(note) + '">✎ ' + ovEsc(note) + '</div>' : '';
+    if (note) chips.push({ cls: 'note', text: '✎ ' + note, title: note });
+
+    // ⚠ 入りきらないぶんは切り捨てず「＋n件」にまとめる（マウスを乗せると全部出る）。
+    const MAX = 3;
+    let html = '';
+    const shown = chips.length > MAX ? chips.slice(0, MAX - 1) : chips;
+    shown.forEach(function(c){
+      html += '<div class="chip ' + c.cls + '" title="' + ovEsc(c.title) + '">' + ovEsc(c.text) + '</div>';
+    });
+    if (chips.length > MAX){
+      const rest = chips.slice(MAX - 1);
+      html += '<div class="chip more" title="' + ovEsc(rest.map(function(c){ return c.title; }).join('\n')) + '">'
+            + '＋' + rest.length + '件</div>';
+    }
+    cell.querySelector('.chips').innerHTML = html;
+    cell.classList.toggle('has-auto', list.length > 0);
 
     // ⚠ 案件が決まっているのに「〇（出勤可）」のままの日は、印を出して知らせるだけ。
     //   勝手に×にはしない。前泊・半日・掛け持ちなど「それでも入れる」ことが本当にあるため。
