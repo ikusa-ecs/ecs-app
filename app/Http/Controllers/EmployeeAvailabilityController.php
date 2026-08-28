@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Models\ShiftPreference;
+use App\Support\ConfirmedSchedule;
 use App\Support\OfficeScope;
 use App\Support\PersonalCases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * 社員の出勤可能日（参加希望）（/employee-availability）。S-018。
@@ -70,12 +72,13 @@ class EmployeeAvailabilityController extends Controller
             ->values();
 
         // 登録済みの出勤可能日（全社員ぶん）。画面の state キー "YYYY-M-D" に合わせて整形する。
-        // 形： { "E-001": { state: {"2026-7-13":"ok", ...}, memo: {"2026-7":"…"} }, ... }
+        // 形： { "E-001": { state: {"2026-7-13":"ok", ...}, memo: {"2026-7":"…"}, dayNote: {"2026-7-13":"午後だけ"} }, ... }
+        $hasDayNote = Schema::hasColumn('shift_preferences', 'day_note');
         $prefs = [];
         foreach (ShiftPreference::all() as $sp) {
             $sid = $sp->staff_id;
             if (! isset($prefs[$sid])) {
-                $prefs[$sid] = ['state' => [], 'memo' => []];
+                $prefs[$sid] = ['state' => [], 'memo' => [], 'dayNote' => []];
             }
             $d = $sp->date; // Carbon（モデルで date キャスト）
             if (! $d) {
@@ -86,6 +89,10 @@ class EmployeeAvailabilityController extends Controller
             $view = self::TO_VIEW[$sp->availability] ?? null;
             if ($view !== null) {
                 $prefs[$sid]['state'][$stateKey] = $view;
+            }
+            // その日のメモ（〇×△とは別。まだ migrate していないサーバーでは列が無いので確認する）。
+            if ($hasDayNote && trim((string) $sp->day_note) !== '') {
+                $prefs[$sid]['dayNote'][$stateKey] = (string) $sp->day_note;
             }
             // 備考はその月（period 由来）に1つ。空でなければ採用。
             $monKey = $d->year.'-'.$d->month;
@@ -106,6 +113,10 @@ class EmployeeAvailabilityController extends Controller
             // ⚠ 拠点名は画面に書かない。正本は拠点マスタ（共通設定 → マスタ管理）。
             'offices' => OfficeScope::options(),
             'myOffice' => OfficeScope::filterSingle(request()),
+            // 「その日にもう決まっている案件」（2026-08-28 baba要望）。
+            // ⚠ 保存しない＝開くたびに数え直す。希望を出したあとに決まった案件も、
+            //   次に開けば自動で出る（希望を出す時点では案件があるか分からないため）。
+            'assigned' => ConfirmedSchedule::forPeople($employees->pluck('id')->all()),
         ]);
     }
 
@@ -138,34 +149,107 @@ class EmployeeAvailabilityController extends Controller
             return response()->json(['ok' => false, 'message' => '社員が見つかりません。'], 404);
         }
 
-        $saved = 0;
+        // その月ぶんを「日付 => 入れる中身」に組み立て直す。
+        // ⚠ 〇×△とメモは別々に送られてくるので、同じ日を2回 updateOrCreate しないよう先にまとめる。
+        $byDate = [];
         foreach ($state as $stateKey => $value) {
             $availability = self::TO_DB[$value] ?? null;
             if ($availability === null) {
                 continue; // 未知の値は無視（不正データ混入の防止）
             }
-            // "Y-M-D"（ゼロ埋めなし）→ Y-m-d の日付に直す。不正な日付は飛ばす。
-            $parts = explode('-', (string) $stateKey);
-            if (count($parts) !== 3) {
-                continue;
+            $date = self::toDate($stateKey);
+            if ($date !== null) {
+                $byDate[$date]['availability'] = $availability;
             }
-            try {
-                $date = Carbon::create((int) $parts[0], (int) $parts[1], (int) $parts[2])->format('Y-m-d');
-            } catch (\Throwable $e) {
-                continue;
+        }
+        // その日のメモ（2026-08-28 追加）。空文字で送られてきたら「消す」＝ null にする。
+        $hasDayNote = Schema::hasColumn('shift_preferences', 'day_note');
+        if ($hasDayNote) {
+            foreach ((array) $request->input('day_notes', []) as $stateKey => $text) {
+                $date = self::toDate($stateKey);
+                if ($date !== null) {
+                    $text = trim((string) $text);
+                    $byDate[$date]['day_note'] = $text !== '' ? $text : null;
+                }
             }
+        }
 
+        $saved = 0;
+        foreach ($byDate as $date => $values) {
             ShiftPreference::updateOrCreate(
                 ['staff_id' => $employeeId, 'date' => $date], // unique キー
-                [
-                    'period' => $period,
-                    'availability' => $availability,
-                    'note' => $memo,
-                ]
+                array_merge(['period' => $period, 'note' => $memo], $values)
             );
             $saved++;
         }
 
-        return response()->json(['ok' => true, 'saved' => $saved]);
+        // ⚠ 送られてこなかった日は「未入力に戻した日」＝画面から消えている。
+        //   以前はここを何もしていなかったので、**一度付けた〇を消しても消えなかった**
+        //   （画面では消えているのに、開き直すと〇が復活する。2026-08-28 修正）。
+        //   メモも〇×△も無くなった行は消し、メモだけ残っている行は〇×△だけ空にする。
+        $cleared = self::clearMissingDays($employeeId, $period, array_keys($byDate), $hasDayNote);
+
+        return response()->json(['ok' => true, 'saved' => $saved, 'cleared' => $cleared]);
+    }
+
+    /**
+     * 画面のキー "Y-M-D"（ゼロ埋めなし）→ "Y-m-d"。おかしな値は null。
+     */
+    private static function toDate(string $stateKey): ?string
+    {
+        $parts = explode('-', $stateKey);
+        if (count($parts) !== 3) {
+            return null;
+        }
+        try {
+            return Carbon::create((int) $parts[0], (int) $parts[1], (int) $parts[2])->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * その月のうち、今回送られてこなかった日を片付ける。
+     *
+     * ⚠ 対象はその月だけ。画面はその月ぶんしか送ってこないので、
+     *   他の月まで見に行くと、開いていない月の入力を消してしまう。
+     *
+     * @param  list<string>  $keptDates  今回保存した日（Y-m-d）
+     */
+    private static function clearMissingDays(string $employeeId, string $period, array $keptDates, bool $hasDayNote): int
+    {
+        try {
+            $month = Carbon::createFromFormat('Y-m-d', $period.'-01');
+        } catch (\Throwable $e) {
+            return 0; // period の形がおかしいときは何もしない（消しすぎないように）
+        }
+
+        $rows = ShiftPreference::where('staff_id', $employeeId)
+            ->whereBetween('date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()])
+            ->get();
+
+        $cleared = 0;
+        foreach ($rows as $row) {
+            $date = $row->date ? $row->date->format('Y-m-d') : null;
+            if ($date === null || in_array($date, $keptDates, true)) {
+                continue;
+            }
+            // メモが残っているなら行は残す（〇×△だけ空にする）。
+            if ($hasDayNote && trim((string) $row->day_note) !== '') {
+                if ($row->availability !== null) {
+                    // ⚠ note（その月の備考）は消さない。消すと、〇を1つ外しただけで
+                    //   その月に書いた備考まで消えてしまう。
+                    $row->availability = null;
+                    $row->save();
+                    $cleared++;
+                }
+
+                continue;
+            }
+            $row->delete();
+            $cleared++;
+        }
+
+        return $cleared;
     }
 }

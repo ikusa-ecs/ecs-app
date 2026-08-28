@@ -37,7 +37,7 @@
     .cal-grid .dow.sat { color: var(--brand); }
     .cal-grid .dow.sun { color: var(--danger); }
     .cell {
-      min-height: 62px; border-radius: 10px; border: 1px solid var(--line);
+      min-height: 70px; border-radius: 10px; border: 1px solid var(--line);
       display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
       padding: 5px 2px 4px; font-size: 13px; background: #fff; position: relative;
     }
@@ -50,6 +50,43 @@
     .cell .badge.big { background: #fde68a; color: #7a5200; border: 1px solid #e0b84a; }
     .cell .st { font-size: 16px; font-weight: 700; margin-top: 4px; }
     .cell .stsub { font-size: 9px; margin-top: 1px; }
+
+    /* ===== その日にもう決まっている案件（自動・消せない）とその日のメモ（手入力・消せる） ===== */
+    /* ⚠ 入れ物は幅いっぱいにする。しないと中身の長さで枠からはみ出す。 */
+    .cell .autos, .cell .dnotes { width: 100%; }
+    .cell .auto, .cell .dnote {
+      max-width: calc(100% - 6px); box-sizing: border-box; margin: 2px 3px 0;
+      font-size: 9px; line-height: 1.3; padding: 1px 3px; border-radius: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+    }
+    /* 青＝ECSが自動で出したもの（アサインが確定した案件）。手では消せない。 */
+    .cell .auto  { background: #e2edfb; color: #1d4e89; border: 1px solid #bcd6f2; font-weight: 700; }
+    /* 茶の破線＝自分で書いたメモ。消せる。 */
+    .cell .dnote { background: #faf5ec; color: #6b5544; border: 1px dashed #d9cbb4; }
+    /* 案件が決まっている日に「〇（出勤可）」のままのとき出す注意の印。自動では直さない。 */
+    .cell .warn { position: absolute; left: 3px; top: 3px; font-size: 11px; line-height: 1; cursor: help; }
+    /* その日のメモを書くボタン（マスをクリックすると〇×△が変わってしまうので別のボタンにする） */
+    .cell .memobtn {
+      position: absolute; right: 3px; bottom: 2px; font-size: 10px; line-height: 1;
+      border: none; background: none; color: #b8a894; cursor: pointer; padding: 2px;
+    }
+    .cell .memobtn:hover { color: var(--brand-dark); }
+    .cell.has-auto { border-color: #bcd6f2; }
+
+    /* その日のメモを書く小窓 */
+    .dn-back { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 60; display: none; }
+    .dn-back.show { display: flex; align-items: center; justify-content: center; }
+    .dn-box { background: #fff; border-radius: 14px; padding: 18px; width: min(420px, 92vw); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .dn-box h4 { margin: 0 0 4px; font-size: 15px; }
+    .dn-box .dn-sub { font-size: 12px; color: var(--muted); margin: 0 0 10px; line-height: 1.6; }
+    .dn-box .dn-auto { font-size: 12px; color: #1d4e89; background: #eef5fd; border: 1px solid #bcd6f2;
+                       border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; line-height: 1.6; }
+    .dn-box textarea { width: 100%; box-sizing: border-box; min-height: 80px; resize: vertical;
+                       border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; }
+    .dn-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+    .dn-btns button { border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .dn-btns .ok { background: var(--brand); color: #fff; border: none; }
+    .dn-btns .cancel { background: #fff; color: #6b5544; border: 1px solid var(--line); }
 
     /* イベント候補日（土日祝・長期休暇）＝クリックで 〇×△ */
     .cell.event { cursor: pointer; }
@@ -129,6 +166,13 @@
     }
     table.ov-tbl td.offcol { color: #556683; }
     table.ov-tbl td.memocol { color: #5a4a38; font-size: 12px; }
+    /* もう案件が決まっている人の日＝薄い青。〇×△はそのまま（本人の申告なので変えない）。 */
+    table.ov-tbl td.ovbusy { background: #eef5fd; }
+    table.ov-tbl tr.me td.ovbusy { background: #eaf1fa; }
+    table.ov-tbl td.ovbusy .ovbusy-txt {
+      font-size: 9px; color: #1d4e89; margin-top: 1px; max-width: 74px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     table.ov-tbl tfoot td { background: #faf5ee; font-weight: 700; color: #5a4a38; }
     table.ov-tbl tfoot td.few { background: #fbe3e3; color: #b91c1c; }
     .ov-note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
@@ -164,6 +208,9 @@
       .cell .st { font-size: 15px; margin-top: 2px; }
       .cell .stsub { font-size: 8px; }
       .cell.weekday.off .st { font-size: 11px; }
+      /* スマホでは案件名・メモを出すと1マスが潰れるので、印だけにする（詳しくは長押しで出る）。 */
+      .cell .auto, .cell .dnote { font-size: 8px; margin: 1px 1px 0; padding: 0 2px; }
+      .cell .memobtn { font-size: 9px; right: 1px; bottom: 0; }
 
       /* 凡例は項目が多いので、すき間をつめて2〜3段に折り返す。 */
       .ea-legend { gap: 8px 12px; font-size: 11px; margin-top: 10px; }
@@ -225,10 +272,15 @@
           <h3>📅 出勤できる日・希望休</h3>
           <p class="sub">
             土日・祝日・長期休暇（色つきの枠）をクリックすると <b>〇 → × → △ → 未入力</b> と切り替わります。<br>
-            平日をクリックすると「希望休（休みたい日）」のオン／オフが切り替わります。
+            平日をクリックすると「希望休（休みたい日）」のオン／オフが切り替わります。<br>
+            <b style="color:#1d4e89;">青い帯＝すでに自分のアサインが確定している案件</b>です。ECSが自動で出すので、書き写す必要はありません（手では消せません）。
+            アサインが後から決まっても、次にこの画面を開いたときに自動で出ます。<br>
+            マスの右下の <b>✎</b> を押すと、<b>その日のメモ</b>（「午後だけ可」「前泊」「ECSにまだ無い予定」など）を書けます。こちらは自分で消せます。
           </p>
           <div class="cal-grid" id="calGrid"></div>
           <div class="ea-legend">
+            <span><i style="background:#e2edfb;border-color:#bcd6f2 !important;"></i>決まっている案件（自動）</span>
+            <span><i style="background:#faf5ec;border-color:#d9cbb4 !important;border-style:dashed;"></i>その日のメモ（手入力）</span>
             <span><i class="lg-need"></i>要入力（未入力の必須日）</span>
             <span><i class="lg-ok"></i>〇 出勤可</span>
             <span><i class="lg-ng"></i>× 不可</span>
@@ -257,6 +309,26 @@
         <button class="ea-float-save" id="floatSave" onclick="saveMine()">💾 この月の内容を保存</button>
       </div>
 
+      <!-- その日のメモを書く小窓（✎ を押すと開く） -->
+      <div class="dn-back" id="dnBack" onclick="if(event.target===this) closeDayNote()">
+        <div class="dn-box">
+          <h4 id="dnTitle">その日のメモ</h4>
+          <p class="dn-sub">
+            この日だけのメモです。<b>ECSがまだ知らない予定</b>（他部署の予定・私用・前泊など）や、
+            <b>△にした理由</b>を書いておくと、アサイン担当が見て判断できます。
+          </p>
+          <div class="dn-auto" id="dnAuto" style="display:none;"></div>
+          <textarea id="dnText" placeholder="例：午後だけ可／前泊で入る／別件の打ち合わせあり"></textarea>
+          <div class="dn-btns">
+            <button class="cancel" onclick="closeDayNote()">やめる</button>
+            <button class="ok" onclick="applyDayNote()">この日に入れる</button>
+          </div>
+          <p class="dn-sub" style="margin:10px 0 0;">
+            ※ 入れたあと、下の「この月の内容を保存」を押すと保存されます。
+          </p>
+        </div>
+      </div>
+
       <!-- ===== タブ②：全社員の一覧 ===== -->
       <div class="ea-pane" id="pane-all">
         <div class="ea-card">
@@ -274,6 +346,8 @@
           <p class="ov-note">
             ※ 黄色い行があなた自身の行です。自分の行は「自分の入力」タブで入れた内容がそのまま反映されます。ほかの社員は、出勤可能日を登録済みならその内容、未登録ならグレーの仮データを表示します。<br>
             ※ 一番下の「〇の人数」が少ない日（赤）は、イベントがあるのに出られる社員が少ない＝注意したい日です。<br>
+            ※ <b style="color:#1d4e89;">薄い青のマス</b>は、その人の<b>アサインがもう確定している日</b>です（案件名を小さく出します。マウスを乗せると詳しく出ます）。
+            そのため「<b>うち空いている人数</b>」＝〇のうち、まだ案件が入っていない人＝<b>これから頼める人数</b>です。<br>
             ※ 上の<b>拠点</b>で絞れます（はじめは自分の拠点）。<b>「〇の人数」も、いま表に出ている人だけで数えます</b>
             ＝その拠点で何人出られるかが分かります。他拠点の人も見たいときは「拠点：すべて」にしてください。
           </p>
@@ -294,6 +368,10 @@
        ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
   window.ECS_OFFICES = @json($offices ?? []);
   window.ECS_MY_OFFICE = @json($myOffice ?? '');
+  {{-- その日にもう確定している案件（2026-08-28 baba要望）。
+       ⚠ 保存された写しではなく、画面を開くたびに assignments から数え直したもの。
+          希望を出したあとに決まった案件も、次に開けば自動で出る。 --}}
+  window.ECS_ASSIGNED = @json($assigned ?? []);
   window.ECS_SAVE_URL  = '/employee-availability/save';
   window.ECS_CSRF      = '{{ csrf_token() }}';
 </script>
@@ -353,12 +431,40 @@
   //   誰がログインしても先頭の社員として保存されていた。必ず ECS_ME を使う。
   const EMP_LIST = window.ECS_EMPLOYEES || [];
   const ME = window.ECS_ME || null;                     // { id, name } or null
-  const PREFS = window.ECS_PREFS || {};                 // { "E-001": { state, memo }, ... }
+  const PREFS = window.ECS_PREFS || {};                 // { "E-001": { state, memo, dayNote }, ... }
 
-  // 自分の登録済みデータ（DB）を myState / myFields に展開（あれば）。
+  // ===== もう決まっている案件（自動・消せない） =====
+  // 形： { "E-001": { "2026-9-13": [ {id,name,role,roleLabel,client,time}, ... ] } }
+  // ⚠ ここは「見るだけ」。画面から書き換えない＝正本は assignments。
+  const ASSIGNED = window.ECS_ASSIGNED || {};
+  function assignedFor(personId, y, m, d){
+    const a = personId ? ASSIGNED[personId] : null;
+    return (a && a[keyOf(y,m,d)]) ? a[keyOf(y,m,d)] : [];
+  }
+  // 案件1件を短い文字にする（マスが狭いので名前だけ。詳しくはマウスを乗せると出る）。
+  function assignedTitle(list){
+    return list.map(function(a){
+      const bits = [a.name];
+      if (a.roleLabel) bits.push('（' + a.roleLabel + '）');
+      if (a.client) bits.push(' / ' + a.client + '様');
+      if (a.time) bits.push(' / ' + a.time);
+      return bits.join('');
+    }).join('\n');
+  }
+
+  // ===== その日のメモ（手入力・消せる） =====
+  // キー＝"YYYY-M-D"、値＝メモ本文。〇×△とは別に持つ（メモだけ書きたい日があるため）。
+  const myNotes = {};
+  // 保存済みのメモ（DBから来たもの）の控え。⚠ 「消した日」を見分けるために要る
+  //   ＝消した日は空文字で送らないと、サーバ側は「変更なし」と見なして残してしまう。
+  let savedNotes = {};
+
+  // 自分の登録済みデータ（DB）を myState / myFields / myNotes に展開（あれば）。
   if (ME && PREFS[ME.id]){
     Object.assign(myState,  PREFS[ME.id].state || {});
     Object.assign(myFields, monMemoToFields(PREFS[ME.id].memo || {}));
+    Object.assign(myNotes,  PREFS[ME.id].dayNote || {});
+    savedNotes = Object.assign({}, myNotes);
   }
   // memo は { "Y-M": "本文" } → myFields の { "Y-M": { memo } } 形へ。
   function monMemoToFields(memoMap){
@@ -394,7 +500,9 @@
       cell.className = 'cell ' + (kind.input ? 'event' : 'weekday');
       cell.innerHTML = '<div class="dnum">' + d + '</div>'
         + (kind.badge ? '<div class="badge' + (kind.badge==='大型'?' big':'') + '">' + kind.badge + '</div>' : '')
-        + '<div class="st"></div><div class="stsub"></div>';
+        + '<div class="st"></div><div class="stsub"></div>'
+        + '<div class="autos"></div><div class="dnotes"></div>'
+        + '<button type="button" class="memobtn" title="この日のメモを書く">✎</button>';
       if (kind.big) cell.title = '大型案件：' + kind.big;
       const k = keyOf(y,m,d);
       if (kind.input){
@@ -405,14 +513,22 @@
           const next = order[(cur+1) % order.length];
           if (next === undefined) delete myState[k]; else myState[k] = next;
           applyEvent(cell, myState[k]);
+          applyExtras(cell, y, m, d);   // 〇に戻したら注意の印も出し直す
         });
       } else {
         applyWeekday(cell, myState[k]);
         cell.addEventListener('click', ()=>{
           if (myState[k] === 'off') delete myState[k]; else myState[k] = 'off';
           applyWeekday(cell, myState[k]);
+          applyExtras(cell, y, m, d);
         });
       }
+      // ✎ はマスのクリック（〇×△の切替）と別扱いにする。
+      cell.querySelector('.memobtn').addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        openDayNote(y, m, d);
+      });
+      applyExtras(cell, y, m, d);
       grid.appendChild(cell);
     }
     // 備考をこの月の保存値に
@@ -435,12 +551,76 @@
     else { st.textContent=''; sub.textContent=''; }
   }
 
+  // マスに「もう決まっている案件」「その日のメモ」「注意の印」を出し直す。
+  function applyExtras(cell, y, m, d){
+    const k = keyOf(y,m,d);
+    const list = assignedFor(ME ? ME.id : null, y, m, d);
+
+    // 決まっている案件（自動）。ここは書き換えられない＝正本はアサインのデータ。
+    const autos = cell.querySelector('.autos');
+    autos.innerHTML = list.map(function(a){
+      return '<div class="auto" title="' + ovEsc(assignedTitle([a])) + '">' + ovEsc(a.name) + '</div>';
+    }).join('');
+    cell.classList.toggle('has-auto', list.length > 0);
+
+    // その日のメモ（手入力）。
+    const notes = cell.querySelector('.dnotes');
+    const note = (myNotes[k] || '').trim();
+    notes.innerHTML = note ? '<div class="dnote" title="' + ovEsc(note) + '">✎ ' + ovEsc(note) + '</div>' : '';
+
+    // ⚠ 案件が決まっているのに「〇（出勤可）」のままの日は、印を出して知らせるだけ。
+    //   勝手に×にはしない。前泊・半日・掛け持ちなど「それでも入れる」ことが本当にあるため。
+    let warn = cell.querySelector('.warn');
+    if (list.length > 0 && myState[k] === 'ok'){
+      if (!warn){ warn = document.createElement('div'); warn.className = 'warn'; cell.appendChild(warn); }
+      warn.textContent = '⚠';
+      warn.title = 'この日はすでに案件が決まっています。それでも入れるなら〇のままで大丈夫です。';
+    } else if (warn){
+      warn.remove();
+    }
+  }
+
+  // ===== その日のメモの小窓 =====
+  let dnKey = null;   // いま開いている日（"Y-M-D"）。閉じているときは null。
+  function openDayNote(y, m, d){
+    dnKey = keyOf(y,m,d);
+    document.getElementById('dnTitle').textContent = y + '年' + m + '月' + d + '日 のメモ';
+    const list = assignedFor(ME ? ME.id : null, y, m, d);
+    const auto = document.getElementById('dnAuto');
+    if (list.length){
+      auto.innerHTML = '<b>この日にもう決まっている案件</b><br>'
+        + list.map(function(a){ return '・' + ovEsc(assignedTitle([a])); }).join('<br>');
+      auto.style.display = 'block';
+    } else {
+      auto.innerHTML = ''; auto.style.display = 'none';
+    }
+    document.getElementById('dnText').value = myNotes[dnKey] || '';
+    document.getElementById('dnBack').classList.add('show');
+    document.getElementById('dnText').focus();
+  }
+  function closeDayNote(){
+    dnKey = null;
+    document.getElementById('dnBack').classList.remove('show');
+  }
+  function applyDayNote(){
+    if (dnKey === null) return;
+    const v = document.getElementById('dnText').value.trim();
+    if (v === '') delete myNotes[dnKey]; else myNotes[dnKey] = v;
+    closeDayNote();
+    // ⚠ 描き直すと備考欄が保存値に戻るので、先に打ちかけの備考を控えておく
+    //   （メモを書いただけで、書きかけの備考が消えないように）。
+    const y = cursor.getFullYear(), m = cursor.getMonth()+1;
+    myFields[monKey(y,m)] = { memo: document.getElementById('memo').value };
+    renderCalendar();
+  }
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeDayNote(); });
+
   function saveMine(){
     const y = cursor.getFullYear(), m = cursor.getMonth()+1;
     const memo = document.getElementById('memo').value;
     myFields[monKey(y,m)] = { memo: memo };
     // モック：localStorage にも保存（端末内のみ・DB保存できない場合の保険）
-    try { localStorage.setItem('ecs_emp_avail', JSON.stringify({ state: myState, fields: myFields })); } catch(e){}
+    try { localStorage.setItem('ecs_emp_avail', JSON.stringify({ state: myState, fields: myFields, notes: myNotes })); } catch(e){}
 
     const msg = document.getElementById('savedMsg');
 
@@ -450,15 +630,27 @@
       const monthState = {};
       const prefix = y + '-' + m + '-';
       for (const k in myState){ if (k.indexOf(prefix) === 0) monthState[k] = myState[k]; }
+      // その日のメモも同じ月ぶんだけ送る。
+      // ⚠ その月に一度でも書いた日は「空文字」でも送る＝消したことをサーバに伝えるため
+      //   （送らないと「変更なし」と見なされて、消したはずのメモが残る）。
+      const monthNotes = {};
+      const days = new Date(y, m, 0).getDate();
+      for (let d=1; d<=days; d++){
+        const k = keyOf(y,m,d);
+        if (k in myNotes) monthNotes[k] = myNotes[k];
+        else if (k in savedNotes) monthNotes[k] = '';   // 消された日
+      }
       const period = y + '-' + String(m).padStart(2,'0'); // 例 2026-07
       fetch(window.ECS_SAVE_URL, {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept':'application/json' },
-        body: JSON.stringify({ employee_id: ME.id, period: period, state: monthState, memo: memo })
+        body: JSON.stringify({ employee_id: ME.id, period: period, state: monthState, memo: memo, day_notes: monthNotes })
       })
       .then(r => r.json())
       .then(res => {
         const ok = !!(res && res.ok);
+        // 保存できたら「保存済みのメモ」の控えを取り直す（次に消したときも正しく伝わるように）。
+        if (ok) savedNotes = Object.assign({}, myNotes);
         msg.textContent = ok ? '✓ 保存しました' : '保存に失敗しました';
         msg.style.display = 'inline';
         flashFloat(ok);
@@ -481,6 +673,7 @@
         const o = JSON.parse(raw);
         Object.assign(myState, o.state||{});
         Object.assign(myFields, o.fields||{});
+        Object.assign(myNotes, o.notes||{});
       }
     } catch(e){}
   })();
@@ -563,6 +756,26 @@
     if (v==='maybe') return '<span class="ov-mark maybe">△</span>';
     return '<span class="ov-mark none">−</span>';
   }
+  // 社員index → その人のID（拠点で絞ったあとも番号は元のままなので、これで引ける）。
+  function empIdOf(idx){
+    const e = EMP_LIST[idx];
+    return e ? e.id : null;
+  }
+  // その人のその日に、もう決まっている案件（一覧タブ用）。
+  function ovAssigned(idx, y, m, d){
+    return assignedFor(empIdOf(idx), y, m, d);
+  }
+  // 〇×△のうしろに「もう案件が入っている」ことを小さく出す。
+  // ⚠ 〇×△そのものは本人の申告なので書き換えない（勝手に×にしない）。
+  function ovCell(idx, name, y, m, d){
+    const v = markFor(idx, name, y, m, d);
+    const list = ovAssigned(idx, y, m, d);
+    if (list.length === 0) return '<td>' + markHtml(v) + '</td>';
+    const tip = ovEsc(assignedTitle(list));
+    const names = ovEsc(list.map(function(a){ return a.name; }).join('・'));
+    return '<td class="ovbusy" title="' + tip + '">' + markHtml(v)
+         + '<div class="ovbusy-txt">' + names + '</div></td>';
+  }
   // 平日のうち希望休にしている日を配列で返す（自分＝myState、他＝その人が登録した内容）。
   // ⚠ 未登録の人は空のまま。架空の希望休を作らない。
   function weekdayOffDays(name, y, m, me, idx){
@@ -625,8 +838,7 @@
       const me = idx === 0;
       body += '<tr class="' + (me?'me':'') + '"><td class="namecol">' + name + '</td>';
       cols.forEach(c=>{
-        const v = markFor(idx, name, y, m, c.d);
-        body += '<td>' + markHtml(v) + '</td>';
+        body += ovCell(idx, name, y, m, c.d);
       });
       const offs = weekdayOffDays(name, y, m, me, idx);
       const offTxt = offs.length ? offs.map(d=>d+'日').join('・') : '<span style="color:#c7bba9;">なし</span>';
@@ -646,6 +858,17 @@
       rows.forEach(({name, idx})=>{
         const v = markFor(idx, name, y, m, c.d);
         if (v==='ok') cnt++;
+      });
+      foot += '<td class="' + (cnt<=3?'few':'') + '">' + cnt + '人</td>';
+    });
+    foot += '<td class="offcol"></td><td class="memocol"></td></tr>';
+    // ⚠ 「まだ空いている人数」＝〇のうち、その日にまだ案件が決まっていない人。
+    //   アサインするときに本当に見たいのはこちら（〇でも、もう他の案件で埋まっている人がいる）。
+    foot += '<tr><td class="namecol">うち空いている人数</td>';
+    cols.forEach(c=>{
+      let cnt = 0;
+      rows.forEach(({name, idx})=>{
+        if (markFor(idx, name, y, m, c.d) === 'ok' && ovAssigned(idx, y, m, c.d).length === 0) cnt++;
       });
       foot += '<td class="' + (cnt<=3?'few':'') + '">' + cnt + '人</td>';
     });

@@ -2,10 +2,8 @@
 
 namespace App\Support;
 
-use App\Models\Content;
 use App\Models\Project;
 use App\Models\Setting;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * カレンダーの予定名（タイトル）の付け方＝命名規則の正本（2026-08-27 baba要望）。
@@ -187,35 +185,9 @@ final class CalendarTitle
             return (string) $project->project_name;
         }
 
-        if ($short) {
-            // ⚠ 略称の正本はコンテンツ台帳（contents.short_name）。ここに変換表を持たない。
-            //   台帳に無い名前（単発コンテンツ）はそのまま使う。
-            $map = self::shortNameMap($names);
-            $names = array_map(fn ($n) => $map[$n] ?? $n, $names);
-        }
-
-        return implode('・', $names);
-    }
-
-    /**
-     * コンテンツ名 => 略称（略称が入っているものだけ）。
-     * ⚠ 1回のクエリでまとめて引く（コンテンツごとに引かない）。
-     *
-     * @param  list<string>  $names
-     * @return array<string, string>
-     */
-    private static function shortNameMap(array $names): array
-    {
-        if (! Schema::hasColumn('contents', 'short_name')) {
-            // まだ migrate していないサーバーでも予定名が作れるようにする（正式名になるだけ）。
-            return [];
-        }
-
-        return Content::whereIn('content_name', $names)
-            ->whereNotNull('short_name')
-            ->where('short_name', '!=', '')
-            ->pluck('short_name', 'content_name')
-            ->all();
+        // ⚠ 略称の正本はコンテンツ台帳（contents.short_name）。ここに変換表を持たない。
+        //   引き当ては ContentShortName に集約している（出勤可能日の画面と共用）。
+        return ContentShortName::label($names, (string) $project->project_name, $short);
     }
 
     /** 拠点名 → 予定名に出す短い形（載っていない拠点は頭1文字）。 */
