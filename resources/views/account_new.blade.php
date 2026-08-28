@@ -69,6 +69,23 @@
             <input type="text" name="name" value="{{ old('name') }}" required placeholder="例）山田 太郎">
           </div>
 
+          {{-- 同じ名前の人が名簿にいたときだけ出す確認（2026-08-28）。
+               二重登録を一度止めて、それでも登録したい（同姓同名の別人）ときだけ進めるようにする。 --}}
+          @if ($errors->has('duplicate_name'))
+            <div class="form-row" style="background:#fdf3e2; border:1px solid #e6c98f; border-radius:10px; padding:12px;">
+              <label style="display:inline-flex; align-items:flex-start; gap:8px; font-weight:400;">
+                <input type="checkbox" name="allow_duplicate_name" value="1" style="width:auto; margin-top:3px;"
+                       @checked(old('allow_duplicate_name'))>
+                <span><b>同姓同名の別の方として登録する</b>
+                  <span style="display:block; font-size:12px; color:#8a7a66; margin-top:2px;">
+                    上に出ている方とは<b>別人</b>のときだけチェックしてください。<br>
+                    同じ方であれば、名簿からその人を直す方が安全です（記録が分かれません）。
+                  </span>
+                </span>
+              </label>
+            </div>
+          @endif
+
           {{-- ふりがな＝五十音順の並びに使う。分かれば入れておくと、本人が初回ログインする前から正しく並ぶ。
                分からなければ空でよい（本人が初回ログインの初期設定で必ず入れる）。 --}}
           <div class="form-row">

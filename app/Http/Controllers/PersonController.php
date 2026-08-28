@@ -591,6 +591,24 @@ class PersonController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
+    /**
+     * 臨時の印を外す（正式なスタッフにする）。POST /people/{id}/unspot
+     * 中身は App\Support\SpotStaff::release が正本。
+     *
+     * 権限＝管理者以上（名簿への登録・ログイン案内と同じ）。
+     */
+    public function releaseSpot(string $id)
+    {
+        $person = Person::find($id);
+        if (! $person) {
+            return response()->json(['ok' => false, 'message' => 'その人が見つかりませんでした。'], 404);
+        }
+
+        $result = SpotStaff::release($person);
+
+        return response()->json($result, $result['ok'] ? 200 : 422);
+    }
+
     public function sendInvite(Request $request, string $id)
     {
         $person = Person::find($id);

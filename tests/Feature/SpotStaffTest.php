@@ -255,4 +255,94 @@ class SpotStaffTest extends TestCase
 
         $this->assertSame(0, Project::count());
     }
+
+    // ── 臨時の解除（2026-08-28 baba要望）─────────────────────────────
+    // 「臨時で入ってもらった方のメアドが分かって、正式に登録したい」で
+    // ふつうに登録し直すと名簿が二重になる（実際に起きた）。印だけ外せるようにした。
+
+    /** 臨時を解除すると印が外れ、ログイン案内が送れるようになる。 */
+    public function test_manager_can_release_a_spot_staff(): void
+    {
+        Mail::fake();
+        PersonFactory::new()->create([
+            'id' => 'S-080', 'name' => '助っ人 八郎', 'role' => 'staff', 'permission' => 'staff',
+            'office' => '東京', 'is_spot' => true, 'must_onboard' => false, 'email' => null,
+        ]);
+
+        $this->actingAsPerson($this->manager())
+            ->postJson('/people/S-080/unspot')
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        $p = Person::findOrFail('S-080');
+        $this->assertFalse((bool) $p->is_spot, '臨時の印が外れること');
+
+        // 外したあとは、ログイン案内メールを送れる（臨時のあいだは断られていた）。
+        $p->email = 'help8@example.com';
+        $p->save();
+        $this->assertTrue(LoginInvite::send($p->fresh())['ok']);
+    }
+
+    /** 解除しても、その人のアサインの記録は消えない（作り直さないのが肝）。 */
+    public function test_release_keeps_the_assignment_records(): void
+    {
+        $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-09-01']);
+        PersonFactory::new()->create([
+            'id' => 'S-081', 'name' => '助っ人 九郎', 'role' => 'staff', 'permission' => 'staff',
+            'office' => '東京', 'is_spot' => true, 'must_onboard' => false,
+        ]);
+        $manager = $this->manager();   // ⚠ manager() は毎回 E-001 を作る＝1回だけ呼ぶ
+        $this->actingAsPerson($manager)->post('/project-assign/save', [
+            'project_id' => $project->id,
+            'status' => '仮',
+            'staff_ids' => ['S-081'],
+            'role' => ['S-081' => 'OP'],
+        ]);
+        $before = \DB::table('assignments')->where('staff_id', 'S-081')->count();
+        $this->assertGreaterThan(0, $before);
+
+        $this->actingAsPerson($manager)->postJson('/people/S-081/unspot')->assertOk();
+
+        $this->assertSame($before, \DB::table('assignments')->where('staff_id', 'S-081')->count());
+        $this->assertSame('S-081', Person::findOrFail('S-081')->id, '同じ人のままであること');
+    }
+
+    /** もともと臨時でない人には効かない（押し間違いを知らせる）。 */
+    public function test_release_is_refused_for_a_normal_staff(): void
+    {
+        PersonFactory::new()->create([
+            'id' => 'S-082', 'name' => 'ふつう 太郎', 'role' => 'staff', 'permission' => 'staff',
+            'is_spot' => false, 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($this->manager())
+            ->postJson('/people/S-082/unspot')
+            ->assertStatus(422)
+            ->assertJson(['ok' => false]);
+    }
+
+    /** 解除できるのは管理者以上（名簿を触る操作なので、足すのと同じ権限）。 */
+    public function test_employee_cannot_release_a_spot_staff(): void
+    {
+        PersonFactory::new()->create([
+            'id' => 'S-083', 'name' => '助っ人 十郎', 'role' => 'staff', 'permission' => 'staff',
+            'is_spot' => true, 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($this->employee())
+            ->postJson('/people/S-083/unspot')
+            ->assertStatus(403);
+
+        $this->assertTrue((bool) Person::findOrFail('S-083')->is_spot, '印が残っていること');
+    }
+
+    /** 名簿の詳細に「臨時を解除」のボタンが出る（臨時の人にだけ）。 */
+    public function test_release_button_is_shown_only_for_spot_staff(): void
+    {
+        $html = $this->actingAsPerson($this->manager())->get('/staff')->assertOk()->getContent();
+
+        // 行はJSで作るので、押したときの入口（data-unspot-id）が画面に含まれていること。
+        $this->assertStringContainsString('data-unspot-id', $html);
+        $this->assertStringContainsString('臨時を解除して正式スタッフにする', $html);
+    }
 }

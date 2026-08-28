@@ -69,6 +69,36 @@ final class SpotStaff
         return ['ok' => true, 'person' => $person, 'message' => "「{$name}」さんを臨時スタッフとして名簿に足しました。"];
     }
 
+    /**
+     * 臨時の印を外して、ふつうのスタッフにする（2026-08-28 baba要望）。
+     *
+     * なぜ要るか＝「臨時で入ってもらった方のメールアドレスが分かって、正式に登録したい」は必ず起きる流れ。
+     * これが無いと、同じ人をもう一度ふつうに登録することになり **名簿が二重になる**
+     * （実際に2026-08-28 に起きた）。二重になると、アサインの記録が付いている方と
+     * ログインできる方が別々になり、出勤数も分かれてしまう。
+     *
+     * ⚠ 印を外すだけで、その人の記録（アサイン・出勤数）はそのまま残る＝**新しく作り直さないのが肝**。
+     * ⚠ 外したあとは、名簿の「📧 ログイン案内メールを送る」でメールを登録して送れる
+     *   （臨時のあいだは LoginInvite が断る決まりになっている）。
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public static function release(Person $person): array
+    {
+        if (! $person->is_spot) {
+            return ['ok' => false, 'message' => $person->name.' さんは臨時スタッフではありません。'];
+        }
+
+        $person->is_spot = false;
+        $person->save();
+
+        return [
+            'ok' => true,
+            'message' => $person->name.' さんの「臨時」を外しました。'
+                .'このあと「ログイン案内メールを送る」でメールアドレスを登録すれば、ご本人がログインできるようになります。',
+        ];
+    }
+
     /** 氏名で名簿を引く（空白の有無は無視する）。 */
     public static function findByName(string $name): ?Person
     {

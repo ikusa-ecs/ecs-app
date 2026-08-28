@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Person;
 use App\Support\Departments;
 use App\Support\LoginInvite;
+use App\Support\SpotStaff;
 use App\Support\TempPassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -106,6 +107,30 @@ class AccountController extends Controller
         }
         if ($validated['role'] === 'employee' && $validated['permission'] === 'staff') {
             throw ValidationException::withMessages(['permission' => '社員には社員以上の権限を選んでください。']);
+        }
+
+        // 同姓同名の二重登録を止める（2026-08-28 baba要望）。
+        // ⚠ なぜ要るか＝臨時スタッフを足すときは前から止めていたのに、この発行画面には入っていなかった。
+        //   「臨時で入ってもらった方のメアドが分かったので、ふつうに登録し直した」で
+        //   同じ人が名簿に2人できた（2026-08-28 に実際に発生）。二重になると、
+        //   アサイン・出勤の記録が付いている方と、ログインできる方が別々になってしまう。
+        // ⚠ 同姓同名の別人は本当にいるので、チェックを入れれば登録できる（止めるのは一度だけ）。
+        if (! $request->boolean('allow_duplicate_name')) {
+            $dup = SpotStaff::findByName($validated['name']);
+            if ($dup) {
+                $where = $dup->office ? $dup->office.'の' : '';
+                $kind = $dup->role === 'employee' ? '社員' : 'スタッフ';
+                $spot = $dup->is_spot ? '・臨時' : '';
+
+                throw ValidationException::withMessages([
+                    'duplicate_name' => "「{$dup->name}」さんは、すでに{$where}{$kind}として名簿にいます（{$dup->id}{$spot}）。"
+                        .'二重に登録すると、アサインの記録が残っている方と、ログインできる方が別々になってしまいます。'
+                        .($dup->is_spot
+                            ? '臨時スタッフを正式にする場合は、名簿の詳細にある「臨時を解除して正式スタッフにする」を使ってください（記録がそのまま残ります）。'
+                            : 'メールアドレスを登録するだけなら、名簿の詳細にある「📧 ログイン案内メールを送る」から行えます。')
+                        .'同姓同名の別の方の場合は、下のチェックを入れてもう一度登録してください。',
+                ]);
+            }
         }
 
         // 仮パスワード（未入力なら自動生成）※任意項目は $validated にキーが無いことがある

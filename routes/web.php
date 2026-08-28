@@ -163,6 +163,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // 臨時スタッフ（インターン・知り合いの助っ人など）をアサイン画面からその場で足す（2026-08-25 baba）。
     // ⚠ 名簿への登録は「管理者以上」（2026-07-02 確定の権限ルール）に合わせる。
     Route::post('/people/spot', [PersonController::class, 'addSpot'])->middleware('tier:manager');
+    // 臨時の印を外して正式なスタッフにする（2026-08-28 baba要望）。
+    // ⚠ 新しく登録し直すと名簿が二重になるので、こちらで印だけ外す（記録はそのまま残る）。
+    Route::post('/people/{id}/unspot', [PersonController::class, 'releaseSpot'])->middleware('tier:manager');
     Route::post('/people/{id}/delete', [PersonController::class, 'destroyPerson'])->middleware('tier:admin');
     // 別ウィンドウで開くポップアップ画面（Blade化済み）
     // 社員・ディレクター集計（別ウィンドウ）。D決め(/assign-director)の保存先＝assignments(role=D/SD)から集計。

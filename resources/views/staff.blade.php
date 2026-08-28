@@ -539,7 +539,18 @@
   function inviteHtml(p){
     if (!window.ECS_CAN_INVITE) return '';
     // 臨時スタッフはログインしない＝案内メールの出番が無い（押しても断られる）。
-    if (p.spot) return '';
+    // かわりに「臨時を解除する」を出す（2026-08-28 baba要望）。
+    // ⚠ メアドが分かったからと言って ふつうに登録し直すと、同じ人が名簿に2人できてしまう。
+    //   アサインの記録が付いている方と、ログインできる方が別々になるので、ここで印だけ外す。
+    if (p.spot) {
+      return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px; flex-wrap:wrap;">
+        <button class="btn sm" data-unspot-id="${p.id}">臨時を解除して正式スタッフにする</button>
+        <span class="muted" style="font-size:12px;">
+          メールアドレスが分かったときはこちら。解除すると<b>ログイン案内メールを送れる</b>ようになります。<br>
+          いまのアサイン・出勤の記録はそのまま残ります（<b>登録し直すと名簿が二重になります</b>）。
+        </span>
+      </div>`;
+    }
     var label = p.login === 'ready' ? '案内メールを送り直す' : '📧 ログイン案内メールを送る';
     var sub = p.invitedAt ? ('（前回 ' + p.invitedAt + ' に送信）') : '';
     return `<div class="save-row" style="border-top:1px dashed var(--line); padding-top:10px; flex-wrap:wrap;">
@@ -599,8 +610,31 @@
     const del = e.target.closest('[data-del-id]');
     if (del) { deletePerson(del.dataset.delId, del.dataset.delName); return; }
     const inv = e.target.closest('[data-invite-id]');
-    if (inv) { sendInvite(inv.dataset.inviteId); }
+    if (inv) { sendInvite(inv.dataset.inviteId); return; }
+    const uns = e.target.closest('[data-unspot-id]');
+    if (uns) { releaseSpot(uns.dataset.unspotId); }
   });
+
+  // 臨時の印を外す（正式なスタッフにする）。記録はそのまま残る。
+  function releaseSpot(id){
+    const msg = ['この方の「臨時」を外して、正式なスタッフにします。',
+                 '',
+                 '・いまのアサイン・出勤の記録はそのまま残ります',
+                 '・このあと「ログイン案内メールを送る」でログインを作れます',
+                 '',
+                 'よろしいですか？'].join('
+');
+    if (!confirm(msg)) return;
+    fetch('/people/' + encodeURIComponent(id) + '/unspot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' }
+    }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        alert((j && j.message) || (ok ? '解除しました。' : '解除できませんでした。'));
+        if (ok) location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
+  }
 
   function setPersonActive(id, active){
     const msg = active

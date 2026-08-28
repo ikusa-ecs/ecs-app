@@ -273,4 +273,37 @@ class LoginInviteTest extends TestCase
 
         return $token;
     }
+
+    // ── 案内メールから入った人も、初期設定を通す（2026-08-28 baba要望）──
+    // これが無いと、ふりがな・身長・靴/衣装のサイズ・都道府県・最寄り駅が空のままだった。
+
+    /** まだパスワードを決めていない人に送ると、初回の初期設定へ通すようになる。 */
+    public function test_invite_marks_the_person_for_onboarding(): void
+    {
+        Mail::fake();
+        $target = $this->staff([
+            'id' => 'S-300', 'email' => 'newcomer@example.com',
+            'must_onboard' => false,      // 「メールはあとで」で名簿に入れた人・臨時から正式にした人
+            'password_set_at' => null,
+        ]);
+
+        $this->assertTrue(LoginInvite::send($target)['ok']);
+
+        $this->assertTrue((bool) $target->fresh()->must_onboard, '初期設定へ通すこと');
+    }
+
+    /** すでに自分でパスワードを決めた人に送り直しても、初期設定には戻さない。 */
+    public function test_resend_does_not_send_a_finished_person_back_to_onboarding(): void
+    {
+        Mail::fake();
+        $target = $this->staff([
+            'id' => 'S-301', 'email' => 'done@example.com',
+            'must_onboard' => false,
+            'password_set_at' => Carbon::now()->subMonth(),   // 本人が決めて、設定も終えている
+        ]);
+
+        $this->assertTrue(LoginInvite::send($target)['ok']);
+
+        $this->assertFalse((bool) $target->fresh()->must_onboard, '設定済みの人を巻き戻さないこと');
+    }
 }
