@@ -157,6 +157,11 @@
     .fbadge.fmt-real   { background: #eef6f0; color: #4f8a63; }
     .fbadge.fmt-long   { background: #fdecd9; color: #b4530a; }
     .fbadge.fmt-online { background: #eef3fb; color: #4f74ad; }
+    /* ⚠ 実施形態が増えても崩れないように、残りの種類にも色を用意しておく。
+       色が無いと文字だけになって「バッジが消えた」ように見えるため。 */
+    .fbadge.fmt-arena  { background: #f3eefb; color: #6b4fad; }
+    .fbadge.fmt-other  { background: #eef7f9; color: #3f7f8a; }
+    .fbadge.fmt-etc    { background: #f1efec; color: #7a6a56; }
     .tag-mini { font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 700; }
     /* 強調（注目してほしい）：追加・宿泊 */
     .tag-mini.add  { background: #b91c1c;            color: #fff; }
@@ -656,7 +661,7 @@
       const _dl = new Date(); _dl.setHours(0,0,0,0); _dl.setDate(_dl.getDate() + c.off - 4);
       return {
         id:c.id, content:c.content, client:c.client, place:c.place, meetPlace:c.meetPlace,
-        area:c.area, format:c.fmt, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
+        area:c.area, format:c.fmt, fmtText:c.fmtText, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
         // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
@@ -687,7 +692,15 @@
     }
 
     const stateBadge = { open:{c:'open', t:'募集中'}, applied:{c:'applied', t:'エントリー中'}, closed:{c:'closed', t:'締切・満員'} };
-    const fmtLabel = { real:{c:'fmt-real', t:'リアル'}, long:{c:'fmt-long', t:'リアルロング'}, online:{c:'fmt-online', t:'オンライン'} };
+    // 実施形態のバッジ。⚠ ここに実施形態の一覧を書かない。
+    //   前は { real:…, long:…, online:… } の対応表を引いていたため、
+    //   ARENA場所貸し・体験会・未入力（＝表に無い値）で undefined になり、
+    //   **そこで募集一覧の描画が丸ごと止まっていた**（お知らせだけ出て一覧が空になる）。
+    //   いまは色の手がかり（fmt）と名前（fmtText）をサーバーから受け取るだけなので、
+    //   実施形態が増えても画面を直す必要が無い。
+    function fmtBadge(j){
+      return { c: j.format || 'fmt-etc', t: (j.fmtText || '').trim() || 'その他' };
+    }
 
     // 絞り込みボタンの状態。
     // jobStateFilter … ''＝すべて / 'open'＝募集中のみ / 'applied'＝エントリー中のみ（どちらか片方）
@@ -752,11 +765,17 @@
         en.style.display = 'none';
       }
 
+      // ⚠ 1件でも描けない案件があっても、そこで止めない。
+      //   前は途中で止まると**残り全部が消える**のに画面は真っ白にならなかったので、
+      //   「公開したのに出てこない」に気づけなかった（2026-08-28 baba報告）。
+      let skipped = 0;
       list.forEach(j => {
+      try {
         const dy   = j.date.getDay();
         const dowC = dy === 0 ? 'sun' : (dy === 6 ? 'sat' : '');
-        const sb   = stateBadge[j.state];
-        const fb   = fmtLabel[j.format];
+        // 状態のバッジも、知らない状態が来たら「募集中」で描き続ける。
+        const sb   = stateBadge[j.state] || stateBadge.open;
+        const fb   = fmtBadge(j);
 
         // 日付（7/5㈰）
         const dateStr = `${j.date.getMonth()+1}/${j.date.getDate()}<span class="${dowC}">${DOW_CIRCLE[dy]}</span>`;
@@ -823,7 +842,19 @@
             <div class="jr-cmt-hint">担当（アサインする人）の画面に表示されます。エントリーしたあとでも直せます。</div>
           </div>`;
         grid.appendChild(row);
+      } catch (e) {
+        // ⚠ 黙って消さない。何件出せなかったかを画面に出して、担当へ言えるようにする。
+        skipped++;
+        console.error('募集案件を表示できませんでした', j && j.id, e);
+      }
       });
+
+      if (skipped > 0) {
+        const warn = document.createElement('div');
+        warn.className = 'extra-notice';
+        warn.innerHTML = `⚠ ${skipped}件は表示できませんでした。お手数ですが担当へお知らせください。`;
+        grid.appendChild(warn);
+      }
 
       document.getElementById('jobEmpty').style.display = list.length === 0 ? '' : 'none';
       document.getElementById('jobSecTitle').textContent = `募集中の案件（${list.length}件）`;

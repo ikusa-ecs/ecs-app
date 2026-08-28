@@ -11,6 +11,7 @@ use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
+use App\Support\ProjectFormats;
 use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
@@ -90,34 +91,34 @@ class StaffPortalController extends Controller
                 $off = intdiv($date->copy()->startOfDay()->timestamp - $today->timestamp, 86400);
 
                 return [
-                    'id'        => $p->id,
-                    'content'   => $p->project_name,
-                    'client'    => $p->client ?? '',
-                    'place'     => $p->location ?? '',
+                    'id' => $p->id,
+                    'content' => $p->project_name,
+                    'client' => $p->client ?? '',
+                    'place' => $p->location ?? '',
                     'meetPlace' => $p->assembly_type ?? '',
                     // スタッフ向けの集合・解散時間。担当が公開ボードで直していれば優先、無ければ社員の時間。
-                    'meet'      => $p->staff_meet_time ?? $p->start_time ?? '—',
-                    'leave'     => $p->staff_leave_time ?? $p->end_time ?? '—',
-                    'off'       => $off,
+                    'meet' => $p->staff_meet_time ?? $p->start_time ?? '—',
+                    'leave' => $p->staff_leave_time ?? $p->end_time ?? '—',
+                    'off' => $off,
                     // 本人の担当ポジション（表示名）。役割コード→表示名は必ず AssignmentRole::label() を使う
                     // （日本語直書き禁止＝表記ゆれ防止）。role2 は兼任。
-                    'mine'      => true,
-                    'myRole'    => AssignmentRole::label($a->role),
-                    'myRole2'   => AssignmentRole::label($a->role2),
+                    'mine' => true,
+                    'myRole' => AssignmentRole::label($a->role),
+                    'myRole2' => AssignmentRole::label($a->role2),
                     // 当日の詳細（スタッフ画面の詳細パネルで見せる）。
-                    'enter'     => $p->event_enter_time ?? '',
-                    'evStart'   => $p->event_start_time ?? '',
-                    'evEnd'     => $p->event_end_time ?? '',
-                    'evTbd'     => (bool) $p->event_time_tbd,   // 本番時間未定（案件登録のチェック）
-                    'lodging'   => $p->lodging ?? '',
-                    'outdoor'   => (bool) $p->is_outdoor,
+                    'enter' => $p->event_enter_time ?? '',
+                    'evStart' => $p->event_start_time ?? '',
+                    'evEnd' => $p->event_end_time ?? '',
+                    'evTbd' => (bool) $p->event_time_tbd,   // 本番時間未定（案件登録のチェック）
+                    'lodging' => $p->lodging ?? '',
+                    'outdoor' => (bool) $p->is_outdoor,
                     // 当日必要な情報（案件登録・公開ボードのどちらからでも入れられる）
                     'meetDetail' => (string) ($p->assembly_detail ?? ''),
                     'belongings' => (string) ($p->staff_belongings ?? ''),
-                    'dresscode'  => (string) ($p->staff_dresscode ?? ''),
+                    'dresscode' => (string) ($p->staff_dresscode ?? ''),
                     'staffNotes' => (string) ($p->staff_notes ?? ''),
                     // 担当がこの人だけに向けて書いた一言（assignments.remark）
-                    'myNote'    => trim((string) ($a->remark ?? '')),
+                    'myNote' => trim((string) ($a->remark ?? '')),
                 ];
             })
             ->filter()
@@ -190,21 +191,21 @@ class StaffPortalController extends Controller
         $next = $first->copy()->addMonthNoOverflow();
 
         return [
-            'year'     => $y,
-            'month'    => $m,
-            'days'     => $first->daysInMonth,
+            'year' => $y,
+            'month' => $m,
+            'days' => $first->daysInMonth,
             'firstDow' => (int) $first->dayOfWeek,   // 0=日曜
-            'label'    => $y . '年' . $m . '月',
+            'label' => $y.'年'.$m.'月',
             // いま表示している月（YYYY-MM に揃えたもの）。プルダウンの選択中の判定に使う。
-            'value'    => $first->format('Y-m'),
+            'value' => $first->format('Y-m'),
             // 月の切り替え（2026-08-21 baba要望）。範囲外は null＝ボタンを出さない。
-            'prev'      => $prev->gte($min) ? $prev->format('Y-m') : null,
-            'next'      => $next->lte($max) ? $next->format('Y-m') : null,
+            'prev' => $prev->gte($min) ? $prev->format('Y-m') : null,
+            'next' => $next->lte($max) ? $next->format('Y-m') : null,
             'prevLabel' => $prev->format('n月'),
             'nextLabel' => $next->format('n月'),
             // 月を直接選べるプルダウン用（当月〜半年先）。押す回数を減らすため。
-            'months'    => $this->prefMonthOptions($min, $max),
-            'isPast'    => $first->lt($min),   // 過ぎた月＝入力してもらう月ではない
+            'months' => $this->prefMonthOptions($min, $max),
+            'isPast' => $first->lt($min),   // 過ぎた月＝入力してもらう月ではない
         ];
     }
 
@@ -239,24 +240,24 @@ class StaffPortalController extends Controller
         $elig = $me->roleEligibilities->pluck('position')->all();
 
         return [
-            'height'            => $me->height,
-            'shoe_size'         => $me->shoe_size,
-            'shirt_size'        => $me->shirt_size,
-            'prefecture'        => $me->prefecture,
-            'nearest_station'   => $me->nearest_station,
-            'appeal'            => $me->appeal,
-            'liked_contents'    => $me->liked_contents,
+            'height' => $me->height,
+            'shoe_size' => $me->shoe_size,
+            'shirt_size' => $me->shirt_size,
+            'prefecture' => $me->prefecture,
+            'nearest_station' => $me->nearest_station,
+            'appeal' => $me->appeal,
+            'liked_contents' => $me->liked_contents,
             'disliked_contents' => $me->disliked_contents,
-            'strong_positions'  => $me->strong_positions,
-            'weak_positions'    => $me->weak_positions,
-            'mcPass'            => (bool) $me->mc_audition_passed,
-            'kigurumi'          => (bool) $me->can_kigurumi,
-            'stay'              => (bool) $me->can_stay_over,
-            'drive'             => $me->driving_level,
-            'english'           => $me->english_level,
+            'strong_positions' => $me->strong_positions,
+            'weak_positions' => $me->weak_positions,
+            'mcPass' => (bool) $me->mc_audition_passed,
+            'kigurumi' => (bool) $me->can_kigurumi,
+            'stay' => (bool) $me->can_stay_over,
+            'drive' => $me->driving_level,
+            'english' => $me->english_level,
             // OP・軍師(SP) は「できる役割」= staff_role_eligibility。トグルの初期ON/OFFに使う。
-            'op'                => in_array(AssignmentRole::OP, $elig, true),
-            'gunshi'            => in_array(AssignmentRole::SP, $elig, true),
+            'op' => in_array(AssignmentRole::OP, $elig, true),
+            'gunshi' => in_array(AssignmentRole::SP, $elig, true),
         ];
     }
 
@@ -272,16 +273,16 @@ class StaffPortalController extends Controller
         }
 
         $data = $request->validate([
-            'height'            => ['nullable', 'string', 'max:20'],
-            'shoe_size'         => ['nullable', 'string', 'max:20'],
-            'shirt_size'        => ['nullable', 'string', 'max:20'],
-            'prefecture'        => ['nullable', 'string', 'max:20'],
-            'nearest_station'   => ['nullable', 'string', 'max:100'],
-            'appeal'            => ['nullable', 'string', 'max:1000'],
-            'liked_contents'    => ['nullable', 'string', 'max:1000'],
+            'height' => ['nullable', 'string', 'max:20'],
+            'shoe_size' => ['nullable', 'string', 'max:20'],
+            'shirt_size' => ['nullable', 'string', 'max:20'],
+            'prefecture' => ['nullable', 'string', 'max:20'],
+            'nearest_station' => ['nullable', 'string', 'max:100'],
+            'appeal' => ['nullable', 'string', 'max:1000'],
+            'liked_contents' => ['nullable', 'string', 'max:1000'],
             'disliked_contents' => ['nullable', 'string', 'max:1000'],
-            'strong_positions'  => ['nullable', 'string', 'max:1000'],
-            'weak_positions'    => ['nullable', 'string', 'max:1000'],
+            'strong_positions' => ['nullable', 'string', 'max:1000'],
+            'weak_positions' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $user->fill($data);   // Person は guarded=[] なので列名一致でそのまま入る
@@ -303,9 +304,9 @@ class StaffPortalController extends Controller
         }
 
         $user->mc_audition_passed = $request->boolean('mc');
-        $user->can_kigurumi       = $request->boolean('kigurumi');
-        $user->can_stay_over      = $request->boolean('stay');
-        $drive   = trim((string) $request->input('drive', ''));
+        $user->can_kigurumi = $request->boolean('kigurumi');
+        $user->can_stay_over = $request->boolean('stay');
+        $drive = trim((string) $request->input('drive', ''));
         $english = trim((string) $request->input('english', ''));
         $user->driving_level = ($drive === '' || $drive === '（なし）') ? null : $drive;
         $user->english_level = ($english === '' || $english === '（なし）') ? null : $english;
@@ -351,6 +352,7 @@ class StaffPortalController extends Controller
                 $map[$d->year.'-'.$d->month.'-'.$d->day] = $view;
             }
         }
+
         return $map;
     }
 
@@ -425,6 +427,7 @@ class StaffPortalController extends Controller
                 ]);
                 $n++;
             }
+
             return $n;
         });
 
@@ -442,9 +445,9 @@ class StaffPortalController extends Controller
     {
         $data = $request->validate([
             'project_id' => ['required', 'string', 'exists:projects,id'],
-            'intent'     => ['nullable', 'in:希望,可'],
-            'note'       => ['nullable', 'string', 'max:1000'],
-            'action'     => ['nullable', 'in:apply,cancel'],
+            'intent' => ['nullable', 'in:希望,可'],
+            'note' => ['nullable', 'string', 'max:1000'],
+            'action' => ['nullable', 'in:apply,cancel'],
         ]);
 
         $action = $data['action'] ?? 'apply';
@@ -456,8 +459,8 @@ class StaffPortalController extends Controller
         // 画面は成功として扱えるよう ok:true を返しつつ saved:false で「保存はしていない」と伝える。
         if (! $user || TestAccounts::isMockOnly($user)) {
             return response()->json([
-                'ok'      => true,
-                'saved'   => false,
+                'ok' => true,
+                'saved' => false,
                 'applied' => $applied,
                 'message' => 'テスト用アカウントのため保存されません（見本）。',
             ]);
@@ -475,8 +478,8 @@ class StaffPortalController extends Controller
         Application::updateOrCreate(
             ['staff_id' => $user->id, 'project_id' => $data['project_id']],
             [
-                'intent'     => $data['intent'] ?? '希望',
-                'note'       => $data['note'] ?? null,
+                'intent' => $data['intent'] ?? '希望',
+                'note' => $data['note'] ?? null,
                 'applied_at' => now(),
             ]
         );
@@ -550,15 +553,14 @@ class StaffPortalController extends Controller
             $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
             $content = $firstContentId ? ($contentNames[$firstContentId] ?? $p->project_name) : $p->project_name;
 
-            $format = (string) ($p->format ?? '');
-            $fmt = '';
-            if (mb_strpos($format, 'オンライン') !== false) {
-                $fmt = 'online';
-            } elseif (mb_strpos($format, 'ロング') !== false) {
-                $fmt = 'long';
-            } elseif (mb_strpos($format, 'リアル') !== false) {
-                $fmt = 'real';
-            }
+            // 実施形態のバッジ。⚠ 振り分けは正本（ProjectFormats::badgeCode）に任せる。
+            //   ここで自前に「オンライン／ロング／リアル」の3つだけに分けていたため、
+            //   **ARENA場所貸し・体験会・未入力は空文字**になっていた。画面はその空文字で
+            //   対応表を引くので値が見つからず、そこで募集一覧の描画が止まっていた
+            //   （お知らせだけ出て一覧が空。2026-08-28 baba報告）。
+            //   badgeCode は必ず何かを返すので、実施形態が増えても止まらない。
+            $format = trim((string) ($p->format ?? ''));
+            $fmt = ProjectFormats::badgeCode($format);
 
             // 画面の jobs 変換（staff_portal.blade）がそのまま読める項目名で返す。
             return [
@@ -569,6 +571,9 @@ class StaffPortalController extends Controller
                 'meetPlace' => $p->assembly_type ?? '',
                 'area' => $p->operation_place ?? '',
                 'fmt' => $fmt,
+                // 実施形態の名前そのもの。バッジにこれを出す＝新しい実施形態が増えても
+                // 画面側に書き足さなくてよい（正本＝ProjectFormats::ALL）。
+                'fmtText' => $format,
                 'scale' => $p->scale ?? '',
                 'repeat' => (bool) $p->is_repeat,
                 'lodging' => $p->lodging ?? '無',
@@ -594,9 +599,9 @@ class StaffPortalController extends Controller
                 'archived' => $off < 0,   // 過去のイベントは募集タブに出さない
                 'draft' => false,
                 // 本人がこの案件に応募済みか＋その内容（画面で応募状態・コメントを復元するために渡す）。
-                'applied'  => $myApps->has($p->id),
+                'applied' => $myApps->has($p->id),
                 'myIntent' => optional($myApps->get($p->id))->intent ?? '希望',
-                'myNote'   => optional($myApps->get($p->id))->note ?? '',
+                'myNote' => optional($myApps->get($p->id))->note ?? '',
             ];
         })->values();
     }
@@ -610,7 +615,7 @@ class StaffPortalController extends Controller
     {
         if (($p->category ?? '通常案件') === '追加案件') {
             $base = $p->extra_published_at ?? $p->created_at;
-            if (!$base) {
+            if (! $base) {
                 return '';
             }
             $d = Carbon::parse($base)->startOfDay()->addDays(3);
