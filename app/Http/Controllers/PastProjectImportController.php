@@ -524,9 +524,24 @@ class PastProjectImportController extends Controller
             // シートの「巻き取り／ヘルプ」の印（無ければ空文字）。
             $crossKind = $get('拠点間の関わり');
 
-            DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus,
+            $isFuture = $mode === self::MODE_FUTURE;
+
+            DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus, $isFuture,
                 $crossKind, $shareOffice, $office, &$created, &$updated, &$assignCount, &$shared) {
                 if ($existing) {
+                    // ⚠ 公開の状態（staff_published）は、読み込み直しでは触らない（2026-08-28 baba報告）。
+                    //   スタッフを1人足すためにアサイン表を読み込み直しただけで**公開が取り消され**、
+                    //   募集がスタッフの画面から消えていた。公開の入口は公開ボードの1つだけ、
+                    //   という決まりに合わせる（案件登録の上書き更新も同じく触っていない）。
+                    //
+                    // ⚠ ただし「過去」で入れてしまったものを「これから」で入れ直したときだけは、
+                    //   非公開に戻す。過去あつかいは公開済みで入るので、そのままだと
+                    //   **これからの案件のクライアント名・会場がスタッフ全員に見えたまま**になる。
+                    //   見分け方＝過去で入った案件は「募集しない」かつ「確定」になっている。
+                    $wasPastImport = ! (bool) $existing->is_recruiting && (string) $existing->status === '確定';
+                    if (! ($isFuture && $wasPastImport)) {
+                        unset($attrs['staff_published']);
+                    }
                     $existing->fill($attrs)->save();
                     $project = $existing;
                     $updated++;
