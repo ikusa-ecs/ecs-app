@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * スタッフ側ポータル（/staff-portal）。
@@ -502,6 +503,15 @@ class StaffPortalController extends Controller
                 'applied_at' => now(),
             ]
         );
+
+        // ⚠ 「エントリーしたのに記録が無い」という報告を追えるように、通ったことを記録に残す
+        //   （2026-08-28 baba報告）。ここに行が出ていなければ、そもそも押せていない／
+        //   通信が届いていない、と切り分けられる。個人情報は名前とIDだけにとどめる。
+        Log::info('staff entry saved', [
+            'staff_id' => $user->id,
+            'staff_name' => $user->name,
+            'project_id' => $data['project_id'],
+        ]);
 
         return response()->json(['ok' => true, 'saved' => true, 'applied' => true]);
     }

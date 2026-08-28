@@ -186,6 +186,12 @@
 
     /* 締切・残り人数のチップ */
     .jr-sub { display: flex; flex-wrap: wrap; gap: 6px; }
+    /* エントリーが保存できなかったときの表示。⚠ 消えるお知らせだけだと
+       「エントリーできたつもり」になるので、カードに残す（2026-08-28 baba報告）。 */
+    .jr-error {
+      margin-top: 6px; padding: 6px 9px; border-radius: 8px; font-size: 12px; line-height: 1.6;
+      background: #fdeaea; border: 1px solid #f0b9b9; color: #b91c1c; font-weight: 700;
+    }
     .chip { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
     .chip.deadline { background: var(--warn-soft); color: #b45309; }
     .chip.slots    { background: var(--ok-soft);   color: #15803d; }
@@ -836,6 +842,7 @@
           ${String(j.staffNotes || '').trim() !== ''
             ? `<div class="jr-note"><span class="ic">📣</span><span>${escLines(j.staffNotes)}</span></div>` : ''}
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
+          ${j.saveError ? `<div class="jr-error">⚠ ${escAttr(j.saveError)}</div>` : ''}
           <div class="jr-foot">
             <button class="cmt-toggle${cmt.open ? ' on' : ''}" onclick="toggleComment(this, '${j.id}')">💬 コメント</button>
             ${btn}
@@ -966,7 +973,8 @@
       })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(res => {
-        if (!res || !res.ok) { j.state = before; renderJobs(); alert('保存できませんでした。もう一度お試しください。'); return; }
+        if (!res || !res.ok) { entryFailed(j, before, '保存できませんでした。'); return; }
+        j.saveError = '';   // 前に失敗していたら消す
         // ⚠ 体験用（見本）アカウントは保存されない。これまでは画面だけ「エントリー済み」に
         //   変わってしまい、担当の画面には出ないので「エントリーしたのに出ない」と見えた
         //   （2026-08-21 baba指摘）。保存されていないことをはっきり知らせて元に戻す。
@@ -977,7 +985,25 @@
           alert(res.message || 'このアカウントは体験用のため、エントリーは保存されません（見本）。実際に試すときは、発行されたスタッフのアカウントでログインしてください。');
         }
       })
-      .catch(err => { j.state = before; renderJobs(); alert('保存に失敗しました（' + err + '）。'); });
+      .catch(err => {
+        // ⚠ 419＝ページを開いたまま時間が経って、ログインの有効期限が切れた状態。
+        //   数字だけ出しても分からないので、何をすればよいかを書く。
+        const msg = (String(err) === '419')
+          ? 'ログインの有効期限が切れています。画面を読み込み直してから、もう一度押してください。'
+          : '保存に失敗しました（' + err + '）。通信を確認して、もう一度押してください。';
+        entryFailed(j, before, msg);
+      });
+    }
+
+    // エントリーが保存できなかったとき。
+    // ⚠ これまでは消えるお知らせ（alert）だけだったので、閉じてしまうと
+    //   「エントリーできたつもり」になっていた（2026-08-28 baba報告）。
+    //   案件のカードに赤い文字で残して、押し直すまで消えないようにする。
+    function entryFailed(j, before, message) {
+      j.state = before;
+      j.saveError = message;
+      renderJobs();
+      alert(message);
     }
 
     // タブの「募集中」の数字バッジ（まだエントリーしていない＝募集中の件数）
