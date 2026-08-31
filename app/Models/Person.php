@@ -69,6 +69,9 @@ class Person extends Model implements AuthenticatableContract
             'op_online' => 'boolean',   // OPオンライン可（B案）
             'op_real' => 'boolean',     // OPリアル(現地)可（B案）
             'notify_settings' => 'array',   // マイページの通知オン/オフ
+            // 本人が入れるプロフィール（複数選択）。選択肢の正本＝App\Support\ProfileOptions。
+            'challenge_positions' => 'array',   // これから挑戦してみたい役割
+            'online_tools' => 'array',          // 日常で使っているオンラインツール
             'mc_audition_passed' => 'boolean',
             'can_kigurumi' => 'boolean',
             'can_stay_over' => 'boolean',

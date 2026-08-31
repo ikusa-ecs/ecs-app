@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Support\ProfileOptions;
 use App\Support\TestAccounts;
 
 /**
@@ -45,6 +46,15 @@ class ProfileController extends Controller
             'chatwork_id' => ['nullable', 'string', 'max:32', 'regex:/^[0-9]+$/'],
             'departments' => ['nullable', 'array'],
             'departments.*' => ['string', 'max:50'],
+            // 本人の申告（社員・スタッフ共通・2026-08-31 baba要望）。
+            // 選択肢の中身は ProfileOptions で照合するので、ここでは「形」だけ見る。
+            'other_languages' => ['nullable', 'string', 'max:255'],
+            'online_tools_other' => ['nullable', 'string', 'max:255'],
+            'profile_note' => ['nullable', 'string', 'max:2000'],
+            'challenge_positions' => ['nullable', 'array'],
+            'challenge_positions.*' => ['string', 'max:50'],
+            'online_tools' => ['nullable', 'array'],
+            'online_tools.*' => ['string', 'max:50'],
         ], [
             'chatwork_id.regex' => 'チャットワークIDは数字だけで入れてください。',
         ], [
@@ -53,6 +63,9 @@ class ProfileController extends Controller
             'email'     => 'メールアドレス',
             'chatwork_id' => 'チャットワークID',
             'departments' => '兼務している所属',
+            'other_languages' => 'その他話せる言語',
+            'online_tools_other' => 'その他のオンラインツール',
+            'profile_note' => 'その他備考',
         ]);
 
         // 4. 共通項目（社員・スタッフ両方）
@@ -67,6 +80,25 @@ class ProfileController extends Controller
         $user->shirt_size      = $request->input('shirt_size');
         $user->prefecture      = $request->input('prefecture');
         $user->nearest_station = $request->input('nearest_station');
+
+        // 運転・英語・話せる言語・挑戦したい役割・使っているツール・備考（社員もスタッフも同じ）。
+        // ⚠ 運転／英語はもともとスタッフ画面の設定タブにしか無かった＝同じ列に保存する（両方から直せる）。
+        //   選択肢の正本は ProfileOptions。一覧に無い値は入れない＝勝手に近い値へ寄せない。
+        $user->driving_level = ProfileOptions::normalizeChoice(
+            $request->input('driving_level'), ProfileOptions::DRIVING
+        );
+        $user->english_level = ProfileOptions::normalizeChoice(
+            $request->input('english_level'), ProfileOptions::ENGLISH
+        );
+        $user->other_languages = $request->input('other_languages') ?: null;
+        $user->challenge_positions = ProfileOptions::normalizeChecks(
+            $request->input('challenge_positions'), ProfileOptions::CHALLENGE_POSITIONS
+        );
+        $user->online_tools = ProfileOptions::normalizeChecks(
+            $request->input('online_tools'), ProfileOptions::ONLINE_TOOLS
+        );
+        $user->online_tools_other = $request->input('online_tools_other') ?: null;
+        $user->profile_note = $request->input('profile_note') ?: null;
 
         // 5. role ごとに対象カラムだけ保存（people に実在する列のみ）
         if ($user->role === 'employee') {

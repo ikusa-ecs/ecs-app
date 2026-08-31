@@ -11,6 +11,7 @@ use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
+use App\Support\ProfileOptions;
 use App\Support\ProjectFormats;
 use App\Support\RecruitStatus;
 use App\Support\StaffLinks;
@@ -275,6 +276,12 @@ class StaffPortalController extends Controller
             'stay' => (bool) $me->can_stay_over,
             'drive' => $me->driving_level,
             'english' => $me->english_level,
+            // 本人の申告（2026-08-31 baba要望）。社員の「マイプロフィール」と同じ項目。
+            'other_languages' => $me->other_languages,
+            'challenge_positions' => (array) $me->challenge_positions,
+            'online_tools' => (array) $me->online_tools,
+            'online_tools_other' => $me->online_tools_other,
+            'profile_note' => $me->profile_note,
             // OP・軍師(SP) は「できる役割」= staff_role_eligibility。トグルの初期ON/OFFに使う。
             'op' => in_array(AssignmentRole::OP, $elig, true),
             'gunshi' => in_array(AssignmentRole::SP, $elig, true),
@@ -303,9 +310,32 @@ class StaffPortalController extends Controller
             'disliked_contents' => ['nullable', 'string', 'max:1000'],
             'strong_positions' => ['nullable', 'string', 'max:1000'],
             'weak_positions' => ['nullable', 'string', 'max:1000'],
+            // 本人の申告（2026-08-31 baba要望）
+            'other_languages' => ['nullable', 'string', 'max:255'],
+            'online_tools_other' => ['nullable', 'string', 'max:255'],
+            'profile_note' => ['nullable', 'string', 'max:2000'],
+            'challenge_positions' => ['nullable', 'array'],
+            'challenge_positions.*' => ['string', 'max:50'],
+            'online_tools' => ['nullable', 'array'],
+            'online_tools.*' => ['string', 'max:50'],
         ]);
 
         $user->fill($data);   // Person は guarded=[] なので列名一致でそのまま入る
+
+        // 複数チェックは選択肢の一覧（ProfileOptions）と突き合わせてから入れる。
+        // ⚠ `..._sent` が付いているときだけ書き換える＝欄ごと送られてこなかったときに
+        //   前の内容を消してしまわないため（全部のチェックを外して保存は、印だけ届くので消せる）。
+        if ($request->has('challenge_positions_sent')) {
+            $user->challenge_positions = ProfileOptions::normalizeChecks(
+                $request->input('challenge_positions'), ProfileOptions::CHALLENGE_POSITIONS
+            );
+        }
+        if ($request->has('online_tools_sent')) {
+            $user->online_tools = ProfileOptions::normalizeChecks(
+                $request->input('online_tools'), ProfileOptions::ONLINE_TOOLS
+            );
+        }
+
         $user->save();
 
         return response()->json(['ok' => true, 'message' => 'プロフィールを保存しました。']);
@@ -326,10 +356,13 @@ class StaffPortalController extends Controller
         $user->mc_audition_passed = $request->boolean('mc');
         $user->can_kigurumi = $request->boolean('kigurumi');
         $user->can_stay_over = $request->boolean('stay');
-        $drive = trim((string) $request->input('drive', ''));
-        $english = trim((string) $request->input('english', ''));
-        $user->driving_level = ($drive === '' || $drive === '（なし）') ? null : $drive;
-        $user->english_level = ($english === '' || $english === '（なし）') ? null : $english;
+        // 運転・英語の選択肢は ProfileOptions が正本（マイプロフィール /profile と同じ列・同じ値）。
+        $user->driving_level = ProfileOptions::normalizeChoice(
+            $request->input('drive'), ProfileOptions::DRIVING
+        );
+        $user->english_level = ProfileOptions::normalizeChoice(
+            $request->input('english'), ProfileOptions::ENGLISH
+        );
         $user->save();
 
         // OP・軍師(SP) の「できる役割」を、この2つの範囲だけ入れ替える（他の役割は消さない）。

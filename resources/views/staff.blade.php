@@ -320,8 +320,10 @@
   // live ＝ どれか1つでも入力済みか（未入力なら「本人未入力」と出す）。
   function profileFor(p){
     const d = p.profile || {};
-    const filled = ['appeal','likeC','dislikeC','strong','weak','height','shoe','shirt','pref','station','drive','english']
-      .some(k => d[k]) || d.mcPass || d.kigurumi || d.stay;
+    const filled = ['appeal','likeC','dislikeC','strong','weak','height','shoe','shirt','pref','station','drive','english',
+                    'otherLang','toolsOther','note']
+      .some(k => d[k]) || d.mcPass || d.kigurumi || d.stay
+      || (d.challenge||[]).length > 0 || (d.tools||[]).length > 0;
     return { live: !!filled, ...d };
   }
 
@@ -463,6 +465,10 @@
     if (prof.stay)     skillBits.push('前泊・後泊OK');
     if (prof.drive)    skillBits.push('運転：' + prof.drive);
     if (prof.english)  skillBits.push('英語：' + prof.english);
+    if (prof.otherLang) skillBits.push('その他の言語：' + prof.otherLang);
+    // 日常で使っているオンラインツール（一覧のチェック＋自由記入をつなげる）
+    const toolBits = (prof.tools || []).slice();
+    if (prof.toolsOther) toolBits.push(prof.toolsOther);
     const physBits = [];
     if (prof.height) physBits.push('身長 ' + prof.height);
     if (prof.shoe)   physBits.push('靴 ' + prof.shoe);
@@ -481,8 +487,11 @@
             <div><b>得意なポジション：</b>${prof.strong||'（未入力）'}</div>
             <div><b>苦手なポジション：</b>${prof.weak||'（未入力）'}</div>
             <div><b>スキル：</b>${skillBits.length ? skillBits.join('／') : '（未入力）'}</div>
+            <div><b>やってみたいポジション：</b>${(prof.challenge||[]).length ? prof.challenge.join('／') : '（未入力）'}</div>
+            <div><b>使っているツール：</b>${toolBits.length ? toolBits.join('／') : '（未入力）'}</div>
             <div><b>身体・サイズ：</b>${physBits.length ? physBits.join('／') : '（未入力）'}</div>
             <div><b>エリア：</b>${areaBits.length ? areaBits.join('　') : '（未入力）'}</div>
+            <div><b>その他備考：</b>${prof.note||'（未入力）'}</div>
           </div>
         </div>
         <div class="dgrid">

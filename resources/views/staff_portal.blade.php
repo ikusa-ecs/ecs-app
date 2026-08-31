@@ -589,6 +589,49 @@
             <div class="field"><label>苦手なコンテンツ</label><input id="pfDislike" type="text" placeholder="例）オンライン配信"></div>
             <div class="field"><label>得意なポジション</label><textarea id="pfStrongPosFree" rows="2" placeholder="例）大人数の前での進行が得意。盛り上げ役が好きです。／裏方作業やサポートをするのが得意です。"></textarea></div>
             <div class="field"><label>苦手なポジション</label><textarea id="pfWeakPosFree" rows="2" placeholder="例）細かい受付業務はやや苦手です。／オンラインなどPC操作が発生する業務が苦手です。"></textarea></div>
+
+            {{-- できること・やってみたいこと（2026-08-31 baba要望）。社員の「マイプロフィール」と同じ項目。
+                 選択肢はサーバー側（App\Support\ProfileOptions）から出す＝画面に直書きしない。
+                 ⚠ 運転・英語はこの下の「できるポジション・スキル」にすでにあるので、ここには置かない（二重入力になる）。 --}}
+            <div class="field">
+              <label>その他話せる言語</label>
+              <input id="pfOtherLang" type="text" placeholder="例）中国語（日常会話）・韓国語（片言）">
+            </div>
+
+            <div class="field">
+              <label>チャレンジしたいポジション</label>
+              <div id="pfChallengeList" style="display:flex;flex-wrap:wrap;gap:8px 16px;padding:4px 2px;">
+                @foreach (\App\Support\ProfileOptions::CHALLENGE_POSITIONS as $opt)
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:400;">
+                    <input type="checkbox" data-val="{{ $opt }}" style="width:auto;">{{ $opt }}
+                  </label>
+                @endforeach
+              </div>
+              <span style="font-size:12px;color:var(--muted);">今できるかどうかは気にせず、やってみたいものを選んでください。</span>
+            </div>
+
+            <div class="field">
+              <label>日常で使っているオンラインツール</label>
+              <div id="pfToolList" style="display:flex;flex-wrap:wrap;gap:8px 16px;padding:4px 2px;">
+                @foreach (\App\Support\ProfileOptions::ONLINE_TOOLS as $opt)
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:400;">
+                    <input type="checkbox" data-val="{{ $opt }}" style="width:auto;">{{ $opt }}
+                  </label>
+                @endforeach
+              </div>
+              <span style="font-size:12px;color:var(--muted);">ひととおり使えるものを選んでください。</span>
+            </div>
+
+            <div class="field">
+              <label>その他のオンラインツール</label>
+              <input id="pfToolOther" type="text" placeholder="例）Miro・Figma">
+            </div>
+
+            <div class="field">
+              <label>その他備考</label>
+              <textarea id="pfNote" rows="2" placeholder="例）土日はほぼ空いています。／簡単な動画編集ができます。"></textarea>
+            </div>
+
             <div style="font-size:12.5px;line-height:1.7;color:var(--muted);background:#f8f3ea;border:1px dashed var(--line);border-radius:8px;padding:9px 12px;margin:4px 0 10px;">
               💡 ここに入力した内容は、メンバーを決めるときの<b>参考</b>にさせてもらうものです。できるだけ希望や得意を活かしたいと思っていますが、現場の状況やチームのバランスもあるため、<b>必ずしも好きなコンテンツや得意なポジションばかりにアサインされるわけではありません</b>。あらかじめご了承ください。
             </div>
@@ -1311,8 +1354,12 @@
     const PF_MAP = {
       pfHeight:'height', pfShoe:'shoe_size', pfWear:'shirt_size', pfPref:'prefecture', pfStation:'nearest_station',
       pfAppeal:'appeal', pfLike:'liked_contents', pfDislike:'disliked_contents',
-      pfStrongPosFree:'strong_positions', pfWeakPosFree:'weak_positions'
+      pfStrongPosFree:'strong_positions', pfWeakPosFree:'weak_positions',
+      pfOtherLang:'other_languages', pfToolOther:'online_tools_other', pfNote:'profile_note'
     };
+
+    // 複数チェックの欄 ↔ people 列名の対応（選択肢そのものは Blade がサーバーから出している）
+    const PF_CHECKS = { pfChallengeList:'challenge_positions', pfToolList:'online_tools' };
 
     // DBに保存済みの本人プロフィールを各欄に入れる
     function loadProfile() {
@@ -1320,6 +1367,15 @@
       Object.keys(PF_MAP).forEach(id => {
         const el = document.getElementById(id);
         if (el && d[PF_MAP[id]] != null) el.value = d[PF_MAP[id]];
+      });
+      // チェックボックス（保存済みの値と同じものにチェックを入れる）
+      Object.keys(PF_CHECKS).forEach(id => {
+        const box = document.getElementById(id);
+        if (!box) return;
+        const saved = d[PF_CHECKS[id]] || [];
+        box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          cb.checked = saved.indexOf(cb.dataset.val) >= 0;
+        });
       });
     }
 
@@ -1329,6 +1385,17 @@
       Object.keys(PF_MAP).forEach(id => {
         const el = document.getElementById(id);
         if (el) body.append(PF_MAP[id], el.value);
+      });
+      // チェックが入っているものだけ送る。1つも無いときは「空で送った」と伝えるため印を付ける
+      // （何も送らないと「欄ごと無かった」ことになり、前の内容が消せなくなる）。
+      Object.keys(PF_CHECKS).forEach(id => {
+        const box = document.getElementById(id);
+        if (!box) return;
+        const name = PF_CHECKS[id];
+        body.append(name + '_sent', '1');
+        box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          if (cb.checked) body.append(name + '[]', cb.dataset.val);
+        });
       });
       postSettings('/staff-portal/profile', body, 'pfSavedMsg');
     }
@@ -1344,11 +1411,13 @@
       { key:'stay',    label:'前泊・後泊OK',      note:'宿泊を伴う遠方の現場に対応できる' },
     ];
     // レベルを選ぶもの（プルダウン）。options[0]＝未選択（なし）
+    // ⚠ options は画面に直書きしない＝正本は App\Support\ProfileOptions（社員のマイプロフィールと共通）。
+    //   ここに書き写すと、片方だけ直して食い違う。
     const POS_SELECTS = [
       { key:'drive',   label:'車（運転）', note:'運転できる車のサイズ',
-        options:['（なし）', '普通サイズなら運転可能', 'ハイエースも普通サイズも運転可能'] },
+        options:@json(\App\Support\ProfileOptions::drivingChoices()) },
       { key:'english', label:'英語力',     note:'英語での対応レベル',
-        options:['（なし）', '片言レベル', '日常会話レベル', 'ビジネス会話可能レベル'] },
+        options:@json(\App\Support\ProfileOptions::englishChoices()) },
     ];
     // DBに保存済みの「できるポジション・スキル」を読む（無ければ既定OFF）
     function loadPositions() {

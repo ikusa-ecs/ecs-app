@@ -205,6 +205,32 @@
     applyFilter();
   }
 
+  // 本人がマイプロフィールで入れた申告（2026-08-31 baba要望）。ここは見るだけ＝直せない。
+  // なぜ名簿に出すか＝車を出せる人・英語で対応できる人を、その都度聞いて回らずに済ませるため。
+  // 直すのは本人（左メニューの「マイプロフィール」）。全部空なら「本人未入力」と出す。
+  function selfProfileHtml(p){
+    const d = p.selfProfile || {};
+    const tools = (d.tools || []).slice();
+    if (d.toolsOther) tools.push(d.toolsOther);
+    const filled = d.drive || d.english || d.otherLang || d.note
+      || (d.challenge || []).length > 0 || tools.length > 0;
+    if (!filled) {
+      return '<h4 style="margin-top:14px;">本人プロフィール（本人入力）</h4>'
+        + '<p class="muted" style="font-size:12px; margin:0;">※ まだ本人が入力していません（マイプロフィールから本人が入れます）。</p>';
+    }
+    const row = (label, value) =>
+      '<div><b>' + label + '：</b>' + (value ? escAttr(value) : '（未入力）') + '</div>';
+    return '<h4 style="margin-top:14px;">本人プロフィール（本人入力）</h4>'
+      + '<div style="font-size:12.5px; line-height:1.9;">'
+      + row('運転', d.drive)
+      + row('英語', d.english)
+      + row('その他話せる言語', d.otherLang)
+      + row('やってみたいポジション', (d.challenge || []).join('／'))
+      + row('使っているツール', tools.join('／'))
+      + row('その他備考', d.note)
+      + '</div>';
+  }
+
   function detailHtml(p, idx){
     const fresh = isFresh(p.joinedMonths);
     return `
@@ -245,6 +271,8 @@
             </div>
 
             ${assignPoolHtml(p, idx)}
+
+            ${selfProfileHtml(p)}
 
             ${fresh ? `<div class="muted" style="font-size:12px; margin-top:12px;">🌱 入社半年以内の新人です。経験コンテンツとDの経験コンテンツを重点的に確認してください。</div>` : ''}
           </div>

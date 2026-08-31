@@ -80,6 +80,17 @@ class PersonController extends Controller
                     // アサインの候補に出すか（2026-08-26 baba要望）。false＝出勤可能日の一覧・
                     // D決め・D/SD/物品担当のプルダウンに出さない。名簿には今までどおり出る。
                     'inAssignPool' => (bool) $p->in_assign_pool,
+                    // 本人がマイプロフィールで入れた申告（2026-08-31 baba要望）。ここでは直せない＝
+                    // 本人が書くものなので、名簿では「見るだけ」（サイズ等の管理項目とは性格が違う）。
+                    'selfProfile' => [
+                        'drive' => $p->driving_level ?? '',
+                        'english' => $p->english_level ?? '',
+                        'otherLang' => $p->other_languages ?? '',
+                        'challenge' => (array) $p->challenge_positions,
+                        'tools' => (array) $p->online_tools,
+                        'toolsOther' => $p->online_tools_other ?? '',
+                        'note' => $p->profile_note ?? '',
+                    ],
                 ];
             })
             ->values();
@@ -405,6 +416,12 @@ class PersonController extends Controller
                         'stay' => (bool) $p->can_stay_over,
                         'drive' => $p->driving_level ?? '',
                         'english' => $p->english_level ?? '',
+                        // 本人の申告（2026-08-31 baba要望）。アサインを決めるときの材料。
+                        'otherLang' => $p->other_languages ?? '',
+                        'challenge' => (array) $p->challenge_positions,
+                        'tools' => (array) $p->online_tools,
+                        'toolsOther' => $p->online_tools_other ?? '',
+                        'note' => $p->profile_note ?? '',
                     ],
                 ];
             })

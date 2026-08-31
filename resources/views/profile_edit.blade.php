@@ -101,6 +101,78 @@
             <input type="text" name="nearest_station" value="{{ $me->nearest_station }}" placeholder="例）JR千葉駅">
           </div>
 
+          {{-- ①-2 できること・やってみたいこと（社員・スタッフ共通・2026-08-31 baba要望）
+               なぜ聞くか＝アサインを決めるときの材料。車を出せる人・英語で対応できる人を
+               その都度聞いて回らなくて済むようにする。挑戦したい役割は「次に何を任せるか」の参考。
+               選択肢の正本＝App\Support\ProfileOptions（画面に直書きしない）。 --}}
+          <h2 style="margin-top:24px;">できること・やってみたいこと</h2>
+
+          <div class="form-row">
+            <label>運転</label>
+            <select name="driving_level">
+              @foreach (\App\Support\ProfileOptions::drivingChoices() as $opt)
+                <option value="{{ $opt }}" @selected(($me->driving_level ?? \App\Support\ProfileOptions::NONE) === $opt)>{{ $opt }}</option>
+              @endforeach
+            </select>
+            <span class="hint">機材を積むハイエースを運転できるかどうかで、当日の車の手配が変わります。</span>
+          </div>
+
+          <div class="form-row">
+            <label>英語</label>
+            <select name="english_level">
+              @foreach (\App\Support\ProfileOptions::englishChoices() as $opt)
+                <option value="{{ $opt }}" @selected(($me->english_level ?? \App\Support\ProfileOptions::NONE) === $opt)>{{ $opt }}</option>
+              @endforeach
+            </select>
+            <span class="hint">英語で進行・対応する案件のときに参考にします。</span>
+          </div>
+
+          <div class="form-row">
+            <label>その他話せる言語</label>
+            <input type="text" name="other_languages" value="{{ $me->other_languages }}" placeholder="例）中国語（日常会話）・韓国語（片言）">
+            <span class="hint">英語以外に話せる言語があれば、レベルも添えて書いてください。</span>
+          </div>
+
+          <div class="form-row">
+            <label>チャレンジしたいポジション</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
+              @foreach (\App\Support\ProfileOptions::CHALLENGE_POSITIONS as $opt)
+                <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">
+                  <input type="checkbox" name="challenge_positions[]" value="{{ $opt }}"
+                         style="width:auto;" @checked(in_array($opt, (array) $me->challenge_positions, true))>
+                  {{ $opt }}
+                </label>
+              @endforeach
+            </div>
+            <span class="hint">今できるかどうかは気にせず、やってみたいものを選んでください。次に任せる役割を決めるときの参考にします。</span>
+          </div>
+
+          <div class="form-row">
+            <label>日常で使っているオンラインツール</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
+              @foreach (\App\Support\ProfileOptions::ONLINE_TOOLS as $opt)
+                <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">
+                  <input type="checkbox" name="online_tools[]" value="{{ $opt }}"
+                         style="width:auto;" @checked(in_array($opt, (array) $me->online_tools, true))>
+                  {{ $opt }}
+                </label>
+              @endforeach
+            </div>
+            <span class="hint">ひととおり使えるものを選んでください。オンライン案件や資料づくりを頼むときの参考にします。</span>
+          </div>
+
+          <div class="form-row">
+            <label>その他のオンラインツール</label>
+            <input type="text" name="online_tools_other" value="{{ $me->online_tools_other }}" placeholder="例）Miro・Figma">
+            <span class="hint">上の一覧に無いものがあれば書いてください。</span>
+          </div>
+
+          <div class="form-row">
+            <label>その他備考</label>
+            <textarea name="profile_note" placeholder="例）土日はほぼ空いています。／簡単な動画編集ができます。">{{ $me->profile_note }}</textarea>
+            <span class="hint">上のどれにも当てはまらないことで、伝えておきたいことがあれば自由に書いてください。</span>
+          </div>
+
           {{-- ② 社員（employee）だけの項目 --}}
           @if ($me->role === 'employee')
             <h2 style="margin-top:24px;">所属（社員）</h2>
