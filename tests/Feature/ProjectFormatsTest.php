@@ -70,6 +70,54 @@ class ProjectFormatsTest extends TestCase
     }
 
     /**
+     * ⚠ 見張り：「リアルロングかどうか」を判定してよいのは正本（ProjectFormats）だけ。
+     *
+     * 【なぜ】リアルとリアルロングの違いは**スタッフの手当（当日スタッフ費）が変わる**ところ。
+     *   判定の写しを別の場所に持つと、片方だけ直したときに手当を間違える。
+     *   実際 2026-08-31 に、収支の当日スタッフ費（PersonalCases）・メンバー決めの絞り込み
+     *   （AssignBoardController）・D決め（AssignDirectorController）の3か所に写しが残っていた。
+     *
+     * 【引っかかったら】その場で判定を書かず、`ProjectFormats::countCode()` を呼ぶこと。
+     */
+    public function test_only_the_one_source_decides_long(): void
+    {
+        $offenders = [];
+
+        foreach ($this->phpFilesUnder(app_path()) as $file) {
+            if (str_ends_with(str_replace('\\', '/', $file), 'app/Support/ProjectFormats.php')) {
+                continue;   // ここが正本。
+            }
+
+            $code = (string) file_get_contents($file);
+            // 「ロング」という文字と比べている行＝判定の写し。ラベルの表（'long' => 'リアルロング'）は
+            // 比較ではないので引っかからない。
+            if (preg_match('/(str_contains|str_starts_with|mb_strpos|strpos)\s*\([^;]*ロング/u', $code)) {
+                $offenders[] = str_replace(base_path().DIRECTORY_SEPARATOR, '', $file);
+            }
+        }
+
+        $this->assertSame([], $offenders,
+            '実施形態「リアルロング」の判定が正本の外に書かれています： '.implode(' / ', $offenders)
+            .'。リアルとリアルロングはスタッフの手当が変わるところなので、'
+            .'App\Support\ProjectFormats::countCode() を呼んでください。');
+    }
+
+    /** app/ 以下の .php を全部あげる。 */
+    private function phpFilesUnder(string $dir): array
+    {
+        $out = [];
+        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS));
+        foreach ($it as $f) {
+            if ($f->isFile() && $f->getExtension() === 'php') {
+                $out[] = $f->getPathname();
+            }
+        }
+        sort($out);
+
+        return $out;
+    }
+
+    /**
      * ⚠ 見張り：`public/ecs/data/cases.js` の window.ECS_fmtCode は countCode と同じ規則を
      *   JavaScript 側にも持っている（危険日の警告で使う）。cases.js は凍結ファイルなので
      *   触っていないが、**片方だけ変えると危険日の判定だけ古いままになる**。

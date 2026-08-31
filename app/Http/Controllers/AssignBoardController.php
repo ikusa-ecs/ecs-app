@@ -745,21 +745,20 @@ class AssignBoardController extends Controller
             ->all();
     }
 
-    /** 実施形態の文字列 → コード（real/long/online）。cases.js の fmt と同じ。 */
+    /**
+     * 実施形態の文字列 → コード（real/long/online）。メンバー決め画面の絞り込みに使う。
+     *
+     * ⚠ ここに判定を書かない。正本＝App\Support\ProjectFormats::countCode
+     *   （public/ecs/data/cases.js の ECS_fmtCode と同じ規則）。
+     * ⚠ 実施形態が未設定の案件は絞り込みから外す（空を返す）＝勝手に「リアル」と決めない。
+     *   ARENA場所貸し・体験会は正本どおり「リアル」に入る（2026-08-31 修正。それまでは
+     *   どの絞り込みを選んでも一覧から消えていた）。
+     */
     private function fmtCode(?string $format): string
     {
-        $f = (string) $format;
-        if (mb_strpos($f, 'オンライン') !== false) {
-            return 'online';
-        }
-        if (mb_strpos($f, 'ロング') !== false) {
-            return 'long';
-        }
-        if (mb_strpos($f, 'リアル') !== false) {
-            return 'real';
-        }
-
-        return '';
+        return trim((string) $format) === ''
+            ? ''
+            : \App\Support\ProjectFormats::countCode($format);
     }
 
     /** 指定IDの people をポジション可否込みで引き、id でキー付けして返す。 */

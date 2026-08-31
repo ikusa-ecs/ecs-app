@@ -99,13 +99,10 @@ class PersonalCases
             : $p->project_name;
 
         // 実施形態（収支の「当日スタッフ費」どの行に人数を仮入力するか）。
-        $format = (string) ($p->format ?? '');
-        $fmt = 'real';
-        if (mb_strpos($format, 'オンライン') !== false) {
-            $fmt = 'online';
-        } elseif (mb_strpos($format, 'ロング') !== false) {
-            $fmt = 'long';
-        }
+        // ⚠ ここに判定を書かない。正本＝App\Support\ProjectFormats::countCode
+        //   （public/ecs/data/cases.js の ECS_fmtCode と同じ規則）。
+        //   写しを持っていたせいで「ヘルプのみ」の案件がリアルの行に入っていた（2026-08-31 修正）。
+        $fmt = ProjectFormats::countCode($p->format);
 
         return [
             'id' => $p->id,

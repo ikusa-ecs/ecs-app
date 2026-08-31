@@ -121,15 +121,11 @@ class AssignDirectorController extends Controller
                     ? ($contentNames[$firstContentId] ?? $p->project_name)
                     : $p->project_name;
 
+                // 実施形態のコード。⚠ ここに判定を書かない。
+                //   正本＝App\Support\ProjectFormats::countCode（cases.js の ECS_fmtCode と同じ規則）。
+                //   未設定は空のまま＝勝手に「リアル」と決めない。
                 $format = (string) ($p->format ?? '');
-                $fmt = '';
-                if (mb_strpos($format, 'オンライン') !== false) {
-                    $fmt = 'online';
-                } elseif (mb_strpos($format, 'ロング') !== false) {
-                    $fmt = 'long';
-                } elseif (mb_strpos($format, 'リアル') !== false) {
-                    $fmt = 'real';
-                }
+                $fmt = trim($format) === '' ? '' : \App\Support\ProjectFormats::countCode($format);
 
                 // 決まっているD/SD（社員ID。未決は null）
                 $decided = $dirByProject->get($p->id, []);
