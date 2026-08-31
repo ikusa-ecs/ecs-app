@@ -182,4 +182,137 @@ class AvailabilityImportTest extends TestCase
 
         $this->actingAsPerson($staff)->get('/availability-import')->assertRedirect();
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // ここから：実物の東京シートの形（2026-08-31。babaが取り込めなかった件）
+    //
+    // ⚠ 事故の中身＝日付の見出しが「9/6」ではなく **「9月」＋「5(土)」** の形だったため、
+    //   見出しの行が見つからず **1件も取り込めなかった**（画面には「見出しの行が
+    //   見つかりませんでした」とだけ出る）。雛型だけで試すと気づけない形の違い。
+    // ─────────────────────────────────────────────────────────────
+
+    /** 実物の東京シートと同じ形（月が別のマス・日付は「5(土)」）。 */
+    private function tokyoSheet(): string
+    {
+        return implode("\n", [
+            "\t\t大型 GrandCentral様\t\t\t\t\t\t",
+            "\t9月\t5(土)\t6(日)\t10(木)\t12(土)\t平日希望休日\t参加したいイベント、参加したいイベント数、その他備考",
+            "\t中村 淳司\t〇\t✕\t〇\t△\t29,30\t",
+            "\t小田 紅\tGrandCentral様\t〇\t〇\t✕\t１０，１１\t",
+            "\t出勤可能\t〇\t\t\t\t\t",
+            "\t出勤不可\t✕\t\t\t\t\t",
+            "\t応相談\t△\t\t\t\t\t",
+        ]);
+    }
+
+    /** 「9月」＋「5(土)」の形が読める。 */
+    public function test_it_reads_the_month_plus_day_shape(): void
+    {
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($this->tokyoSheet()), '2026-09');
+
+        $this->assertSame(
+            ['2026-09-05', '2026-09-06', '2026-09-10', '2026-09-12'],
+            $read['dates'],
+            '「9月」＋「5(土)」の形が読めていません。実物の東京シートはこの形です。'
+        );
+
+        $naka = collect($read['people'])->firstWhere('name', '中村 淳司');
+        $this->assertNotNull($naka);
+        $this->assertSame('ok', $naka['days']['2026-09-05']['code']);
+        $this->assertSame('ng', $naka['days']['2026-09-06']['code']);
+        $this->assertSame('maybe', $naka['days']['2026-09-12']['code']);
+
+        // 予定名は △＋メモ（これまでどおり）。
+        $oda = collect($read['people'])->firstWhere('name', '小田 紅');
+        $this->assertSame('maybe', $oda['days']['2026-09-05']['code']);
+        $this->assertSame('GrandCentral様', $oda['days']['2026-09-05']['memo']);
+    }
+
+    /**
+     * ⚠ 表のいちばん下の凡例（「出勤可能 〇」など）を人として読まない。
+     *   読むと「名簿に見つかりません」に3件並び、本当の見落としが埋もれる。
+     */
+    public function test_legend_rows_are_not_treated_as_people(): void
+    {
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($this->tokyoSheet()), '2026-09');
+
+        $names = array_column($read['people'], 'name');
+        $this->assertSame(['中村 淳司', '小田 紅'], $names);
+    }
+
+    /**
+     * 月を書いていない希望休（「29,30」「１０，１１」）は、選んだ月の日として読む（2026-08-31 baba決定）。
+     * ⚠ 全角の数字・読点もそろえてから見る。
+     */
+    public function test_day_off_without_a_month_uses_the_chosen_month(): void
+    {
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($this->tokyoSheet()), '2026-09');
+
+        $naka = collect($read['people'])->firstWhere('name', '中村 淳司');
+        $this->assertSame(['2026-09-29', '2026-09-30'], $naka['offDays']);
+
+        $oda = collect($read['people'])->firstWhere('name', '小田 紅');
+        $this->assertSame(['2026-09-10', '2026-09-11'], $oda['offDays'], '全角の「１０，１１」が読めていません。');
+    }
+
+    /**
+     * ⚠ カッコの曜日が合わなければ読まない＝**別の月・別の年のシートを入れた**ことに気づける。
+     *   ここが緩いと、去年の9月のシートを今年として黙って取り込む。
+     */
+    public function test_a_day_whose_weekday_does_not_match_is_not_read(): void
+    {
+        // 2026-09-05 は土曜。わざと「5(月)」と書く。
+        $sheet = implode("\n", [
+            "\t9月\t5(月)\t6(日)\t10(木)\t12(土)\t平日希望休日\t備考",
+            "\t中村 淳司\t〇\t〇\t〇\t〇\t\t",
+        ]);
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($sheet), '2026-09');
+
+        $this->assertNotContains('2026-09-05', $read['dates']);
+        $this->assertStringContainsString('土曜日', implode(' ', $read['errors']));
+    }
+
+    /** シートに書いてある月と、選んだ年月が違うときは知らせる（勝手に読まない）。 */
+    public function test_a_sheet_for_another_month_is_reported(): void
+    {
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($this->tokyoSheet()), '2026-12');
+
+        $this->assertSame([], $read['dates']);
+        $this->assertStringContainsString('9月', implode(' ', $read['errors']));
+        $this->assertStringContainsString('年月を選び直して', implode(' ', $read['errors']));
+    }
+
+    /**
+     * ⚠ 同じ日の列が2つあって中身が違うときは、その日だけ取り込まない（2026-08-31 baba決定）。
+     *   実物の東京シートは 9/5 の列が2つあり、1人だけ「✕」と「〇」で食い違っていた。
+     *   勝手に選ぶと、出勤できない日を「〇」で入れてしまう。
+     */
+    public function test_two_columns_for_the_same_day_that_disagree_are_skipped(): void
+    {
+        $sheet = implode("\n", [
+            "\t9月\t5(土)\t5(土)\t6(日)\t10(木)\t平日希望休日\t備考",
+            "\t中村 淳司\t✕\t〇\t〇\t〇\t\t",       // 食い違い → 9/5 は入れない
+            "\t小田 紅\t〇\t〇\t〇\t〇\t\t",         // 同じ値 → ふつうに入る
+            "\t大友 茜\t〇\t\t〇\t〇\t\t",           // 片方が空 → ふつうに入る
+        ]);
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($sheet), '2026-09');
+
+        $naka = collect($read['people'])->firstWhere('name', '中村 淳司');
+        $this->assertArrayNotHasKey('2026-09-05', $naka['days'], '食い違う日を勝手に取り込んでいます。');
+        $this->assertArrayHasKey('2026-09-06', $naka['days'], '食い違った日以外まで落としています。');
+        $this->assertStringContainsString('中村 淳司', implode(' ', $read['errors']));
+        $this->assertStringContainsString('9月5日', implode(' ', $read['errors']));
+
+        $this->assertSame('ok', collect($read['people'])->firstWhere('name', '小田 紅')['days']['2026-09-05']['code']);
+        $this->assertSame('ok', collect($read['people'])->firstWhere('name', '大友 茜')['days']['2026-09-05']['code']);
+    }
+
+    /** 読めなかった理由を、見出しが見つからないときも捨てない。 */
+    public function test_the_reason_is_kept_when_no_header_is_found(): void
+    {
+        $sheet = "\t9月\t5(土)\t6(日)\t10(木)\t平日希望休日\t備考\n\t中村 淳司\t〇\t〇\t〇\t\t";
+        $read = AvailabilitySheetReader::read(\App\Support\CsvText::rowsPasted($sheet), '2026-12');
+
+        $this->assertStringContainsString('9月', implode(' ', $read['errors']));
+    }
 }
