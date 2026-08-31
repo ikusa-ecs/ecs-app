@@ -176,10 +176,23 @@ class EmployeeAvailabilityController extends Controller
 
         $saved = 0;
         foreach ($byDate as $date => $values) {
-            ShiftPreference::updateOrCreate(
-                ['staff_id' => $employeeId, 'date' => $date], // unique キー
-                array_merge(['period' => $period, 'note' => $memo], $values)
-            );
+            // ⚠ updateOrCreate(['date' => 'Y-m-d']) は使えない（2026-08-31 修正）。
+            //   date は**日時**として保存される（'2026-09-06 00:00:00'）ので、'Y-m-d' の文字とは
+            //   一致せず、既にある行を見つけられない → 新しく作ろうとして
+            //   unique(staff_id, date) に引っかかり **500になって保存できない**。
+            //   ＝ 同じ月をもう一度保存すると必ず失敗していた。whereDate で日付として引き当てる。
+            //   （同じ罠は AssignDirectorController でも踏んでいる＝date をキーにするときの決まり）
+            $row = ShiftPreference::where('staff_id', $employeeId)
+                ->whereDate('date', $date)
+                ->first();
+
+            $attrs = array_merge(['period' => $period, 'note' => $memo], $values);
+
+            if ($row) {
+                $row->fill($attrs)->save();
+            } else {
+                ShiftPreference::create($attrs + ['staff_id' => $employeeId, 'date' => $date]);
+            }
             $saved++;
         }
 

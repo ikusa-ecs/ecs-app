@@ -20,6 +20,14 @@ return Application::configure(basePath: dirname(__DIR__))
             // 'twofa' ＝ ログイン後、メールで届く確認コードを入れるまで業務画面へ進ませない。
             'twofa' => \App\Http\Middleware\EnsureTwoFactor::class,
         ]);
+
+        // ⚠ 表を「コピーして貼り付ける」欄だけは、前後の空白を勝手に落とさない（2026-08-31）。
+        //   Laravel は既定で入力の前後の空白を削る。ふだんは親切な機能だが、
+        //   スプレッドシートの**選んだ範囲の左端が空のセル**だと1行目がタブで始まるため、
+        //   **1行目だけ**そのタブが消えて見出しの列が1つ左にずれる
+        //   ＝ 氏名と日付の列が全部ずれて、**1人も読めない／別の人の日に入る**。
+        //   エラーも出ないので気づけない。貼り付け欄は元の文字のまま受け取る。
+        $middleware->trimStrings(except: ['paste', 'pasted']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

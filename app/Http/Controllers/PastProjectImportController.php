@@ -106,8 +106,11 @@ class PastProjectImportController extends Controller
         //   ②貼り付ける   … スプレッドシートでセルをコピーして貼ったもの（タブ区切り）
         // ⚠ 読み取りから先は**まったく同じ道**を通す。ここで分かれるのは「文字をどう取るか」と
         //   「何年何月ぶんか」の決め方だけ＝2つの読み取りを持たない（食い違いの元）。
-        $pasted = trim((string) $request->input('paste', ''));
-        $isPaste = $pasted !== '' && $request->file('csv') === null;
+        // ⚠ 貼り付けた文字は trim しない（2026-08-31）。選んだ範囲の左端が空のセルだと
+        //   1行目がタブで始まり、それを削ると**1行目だけ列が1つずれる**＝見出しと中身が食い違う。
+        //   空かどうかの判定だけ trim する。（Laravel の自動トリムも bootstrap/app.php で外してある）
+        $pasted = (string) $request->input('paste', '');
+        $isPaste = trim($pasted) !== '' && $request->file('csv') === null;
 
         if ($isPaste) {
             // 貼り付けはタブ区切り。セルの中に改行やカンマが入っていても壊れない。

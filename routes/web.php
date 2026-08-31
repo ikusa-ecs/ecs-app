@@ -12,6 +12,7 @@ use App\Http\Controllers\AssignPublishController;
 use App\Http\Controllers\AssignSheetController;
 use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AvailabilityImportController;
 use App\Http\Controllers\CountDeadlineReminderController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeAvailabilityController;
@@ -147,6 +148,11 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/past-import', [PastProjectImportController::class, 'show'])->middleware('tier:manager');
     Route::post('/past-import/preview', [PastProjectImportController::class, 'preview'])->middleware('tier:manager');
     Route::post('/past-import', [PastProjectImportController::class, 'import'])->middleware('tier:manager');
+    // 社員の出勤可能日のまとめて取込（2026-08-31 baba要望）。月別シートをそのまま流し込む。
+    // ⚠ 必ずプレビューを見せてから保存する（誰の何日がどう入るかを見てから確定）。
+    Route::get('/availability-import', [AvailabilityImportController::class, 'show'])->middleware('tier:manager');
+    Route::post('/availability-import/preview', [AvailabilityImportController::class, 'preview'])->middleware('tier:manager');
+    Route::post('/availability-import', [AvailabilityImportController::class, 'import'])->middleware('tier:manager');
     // アカウント発行（1人ずつ）。最初はCSV一括、以降はここで発行。作成＝管理者以上。
     Route::get('/account-new', [AccountController::class, 'create'])->middleware('tier:manager');
     Route::post('/account-new', [AccountController::class, 'store'])->middleware('tier:manager');
