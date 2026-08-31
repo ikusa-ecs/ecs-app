@@ -697,6 +697,15 @@
     window.ECS_PREF_PERIOD = @json($prefPeriod ?? '');
     window.ECS_MY_PREF_MEMO = @json($myPrefMemo ?? '');
     window.ECS_PREF_META = @json($prefMeta ?? null);
+    {{-- プロフィールの選択肢（運転・英語）。正本＝App\Support\ProfileOptions。
+         ⚠ 必ずここ（下の「そのまま出す」区間の外）で渡すこと。
+           下の script はその区間の中なので、Blade の書き方をしても処理されず、
+           書いた文字がそのまま JavaScript に出て文法エラーになる
+           ＝ スタッフ画面が丸ごと動かなくなる（2026-08-31 に本番で起こした。タブも押せない）。 --}}
+    window.ECS_PROFILE_OPTIONS = @json([
+        'driving' => \App\Support\ProfileOptions::drivingChoices(),
+        'english' => \App\Support\ProfileOptions::englishChoices(),
+    ]);
   </script>
   @verbatim
   <script>
@@ -1413,11 +1422,16 @@
     // レベルを選ぶもの（プルダウン）。options[0]＝未選択（なし）
     // ⚠ options は画面に直書きしない＝正本は App\Support\ProfileOptions（社員のマイプロフィールと共通）。
     //   ここに書き写すと、片方だけ直して食い違う。
+    // ⚠⚠ ここは @verbatim の中なので **Blade の書き方（@json など）は使えない**。
+    //   書いてもそのままの文字が出て、JavaScript の文法エラーになり
+    //   **この画面が丸ごと動かなくなる**（2026-08-31 に本番でやった）。
+    //   サーバーの値は上の window.ECS_… で受け取る。
+    const _po = window.ECS_PROFILE_OPTIONS || { driving: [], english: [] };
     const POS_SELECTS = [
       { key:'drive',   label:'車（運転）', note:'運転できる車のサイズ',
-        options:@json(\App\Support\ProfileOptions::drivingChoices()) },
+        options:_po.driving },
       { key:'english', label:'英語力',     note:'英語での対応レベル',
-        options:@json(\App\Support\ProfileOptions::englishChoices()) },
+        options:_po.english },
     ];
     // DBに保存済みの「できるポジション・スキル」を読む（無ければ既定OFF）
     function loadPositions() {

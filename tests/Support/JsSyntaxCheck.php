@@ -146,6 +146,18 @@ class JsSyntaxCheck
                 continue;
             }
 
+            // ── JavaScript に出てはいけない文字 ──
+            // ⚠ 2026-08-31 に本番でこれをやった＝ @verbatim の中に @json と書いたため、
+            //   Blade が処理せず「@json(\App\Support\…)」という文字がそのまま JavaScript に出た。
+            //   JavaScript に「@」や「\」は（文字列の外では）書けないので**文法エラー**になり、
+            //   その画面の <script> が丸ごと読み込めなくなる（タブもボタンも押せなくなる）。
+            //   ＝ Blade の書き方が JavaScript へ漏れ出した合図。必ず見つける。
+            if ($c === '@' || $c === '\\') {
+                $problems[] = "{$line}行目：JavaScriptに書けない文字「{$c}」がそのまま出ています。"
+                    .'＝Bladeの書き方（@json など）が @verbatim の中に書かれていて、処理されずに'
+                    .'文字のまま出た可能性。この画面のJavaScriptは丸ごと読み込みに失敗します。';
+            }
+
             // ── 中身が空の代入（= のあとに何も無い）──
             // ⚠ 2026-08-31 に本番でこれが起きた＝ @json が文字化けで何も出さず
             //   `window.ECS_RECRUIT_JOBS = ;` になり、画面のJSが丸ごと読み込めなくなった。
