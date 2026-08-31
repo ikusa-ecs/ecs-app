@@ -32,8 +32,14 @@ class SafeJson
      * 既定の記号（< > & ' "）のエスケープは Blade の @json と同じにそろえてある
      * ＝ 見た目・既存のテストの前提を変えないため。
      */
-    public static function forScript($value, int $flags = 0, int $depth = 512): string
+    public static function forScript($value = null, int $flags = 0, int $depth = 512): string
     {
+        // ⚠ $value に既定値を付けてある理由＝
+        //   画面ファイルのコメントに、この命令の名前を記号つきで素書きしてしまうと
+        //   （例：注意書きの文中）、Blade はそれも命令として読み、値なしで呼んでしまう。
+        //   既定値が無いと **その画面が500で開かなくなる**。あっても出るのは null だけなので、
+        //   画面は動き続ける。書き間違い自体はテスト（BladeDirectiveLeakTest・画面のJS検査）が見つける。
+
         $base = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
         // JSON_INVALID_UTF8_SUBSTITUTE ＝ 壊れた文字を「�」に置き換えて、失敗させない。

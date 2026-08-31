@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use Database\Factories\PersonFactory;
 use Database\Factories\ProjectFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\Support\JsSyntaxCheck;
 use Tests\TestCase;
 
@@ -12,58 +13,82 @@ use Tests\TestCase;
  * 「画面は出るのに JavaScript だけ死んでいる」を見つける（2026-08-31 baba要望）。
  *
  * 【なぜ要るか＝これが繰り返し起きている事故そのもの】
- * Blade の中の JavaScript が壊れると、**HTMLは普通に出るのに JS が丸ごと止まる**。
- *   ・真っ白にならない ・表が空になる ・ボタンを押しても何も起きない
- * これまでのテストは「画面が開くか（200か）」「文字が出ているか」しか見ていなかったので、
- * **全部緑のまま本番へ出てしまう**。実際に 2026-08-26／08-28／08-31 と起きている。
+ * 画面の中の JavaScript が壊れると、**HTMLは普通に出るのに JS が丸ごと止まる**。
+ *   ・真っ白にならない ・表が空になる ・ボタンもタブも押せない
+ * これまでのテストは「画面が開くか（200か）」しか見ていなかったので、
+ * **全部緑のまま本番へ出てしまう**。2026-08-26／08-28／08-31 と起きている。
  *
- * ここでは **実際に画面を出して**、その HTML の <script> の中身が
- * 文法として壊れていないかを調べる。Blade の @json・@foreach が展開されたあとの姿を見るので、
- * ファイルの文字だけを見る `BladeScriptEscapeTest` では見つからないものも捕まえられる。
+ * ⚠ **画面の一覧を手で書かない。** 最初の版は手で並べていたため `/pickup` が漏れ、
+ *   その画面が壊れているのに気づけなかった（2026-08-31）。
+ *   ルート表から**自動で全部**拾う＝画面を足したら自動で見張りの対象になる。
  */
 class RenderedScriptSyntaxTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** 社員以上で見る画面（サイドバーから開けるもの）。 */
-    private const EMPLOYEE_PAGES = [
-        '/dashboard', '/projects', '/project-form', '/assign-sheet', '/assign-dashboard',
-        '/staff', '/employees', '/masters', '/settings', '/stats', '/imports',
-        '/employee-availability', '/finance-list', '/paper-stock', '/mypage', '/profile',
-        '/person-import', '/content-import', '/project-import', '/past-import',
-        '/availability-import', '/assign-publish', '/entries', '/experience',
-    ];
-
-    /** スタッフ本人が見る画面。 */
-    private const STAFF_PAGES = ['/staff-portal', '/profile', '/guide-staff'];
-
-    public function test_every_employee_screen_has_working_javascript(): void
+    public function test_every_screen_an_admin_can_open_has_working_javascript(): void
     {
-        $me = PersonFactory::new()->admin()->create();
-        ProjectFactory::new()->count(2)->create();
-        PersonFactory::new()->staff()->count(2)->create();
+        $me = PersonFactory::new()->admin()->create(['office' => '東京']);
+        ProjectFactory::new()->count(2)->create(['office' => '東京']);
+        PersonFactory::new()->staff()->count(2)->create(['office' => '東京']);
 
-        $this->assertScriptsAreValid($me, self::EMPLOYEE_PAGES);
+        $this->assertScriptsAreValid($me, $this->screenUrls());
     }
 
-    public function test_every_staff_screen_has_working_javascript(): void
+    public function test_every_screen_a_staff_can_open_has_working_javascript(): void
     {
-        $me = PersonFactory::new()->staff()->create();
-        ProjectFactory::new()->count(2)->create();
+        $me = PersonFactory::new()->staff()->create(['office' => '東京']);
+        ProjectFactory::new()->count(2)->create(['office' => '東京']);
 
-        $this->assertScriptsAreValid($me, self::STAFF_PAGES);
+        $this->assertScriptsAreValid($me, $this->screenUrls());
+    }
+
+    /**
+     * 画面として開ける URL を、ルート表から自動で拾う。
+     * ・GET だけ（POSTは画面ではない）
+     * ・{id} などの入れ替え部分が無いものだけ（値を勝手に作らない）
+     * ・ログインや認証の入口は対象外（画面の中身がほぼ無く、ここでは見なくてよい）
+     *
+     * @return list<string>
+     */
+    private function screenUrls(): array
+    {
+        $skip = ['login', 'logout', 'otp', 'up', 'password/reset', 'password/forgot', 'register'];
+        $urls = [];
+
+        foreach (Route::getRoutes() as $route) {
+            if (! in_array('GET', $route->methods(), true)) {
+                continue;
+            }
+            $uri = $route->uri();
+            if (str_contains($uri, '{') || $uri === '/' || str_starts_with($uri, '_')) {
+                continue;
+            }
+            foreach ($skip as $s) {
+                if (str_starts_with($uri, $s)) {
+                    continue 2;
+                }
+            }
+            $urls[] = '/'.ltrim($uri, '/');
+        }
+
+        sort($urls);
+
+        return array_values(array_unique($urls));
     }
 
     /** それぞれの画面を出して、<script> の中身を調べる。 */
     private function assertScriptsAreValid($me, array $pages): void
     {
         $bad = [];
+        $checked = 0;
 
         foreach ($pages as $url) {
             $res = $this->actingAsPerson($me)->get($url);
             if ($res->getStatusCode() !== 200) {
-                continue;   // 権限や前提データで開かない画面はここでは扱わない
+                continue;   // 権限や前提データで開かない画面は、ここでは扱わない
             }
+            $checked++;
 
             foreach (JsSyntaxCheck::extractScripts($res->getContent()) as $n => $js) {
                 foreach (JsSyntaxCheck::problems($js) as $p) {
@@ -72,9 +97,13 @@ class RenderedScriptSyntaxTest extends TestCase
             }
         }
 
+        // 何も見ていないのに緑になるのを防ぐ（ルートの拾い方が壊れたら気づけるように）。
+        $this->assertGreaterThan(5, $checked, '画面をほとんど見ていません。ルートの拾い方が壊れていないか確かめてください。');
+
         $this->assertSame([], $bad,
             "画面のJavaScriptが壊れています。\n"
-            ."この状態になると、画面は普通に出るのにボタンが効かず、表が空になります（真っ白にならないので目で気づけません）。\n"
+            ."この状態になると、画面は普通に出るのにボタンもタブも押せず、表が空になります\n"
+            ."（真っ白にならないので目で気づけません）。\n"
             .implode("\n", $bad));
     }
 }

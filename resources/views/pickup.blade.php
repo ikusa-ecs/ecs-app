@@ -231,7 +231,12 @@
 <script>window.ECS_PICKUP_CASES = @json($pickupCases ?? []);</script>
 <!-- DBに案件があるか（拠点で絞って0件になっても見本データに戻さないための旗）。 -->
 <script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
-<!-- DB保存に必要な橋渡し（CSRF・保存先URL・役割/担当メモの選択肢）。@verbatimの外で渡す。 -->
+<!-- DB保存に必要な橋渡し（CSRF・保存先URL・役割/担当メモの選択肢）。
+     ⚠ ここは「そのまま出す区間」の外で渡すこと。中で渡すと処理されず、文字のままJSに出て壊れる。
+     ⚠⚠ この注意書きに Blade の命令の名前を、記号つきで書いてはいけない。
+        コメントの中でも命令として読まれてしまう。
+        2026-08-31 まで、ここに区間を始める命令の名前が書いてあったせいで、
+        この下の値がどれも処理されずに出ていた＝この画面の保存が動かない状態だった。 -->
 <script>
   window.ECS_CSRF = '{{ csrf_token() }}';
   window.ECS_PICKUP_SAVE = '/pickup/save';
