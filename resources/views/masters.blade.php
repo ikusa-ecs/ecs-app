@@ -23,16 +23,28 @@
       border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 14px;
     }
 
+    /* コンテンツの表は列が多いので、パネルを広めにする。
+       ⚠ ここを狭くすると「コンテンツ名」の列（残り全部＝1fr）が真っ先に潰れて
+         **名前の欄が空に見える**（2026-08-27に略称の列を足したとき実際に起きた）。
+         固定幅の合計＋すき間が、パネルの中で使える幅を超えないこと。
+         見張りのテスト＝MastersGridWidthTest。 */
+    .m-wrap.m-wide { max-width: 1100px; }
+    /* 画面が狭いときは縦に潰さず横スクロールにする（潰れると気づけないため）。 */
+    .m-scroll { overflow-x: auto; }
+
     .m-head {
-      display: grid; grid-template-columns: 66px 1fr 120px 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
+      display: grid; grid-template-columns: 46px 66px minmax(150px, 1fr) 120px 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
       font-size: 11.5px; font-weight: 700; color: var(--muted); padding: 2px 4px 6px; align-items: end;
     }
     .m-head.off { grid-template-columns: 56px 1fr 96px 52px 150px; }
     .m-row {
-      display: grid; grid-template-columns: 66px 1fr 120px 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
+      display: grid; grid-template-columns: 46px 66px minmax(150px, 1fr) 120px 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
       align-items: center; padding: 6px 4px; border-top: 1px solid var(--line);
     }
     .m-row.off { grid-template-columns: 56px 1fr 96px 52px 150px; }
+    /* 削除のチェック欄。使われているコンテンツは選べないので、かわりに件数を出す。 */
+    .m-del { display: flex; align-items: center; justify-content: center; }
+    .m-used { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.3; }
     .m-row.add { border-top: 2px solid #e3d3b6; margin-top: 4px; }
     /* まとめて保存バー */
     .m-save-bar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 12px 4px 2px; }
@@ -88,20 +100,37 @@
   @endif
 
   {{-- ── コンテンツ ── --}}
-  <div class="panel m-wrap" id="contents">
+  <div class="panel m-wrap m-wide" id="contents">
     <div class="panel-head"><h2>コンテンツ</h2></div>
     <p class="m-intro">案件名に使うコンテンツ（水合戦・運動会 など）。ここを直すと案件登録の選択肢に反映されます。<br>
       「紙」＝謎解きシートが必要なコンテンツ。オンにすると <a href="/paper-stock">謎解きの紙 在庫</a> で集計されます（枚/組＝1チームあたりの必要枚数・基本1）。<br>
       <b>「略称」</b>＝カレンダーの予定名などで、正式名のかわりに使う短い名前です（例「先が見えない防災訓練」→「防災訓練」）。
       <b>空のままなら正式名を使います</b>ので、略称が無いコンテンツは空でOKです。</p>
 
+    {{-- 画面が狭いときは、列を縮めずに横スクロールにする。
+         ⚠ 縮めると「コンテンツ名」の欄が先に潰れて、名前が消えたように見える（実際に起きた）。 --}}
+    <div class="m-scroll">
     <form method="POST" action="/masters/contents/bulk">
       @csrf
       <div class="m-head">
-        <span>ID</span><span>コンテンツ名</span><span>略称</span><span>分類</span><span>紙</span><span>枚/組</span><span>有効</span><span>必要人数</span><span>並び替え</span><span>操作</span>
+        <span>削除</span><span>ID</span><span>コンテンツ名</span><span>略称</span><span>分類</span><span>紙</span><span>枚/組</span><span>有効</span><span>必要人数</span><span>並び替え</span><span>操作</span>
       </div>
       @foreach ($contents as $c)
         <div class="m-row">
+          {{-- まとめて削除のチェック（2026-08-31 baba要望）。案件CSVの取込で台帳に増えた
+               いらないコンテンツを一度に片づけるためのもの。
+               ⚠ 案件で使われているコンテンツは選べない＝消すと、その案件のコンテンツ名が
+                 行方不明になるため。かわりに「案件で使われている件数」を出す。 --}}
+          <div class="m-del">
+            @if (($usedCounts[$c->id] ?? 0) > 0)
+              <span class="m-used" title="{{ $usedCounts[$c->id] }}件の案件で使われているため削除できません">案件<br>{{ $usedCounts[$c->id] }}件</span>
+            @elseif ($canDelete)
+              <input type="checkbox" name="del[]" value="{{ $c->id }}" form="contentBulkDelete"
+                     title="このコンテンツを削除する（下の「選んだものを削除」を押すと消えます）">
+            @else
+              <span class="m-used" title="削除は Administrator のみ">—</span>
+            @endif
+          </div>
           <span class="m-id">{{ $c->id }}</span>
           <input type="text" name="rows[{{ $c->id }}][content_name]" value="{{ $c->content_name }}" required>
           {{-- 略称（2026-08-27 baba要望）。カレンダーの予定名などで正式名のかわりに使う。
@@ -139,8 +168,26 @@
       </div>
     </form>
 
+    {{-- まとめて削除（2026-08-31 baba要望・Administratorのみ）。
+         上の一覧の「削除」欄のチェックは form="contentBulkDelete" でこちらへ送られる
+         （フォームの中にフォームは入れられないため、HTMLの form 属性でつなぐ）。 --}}
+    @if ($canDelete)
+      <form id="contentBulkDelete" method="POST" action="/masters/contents/bulk-delete"
+            onsubmit="return confirm('チェックしたコンテンツを削除します。よろしいですか？（元に戻せません）');">
+        @csrf
+        <div class="m-save-bar" style="border-top:1px solid var(--line); margin-top:4px;">
+          <span class="m-note" style="margin:0;">
+            案件CSVの取込などで増えた、いらないコンテンツを片づけられます。<br>
+            ⚠ <b>案件で使われているコンテンツは選べません</b>（消すと、その案件のコンテンツ名が分からなくなるため）。
+          </span>
+          <button type="submit" class="m-btn danger">選んだものを削除</button>
+        </div>
+      </form>
+    @endif
+
     <form class="m-row add" method="POST" action="/masters/contents">
       @csrf
+      <div class="m-del"></div>
       <span class="m-id">新規</span>
       <input type="text" name="content_name" placeholder="コンテンツ名" required>
       <input type="text" name="short_name" placeholder="略称（任意）">
@@ -152,6 +199,7 @@
       <div class="m-move" style="color:var(--muted); font-size:11px; align-items:center;">末尾に追加</div>
       <div class="m-acts"><button type="submit" class="m-btn primary">＋ 追加</button></div>
     </form>
+    </div>
   </div>
 
   {{-- ── 拠点（事務所）── --}}

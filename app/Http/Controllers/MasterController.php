@@ -7,6 +7,7 @@ use App\Models\ContentRoleRequirement;
 use App\Models\Office;
 use App\Support\AssignmentRole;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 /**
@@ -49,7 +50,80 @@ class MasterController extends Controller
             // コンテンツごとの必要人数の合計（規模別）。一覧で「今何人で登録されているか」が
             // すぐ分かるように渡す（毎回「必要人数」画面を開かなくてよいように・2026-08-21 baba）。
             'reqTotals' => $this->requirementTotals(),
+            // コンテンツごとの「使われている案件の件数」（2026-08-31 baba要望）。
+            // まとめて削除で、使われているものを選べないようにするために使う。
+            'usedCounts' => $this->contentUsageCounts(),
+            // まとめて削除を出すか＝Administrator のみ（1件ずつの削除と同じ線引き）。
+            'canDelete' => optional(Auth::user())->permission === 'admin',
         ]);
+    }
+
+    /**
+     * コンテンツID => それを使っている案件の件数。
+     *
+     * ⚠ projects.content_ids は JSON の配列なので、SQLでは環境ごとに書き方が変わる
+     *   （SQLite と MySQL で違う）。件数は多くないので、PHP側で数えて食い違いを無くす。
+     *
+     * @return array<string,int>
+     */
+    private function contentUsageCounts(): array
+    {
+        $counts = [];
+        foreach (\App\Models\Project::pluck('content_ids') as $ids) {
+            foreach (array_unique((array) $ids) as $id) {
+                if (is_string($id) && $id !== '') {
+                    $counts[$id] = ($counts[$id] ?? 0) + 1;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * チェックしたコンテンツをまとめて削除する（Administrator のみ・2026-08-31 baba要望）。
+     *
+     * 【なぜ要るか】案件CSVの取込は、台帳に無いコンテンツ名を見つけると台帳に足す
+     * （`ProjectController::resolveContentIds`）。書き方がゆれた名前や一度きりの名前が
+     * どんどん増えるので、1件ずつ消していられない。
+     *
+     * ⚠ **案件で使われているコンテンツは消さない。** 消すと、その案件が指しているIDの
+     *   行方が分からなくなり、案件のコンテンツ名が出なくなる。数えたうえで、はっきり断る。
+     */
+    public function contentBulkDestroy(Request $request)
+    {
+        $ids = array_values(array_filter((array) $request->input('del', []), 'is_string'));
+
+        if ($ids === []) {
+            return redirect('/masters#contents')->with('status', '削除するコンテンツが選ばれていませんでした。');
+        }
+
+        $used = $this->contentUsageCounts();
+        $deleted = [];
+        $refused = [];
+
+        foreach ($ids as $id) {
+            $content = Content::find($id);
+            if (! $content) {
+                continue;
+            }
+            if (($used[$id] ?? 0) > 0) {
+                $refused[] = $content->content_name.'（案件'.$used[$id].'件で使用中）';
+                continue;
+            }
+            $name = $content->content_name;
+            $content->delete();
+            // 必要人数の設定も一緒に消す（孤立データを残さない＝1件ずつの削除と同じ）。
+            ContentRoleRequirement::where('content_id', $id)->delete();
+            $deleted[] = $name;
+        }
+
+        $msg = count($deleted).'件のコンテンツを削除しました。';
+        if ($refused) {
+            $msg .= ' 使われているため削除しなかったもの：'.implode('／', $refused);
+        }
+
+        return redirect('/masters#contents')->with('status', $msg);
     }
 
     /**

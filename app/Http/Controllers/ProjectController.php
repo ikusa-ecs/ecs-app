@@ -1168,6 +1168,14 @@ class ProjectController extends Controller
         $oneOffNames = $oneOffNames ?: collect();
 
         return $names->map(function ($name) use ($oneOffNames) {
+            // ⚠ 空白だけの名前で台帳を作らない（2026-08-31）。
+            //   前後の空白を落として空なら何もしない＝マスタ管理に「名前が空の行」が
+            //   増えるのを防ぐ。過去案件の取込（PastProjectImportController）は元から
+            //   同じ守りが入っていて、こちらだけ抜けていた。
+            $name = trim((string) $name);
+            if ($name === '') {
+                return null;
+            }
             $existing = Content::where('content_name', $name)->first();
             if ($existing) {
                 return $existing->id;
