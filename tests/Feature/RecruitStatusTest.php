@@ -229,7 +229,13 @@ class RecruitStatusTest extends TestCase
             ->assertSee('function detailBtnHtml', false)
             ->assertSee('案件の詳細 →', false)
             // 実施形態のバッジ（2026-09-01 baba要望）。
-            ->assertSee('function fmtBadgeHtml', false);
+            ->assertSee('function fmtBadgeHtml', false)
+            // ⚠ 締めたあとの見え方（2026-09-01 baba指摘）。
+            //   締めたのに人数のバーが「足りていない」ままだと、まだ足すのか分からない。
+            //   バーを満たす（settled）／数字に「この人数で確定」／その日の「あと◯名」から外す。
+            ->assertSee('const settled', false)
+            ->assertSee('この人数で確定・予定', false)
+            ->assertSee('const needOf', false);
     }
 
     /**

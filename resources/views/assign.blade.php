@@ -356,8 +356,9 @@
         <b>「確定」の人数が運営人数に達すると、印は「締切」に変わります</b>＝スタッフの画面でも「締切・満員」になってエントリーできません。
         <b>「仮」の人は数えません</b>（まだ決まっていないので募集を続けます）。<br>
         <b>運営人数が埋まっていなくても「これで足りている」ときは、カードの「🔒 この人数で足りている」を押してください</b>
-        （2026-09-01 追加）。募集が締まって<b>「募集中 あと◯名」が消えます</b>＝もう人を足さなくてよいことが、ひと目で分かります。
-        <b>運営人数（セールスが入れた数）は変わりません。</b>
+        （2026-09-01 追加）。募集が締まって<b>「募集中 あと◯名」が消え</b>、
+        <b>人数のバーも緑（足りている）になり</b>、その日の<b>「あと◯名」からも外れます</b>＝もう人を足さなくてよいことが、ひと目で分かります。
+        数字は「<b>6名（この人数で確定・予定8名）</b>」と出るので、<b>運営人数（セールスが入れた数）も残ります。</b>
         ⚠ <b>「✓確定にする」では募集は締まりません</b>（本当に人が足りなくて、確定にしても募集を続けたい案件があるため）。<br>
         また募集したいときは<b>「＋ 追加募集する」</b>を押してください（<b>公開し直す必要はありません</b>）。<br>
         <b>日付の横のボタンから、その日をまとめて確定・まとめて公開できます</b>（対象がある日だけ出ます。押す前に案件名を出して確認します）。<br>
@@ -1403,7 +1404,12 @@
       //  ・候補   ＝稼働希望〇＋その日の案件へのエントリー（すでに入っている人は除く）
       // 以前は「稼働可−割当済」を『残り』と出していたため、希望カレンダーが空の日は
       // 必ず「残り −1名／稼働可を超過（重複の可能性）」と出て、意味が分からなかった。
-      const needTotal = dayCases.reduce((s,c) => s + (c.need || 0), 0);
+      // ⚠ 「🔒 この人数で足りている」で締めた案件は、いま入っている人数を「必要」として数える
+      //   （2026-09-01 baba指摘）。運営人数のまま数えると、もう足さなくてよいのに
+      //   その日の「あと◯名」が減らず、まだ人が要るように見えてしまう。
+      //   運営人数（セールスが書いた予定）そのものは変えていない。
+      const needOf = (c) => (bPubOn(c) && !bRecruit(c)) ? filledOf(c) : (c.need || 0);
+      const needTotal = dayCases.reduce((s,c) => s + needOf(c), 0);
       const assigned  = dayCases.reduce((s,c) => s + filledOf(c), 0);
       const remain    = needTotal - assigned;
       const assignedNames = new Set();
@@ -1657,8 +1663,13 @@
     const filled = filledOf(c);
 
     // 充足バー
-    const ratio = c.need ? Math.min(1, filled / c.need) : 0;
-    const barCls = filled >= c.need ? 'full' : (ratio >= 0.7 ? 'mid' : 'low');
+    // ⚠ 「🔒 この人数で足りている」で募集を締めた案件は、人数が運営人数に届いていなくても
+    //   バーを満たして緑にする（2026-09-01 baba指摘）。
+    //   締めたのにバーが「足りていない」ままだと、まだ人を足すのかどうかが分からない。
+    //   運営人数（セールスが書いた予定）は消さず、数字の横に「予定◯名」として残す。
+    const settled = bPubOn(c) && !bRecruit(c);
+    const ratio = settled ? 1 : (c.need ? Math.min(1, filled / c.need) : 0);
+    const barCls = (settled || filled >= c.need) ? 'full' : (ratio >= 0.7 ? 'mid' : 'low');
 
     // ポジション充足ランプ
     const posHtml = c.pos.map(p => {
@@ -1803,7 +1814,7 @@
         <span class="sb ${stat}" title="案件の進み具合">${stateLabel[stat] || ''}</span>${recruitBadge(c)}
         <div class="cc-actions">
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
-          ${filled < c.need ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
+          ${(filled < c.need && !settled) ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
           ${stateBtn}
           ${detailBtnHtml(c)}
           <a class="open-btn" href="/project-assign?project=${c.id}">アサイン画面 →</a>
@@ -1814,7 +1825,9 @@
       <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${fmtBadgeHtml(c)}${posHtml}</div>
       <div class="cc-fill">
         <div class="fbar"><i class="${barCls}" style="width:${Math.round(ratio*100)}%;"></i></div>
-        <span class="fnum">${filled}<span class="need"> / ${c.need}名</span></span>
+        <span class="fnum">${filled}${settled
+          ? `<span class="need">名（この人数で確定・予定${c.need}名）</span>`
+          : `<span class="need"> / ${c.need}名</span>`}</span>
       </div>
       <div class="cc-cols">
         ${memCol}
