@@ -223,6 +223,10 @@ class RecruitStatusTest extends TestCase
             ->assertSee('function closeRecruit', false)
             ->assertSee('この人数で足りている', false)
             // 募集を続けているかがボードに渡っていないと、締めてもバッジが消えない。
-            ->assertSee('function bRecruit', false);
+            ->assertSee('function bRecruit', false)
+            // 案件の詳細へ行くボタン（2026-09-01 baba要望）。
+            // ⚠ 案件名のリンクだけだと押せることに気づけない、というご意見だった。
+            ->assertSee('function detailBtnHtml', false)
+            ->assertSee('案件の詳細 →', false);
     }
 }

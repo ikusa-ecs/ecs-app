@@ -350,7 +350,8 @@
         ⚠ <b>「✓確定にする」では募集は締まりません</b>（本当に人が足りなくて、確定にしても募集を続けたい案件があるため）。<br>
         また募集したいときは<b>「＋ 追加募集する」</b>を押してください（<b>公開し直す必要はありません</b>）。<br>
         <b>日付の横のボタンから、その日をまとめて確定・まとめて公開できます</b>（対象がある日だけ出ます。押す前に案件名を出して確認します）。<br>
-        <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
+        <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。
+        カードの<b>「📄 案件の詳細 →」</b>で案件の登録・編集画面（時間・会場・運営人数・備考など）、<b>「アサイン画面 →」</b>でその案件のアサイン画面に進みます（案件名を押しても詳細が開きます）。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
       </div>
 
@@ -1099,6 +1100,16 @@
     return `<span class="ymk ${y.c}" title="確度：${c.yomi}（まだ確定していない案件です）">${y.t}</span>`;
   }
 
+  // 案件の詳細（登録・編集画面）へ行くボタン（2026-09-01 baba要望）。
+  // ⚠ 案件名を押しても同じところへ行けるが、**リンクだと気づけない**というご意見。
+  //   他のボタンと同じ並びに置いて、押せることが分かるようにする。
+  // ⚠ 見本データのときは出さない（開いても中身が無い案件のため）。
+  function detailBtnHtml(c){
+    if (!USING_DB) return '';
+    return `<a class="open-btn" href="/project-form?project=${encodeURIComponent(c.id)}"`
+      + ` title="この案件の詳細（登録・編集画面）を開きます。時間・会場・運営人数・備考などはそこで直せます。">📄 案件の詳細 →</a>`;
+  }
+
   function titleBlockHtml(c){
     const name = c.name || '';
     const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツがマスタに未登録です。案件名で仮表示しています。">⚠未登録</span> ' : '';
@@ -1772,6 +1783,7 @@
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
           ${filled < c.need ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
           ${stateBtn}
+          ${detailBtnHtml(c)}
           <a class="open-btn" href="/project-assign?project=${c.id}">アサイン画面 →</a>
         </div>
       </div>
