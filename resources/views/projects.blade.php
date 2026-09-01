@@ -455,6 +455,15 @@
       <!-- 絞り込みバー -->
       <div class="panel">
         <div class="filter-bar">
+          <!-- 並び順（2026-09-01 baba要望）。スタッフ公開ボードと同じ2つを出す。
+               登録順＝いま登録した案件がいちばん上に来る＝入れた直後に確認しやすい。 -->
+          <div class="f-item">
+            <label>並び順</label>
+            <select id="sortMode" onchange="applySort()" title="並び順を切り替えます">
+              <option value="calendar">カレンダー順（日付・月ごと）</option>
+              <option value="registered">登録順（新しい順・登録したてが上）</option>
+            </select>
+          </div>
           <div class="f-item">
             <label>キーワード（案件名・会場）</label>
             <input type="text" id="kw" placeholder="例）水合戦、〇〇公園" oninput="applyFilter()">
@@ -737,7 +746,10 @@
       office:c.office || '', sharedOffices:c.sharedOffices || [], isOwn:!!c.isOwn,
       sharedToMe:!!c.sharedToMe, myKind:c.myKind || 'ヘルプ', canCopy:!!c.canCopy,
       // 詳細プルダウンの現在値（社員ID）。担当なしは null。音響(sound)は上で設定済み。
-      directorId:c.director_id, sdId:c.sd_id, goodsId:c.goods_owner_id
+      directorId:c.director_id, sdId:c.sd_id, goodsId:c.goods_owner_id,
+      // 登録日（今日から何日前か。マイナス＝過去に登録）。「登録順」の並べ替えに使う。
+      // ⚠ ここに書き写さないと画面側では空になる（上の拠点・ケータリングと同じ抜け方をする）。
+      added:(typeof c.added === 'number') ? c.added : 0
     };
   });
   projects.forEach((p, i) => { p._i = i; });   // 編集・展開用に番号を保持
@@ -1275,6 +1287,48 @@
   emptyRow.innerHTML = `<td colspan="${COLSPAN}">条件に合う案件がありません。</td>`;
   tbody.appendChild(emptyRow);
 
+  // ===== 並び順（カレンダー順／登録順）2026-09-01 baba要望 =====
+  // ⚠ 行を作り直さない。**すでにある行を並べ替えるだけ**にしている。
+  //   作り直すと、同じ行の作り方が2つになって片方だけ直す事故になる（この画面は行がとても長い）。
+  //   詳細行（detail-◯）は案件行のすぐ下に置く決まりなので、2行を1組として動かす。
+  let ORIGINAL_ORDER = null;   // 最初に描いた並び（＝カレンダー順）を覚えておく
+
+  function sortModeValue() {
+    const s = document.getElementById('sortMode');
+    return s ? s.value : 'calendar';
+  }
+
+  function applySort() {
+    if (!ORIGINAL_ORDER) ORIGINAL_ORDER = Array.prototype.slice.call(tbody.children);
+
+    if (sortModeValue() === 'registered') {
+      // 登録順＝月の見出しなしの1本のリスト。新しく登録したものが上。
+      const pairs = [];
+      ORIGINAL_ORDER.forEach(tr => {
+        if (!tr.classList || !tr.classList.contains('main-row')) return;
+        const detail = document.getElementById('detail-' + tr.dataset.idx);
+        const p = projects[Number(tr.dataset.idx)];
+        pairs.push({
+          rows: detail ? [tr, detail] : [tr],
+          added: p ? (p.added || 0) : 0,
+          date: p ? p.date : 0,
+        });
+      });
+      // 登録が新しい順。同じ日に登録したものは開催日が早い順（毎回同じ並びになるように）。
+      pairs.sort((a, b) => (b.added - a.added) || (a.date - b.date));
+      // 見出し行は隠したまま末尾へ寄せる（消さない＝カレンダー順に戻せるようにするため）。
+      ORIGINAL_ORDER.forEach(tr => {
+        if (tr.classList && tr.classList.contains('group-row')) tbody.appendChild(tr);
+      });
+      pairs.forEach(pr => pr.rows.forEach(r => tbody.appendChild(r)));
+    } else {
+      // カレンダー順＝最初の並びに戻す。
+      ORIGINAL_ORDER.forEach(tr => tbody.appendChild(tr));
+    }
+    tbody.appendChild(emptyRow);   // 「該当なし」は必ずいちばん下
+    applyFilter();
+  }
+
   // ===== 詳細行の開閉 =====
   function toggleDetail(idx) {
     const d = document.getElementById('detail-' + idx);
@@ -1387,6 +1441,8 @@
     const dFrom   = document.getElementById('dFrom').value;        // ''か '2026-08-01'
     const dTo     = document.getElementById('dTo').value;
 
+    // 並び順が「登録順」か（＝月の見出しを使わない1本のリスト）。
+    const flatOrder = sortModeValue() === 'registered';
     // キャンセルを隠すか（既定は隠す）。隠した件数はチェックボックスの横に出す。
     const hideCxl = document.getElementById('hideCancelled').checked;
     let cancelledHidden = 0;
@@ -1424,7 +1480,9 @@
       const matched = okTab && okCxl && okKw && okYo && okFmt && okToc && okCat && okLine && okKbn && okOf && okDate;
       // チャットワーク用の書き出しは「月を畳んでいても、絞り込みに一致した案件」を対象にする。
       tr.dataset.matched = matched ? '1' : '0';
-      const collapsed = collapsedMonths.has(tr.dataset.group);
+      // ⚠ 登録順のときは月の見出しを出さないので、「月を畳んでいる」も効かせない
+      //   （畳んだまま登録順にすると、案件が1件も出なくなってしまう）。
+      const collapsed = !flatOrder && collapsedMonths.has(tr.dataset.group);
       tr.style.display = (matched && !collapsed) ? '' : 'none';
       // 詳細はいったん閉じる
       const d = document.getElementById('detail-' + tr.dataset.idx);
@@ -1440,9 +1498,10 @@
     });
 
     // グループ見出しは、その月に一致行が1件もなければ隠す。件数・開閉マークを更新。
+    // ⚠ 登録順のときは月でまとめないので、見出しは全部隠す。
     document.querySelectorAll('#projBody tr.group-row').forEach(gr => {
       const n = groupShown[gr.dataset.group] || 0;
-      gr.style.display = n === 0 ? 'none' : '';
+      gr.style.display = (flatOrder || n === 0) ? 'none' : '';
       const c = gr.querySelector('.g-count');
       if (c) c.textContent = n + '件';
       const car = gr.querySelector('.gcaret');
@@ -1661,6 +1720,13 @@
         renderCalendar();
       }
       return;
+    }
+
+    // ⚠ 登録順で見ているときは月の見出しが無いので、カレンダー順に戻してから飛ぶ
+    //   （そうしないと左メニューの年月を押しても何も起きない）。
+    if (sortModeValue() === 'registered') {
+      const s = document.getElementById('sortMode');
+      if (s) { s.value = 'calendar'; applySort(); }
     }
 
     const gr = document.getElementById('group-' + key);

@@ -164,6 +164,12 @@ class ProjectController extends Controller
                 // チェックボックスで一覧から隠せる。実施形態の値は消していない（戻せる）。
                 'cancelled' => (bool) $p->is_cancelled,
                 'off' => $off,
+                // 登録日（今日から何日前か。マイナス＝過去に登録）。「登録順」で並べ替えるのに使う。
+                // ⚠ 公開ボードの added と同じ作り方にそろえてある（画面によって並びが違うと混乱するため）。
+                //   登録日が無い古いデータは 0（今日扱い）＝並びの中では新しいほうに来る。
+                'added' => $p->created_at
+                    ? intdiv($p->created_at->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
+                    : 0,
                 // ---- 拠点まわり（全拠点運用・設計書19.2）----
                 'office' => $p->office ?? '',                          // 登録拠点
                 'sharedOffices' => $sharesByProject->get($p->id, collect())
