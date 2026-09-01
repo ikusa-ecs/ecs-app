@@ -418,6 +418,9 @@ class PastProjectImportController extends Controller
                 // キャンセルの印が付いていて取り込まない案件（終わった案件のときだけ）。
                 // ⚠ 取込側と同じ判定にしている。画面では灰色にして「キャンセル」と出す。
                 'cancelled' => $mode !== self::MODE_FUTURE && $get('キャンセル') !== '',
+                // すでに入っている案件との重なり（2026-09-01 baba要望）。
+                // ⚠ 判定は findExisting の1か所（下見と取込で同じ）。画面で判定し直さない。
+                'dup' => $this->dupInfo($info, $get, $edit),
                 'label' => $entry['label'],
                 'date' => $info['date'],
                 'name' => $info['name'],
@@ -540,14 +543,13 @@ class PastProjectImportController extends Controller
             $attrs = $this->projectAttributes($get, $name, $date, $info['count'], $client, $meetTime,
                 $office, $mode, $assignments !== []);
 
-            // 同じ案件があるか＝開催日・コンテンツ名・顧客名・集合時間が全部同じ。
-            // ⚠ 日付は「2026-01-20 00:00:00」の形で保存されるので、where ではなく whereDate で探す
-            //   （where だと一致せず、取り込み直すたびに案件が増えてしまう。既知の罠）。
-            $existing = Project::whereDate('start_date', $date)
-                ->where('project_name', $name)
-                ->where('client', $client)
-                ->where('start_time', $meetTime)
-                ->first();
+            // 同じ案件があるか。⚠ 探し方の正本は findExisting（下見とまったく同じものを使う）。
+            //   「似ているだけ」の案件を上書きするかどうかは、下見で人が選んだ印（asNew）で決める。
+            $found = $this->findExisting($date, $name, $client, $meetTime);
+            $existing = $found['exact'];
+            if (! $existing && ! ($edit['asNew'] ?? false)) {
+                $existing = $found['similar'];
+            }
 
             // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
             $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
@@ -895,6 +897,11 @@ class PastProjectImportController extends Controller
             if (! empty($edit['skip'])) {
                 $clean['skip'] = true;
             }
+            // 「似た案件があるけれど、別の案件として新しく登録する」（2026-09-01 baba要望）。
+            // ⚠ 印が無いときは上書き＝二重登録を増やさない側に倒す。
+            if (! empty($edit['asNew'])) {
+                $clean['asNew'] = true;
+            }
             if ($clean !== []) {
                 $edits[(int) $index] = $clean;
             }
@@ -1048,6 +1055,88 @@ class PastProjectImportController extends Controller
         [$y, $m, $d] = array_pad(explode('-', $date), 3, '0');
 
         return checkdate((int) $m, (int) $d, (int) $y);
+    }
+
+    /**
+     * 下見の1行ぶんの「すでに入っている案件との重なり」（2026-09-01 baba要望）。
+     *
+     * @return array{kind:string, asNew:bool, was:string, now:string, count:int}
+     *   kind: ''＝新しい案件／'same'＝完全に同じ（黙って上書き）／'similar'＝似ている（人に聞く）
+     */
+    private function dupInfo(array $info, callable $get, array $edit): array
+    {
+        $none = ['kind' => '', 'asNew' => false, 'was' => '', 'now' => '', 'count' => 0];
+        if ($info['errors']) {
+            return $none;   // そもそも入れられない行は聞かない
+        }
+
+        $found = $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null);
+        if ($found['exact']) {
+            return ['kind' => 'same', 'asNew' => false, 'was' => '', 'now' => '', 'count' => 0];
+        }
+        if (! $found['similar']) {
+            return $none;
+        }
+
+        $old = $found['similar'];
+        $fmt = fn ($t, $n) => '集合 '.(trim((string) $t) !== '' ? $t : '未定')
+            .'／運営人数 '.(trim((string) $n) !== '' ? $n : '未入力');
+
+        return [
+            'kind' => 'similar',
+            'asNew' => ! empty($edit['asNew']),
+            'was' => $fmt($old->start_time, $old->required_count),
+            'now' => $fmt($info['meetTime'] ?? '', $info['count']),
+            'count' => $found['similarCount'],
+        ];
+    }
+
+    /**
+     * すでに入っている同じ案件をさがす（2026-09-01 baba要望で作り直し）。
+     *
+     * 【なぜ2段階にしたか】
+     * それまでは「開催日・コンテンツ名・顧客名・**集合時間**」が全部同じときだけ同じ案件とみなしていた。
+     * ⚠ そのため、**シートで集合時間や運営人数を直してから取り込み直すと、別の案件として増えていた**
+     *   （babaの報告：「2回取り込んでも上書きのはずなのに、同じ案件がちょこちょこ混ざっていた」）。
+     *
+     * 【いまの決まり】
+     *  ・exact   … 開催日・コンテンツ名・顧客名・集合時間が全部同じ → 黙って上書き（今までどおり）
+     *  ・similar … 開催日・コンテンツ名・顧客名は同じで、**集合時間だけ違う** → 下見で人に聞く
+     *
+     * ⚠ 勝手に上書きしない理由＝**同じ日・同じお客様・同じコンテンツで、午前と午後の2本立て**という
+     *   本物の別案件がありうる。潰すとアサインごと消えるので、人が選べるようにする。
+     * ⚠ 似た案件が2件以上あるときは、いちばん古いもの（先に登録されたもの）を候補にする。
+     *
+     * @return array{exact: ?Project, similar: ?Project, similarCount: int}
+     */
+    private function findExisting(?string $date, string $name, ?string $client, ?string $meetTime): array
+    {
+        if (! $date || $name === '') {
+            return ['exact' => null, 'similar' => null, 'similarCount' => 0];
+        }
+
+        // ⚠ 日付は「2026-01-20 00:00:00」の形で保存されるので、where ではなく whereDate で探す
+        //   （where だと一致せず、取り込み直すたびに案件が増えてしまう。既知の罠）。
+        $sameDayList = Project::whereDate('start_date', $date)
+            ->where('project_name', $name)
+            ->where('client', $client)
+            ->orderBy('id')
+            ->get();
+
+        // ⚠ 時間は「08:00」でも「8:00」でも同じものとして比べる。
+        //   保存されるのは整えたあとの「8:00」なので、シートの「08:00」とそのまま比べると
+        //   **同じCSVを入れ直しただけで「似た案件」と出てしまう**（正本＝ProjectImportColumns::normalizeTime）。
+        $hm = fn ($t) => ProjectImportColumns::normalizeTime((string) $t);
+        $want = $hm($meetTime);
+
+        $exact = $sameDayList->first(fn (Project $p) => $hm($p->start_time) === $want);
+        $others = $sameDayList->filter(fn (Project $p) => $hm($p->start_time) !== $want);
+
+        return [
+            'exact' => $exact,
+            'similar' => $exact ? null : $others->first(),
+            'similarCount' => $others->count(),
+        ];
     }
 
     /** 画面に出す結果のメッセージ。 */

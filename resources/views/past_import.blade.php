@@ -74,6 +74,16 @@
   table.pj-table tr.row-skip input { opacity: .55; }
   .pj-col-date { width: 140px; } .pj-col-name { width: 220px; }
   .pj-col-client { width: 180px; } .pj-col-count { width: 78px; }
+  /* すでに入っている案件との重なり（2026-09-01 baba要望）。
+     ⚠ 集合時間や運営人数を直して取り込み直すと、同じ案件が増えていた。
+       「似ている」ときは黙って決めず、人に選んでもらう。 */
+  .pj-col-dup { width: 230px; }
+  .pj-dup-same { font-size: 11.5px; font-weight: 700; color: #2c6ca0; background: #e3edf7;
+                 border-radius: 5px; padding: 1px 7px; white-space: nowrap; }
+  .pj-dup-new  { font-size: 11.5px; color: #9a8f80; }
+  .pj-dup-ask  { background: #fdf3e2; border: 1px solid #ecd9b6; border-radius: 6px; padding: 5px 6px; }
+  .pj-dup-note { font-size: 11px; line-height: 1.5; color: #8a5a10; margin-bottom: 4px; }
+  .pj-dup-ask select { width: 100%; font-size: 11.5px; padding: 3px 4px; font-family: inherit; }
 </style>
 @endpush
 
@@ -295,6 +305,7 @@
             <th>件</th><th>取込</th><th>判定</th>
             <th class="pj-col-date">日程</th><th class="pj-col-name">コンテンツ</th>
             <th class="pj-col-client">顧客名</th><th class="pj-col-count">運営人数</th>
+            <th class="pj-col-dup">すでにある案件</th>
             <th>入る人</th><th>理由・注意</th>
           </tr>
         </thead>
@@ -393,6 +404,15 @@
       w += '<div class="pj-flash warn"><b>知らないポジションの書き方：</b>' + pjEsc(data.unknownRoles.join('・'))
         + '<br>勝手に決めずに入れていません。この書き方も使うなら教えてください（対応を足します）。</div>';
     }
+    // 「似た案件があるので選んでほしい」件数。
+    var askCount = rows.filter(function (r) { return r.dup && r.dup.kind === 'similar'; }).length;
+    if (askCount > 0) {
+      w += '<div class="pj-flash warn"><b>すでに入っている案件と似たものが ' + askCount + '件あります。</b>'
+        + '<br>開催日・コンテンツ・顧客名は同じですが、<b>集合時間が違います</b>。'
+        + '表の「すでにある案件」の欄で、<b>同じ案件（上書き）</b>か<b>別の案件（新しく登録）</b>かを選んでください。'
+        + '<br>そのままだと<b>「同じ案件（上書き）」</b>で取り込みます。'
+        + '午前・午後の2本立てなど、本当に別の案件のときは「別の案件」に変えてください。</div>';
+    }
     if (cxlCount > 0) {
       w += '<div class="pj-flash warn"><b>キャンセルの印が付いた ' + cxlCount + '件は取り込みません。</b>'
         + '<br>実施していない案件なので、履歴にもアサインにも入れません（2026-09-01 の決まり）。'
@@ -421,6 +441,7 @@
         + '<td>' + pjInput('name', r.name, 'text') + '</td>'
         + '<td>' + pjInput('client', r.client, 'text') + '</td>'
         + '<td>' + pjCountInput(r) + '</td>'
+        + '<td>' + pjDupCell(r) + '</td>'
         + '<td>' + pjEsc(r.people) + ' 名</td>'
         + '<td class="' + (ok ? 'pj-miss' : 'pj-reason') + '">' + pjEsc(notes.join(' / ')) + '</td>'
         + '</tr>';
@@ -470,6 +491,30 @@
     });
   }
 
+  // すでに入っている案件との重なり（2026-09-01 baba要望）。
+  // ⚠ 判定はサーバー（下見と取込で同じもの）。ここでは出すだけ・判定し直さない。
+  //   ・same    … 開催日・コンテンツ・顧客名・集合時間まで同じ → 黙って上書き（今までどおり）
+  //   ・similar … 集合時間だけ違う → **同じ案件か人に選んでもらう**
+  //     以前は「集合時間が違う＝別案件」で黙って新しく作っていたため、
+  //     シートで時間や人数を直して取り込み直すと同じ案件が増えていた（babaの報告）。
+  function pjDupCell(r) {
+    var d = r.dup || {};
+    if (d.kind === 'same') {
+      return '<span class="pj-dup-same" title="開催日・コンテンツ・顧客名・集合時間まで同じ案件です">上書き</span>';
+    }
+    if (d.kind !== 'similar') {
+      return '<span class="pj-dup-new">新規</span>';
+    }
+    var more = (d.count > 1) ? ('<div class="pj-dup-note">似た案件が' + d.count + '件あります</div>') : '';
+    return '<div class="pj-dup-ask">'
+      + '<div class="pj-dup-note"><b>似た案件があります</b><br>いま入っている：' + pjEsc(d.was)
+      + '<br>これから入れる：' + pjEsc(d.now) + '</div>' + more
+      + '<select data-f="asNew" onchange="pjSyncEdits()">'
+      + '<option value=""' + (d.asNew ? '' : ' selected') + '>同じ案件（上書きする）</option>'
+      + '<option value="1"' + (d.asNew ? ' selected' : '') + '>別の案件（新しく登録する）</option>'
+      + '</select></div>';
+  }
+
   // 「取込」のチェックを外した行は、その場で灰色にする（判定のやり直しを待たずに分かるように）。
   function pjToggleSkip(el) {
     var tr = el.closest('tr');
@@ -490,6 +535,9 @@
       var sk = tr.querySelector('[data-f="skip"]');
       // チェックが外れている＝取り込まない。
       if (sk) { if (sk.checked) { delete cur.skip; } else { cur.skip = true; } }
+      // 似た案件のとき「別の案件として登録する」を選んだか。
+      var an = tr.querySelector('[data-f="asNew"]');
+      if (an) { if (an.value === '1') { cur.asNew = true; } else { delete cur.asNew; } }
       if (Object.keys(cur).length) { pjEdits[idx] = cur; } else { delete pjEdits[idx]; }
     });
 

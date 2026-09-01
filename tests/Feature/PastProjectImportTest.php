@@ -189,6 +189,91 @@ class PastProjectImportTest extends TestCase
         $this->assertSame(1, Assignment::where('project_id', $p->id)->count(), 'アサインも二重にならないこと');
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // 集合時間だけ違うとき（2026-09-01 babaの報告）
+    //
+    // ⚠ それまでは「開催日・コンテンツ・顧客名・**集合時間**」が全部同じときだけ
+    //   同じ案件とみなしていた。そのため**シートで集合時間や運営人数を直して取り込み直すと、
+    //   別の案件として静かに増えていた**（「2回取り込んでも上書きのはずなのに、
+    //   同じ案件がちょこちょこ混ざっていた」）。
+    // ⚠ 勝手に上書きもしない＝同じ日・同じお客様・同じコンテンツで**午前/午後の2本立て**という
+    //   本物の別案件がありうる。下見で人に選んでもらう。
+    // ─────────────────────────────────────────────────────────────
+
+    /** 集合時間だけ違うときは、既定で上書き＝二重にならない。 */
+    public function test_only_the_meet_time_differs_is_treated_as_the_same_project(): void
+    {
+        $me = $this->manager();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row([13 => '08:00'])]),
+        ])->assertRedirect('/past-import');
+
+        // シートで集合時間と運営人数を直して、取り込み直した。
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row([13 => '09:30', 22 => '8'])]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(1, Project::where('project_name', '水合戦')->count(),
+            '集合時間を直して取り込み直しただけで、案件が二重になっています。');
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+        $this->assertSame('9:30', (string) $p->start_time, '新しい集合時間で上書きされていない');
+        $this->assertSame(8, (int) $p->required_count);
+    }
+
+    /** 「別の案件として登録する」を選べば、2件として入る（午前・午後の2本立てなど）。 */
+    public function test_the_user_can_choose_to_keep_it_as_a_separate_project(): void
+    {
+        $me = $this->manager();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row([13 => '08:00'])]),
+        ])->assertRedirect('/past-import');
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row([13 => '13:00'])]),
+            'edits' => json_encode([0 => ['asNew' => true]]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(2, Project::where('project_name', '水合戦')->count(),
+            '「別の案件」を選んだのに上書きされています。');
+    }
+
+    /** 下見が「似た案件がある」と教える（何が違うのかも出す）。 */
+    public function test_the_preview_tells_about_a_similar_project(): void
+    {
+        $me = $this->manager();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row([13 => '08:00'])]),
+        ])->assertRedirect('/past-import');
+
+        $res = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->csv([$this->row([13 => '13:00', 22 => '9'])]),
+        ])->assertOk()->json();
+
+        $dup = $res['rows'][0]['dup'];
+        $this->assertSame('similar', $dup['kind']);
+        $this->assertStringContainsString('8:00', $dup['was'], 'いま入っている中身を出していない');
+        $this->assertStringContainsString('13:00', $dup['now'], 'これから入れる中身を出していない');
+    }
+
+    /** 集合時間まで同じなら「上書き」とだけ出す（いちいち聞かない）。 */
+    public function test_the_preview_does_not_ask_when_everything_matches(): void
+    {
+        $me = $this->manager();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row()]),
+        ])->assertRedirect('/past-import');
+
+        $res = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->csv([$this->row()]),
+        ])->assertOk()->json();
+
+        $this->assertSame('same', $res['rows'][0]['dup']['kind']);
+    }
+
     /** 顧客名が違えば別案件として新しく作る（同じ日・同じコンテンツでも）。 */
     public function test_different_client_becomes_separate_project(): void
     {
