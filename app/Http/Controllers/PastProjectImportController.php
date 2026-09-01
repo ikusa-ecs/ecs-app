@@ -372,6 +372,9 @@ class PastProjectImportController extends Controller
         ]);
 
         $edits = $this->editsFromRequest($request);
+        // ⚠ 下見と取込で判定を必ずそろえる（片方だけ直すと「入るはずが入らない」になる）。
+        //   終わった案件のときだけ、キャンセルの印が付いたものを取り込まない。
+        $mode = $this->targetMode($request);
 
         $read = $this->readCsv($request);
         if ($read['error'] !== null) {
@@ -412,6 +415,9 @@ class PastProjectImportController extends Controller
                 'index' => $i,
                 // 「この件は取り込まない」に印を付けたかどうか（確かめ直しても印が消えないように返す）。
                 'skip' => ! empty($edit['skip']),
+                // キャンセルの印が付いていて取り込まない案件（終わった案件のときだけ）。
+                // ⚠ 取込側と同じ判定にしている。画面では灰色にして「キャンセル」と出す。
+                'cancelled' => $mode !== self::MODE_FUTURE && $get('キャンセル') !== '',
                 'label' => $entry['label'],
                 'date' => $info['date'],
                 'name' => $info['name'],
@@ -483,6 +489,7 @@ class PastProjectImportController extends Controller
         $assignCount = 0;
         $shared = 0;
         $skipped = 0;
+        $cancelled = [];        // キャンセルの印が付いていて取り込まなかった案件（終わった案件のとき）
         $errors = [];
         $missingNames = [];     // 名簿に無かった人
         $ambiguousNames = [];   // 同姓同名で決められなかった人
@@ -498,6 +505,18 @@ class PastProjectImportController extends Controller
             }
 
             $get = $this->cellReader($entry['header'], $entry['row']);
+
+            // ⚠ 「キャンセル」の印が付いた**終わった案件**は取り込まない（2026-09-01 baba要望）。
+            //   実施していないので、履歴に残す意味がない（アサインまで入ると出勤数にも混ざる）。
+            //   これまでは備考に【キャンセル】を付けて「イベント数に数えない」で入れていた。
+            // ⚠ **これからの案件は今までどおり入れる。** これから中止になるかもしれない案件は、
+            //   画面で状況を追いたいため（キャンセルの印は備考に残る）。
+            // ⚠ 黙って捨てない。何件・どの案件を飛ばしたかを必ず知らせる。
+            if ($mode !== self::MODE_FUTURE && $get('キャンセル') !== '') {
+                $cancelled[] = $entry['label'].'（'.($get('コンテンツ') ?: $entry['label']).'）';
+
+                continue;
+            }
 
             // 中身を取り出して、入れられるかどうかを見る（下見の画面とまったく同じ判定）。
             // 画面で直した値があれば、そちらを使う。
@@ -613,7 +632,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled))
             ->with('past_missing', array_keys($missingNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
@@ -1033,7 +1052,8 @@ class PastProjectImportController extends Controller
 
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
-        int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST, int $shared = 0): string
+        int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST, int $shared = 0,
+        array $cancelled = []): string
     {
         $future = $mode === self::MODE_FUTURE;
         $msg = $isMonthly
@@ -1055,6 +1075,14 @@ class PastProjectImportController extends Controller
 
         if ($skipped > 0) {
             $msg .= " 「取り込まない」に印を付けた{$skipped}件は入れていません。";
+        }
+
+        // ⚠ キャンセルは黙って捨てない。何件・どれを飛ばしたかを必ず出す
+        //   （「取り込んだはずの案件が無い」と探すことになるため）。
+        if ($cancelled) {
+            $msg .= ' キャンセルの印が付いていた'.count($cancelled).'件は取り込みませんでした：'
+                .implode(' / ', $cancelled)
+                .'（実施していないため。入れたい場合は、シートのキャンセルの印を外してください）';
         }
 
         if ($errors) {

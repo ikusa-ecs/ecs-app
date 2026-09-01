@@ -357,9 +357,12 @@
     }
 
     var rows = data.rows || [];
-    var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0;
+    var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0, cxlCount = 0;
     rows.forEach(function (r) {
       if (r.skip) { skipCount++; return; }   // 取り込まない件は数に入れない
+      // キャンセルの印が付いた終わった案件は取り込まない（2026-09-01 baba要望）。
+      // ⚠ 判定はサーバー（下見と取込で同じもの）が付けた印を使う。ここで判定し直さない。
+      if (r.cancelled) { cxlCount++; return; }
       if (r.errors && r.errors.length) { ngCount++; } else { okCount++; peopleCount += (r.people || 0); }
     });
 
@@ -390,6 +393,11 @@
       w += '<div class="pj-flash warn"><b>知らないポジションの書き方：</b>' + pjEsc(data.unknownRoles.join('・'))
         + '<br>勝手に決めずに入れていません。この書き方も使うなら教えてください（対応を足します）。</div>';
     }
+    if (cxlCount > 0) {
+      w += '<div class="pj-flash warn"><b>キャンセルの印が付いた ' + cxlCount + '件は取り込みません。</b>'
+        + '<br>実施していない案件なので、履歴にもアサインにも入れません（2026-09-01 の決まり）。'
+        + '入れたい場合は、シートのキャンセルの印を外してから読み込み直してください。</div>';
+    }
     if (data.unmapped && data.unmapped.length) {
       w += '<div class="pj-flash">取り込まなかった項目：' + pjEsc(data.unmapped.join('・'))
         + '<br>ECSに入れる場所がまだ無い項目です（案件は入ります）。</div>';
@@ -401,13 +409,14 @@
       var notes = (r.errors || []).slice();
       if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
       if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
-      var cls = r.skip ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
+      if (r.cancelled) { notes.unshift('キャンセルの印が付いているので取り込みません'); }
+      var cls = (r.skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
       return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '">'
         + '<td>' + pjEsc(r.label) + '</td>'
         + '<td style="text-align:center;">'
           + '<input type="checkbox" data-f="skip" onchange="pjToggleSkip(this)"'
           + ' title="チェックを外すと、この案件は取り込みません"' + (r.skip ? '' : ' checked') + '></td>'
-        + '<td>' + (r.skip ? '—' : (ok ? 'OK' : 'エラー')) + '</td>'
+        + '<td>' + (r.skip ? '—' : (r.cancelled ? 'キャンセル' : (ok ? 'OK' : 'エラー'))) + '</td>'
         + '<td>' + pjInput('date', r.date, 'date') + '</td>'
         + '<td>' + pjInput('name', r.name, 'text') + '</td>'
         + '<td>' + pjInput('client', r.client, 'text') + '</td>'

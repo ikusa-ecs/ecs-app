@@ -495,16 +495,41 @@ class PastProjectImportTest extends TestCase
     }
 
     /**
-     * キャンセルは備考に書き、イベント数には数えない（2026-08-26 baba要望）。
-     * ⚠ 案件の状態（status）に「キャンセル」は無い（未着手/調整中/確定/完了の4つ）。
-     *   状態を増やすとアサイン画面の進み方まで作り直しになるため、いまはこの形。
+     * ⚠ キャンセルの印が付いた**終わった案件は取り込まない**（2026-09-01 baba要望）。
+     *   実施していないので、履歴にもアサインにも入れない
+     *   （入れると出勤数にも混ざり、実際より多く数えてしまう）。
+     * ⚠ 黙って捨てない。何件・どれを飛ばしたかを必ずお知らせに出す。
      */
-    public function test_monthly_sheet_cancelled_project_is_noted_and_not_counted(): void
+    public function test_monthly_sheet_cancelled_past_project_is_not_imported(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', 'キャンセル'),
+        ])->assertRedirect('/past-import');
+
+        $this->assertNull(Project::where('project_name', '会議室')->first(),
+            'キャンセルの案件を取り込んでいます。実施していないので入れません。');
+        $this->assertSame(0, Assignment::count(), 'キャンセルの案件のアサインが入っています。');
+
+        $msg = (string) $res->getSession()->get('status');
+        $this->assertStringContainsString('キャンセルの印が付いていた1件は取り込みませんでした', $msg,
+            '黙って捨てています。何件飛ばしたかを必ず知らせること。');
+    }
+
+    /**
+     * ⚠ **これからの案件は今までどおり取り込む。** これから中止になるかもしれない案件は、
+     *   画面で状況を追いたいため（キャンセルの印は備考に残る／イベント数には数えない）。
+     */
+    public function test_monthly_sheet_cancelled_future_project_is_still_imported(): void
     {
         $me = $this->manager();
         $this->staff('S-001', '鈴木 彩');
 
         $this->actingAsPerson($me)->post('/past-import', [
+            'mode' => 'これから',
             'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
                 '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', 'キャンセル'),
         ])->assertRedirect('/past-import');
