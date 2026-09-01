@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Support\ProfileOptions;
+use App\Support\ProfileExtras;
 use App\Support\TestAccounts;
 
 /**
@@ -47,15 +47,8 @@ class ProfileController extends Controller
             'departments' => ['nullable', 'array'],
             'departments.*' => ['string', 'max:50'],
             // 本人の申告（社員・スタッフ共通・2026-08-31 baba要望）。
-            // 選択肢の中身は ProfileOptions で照合するので、ここでは「形」だけ見る。
-            'other_languages' => ['nullable', 'string', 'max:255'],
-            'online_tools_other' => ['nullable', 'string', 'max:255'],
-            'profile_note' => ['nullable', 'string', 'max:2000'],
-            'challenge_positions' => ['nullable', 'array'],
-            'challenge_positions.*' => ['string', 'max:50'],
-            'online_tools' => ['nullable', 'array'],
-            'online_tools.*' => ['string', 'max:50'],
-        ], [
+            // ⚠ 決まりは書き写さない。正本＝App\Support\ProfileExtras::RULES。
+        ] + ProfileExtras::RULES, [
             'chatwork_id.regex' => 'チャットワークIDは数字だけで入れてください。',
         ], [
             'name'      => '氏名',
@@ -63,10 +56,7 @@ class ProfileController extends Controller
             'email'     => 'メールアドレス',
             'chatwork_id' => 'チャットワークID',
             'departments' => '兼務している所属',
-            'other_languages' => 'その他話せる言語',
-            'online_tools_other' => 'その他のオンラインツール',
-            'profile_note' => 'その他備考',
-        ]);
+        ] + ProfileExtras::LABELS);
 
         // 4. 共通項目（社員・スタッフ両方）
         $user->name      = $request->input('name');
@@ -83,22 +73,8 @@ class ProfileController extends Controller
 
         // 運転・英語・話せる言語・挑戦したい役割・使っているツール・備考（社員もスタッフも同じ）。
         // ⚠ 運転／英語はもともとスタッフ画面の設定タブにしか無かった＝同じ列に保存する（両方から直せる）。
-        //   選択肢の正本は ProfileOptions。一覧に無い値は入れない＝勝手に近い値へ寄せない。
-        $user->driving_level = ProfileOptions::normalizeChoice(
-            $request->input('driving_level'), ProfileOptions::DRIVING
-        );
-        $user->english_level = ProfileOptions::normalizeChoice(
-            $request->input('english_level'), ProfileOptions::ENGLISH
-        );
-        $user->other_languages = $request->input('other_languages') ?: null;
-        $user->challenge_positions = ProfileOptions::normalizeChecks(
-            $request->input('challenge_positions'), ProfileOptions::CHALLENGE_POSITIONS
-        );
-        $user->online_tools = ProfileOptions::normalizeChecks(
-            $request->input('online_tools'), ProfileOptions::ONLINE_TOOLS
-        );
-        $user->online_tools_other = $request->input('online_tools_other') ?: null;
-        $user->profile_note = $request->input('profile_note') ?: null;
+        //   ⚠ 保存のしかたはここに書かない。正本＝App\Support\ProfileExtras（入口が4つあるため）。
+        ProfileExtras::apply($user, $request->all());
 
         // 5. role ごとに対象カラムだけ保存（people に実在する列のみ）
         if ($user->role === 'employee') {
@@ -127,4 +103,31 @@ class ProfileController extends Controller
         return back()->with('status', 'プロフィールを保存しました。');
     }
 
+    /**
+     * マイページのカードから、本人の申告6項目だけを保存する（2026-08-31 baba要望）。
+     *
+     * 【なぜ別の入口を作ったか】
+     * 6項目を足したものの、入れる場所が「マイページ →『プロフィールを編集』→ 下までスクロール」
+     * でしか無く、**社員が気づけなかった**（babaから指摘）。いちばんよく開くマイページの
+     * カードの中で、そのまま選んで保存できるようにする。
+     *
+     * ⚠ update() は「フォームに出ている項目を全部書き換える」作りなので、
+     *   ここから /profile へ送ると**氏名や身長まで空で上書きされる**。だから別の入口にしている。
+     *   ここで触るのは ProfileExtras が持つ6＋1列だけ。
+     */
+    public function updateExtras(Request $request)
+    {
+        $user = Auth::user();
+
+        if (TestAccounts::isTest($user)) {
+            return back()->with('status', 'テスト用アカウントはプロフィールを保存できません（見本のため）。');
+        }
+
+        $request->validate(ProfileExtras::RULES, [], ProfileExtras::LABELS);
+
+        ProfileExtras::apply($user, $request->all());
+        $user->save();
+
+        return back()->with('status', 'プロフィールを保存しました。');
+    }
 }

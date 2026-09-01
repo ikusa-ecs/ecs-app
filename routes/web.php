@@ -93,6 +93,9 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // 本人のプロフィール入力・編集（旧・新規登録の項目を本人が埋める）。
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    // マイページのカードから「本人の申告6項目」だけを保存する（2026-08-31）。
+    // ⚠ /profile へ送ると氏名や身長まで空で上書きされるので、入口を分けている。
+    Route::post('/profile/extras', [ProfileController::class, 'updateExtras'])->name('profile.extras');
 });
 
 // ══════════════════════════════════════════════════════════════════

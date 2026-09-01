@@ -201,4 +201,140 @@ class ProfileExtrasTest extends TestCase
         $this->assertStringNotContainsString("'ハイエースも普通サイズも運転可能'", $blade);
         $this->assertStringNotContainsString("'ビジネス会話可能レベル'", $blade);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // ここから：マイページのカードでその場で直せる欄（2026-08-31 baba要望）
+    //
+    // ⚠ なぜ作ったか＝6項目を足したものの、入れる場所が「マイページ →『プロフィールを編集』
+    //   → 下までスクロール」しか無く、**社員が気づけなかった**（babaから指摘）。
+    // ─────────────────────────────────────────────────────────────
+
+    /** マイページを開いた時点で、6項目が見えて・その場で直せる。 */
+    public function test_the_mypage_shows_the_items_and_can_edit_them_there(): void
+    {
+        $me = PersonFactory::new()->create();
+
+        $this->actingAsPerson($me)->get('/mypage')
+            ->assertOk()
+            ->assertSee('できること・やってみたいこと')
+            ->assertSee('チャレンジしたいポジション')
+            ->assertSee('日常で使っているオンラインツール')
+            // その場で保存できる＝別画面へ飛ばさない
+            ->assertSee('action="/profile/extras"', false);
+    }
+
+    /** マイページの欄から保存できる。 */
+    public function test_the_mypage_form_saves_the_items(): void
+    {
+        $me = PersonFactory::new()->create();
+
+        $this->actingAsPerson($me)->post('/profile/extras', [
+            'driving_level' => 'ハイエースも普通サイズも運転可能',
+            'english_level' => '日常会話レベル',
+            'other_languages' => '中国語（日常会話）',
+            'challenge_positions_sent' => '1',
+            'challenge_positions' => ['MC（司会進行）'],
+            'online_tools_sent' => '1',
+            'online_tools' => ['Zoom', 'Notion'],
+            'online_tools_other' => 'Miro',
+            'profile_note' => '土日はほぼ空いています',
+        ])->assertRedirect();
+
+        $me->refresh();
+        $this->assertSame('ハイエースも普通サイズも運転可能', $me->driving_level);
+        $this->assertSame('日常会話レベル', $me->english_level);
+        $this->assertSame(['MC（司会進行）'], $me->challenge_positions);
+        $this->assertSame(['Zoom', 'Notion'], $me->online_tools);
+        $this->assertSame('Miro', $me->online_tools_other);
+        $this->assertSame('土日はほぼ空いています', $me->profile_note);
+    }
+
+    /**
+     * ⚠⚠ マイページの欄は**氏名・身長などを消してはいけない**。
+     *   /profile は「フォームに出ている項目を全部書き換える」作りなので、
+     *   もし送り先を間違えて /profile にすると、氏名も身長も空になる。
+     */
+    public function test_the_mypage_form_does_not_wipe_the_other_profile_fields(): void
+    {
+        $me = PersonFactory::new()->create([
+            'name' => '試験 太郎',
+            'name_kana' => 'しけん たろう',
+            'height' => '172',
+            'shoe_size' => '27',
+            'prefecture' => '東京都',
+            'nearest_station' => '新宿',
+            'department' => 'イベプラ',
+        ]);
+
+        $this->actingAsPerson($me)->post('/profile/extras', [
+            'driving_level' => '普通サイズなら運転可能',
+        ])->assertRedirect();
+
+        $me->refresh();
+        $this->assertSame('試験 太郎', $me->name);
+        $this->assertSame('しけん たろう', $me->name_kana);
+        $this->assertSame('172', $me->height);
+        $this->assertSame('27', $me->shoe_size);
+        $this->assertSame('東京都', $me->prefecture);
+        $this->assertSame('新宿', $me->nearest_station);
+        $this->assertSame('イベプラ', $me->department);
+        $this->assertSame('普通サイズなら運転可能', $me->driving_level);
+    }
+
+    /**
+     * 送られてこなかった欄は消さない。
+     * ⚠ 画面によって出している項目が違うので、ここが緩いと**別の画面で入れた内容が消える**。
+     */
+    public function test_fields_that_were_not_sent_are_left_alone(): void
+    {
+        $me = PersonFactory::new()->create([
+            'english_level' => 'ビジネス会話可能レベル',
+            'online_tools' => ['Zoom'],
+            'profile_note' => '前に書いたこと',
+        ]);
+
+        // 運転だけ送る。
+        $this->actingAsPerson($me)->post('/profile/extras', ['driving_level' => '普通サイズなら運転可能']);
+
+        $me->refresh();
+        $this->assertSame('ビジネス会話可能レベル', $me->english_level, '送っていない欄が消えています。');
+        $this->assertSame(['Zoom'], $me->online_tools, '送っていないチェック欄が消えています。');
+        $this->assertSame('前に書いたこと', $me->profile_note);
+    }
+
+    /** マイページからもチェックを全部外せる（印つきで空を送る）。 */
+    public function test_unchecking_everything_from_the_mypage_clears_it(): void
+    {
+        $me = PersonFactory::new()->create(['online_tools' => ['Zoom', 'Slack']]);
+
+        $this->actingAsPerson($me)->post('/profile/extras', ['online_tools_sent' => '1']);
+
+        $me->refresh();
+        $this->assertNull($me->online_tools);
+    }
+
+    /**
+     * ⚠ 見張り：保存のしかたを画面ごとに書き写さない。
+     *   運転／英語を people の列へ直接入れているのは ProfileExtras だけであること。
+     *   （書き写すと、片方の決まりだけ直したときに画面によって保存結果が変わる）
+     */
+    public function test_only_one_place_writes_these_columns(): void
+    {
+        $offenders = [];
+        foreach (['app/Http/Controllers', 'app/Support'] as $dir) {
+            foreach (glob(base_path($dir).'/*.php') as $file) {
+                if (basename($file) === 'ProfileExtras.php') {
+                    continue;   // ここが正本。
+                }
+                $code = (string) file_get_contents($file);
+                if (preg_match('~->(driving_level|english_level|challenge_positions|online_tools)\s*=~u', $code)) {
+                    $offenders[] = basename($file);
+                }
+            }
+        }
+
+        $this->assertSame([], $offenders,
+            '本人の申告の保存が正本の外に書かれています： '.implode(' / ', $offenders)
+            .'。App\Support\ProfileExtras::apply() を呼んでください。');
+    }
 }

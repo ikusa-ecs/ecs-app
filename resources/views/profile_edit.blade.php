@@ -135,6 +135,10 @@
 
           <div class="form-row">
             <label>チャレンジしたいポジション</label>
+            {{-- ⚠ 「この欄を送りました」の印。チェックは選んだものしか送られないので、
+                 印が無いと**全部外した状態を保存できない**（一度入れたら消せない画面になる）。
+                 決まりの正本＝App\Support\ProfileExtras。 --}}
+            <input type="hidden" name="challenge_positions_sent" value="1">
             <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
               @foreach (\App\Support\ProfileOptions::CHALLENGE_POSITIONS as $opt)
                 <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">
@@ -149,6 +153,7 @@
 
           <div class="form-row">
             <label>日常で使っているオンラインツール</label>
+            <input type="hidden" name="online_tools_sent" value="1">
             <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
               @foreach (\App\Support\ProfileOptions::ONLINE_TOOLS as $opt)
                 <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">

@@ -310,31 +310,17 @@ class StaffPortalController extends Controller
             'disliked_contents' => ['nullable', 'string', 'max:1000'],
             'strong_positions' => ['nullable', 'string', 'max:1000'],
             'weak_positions' => ['nullable', 'string', 'max:1000'],
-            // 本人の申告（2026-08-31 baba要望）
-            'other_languages' => ['nullable', 'string', 'max:255'],
-            'online_tools_other' => ['nullable', 'string', 'max:255'],
-            'profile_note' => ['nullable', 'string', 'max:2000'],
-            'challenge_positions' => ['nullable', 'array'],
-            'challenge_positions.*' => ['string', 'max:50'],
-            'online_tools' => ['nullable', 'array'],
-            'online_tools.*' => ['string', 'max:50'],
-        ]);
+            // 本人の申告（2026-08-31 baba要望）。
+            // ⚠ 決まりは書き写さない。正本＝App\Support\ProfileExtras::RULES。
+        ] + \App\Support\ProfileExtras::RULES);
 
-        $user->fill($data);   // Person は guarded=[] なので列名一致でそのまま入る
+        // スタッフ画面だけの項目（身長・アピール等）。Person は guarded=[] なので列名一致でそのまま入る。
+        // ⚠ 本人の申告6項目は下の ProfileExtras に任せるので、ここでは触らない
+        //   （2回入れると、片方の決まりだけ直したときに食い違う）。
+        $user->fill(array_diff_key($data, \App\Support\ProfileExtras::RULES));
 
-        // 複数チェックは選択肢の一覧（ProfileOptions）と突き合わせてから入れる。
-        // ⚠ `..._sent` が付いているときだけ書き換える＝欄ごと送られてこなかったときに
-        //   前の内容を消してしまわないため（全部のチェックを外して保存は、印だけ届くので消せる）。
-        if ($request->has('challenge_positions_sent')) {
-            $user->challenge_positions = ProfileOptions::normalizeChecks(
-                $request->input('challenge_positions'), ProfileOptions::CHALLENGE_POSITIONS
-            );
-        }
-        if ($request->has('online_tools_sent')) {
-            $user->online_tools = ProfileOptions::normalizeChecks(
-                $request->input('online_tools'), ProfileOptions::ONLINE_TOOLS
-            );
-        }
+        // 本人の申告6項目。「送られてきた欄だけ直す」決まりの正本＝App\Support\ProfileExtras。
+        \App\Support\ProfileExtras::apply($user, $request->all());
 
         $user->save();
 
@@ -356,13 +342,13 @@ class StaffPortalController extends Controller
         $user->mc_audition_passed = $request->boolean('mc');
         $user->can_kigurumi = $request->boolean('kigurumi');
         $user->can_stay_over = $request->boolean('stay');
-        // 運転・英語の選択肢は ProfileOptions が正本（マイプロフィール /profile と同じ列・同じ値）。
-        $user->driving_level = ProfileOptions::normalizeChoice(
-            $request->input('drive'), ProfileOptions::DRIVING
-        );
-        $user->english_level = ProfileOptions::normalizeChoice(
-            $request->input('english'), ProfileOptions::ENGLISH
-        );
+        // 運転・英語（マイプロフィール /profile・マイページと同じ列・同じ値）。
+        // ⚠ 保存のしかたはここに書かない。正本＝App\Support\ProfileExtras。
+        //   この画面だけ欄の名前が drive / english なので、ここで言い換えて渡す。
+        \App\Support\ProfileExtras::apply($user, [
+            'driving_level' => $request->input('drive'),
+            'english_level' => $request->input('english'),
+        ]);
         $user->save();
 
         // OP・軍師(SP) の「できる役割」を、この2つの範囲だけ入れ替える（他の役割は消さない）。
