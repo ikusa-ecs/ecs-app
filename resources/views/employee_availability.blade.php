@@ -162,6 +162,15 @@
     table.ov-tbl thead th { background: #f3ece2; color: #5a4a38; font-weight: 700; }
     table.ov-tbl th.namecol { text-align: left; position: sticky; left: 0; background: #f3ece2; z-index: 1; }
     table.ov-tbl td.namecol { text-align: left; position: sticky; left: 0; background: #fff; font-weight: 600; }
+    /* 所属ごとの背景色（2026-09-01 baba要望）。並びが イベプラ → セールス → その他 なので、
+       色が変わるところが組の切れ目になる。
+       ⚠ 色はここに書かない。App\Support\Departments が持っている名簿のバッジと同じ色を流し込む
+         ＝2か所で色がずれない。名前のマスは表を横スクロールしても残る（sticky）ので、
+         そこにも同じ色を敷かないと、スクロールしたとき組が分からなくなる。 */
+@endverbatim
+    {!! \App\Support\Departments::rowBgCss('table.ov-tbl tr', 'td.namecol') !!}
+@verbatim
+    /* 自分の行は今までどおり目立たせる（所属の色より優先）。 */
     table.ov-tbl tr.me td.namecol { background: #fff7ec; }
     table.ov-tbl tr.me td { background: #fffaf2; }
     table.ov-tbl .vh th.we { color: var(--brand); }
@@ -948,7 +957,14 @@
     let body = '<tbody>';
     rows.forEach(({name, idx})=>{
       const me = idx === 0;
-      body += '<tr class="' + (me?'me':'') + '"><td class="namecol">' + name + '</td>';
+      // 所属で背景色を変える（2026-09-01 baba要望）。並びは イベプラ → セールス → その他 なので、
+      // 色が変わるところが組の切れ目になる。
+      // ⚠ 色は画面に書かない。サーバーが渡した dept（plan/sales/…）を class にするだけ
+      //   ＝色の正本は App\Support\Departments の1か所（名簿のバッジと同じ色）。
+      const dep = (EMP_LIST[idx] && EMP_LIST[idx].dept) ? EMP_LIST[idx].dept : 'none';
+      const depTitle = (EMP_LIST[idx] && EMP_LIST[idx].deptLabel) ? EMP_LIST[idx].deptLabel : '';
+      body += '<tr class="dep-' + dep + (me?' me':'') + '">'
+            + '<td class="namecol" title="' + ovEsc(depTitle) + '">' + name + '</td>';
       cols.forEach(c=>{
         body += ovCell(idx, name, y, m, c.d);
       });

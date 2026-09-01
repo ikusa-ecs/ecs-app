@@ -166,6 +166,30 @@ final class Departments
         return implode("\n    ", $out);
     }
 
+    /**
+     * 表の「行」の背景色にしたい画面向けのCSS（2026-09-01・社員の出勤可能日の一覧）。
+     *
+     * `dep-plan` のようなクラスを行に付けて使う。文字色は変えない
+     * （マスの中に〇×△が入るので、文字色まで変えると読みにくくなる）。
+     *
+     * @param  string  $rowSelector  行のセレクタ（例 'table.ov-tbl tr'）
+     * @param  string  $cellSelector 横スクロールで残る列にも同じ色を敷く（例 'td.namecol'）。空なら付けない。
+     */
+    public static function rowBgCss(string $rowSelector, string $cellSelector = ''): string
+    {
+        $out = [];
+        foreach (self::COLORS as $code => [$bg]) {
+            $out[] = "{$rowSelector}.dep-{$code} { background: {$bg}; }";
+            if ($cellSelector !== '') {
+                // ⚠ 貼り付いている列（sticky）は自前の背景を持つので、そこにも同じ色を敷く。
+                //   敷かないと、横にスクロールしたとき名前の列だけ白くなって組が分からなくなる。
+                $out[] = "{$rowSelector}.dep-{$code} {$cellSelector} { background: {$bg}; }";
+            }
+        }
+
+        return implode("\n    ", $out);
+    }
+
     /** 名前の文字色だけを変えたい画面（D決め・集計）向けのCSS。 */
     public static function nameColorCss(string $prefix = '.dep'): string
     {

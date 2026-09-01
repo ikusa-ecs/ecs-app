@@ -6,6 +6,7 @@ use App\Models\Person;
 use App\Models\ShiftPreference;
 use App\Support\ConfirmedSchedule;
 use App\Support\OfficeScope;
+use App\Support\Departments;
 use App\Support\PersonalCases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -61,14 +62,38 @@ class EmployeeAvailabilityController extends Controller
         // ⚠ 「アサインの候補に出さない」社員は一覧に並べない（2026-08-26 baba要望）。
         //   自分は対象外にしていても必ず残す＝画面は「先頭の行＝自分」という決まりで
         //   動いているので、自分が消えると他人の行に自分の入力が出てしまう。
+        // 並び順＝**自分 → イベプラ → セールス → その他**、それぞれの中は**五十音順**（2026-09-01 baba要望）。
+        // ⚠ 五十音順は name_kana で並べる（漢字のままだと「青山」より「渡辺」が先に来ることがある）。
+        //   そのため先に byKana() で引いてから、下の sortBy で組み分けする。
+        //   PHP 8 の並べ替えは同じ順位なら元の順を保つので、組の中の五十音順は崩れない。
+        // ⚠ 自分は必ず先頭。画面が「先頭の行＝自分」という決まりで動いているため
+        //   （ここを崩すと、他人の行に自分の入力が出る）。
+        // 組の順番。⚠ 所属名そのものではなく、色分けと同じコード（正本＝Departments::code）で見る
+        //   ＝「イベプラ」の言い方が変わっても、直すのは正本の1か所で済む。
+        $deptRank = fn (string $code) => match ($code) {
+            'plan' => 0,    // イベプラ
+            'sales' => 1,   // セールス
+            default => 2,   // それ以外（クリエイティブ・その他・未設定）
+        };
+
         $employees = Person::employees()
             ->inAssignPool($me ? [$me->id] : [])
-            ->bySeniority()
-            ->get(['id', 'name', 'office'])
+            ->byKana()
+            ->get(['id', 'name', 'name_kana', 'office', 'department'])
             // 拠点で絞って見られるように office も渡す（2026-08-26 baba要望）。
             // ⚠ 空の人は画面側で「東京」として扱う（名簿・案件と同じ決まり）。
-            ->map(fn (Person $p) => ['id' => $p->id, 'name' => $p->name, 'office' => $p->office])
-            ->sortBy(fn (array $e) => ($me && $e['id'] === $me->id) ? 0 : 1)
+            // dept＝所属の色分け用コード（plan/sales/other…）。色の正本＝App\Support\Departments。
+            ->map(fn (Person $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'office' => $p->office,
+                'dept' => Departments::code($p->department),
+                'deptLabel' => Departments::label($p->department),
+            ])
+            ->sortBy(fn (array $e) => [
+                ($me && $e['id'] === $me->id) ? 0 : 1,
+                $deptRank($e['dept']),
+            ])
             ->values();
 
         // 登録済みの出勤可能日（全社員ぶん）。画面の state キー "YYYY-M-D" に合わせて整形する。
