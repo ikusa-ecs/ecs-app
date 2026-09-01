@@ -629,7 +629,7 @@
 
             <div class="field">
               <label>その他備考</label>
-              <textarea id="pfNote" rows="2" placeholder="例）土日はほぼ空いています。／簡単な動画編集ができます。"></textarea>
+              <textarea id="pfNote" rows="2" placeholder="例）運転練習中です。簡単な動画編集ができます。"></textarea>
             </div>
 
             <div style="font-size:12.5px;line-height:1.7;color:var(--muted);background:#f8f3ea;border:1px dashed var(--line);border-radius:8px;padding:9px 12px;margin:4px 0 10px;">

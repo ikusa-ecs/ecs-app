@@ -310,116 +310,6 @@
           <a class="line-btn" href="/profile" style="text-decoration:none; display:inline-block;">氏名・所属などを編集</a>
         </div>
       </div>
-@endverbatim
-
-      {{-- ここから：本人の申告6項目を、この場で選んで保存できる欄（2026-08-31 baba要望）。
-
-           なぜここに置くか＝6項目を足したものの、入れる場所が
-           「マイページ →『プロフィールを編集』→ 下までスクロール」しか無く、**社員が気づけなかった**。
-           いちばんよく開くマイページで、開いた瞬間に見えて、その場で直せるようにする。
-
-           ⚠ この欄の保存先は `/profile/extras`（`/profile` ではない）。
-             `/profile` は「フォームに出ている項目を全部書き換える」作りなので、
-             ここから送ると**氏名や身長まで空で上書きされる**。
-           ⚠ 保存のしかた・選択肢の正本は App\Support\ProfileExtras と ProfileOptions。
-             ここに選択肢を直書きしない（画面ごとに増やすと必ず食い違う）。
-           ⚠ この区間は「そのまま出す区間」の外に出してある。中に入れると差し込みの記号が
-             そのまま画面に出てしまう（過去に4回踏んだ罠）。
-           ⚠ このコメントの中にも、Blade の命令名や差し込みの記号を書かないこと
-             （コメントの中でも先に解釈されて画面が真っ白になる。今まさに1回踏んだ）。 --}}
-      @php($extras = \App\Support\ProfileExtras::of(Auth::user()))
-
-      @if (session('status'))
-        <div class="panel mp-wrap" style="margin-top:12px; background:#e7f6ec; color:#166534; border-color:#b7e0c2; font-size:13px; padding:12px 14px;">
-          {{ session('status') }}
-        </div>
-      @endif
-
-      <div class="panel mp-wrap" style="margin-top:12px;">
-        <div class="panel-head">
-          <h2>できること・やってみたいこと</h2>
-          @if (\App\Support\ProfileExtras::isEmpty(Auth::user()))
-            <span style="margin-left:8px; background:#fdecec; color:#b91c1c; border:1px solid #f3c0c0; border-radius:999px; padding:2px 10px; font-size:12px;">未記入</span>
-          @endif
-        </div>
-        <p class="sec-count">
-          アサインを決めるときの材料です。車を出せる人・英語で対応できる人を、その都度聞いて回らなくて済むようにします。
-          <b>いつでも直せます。</b>
-        </p>
-
-        <form method="POST" action="/profile/extras" style="padding:4px 2px 2px;">
-          @csrf
-
-          <div class="mp-prof-grid">
-            <label class="mp-prof-key" for="pxDriving">運転</label>
-            <div class="mp-prof-val">
-              <select id="pxDriving" name="driving_level">
-                @foreach (\App\Support\ProfileOptions::drivingChoices() as $opt)
-                  <option value="{{ $opt }}" @selected(($extras['driving_level'] ?: \App\Support\ProfileOptions::NONE) === $opt)>{{ $opt }}</option>
-                @endforeach
-              </select>
-              <span class="mp-prof-hint">機材を積むハイエースを運転できるかどうかで、当日の車の手配が変わります。</span>
-            </div>
-
-            <label class="mp-prof-key" for="pxEnglish">英語</label>
-            <div class="mp-prof-val">
-              <select id="pxEnglish" name="english_level">
-                @foreach (\App\Support\ProfileOptions::englishChoices() as $opt)
-                  <option value="{{ $opt }}" @selected(($extras['english_level'] ?: \App\Support\ProfileOptions::NONE) === $opt)>{{ $opt }}</option>
-                @endforeach
-              </select>
-              <span class="mp-prof-hint">英語で進行・対応する案件のときに参考にします。</span>
-            </div>
-
-            <label class="mp-prof-key" for="pxLang">その他話せる言語</label>
-            <div class="mp-prof-val">
-              <input type="text" id="pxLang" name="other_languages" value="{{ $extras['other_languages'] }}"
-                     placeholder="例）中国語（日常会話）・韓国語（片言）">
-            </div>
-
-            <span class="mp-prof-key">チャレンジしたいポジション</span>
-            <div class="mp-prof-val">
-              {{-- ⚠ 「この欄を送りました」の印。チェックは選んだものしか送られないので、
-                   印が無いと全部外した状態を保存できない（一度入れたら消せない画面になる）。 --}}
-              <input type="hidden" name="challenge_positions_sent" value="1">
-              <div class="mp-prof-checks">
-                @foreach (\App\Support\ProfileOptions::CHALLENGE_POSITIONS as $opt)
-                  <label><input type="checkbox" name="challenge_positions[]" value="{{ $opt }}"
-                                @checked(in_array($opt, $extras['challenge_positions'], true))> {{ $opt }}</label>
-                @endforeach
-              </div>
-              <span class="mp-prof-hint">今できるかどうかは気にせず、やってみたいものを選んでください。次に任せる役割を決めるときの参考にします。</span>
-            </div>
-
-            <span class="mp-prof-key">日常で使っているオンラインツール</span>
-            <div class="mp-prof-val">
-              <input type="hidden" name="online_tools_sent" value="1">
-              <div class="mp-prof-checks">
-                @foreach (\App\Support\ProfileOptions::ONLINE_TOOLS as $opt)
-                  <label><input type="checkbox" name="online_tools[]" value="{{ $opt }}"
-                                @checked(in_array($opt, $extras['online_tools'], true))> {{ $opt }}</label>
-                @endforeach
-              </div>
-              <input type="text" name="online_tools_other" value="{{ $extras['online_tools_other'] }}"
-                     placeholder="上に無いものがあれば（例）Miro・Figma" style="margin-top:6px;">
-            </div>
-
-            <label class="mp-prof-key" for="pxNote">その他備考</label>
-            <div class="mp-prof-val">
-              <textarea id="pxNote" name="profile_note" rows="2"
-                        placeholder="例）土日はほぼ空いています。／簡単な動画編集ができます。">{{ $extras['profile_note'] }}</textarea>
-            </div>
-          </div>
-
-          <div style="margin-top:12px;">
-            <button class="btn primary" type="submit">保存する</button>
-            <span class="mp-prof-hint" style="margin-left:10px;">
-              氏名・所属・身長などは上の「氏名・所属などを編集」から直せます。
-            </span>
-          </div>
-        </form>
-      </div>
-@verbatim
 
       <!-- 月の絞り込み -->
       <div class="panel mp-wrap" style="margin-top:12px;">
@@ -551,6 +441,124 @@
           ※ 通知の届け方（メール／チャットワーク等）は今後決めます。オン・オフの設定は保存されます。
         </p>
       </div>
+
+@endverbatim
+
+      {{-- ここから：本人の申告6項目を、この場で選んで保存できる欄（2026-08-31 baba要望）。
+
+           なぜここに置くか＝6項目を足したものの、入れる場所が
+           「マイページ →『プロフィールを編集』→ 下までスクロール」しか無く、**社員が気づけなかった**。
+           いちばんよく開くマイページで、開いた瞬間に見えて、その場で直せるようにする。
+
+           ⚠ この欄の保存先は `/profile/extras`（`/profile` ではない）。
+             `/profile` は「フォームに出ている項目を全部書き換える」作りなので、
+             ここから送ると**氏名や身長まで空で上書きされる**。
+           ⚠ 保存のしかた・選択肢の正本は App\Support\ProfileExtras と ProfileOptions。
+             ここに選択肢を直書きしない（画面ごとに増やすと必ず食い違う）。
+           ⚠ この区間は「そのまま出す区間」の外に出してある。中に入れると差し込みの記号が
+             そのまま画面に出てしまう（過去に4回踏んだ罠）。
+           ⚠ このコメントの中にも、Blade の命令名や差し込みの記号を書かないこと
+             （コメントの中でも先に解釈されて画面が真っ白になる。今まさに1回踏んだ）。 --}}
+      @php($me = Auth::user())
+      @php($extras = \App\Support\ProfileExtras::of($me))
+
+      @if (session('status'))
+        <div class="panel mp-wrap" style="margin-top:12px; background:#e7f6ec; color:#166534; border-color:#b7e0c2; font-size:13px; padding:12px 14px;">
+          {{ session('status') }}
+        </div>
+      @endif
+
+      @if ($errors->any())
+        <div class="panel mp-wrap" style="margin-top:12px; background:#fdecec; color:#b91c1c; border-color:#f3c0c0; font-size:13px; padding:12px 14px;">
+          {{ $errors->first() }}
+        </div>
+      @endif
+
+      <div class="panel mp-wrap" style="margin-top:12px;">
+        <div class="panel-head">
+          <h2>できること・やってみたいこと</h2>
+          @if (\App\Support\ProfileExtras::isEmpty(Auth::user()))
+            <span style="margin-left:8px; background:#fdecec; color:#b91c1c; border:1px solid #f3c0c0; border-radius:999px; padding:2px 10px; font-size:12px;">未記入</span>
+          @endif
+        </div>
+        <p class="sec-count">
+          アサインを決めるときの材料です。車を出せる人・英語で対応できる人を、その都度聞いて回らなくて済むようにします。
+          <b>いつでも直せます。</b>
+        </p>
+
+        <form method="POST" action="/profile/extras" style="padding:4px 2px 2px;">
+          @csrf
+
+          <div class="mp-prof-grid">
+            <label class="mp-prof-key" for="pxDriving">運転</label>
+            <div class="mp-prof-val">
+              <select id="pxDriving" name="driving_level">
+                @foreach (\App\Support\ProfileOptions::drivingChoices() as $opt)
+                  <option value="{{ $opt }}" @selected(($extras['driving_level'] ?: \App\Support\ProfileOptions::NONE) === $opt)>{{ $opt }}</option>
+                @endforeach
+              </select>
+              <span class="mp-prof-hint">機材を積むハイエースを運転できるかどうかで、当日の車の手配が変わります。</span>
+            </div>
+
+            <label class="mp-prof-key" for="pxEnglish">英語</label>
+            <div class="mp-prof-val">
+              <select id="pxEnglish" name="english_level">
+                @foreach (\App\Support\ProfileOptions::englishChoices() as $opt)
+                  <option value="{{ $opt }}" @selected(($extras['english_level'] ?: \App\Support\ProfileOptions::NONE) === $opt)>{{ $opt }}</option>
+                @endforeach
+              </select>
+              <span class="mp-prof-hint">英語で進行・対応する案件のときに参考にします。</span>
+            </div>
+
+            <label class="mp-prof-key" for="pxLang">その他話せる言語</label>
+            <div class="mp-prof-val">
+              <input type="text" id="pxLang" name="other_languages" value="{{ $extras['other_languages'] }}"
+                     placeholder="例）中国語（日常会話）・韓国語（片言）">
+            </div>
+
+            <span class="mp-prof-key">チャレンジしたいポジション</span>
+            <div class="mp-prof-val">
+              {{-- ⚠ 「この欄を送りました」の印。チェックは選んだものしか送られないので、
+                   印が無いと全部外した状態を保存できない（一度入れたら消せない画面になる）。 --}}
+              <input type="hidden" name="challenge_positions_sent" value="1">
+              <div class="mp-prof-checks">
+                @foreach (\App\Support\ProfileOptions::CHALLENGE_POSITIONS as $opt)
+                  <label><input type="checkbox" name="challenge_positions[]" value="{{ $opt }}"
+                                @checked(in_array($opt, $extras['challenge_positions'], true))> {{ $opt }}</label>
+                @endforeach
+              </div>
+              <span class="mp-prof-hint">今できるかどうかは気にせず、やってみたいものを選んでください。次に任せる役割を決めるときの参考にします。</span>
+            </div>
+
+            <span class="mp-prof-key">日常で使っているオンラインツール</span>
+            <div class="mp-prof-val">
+              <input type="hidden" name="online_tools_sent" value="1">
+              <div class="mp-prof-checks">
+                @foreach (\App\Support\ProfileOptions::ONLINE_TOOLS as $opt)
+                  <label><input type="checkbox" name="online_tools[]" value="{{ $opt }}"
+                                @checked(in_array($opt, $extras['online_tools'], true))> {{ $opt }}</label>
+                @endforeach
+              </div>
+              <input type="text" name="online_tools_other" value="{{ $extras['online_tools_other'] }}"
+                     placeholder="上に無いものがあれば（例）Miro・Figma" style="margin-top:6px;">
+            </div>
+
+            <label class="mp-prof-key" for="pxNote">その他備考</label>
+            <div class="mp-prof-val">
+              <textarea id="pxNote" name="profile_note" rows="2"
+                        placeholder="例）運転練習中です。簡単な動画編集ができます。">{{ $extras['profile_note'] }}</textarea>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <button class="btn primary" type="submit">保存する</button>
+            <span class="mp-prof-hint" style="margin-left:10px;">
+              氏名・所属・身長などは、上のカードの「氏名・所属などを編集」から直せます。
+            </span>
+          </div>
+        </form>
+      </div>
+@verbatim
 
       <!-- アカウント -->
       <div class="panel mp-wrap" style="margin-top:12px;">

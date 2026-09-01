@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Support\ProfileBasics;
 use App\Support\ProfileExtras;
 use App\Support\TestAccounts;
 
@@ -38,54 +39,25 @@ class ProfileController extends Controller
         }
 
         // 3. 入力チェック（氏名だけ必須・他は任意）
-        $request->validate([
-            'name'      => ['required'],
-            'name_kana' => ['nullable', 'string', 'max:255'],
-            'email'     => ['nullable', 'email'],
-            // チャットワークID＝リマインドの宛先。数字のみ（桁が多いので文字列で持つ）。
-            'chatwork_id' => ['nullable', 'string', 'max:32', 'regex:/^[0-9]+$/'],
-            'departments' => ['nullable', 'array'],
-            'departments.*' => ['string', 'max:50'],
-            // 本人の申告（社員・スタッフ共通・2026-08-31 baba要望）。
-            // ⚠ 決まりは書き写さない。正本＝App\Support\ProfileExtras::RULES。
-        ] + ProfileExtras::RULES, [
-            'chatwork_id.regex' => 'チャットワークIDは数字だけで入れてください。',
-        ], [
-            'name'      => '氏名',
-            'name_kana' => 'ふりがな',
-            'email'     => 'メールアドレス',
-            'chatwork_id' => 'チャットワークID',
-            'departments' => '兼務している所属',
-        ] + ProfileExtras::LABELS);
+        //    ⚠ 決まりは書き写さない。正本＝ProfileBasics::RULES（氏名・所属など）と
+        //      ProfileExtras::RULES（本人の申告6項目）。
+        $request->validate(
+            ProfileBasics::RULES + ProfileExtras::RULES,
+            ProfileBasics::MESSAGES,
+            ProfileBasics::LABELS + ProfileExtras::LABELS
+        );
 
-        // 4. 共通項目（社員・スタッフ両方）
-        $user->name      = $request->input('name');
-        $user->name_kana = $request->input('name_kana');   // 五十音順の並びに使う
-        $user->email     = $request->input('email');
-        $user->chatwork_id = $request->input('chatwork_id') ?: null;   // リマインドの宛先
-        $user->office = $request->input('office');
-        // 身長・靴/服（衣装）サイズ・都道府県・最寄り駅（旧・新規登録の基本情報。当日準備の参考）
-        $user->height          = $request->input('height');
-        $user->shoe_size       = $request->input('shoe_size');
-        $user->shirt_size      = $request->input('shirt_size');
-        $user->prefecture      = $request->input('prefecture');
-        $user->nearest_station = $request->input('nearest_station');
+        // 4. 氏名・ふりがな・メール・チャットワークID・事務所・身長・靴/服・都道府県・最寄り駅
+        //    ＋（社員のみ）主な所属・兼務。⚠ 保存のしかたはここに書かない。正本＝ProfileBasics。
+        ProfileBasics::apply($user, $request->all());
 
         // 運転・英語・話せる言語・挑戦したい役割・使っているツール・備考（社員もスタッフも同じ）。
         // ⚠ 運転／英語はもともとスタッフ画面の設定タブにしか無かった＝同じ列に保存する（両方から直せる）。
         //   ⚠ 保存のしかたはここに書かない。正本＝App\Support\ProfileExtras（入口が4つあるため）。
         ProfileExtras::apply($user, $request->all());
 
-        // 5. role ごとに対象カラムだけ保存（people に実在する列のみ）
-        if ($user->role === 'employee') {
-            // 社員だけの項目
-            $user->department = $request->input('department');
-            // 兼務を含めた所属すべて。主な所属は必ず含める（チェックを外していても入れる）。
-            $user->departments = \App\Support\Departments::normalize(
-                $request->input('department'),
-                (array) $request->input('departments', [])
-            );
-        } elseif ($user->role === 'staff') {
+        // 5. スタッフだけの項目（この画面にしか無い）
+        if ($user->role === 'staff') {
             // スタッフだけの項目
             $user->appeal            = $request->input('appeal');
             $user->liked_contents    = $request->input('liked_contents');
@@ -130,4 +102,5 @@ class ProfileController extends Controller
 
         return back()->with('status', 'プロフィールを保存しました。');
     }
+
 }
