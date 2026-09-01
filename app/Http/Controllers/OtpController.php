@@ -59,13 +59,32 @@ class OtpController extends Controller
             ]);
         }
 
-        if (! Hash::check(trim($request->input('code')), $pending['code_hash'])) {
+        $code = self::normalizeCode((string) $request->input('code'));
+
+        // 6桁の数字になっていない＝入れ方の問題。何が起きたかを具体的に伝える
+        // （「コードが違います」とだけ出すと、正しく写しているのに何度も弾かれて詰む）。
+        // ⚠ ここでは試行回数を減らさない。6桁でない入力は「コードの当てずっぽう」になり得ないので、
+        //   減らすと**打ち間違えただけの人が5回で締め出される**（本人が困るだけで、安全にはならない）。
+        if (! preg_match('~^\d{6}$~', $code)) {
+            throw ValidationException::withMessages([
+                'code' => $code === ''
+                    ? '数字が読み取れませんでした。メールの「確認コード：」の右にある6桁を入れてください。'
+                    : 'コードは数字6桁です。いま入れられたものからは数字が'.mb_strlen($code).'桁ぶん読み取れました。'
+                        .'メールの「確認コード：」の右にある6桁だけを入れてください。',
+            ]);
+        }
+
+        if (! Hash::check($code, $pending['code_hash'])) {
             // 試行回数を1つ増やして戻す。
             $pending['attempts'] = ($pending['attempts'] ?? 0) + 1;
             $request->session()->put('twofa', $pending);
 
+            $left = max(0, self::MAX_ATTEMPTS - $pending['attempts']);
+
             throw ValidationException::withMessages([
-                'code' => 'コードが違います。メールに届いた6桁を確認してください。',
+                'code' => 'コードが違います。メールが何通か届いているときは、'
+                    .'いちばん新しいメールの6桁を入れてください（古いコードは使えません）。'
+                    ."あと {$left} 回試せます。",
             ]);
         }
 
@@ -82,6 +101,27 @@ class OtpController extends Controller
         $this->issueCode($request);
 
         return redirect()->route('otp.challenge')->with('status', 'confirmation-code-sent');
+    }
+
+    /**
+     * 入力された確認コードを、照合できる形にそろえる（2026-09-01）。
+     *
+     * ⚠ babaから「メールを受け取ってすぐ入れたのにコードが違うと弾かれる」と報告があり、
+     *   実際に再現した。**入力の仕方でつまずくのであって、コード自体は合っている**ことがある：
+     *   ・**全角の数字**（`１２３４５６`）… 日本語入力が全角のまま打つとこうなる。いちばん多い。
+     *   ・**1文字ずつ空白が入る**（`1 2 3 4 5 6`）… メールの表示や読み上げからの写し。
+     *   ・全角の空白・ハイフン・改行（`123-456`／コピペの改行）。
+     *   そのまま突き合わせると全部「コードが違います」になり、**何度やっても入れない**。
+     *
+     * 数字だけを取り出すので、`確認コード： 123456` のように余分な文字ごと貼っても通る。
+     */
+    private static function normalizeCode(string $input): string
+    {
+        // 全角の数字・記号・空白を半角にそろえる（'a'＝英数記号／'s'＝空白）。
+        $text = mb_convert_kana($input, 'as');
+
+        // 数字以外（空白・ハイフン・改行・「確認コード：」などの文字）を落とす。
+        return (string) preg_replace('~\D~u', '', $text);
     }
 
     /** 6桁コードを新規発行し、ハッシュをセッションに保存＋平文をメール送信する。 */

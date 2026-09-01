@@ -44,7 +44,13 @@
       @csrf
       <div class="form-row">
         <label>確認コード（6桁）</label>
-        <input class="code-input" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="______" required autofocus>
+        {{-- ⚠ maxlength は 6 にしない。メールから「 123456」のように前に空白ごとコピーすると、
+             6文字で切られて静かに5桁になり、正しく写しているのに弾かれる（2026-09-01 に判明）。
+             余分な文字はサーバー側で落とすので、ここでは長めに許す。 --}}
+        <input class="code-input" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" placeholder="______" required autofocus>
+        <span style="display:block; margin-top:6px; font-size:12px; color:var(--muted); text-align:center;">
+          全角で入っていても大丈夫です。空白が混ざっていても読み取ります。
+        </span>
       </div>
       <button class="btn primary" type="submit" style="width:100%; justify-content:center; margin-top:6px;">ログイン</button>
     </form>
