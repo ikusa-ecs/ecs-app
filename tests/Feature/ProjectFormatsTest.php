@@ -141,11 +141,14 @@ class ProjectFormatsTest extends TestCase
             );
         }
 
-        // ⚠ 分かっている食い違い（2026-09-01）＝cases.js はまだ「ヘルプのみ→オンライン」のまま。
-        //   PHP 側は baba訂正で「ヘルプのみは実施形態ではない」に直した。
-        //   cases.js は CLAUDE.md で凍結（触らない）と決まっているので、直すかは baba に確認してから。
-        //   影響＝**危険日の警告だけ**、ヘルプのみのリアル案件がリアルとして数えられない。
-        $this->assertStringContainsString('ヘルプのみ', $js,
-            'cases.js が直されたようです。直したなら、この見張りと ProjectFormats の注意書きも消してください。');
+        // ⚠ 「ヘルプのみ」で online を返してはいけない（2026-09-01 baba訂正・危険日の警告もそろえた）。
+        //   ヘルプのみ＝どの拠点が手伝うかという運用の話で、実施形態ではない。
+        //   リアルのイベントはヘルプで入ってもリアル＝危険日でもリアルとして数える。
+        $this->assertDoesNotMatchRegularExpression(
+            "~indexOf\('ヘルプのみ'\)[^\n]*return 'online'~u",
+            $js,
+            'cases.js の ECS_fmtCode が「ヘルプのみ→オンライン」に戻っています。'
+                .'ヘルプのみは実施形態ではないので、リアル系として数えてください。'
+        );
     }
 }

@@ -379,6 +379,10 @@ class AssignBoardController extends Controller
                 //   別のことなので別々に持つ（2026-08-28 baba指摘）。
                 'stat' => $this->boardStatus($p),
                 'pubOn' => (bool) $p->staff_published,
+                // スタッフ募集を続けているか。⚠ 「公開しているか」とは別。
+                //   確定にすると締まる（正本＝RecruitStatus::closeOnConfirmed）。
+                //   これを渡していなかったので、募集を止めた案件でも「募集中 あと◯名」と出ていた。
+                'recruit' => (bool) $p->is_recruiting,
                 // 確度（Aヨミ/Bヨミ/Cヨミ）。⚠ 確度が低い案件は無くなることがあるので、
                 //   アサインを詰める前に気づけるようカードにも出す（2026-08-28 baba要望）。
                 'yomi' => (string) ($p->yomi ?? ''),

@@ -43,6 +43,19 @@
       padding: 5px 10px; border-radius: 10px;
       background: var(--brand-soft); color: var(--brand-dark);
       font-weight: 700; margin-bottom: 7px;
+      /* 日付の帯を画面の上に貼り付ける（2026-09-01 スタッフからのご意見）。
+         ⚠ 同じ日に案件が何件もあると、下へスクロールしたときに日付が画面の外へ出てしまい
+           「いま何日を見ているんだっけ？」になる。JSは使わずブラウザ標準の sticky。
+         ⚠ 上に重ねるので背景色は必ず付いたままにする（透けると下の文字と重なって読めない）。 */
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      /* 貼り付いたときに、下のカードとの境目が分かるように薄く影を落とす。 */
+      box-shadow: 0 2px 6px rgba(110, 95, 79, .12);
+    }
+    /* スマホは上のバーが貼り付いているので、その下に来るようにずらす（バーの高さ52px）。 */
+    @media (max-width: 720px) {
+      .day-head { top: 52px; }
     }
     .day-head .d-date { font-size: 15px; font-variant-numeric: tabular-nums; }
     .day-head .d-date .sun { color: var(--danger); } .day-head .d-date .sat { color: var(--brand); }
@@ -330,8 +343,12 @@
         <b>「募集中」の印は「スタッフ公開ボードでエントリーを募っている」という意味</b>で、アサインとは別のことです。
         <b>募集中でも「✓確定にする」は押せます</b>（募集して人が集まってから確定にするのが普通の流れです）。<br>
         <b>「確定」の人数が運営人数に達すると、印は「締切」に変わります</b>＝スタッフの画面でも「締切・満員」になってエントリーできません。
-        <b>「仮」の人は数えません</b>（まだ決まっていないので募集を続けます）。
-        また募集したいときは<b>「＋ 追加募集する」</b>で運営人数を増やしてください（<b>公開し直す必要はありません</b>）。<br>
+        <b>「仮」の人は数えません</b>（まだ決まっていないので募集を続けます）。<br>
+        <b>運営人数が埋まっていなくても「これで足りている」ときは、カードの「🔒 この人数で足りている」を押してください</b>
+        （2026-09-01 追加）。募集が締まって<b>「募集中 あと◯名」が消えます</b>＝もう人を足さなくてよいことが、ひと目で分かります。
+        <b>運営人数（セールスが入れた数）は変わりません。</b>
+        ⚠ <b>「✓確定にする」では募集は締まりません</b>（本当に人が足りなくて、確定にしても募集を続けたい案件があるため）。<br>
+        また募集したいときは<b>「＋ 追加募集する」</b>を押してください（<b>公開し直す必要はありません</b>）。<br>
         <b>日付の横のボタンから、その日をまとめて確定・まとめて公開できます</b>（対象がある日だけ出ます。押す前に案件名を出して確認します）。<br>
         <b>日ごとに、その日の案件を横に並べて表示します。</b>同じ日のスタッフは取り合いになるため、各日の「稼働可／割当済／残り」を見ながら割り当てます。案件カードの「アサインを開く」で、その案件の詳細に進みます。
         <span style="display:inline-block; margin-top:4px;">全体の状況（募集中・要注意スタッフ・確定履歴）は <a href="/assign-dashboard">▣ アサインダッシュボード</a> にまとめています。</span>
@@ -1426,9 +1443,16 @@
   function isFullForStaff(c){ return confirmedOf(c) >= needStaffOf(c); }
   function remainForStaff(c){ return Math.max(0, needStaffOf(c) - confirmedOf(c)); }
 
+  // 募集を続けているか（古いデータには recruit が無いので、無ければ「募集中」とみなす）。
+  function bRecruit(c){ return (c.recruit !== undefined) ? !!c.recruit : true; }
+
   // カードに出す「いまスタッフからどう見えているか」の印。公開していない案件には出さない。
+  // ⚠ 募集を締めた案件には何も出さない（2026-09-01 スタッフからのご意見）。
+  //   運営人数より少なくても「これでOK」と確定にしたとき、「募集中 あと◯名」が残っていると
+  //   まだ人を足すのか・もう要らないのかが分からなかった。
+  //   確定にすると募集は締まる（正本＝App\Support\RecruitStatus）。足したくなったら「＋ 追加募集する」。
   function recruitBadge(c){
-    if (!bPubOn(c)) return '';
+    if (!bPubOn(c) || !bRecruit(c)) return '';
     if (isFullForStaff(c)) {
       return '<span class="sb full" title="「確定」の人数が運営人数に達しているので、スタッフの画面では「締切・満員」に見えています。'
         + '運営人数を増やすと、その場でまた募集中に戻ります（公開し直す必要はありません）。">締切</span>';
@@ -1522,17 +1546,48 @@
   //   人数を増やせばそれだけでまた募集中に戻る。
   // ⚠ 保存はアサイン表と同じ入口（/assign-sheet/project）を使う＝運営人数の直し方を2つ作らない。
   //   「6〜8」のような範囲もそのまま入れられる（Headcount が読む）。
+  // 「🔒 この人数で足りている」＝募集を締める（2026-09-01 baba要望）。
+  // ⚠ 運営人数（セールスが書いた数）は変えない。変えるとセールスの予定が消えてしまう。
+  // ⚠ バッジを消すだけにしない＝スタッフ画面の募集も止める（社員とスタッフで言うことを合わせる）。
+  function closeRecruit(id){
+    const c = cases.find(x => x.id === id);
+    if (!c) return;
+    if (!confirm('「' + c.name + '」の募集を締めます。\n'
+      + '運営人数 ' + needStaffOf(c) + '名 に対して、いま確定は ' + confirmedOf(c) + '名です。\n\n'
+      + '・スタッフの画面から、この案件の募集が消えます（確定した方の予定には残ります）\n'
+      + '・運営人数は ' + needStaffOf(c) + '名 のままです（変えません）\n'
+      + '・あとで足したくなったら「＋ 追加募集する」で戻せます\n\n'
+      + 'この人数で足りていますか？')) return;
+    if (!USING_DB){ c.recruit = false; render(); return; }
+    fetch('/projects/cells', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ id: id, recruit: false })
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(() => { c.recruit = false; render(); })
+      .catch(e => alert('募集を締められませんでした（' + e + '）。もう一度お試しください。'));
+  }
+
+  // 「＋ 追加募集する」＝運営人数を増やす／締めた募集を再開する。
+  // ⚠ 締めた案件は、人数を増やしただけではスタッフの画面に出ない＝ここで募集も開け直す。
   function addRecruit(id){
     const c = cases.find(x => x.id === id);
     if (!c) return;
     const now = needStaffOf(c);
-    const input = prompt('「' + c.name + '」の運営人数を増やします。\n'
-      + 'いまの運営人数：' + now + '名（確定 ' + confirmedOf(c) + '名で満員です）\n\n'
-      + '新しい運営人数を入れてください（「6〜8」のような範囲でも入れられます）。', String(now + 1));
+    const closed = !bRecruit(c);
+    const head = closed
+      ? '「' + c.name + '」の募集を再開します（「この人数で足りている」で締めていました）。\n'
+        + 'いまの運営人数：' + now + '名（確定 ' + confirmedOf(c) + '名）\n\n'
+        + '運営人数はこのままでも再開できます。増やすときだけ数字を変えてください（「6〜8」のような範囲も可）。'
+      : '「' + c.name + '」の運営人数を増やします。\n'
+        + 'いまの運営人数：' + now + '名（確定 ' + confirmedOf(c) + '名で満員です）\n\n'
+        + '新しい運営人数を入れてください（「6〜8」のような範囲でも入れられます）。';
+    const input = prompt(head, closed ? String(now) : String(now + 1));
     if (input === null) return;
     const value = input.trim();
     if (value === '') return;
-    if (!USING_DB){ c.need = parseInt(value, 10) || c.need; c.needStaff = c.need; render(); return; }
+    if (!USING_DB){ c.need = parseInt(value, 10) || c.need; c.needStaff = c.need; c.recruit = true; render(); return; }
     fetch('/assign-sheet/project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
@@ -1540,14 +1595,23 @@
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(res => {
-        if (!res || !res.ok) { alert((res && res.message) || '運営人数を変えられませんでした。'); return; }
-        // 画面を開き直さなくても分かるように、その場で数字を入れ替える。
+        if (!res || !res.ok) return Promise.reject((res && res.message) || '運営人数を変えられませんでした。');
+        // ⚠ 募集を締めていたら、ここで開け直す（保存の入口は案件一覧のセルと同じ）。
+        return fetch('/projects/cells', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+          body: JSON.stringify({ id: id, recruit: true })
+        }).then(r => r.ok ? r.json() : Promise.reject(r.status));
+      })
+      .then(() => {
+        // 画面を開き直さなくても分かるように、その場で数字と募集の印を入れ替える。
         const max = Math.max.apply(null, (value.match(/\d+/g) || ['0']).map(Number));
         if (max > 0) { c.need = max; c.needStaff = max; }
+        c.recruit = true;
         render();
-        alert('運営人数を「' + value + '」にしました。\nスタッフの画面でまた募集中になります。');
+        alert('運営人数を「' + value + '」にして、募集を再開しました。\nスタッフの画面にまた募集として出ます。');
       })
-      .catch(e => alert('運営人数を変えられませんでした（' + e + '）。もう一度お試しください。'));
+      .catch(e => alert('募集を再開できませんでした（' + e + '）。もう一度お試しください。'));
   }
 
   function buildCard(c, dayCases, dupNames, amap){
@@ -1673,8 +1737,16 @@
     // （公開のON/OFFの入口を増やすと、どこで切ったか分からなくなるため）。
     // 締切（満員）のときは「追加募集する」＝運営人数を増やす道を出す（2026-08-28 baba要望）。
     // ⚠ 公開し直す必要はない。人数を増やせば、その場でまたスタッフ画面に「募集中」で出る。
-    if (pubOn && isFullForStaff(c)) {
-      stateBtn += `<button class="edit-btn" onclick="addRecruit('${c.id}')" title="運営人数を増やすと、スタッフの画面でまた募集中になります（公開し直す必要はありません）">＋ 追加募集する</button>`;
+    // 「🔒 この人数で足りている」＝運営人数は埋まっていないが、これで決まりにする（2026-09-01 baba要望）。
+    // ⚠ 「確定にする」とは別の意思表示。確定にしても**本当に人が足りなくて募集を続けたい**案件があるため。
+    //   押すと募集が締まり、「募集中 あと◯名」が消える。運営人数（セールスが書いた数）は変えない。
+    if (pubOn && bRecruit(c) && !isFullForStaff(c)) {
+      stateBtn += `<button class="edit-btn" onclick="closeRecruit('${c.id}')" title="運営人数は埋まっていませんが、この人数で決まりにします。スタッフの募集を締めて「募集中 あと◯名」を消します（運営人数は変えません）。あとで足したくなったら「＋ 追加募集する」で戻せます。">🔒 この人数で足りている</button>`;
+    }
+    // ⚠ 募集を締めたあとにも出す（2026-09-01 baba「確定のあとに追加募集することはある」）。
+    //   ここを満員のときだけにしていると、締めた案件に人を足せなくなる。
+    if (pubOn && (isFullForStaff(c) || !bRecruit(c))) {
+      stateBtn += `<button class="edit-btn" onclick="addRecruit('${c.id}')" title="スタッフの画面にまた募集として出します（公開し直す必要はありません）">＋ 追加募集する</button>`;
     }
     // ⚠ 「?project=案件ID」を付けて、公開ボードの**その案件の行**まで飛ばす（2026-08-28 baba要望）。
     //   前はただ公開ボードを開くだけで、どの案件だったか探し直す必要があった。

@@ -441,12 +441,17 @@
           </div>
           <div class="form-row">
             <label>営業担当<span class="req-mark red">必須</span></label>
-            <select id="salesOwnerSel" name="sales_owner" data-need="req" onchange="onSalesChange()">
-              <option value="">（選択してください）</option>
-              <option value="__other__">その他（直接入力）</option>
-            </select>
-            <input type="text" id="salesOwnerOther" data-need="req" autocomplete="off" placeholder="社員名を入力" style="display:none;margin-top:8px;">
-            <div class="hint">社員マスタ（社員）から選びます。既定はログイン中の社員です。一覧にない方は「その他（直接入力）」を選ぶと手入力できます。</div>
+<!-- 名前を打つと候補が絞り込まれる欄（2026-09-01 スタッフからのご意見）。
+                 ⚠ それまではプルダウンだけで、社員が増えると目で探すしかなかった。
+                 ⚠ プルダウンと「その他（直接入力）」の2つの欄を1つにまとめた＝
+                   一覧に無い名前は、そのまま打てばよい（切り替えが要らない）。
+                 ⚠ ここはBladeを解釈しない区間なので、コメントもHTMLの形で書くこと
+                   （Bladeのコメントで書くと、その文字がそのまま画面に出る。今回それを踏んだ）。 -->
+            <input type="text" id="salesOwnerSel" name="sales_owner" data-need="req" list="salesOwnerList"
+                   autocomplete="off" oninput="onSalesChange()"
+                   placeholder="名前を打つと候補が出ます">
+            <datalist id="salesOwnerList"></datalist>
+            <div class="hint">社員マスタ（社員）から探せます。<b>名字の一部を打つと候補が絞られます。</b>既定はログイン中の社員です。<b>一覧にない方は、そのまま名前を入力してください。</b></div>
           </div>
 
           <!-- 登録拠点：この案件がどの拠点のものか（全拠点運用・設計書19.2）。
@@ -1003,6 +1008,9 @@
 <script>window.ECS_PARENTS = @json($parentProjects ?? []);</script>
 {{-- 営業担当プルダウンの選択肢＝社員（role=employee）の名前一覧。 --}}
 <script>window.ECS_SALES = @json($salesOwners ?? []);</script>
+{{-- 新規登録のときの営業担当の初期値＝ログイン中の社員（2026-09-01）。
+     ⚠ これまで画面に 'baba' と直書きしてあり、誰が登録しても baba さんが入っていた。 --}}
+<script>window.ECS_ME_NAME = @json($meName ?? '');</script>
 {{-- 登録拠点プルダウンの選択肢（拠点マスタ）と既定値（編集=既存/新規=ログイン者の拠点）。 --}}
 <script>
   window.ECS_OFFICES = @json($offices ?? ['東京']);
@@ -1779,43 +1787,27 @@
     });
   })();
 
-  // ===== 営業担当：プルダウン（社員一覧）＋「その他（直接入力）」で手入力も可 =====
-  // 「その他」を選ぶと手入力欄が出る。送信は選んだ方だけ name="sales_owner" になる。
+  // ===== 営業担当：名前を打つと候補が絞られる欄（2026-09-01 スタッフからのご意見）=====
+  // ⚠ それまではプルダウンだけで、社員が増えると目で探すしかなかった。
+  //   ふつうの入力欄＋候補一覧（datalist）にすると、打った文字でブラウザが勝手に絞ってくれる。
+  // ⚠ 「その他（直接入力）」の欄は無くした＝一覧に無い名前はそのまま打てばよい
+  //   （切り替えを忘れて保存できない、が起きなくなる）。送り先の名前（sales_owner）は変えていない。
   function onSalesChange() {
-    const sel = document.getElementById('salesOwnerSel');
-    const other = document.getElementById('salesOwnerOther');
-    if (!sel || !other) return;
-    if (sel.value === '__other__') {
-      other.style.display = '';
-      other.setAttribute('name', 'sales_owner');
-      sel.removeAttribute('name');           // 送信は手入力欄の値だけにする
-      if (!other.value) other.focus();
-    } else {
-      other.style.display = 'none';
-      other.removeAttribute('name');
-      sel.setAttribute('name', 'sales_owner'); // 送信はプルダウンの値
-    }
     if (typeof refreshAllNeed === 'function') refreshAllNeed();
   }
-  // 社員一覧を「その他」の前に並べ、初期値（編集＝保存値／新規＝baba）を入れる。
+  // 候補一覧に社員を並べ、初期値（編集＝保存値／新規＝ログイン中の社員）を入れる。
   (function buildSalesOptions() {
-    const sel = document.getElementById('salesOwnerSel');
-    if (!sel || !Array.isArray(window.ECS_SALES)) return;
-    const otherOpt = sel.querySelector('option[value="__other__"]');
+    const input = document.getElementById('salesOwnerSel');
+    const list = document.getElementById('salesOwnerList');
+    if (!input || !list || !Array.isArray(window.ECS_SALES)) return;
     window.ECS_SALES.forEach(function (n) {
       const opt = document.createElement('option');
-      opt.value = n; opt.textContent = n;
-      sel.insertBefore(opt, otherOpt);       // 「その他（直接入力）」の前に社員を並べる
+      opt.value = n;
+      list.appendChild(opt);
     });
-    const init = window.ECS_EDIT ? (window.ECS_EDIT.sales_owner || '') : 'baba';
-    if (init && window.ECS_SALES.indexOf(init) !== -1) {
-      sel.value = init;                      // 一覧にいる人＝そのまま選択
-    } else if (init) {
-      sel.value = '__other__';               // 一覧に無い名前＝その他（手入力）へ
-      const other = document.getElementById('salesOwnerOther');
-      if (other) other.value = init;
-    }
-    onSalesChange();                         // 手入力欄の表示・name付け替えを反映
+    // ⚠ 一覧に無い名前でもそのまま入れる（昔の案件に、辞めた方の名前が入っていることがある）。
+    input.value = window.ECS_EDIT ? (window.ECS_EDIT.sales_owner || '') : (window.ECS_ME_NAME || '');
+    onSalesChange();
   })();
 
   // 登録拠点プルダウン：拠点マスタを並べ、初期値（編集＝保存値／新規＝ログイン者の拠点）を選ぶ。

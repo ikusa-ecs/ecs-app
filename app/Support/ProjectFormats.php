@@ -42,8 +42,8 @@ final class ProjectFormats
      *   リアルのイベントは、ヘルプで入っていても**リアル**。実施形態は紐づくイベントに合わせる。
      *   取込側も同じ扱い（`MonthlySheetReader::CROSS_OFFICE`＝拠点をまたいだ関わりとして読む）。
      *   → ここでは何もしない＝「オンライン」と書いてあればオンライン、無ければリアル系に落ちる。
-     *   ⚠ `public/ecs/data/cases.js` の `window.ECS_fmtCode` には**まだ古い規則が残っている**
-     *     （ヘルプのみ→online）。凍結ファイルなので触っていない。危険日の警告だけ判定がずれる。
+     *   `public/ecs/data/cases.js` の `window.ECS_fmtCode`（危険日の警告で使う）も
+     *   2026-09-01 に同じ規則へそろえた（baba了解のうえ、その1か所だけ触った）。
      */
     public static function countCode(?string $format): string
     {

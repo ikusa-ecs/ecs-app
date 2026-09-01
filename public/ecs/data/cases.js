@@ -209,12 +209,17 @@ window.ECS_caseDate = function(off){
    ===================================================================== */
 window.ECS_ACTIVE_STAFF = 40; // ★アクティブ＋準アクティブの想定人数（モック）。本番はDBで自動算出。
 
-/* 実施形態の文字列 → 種別コード（real / long / online）。cases.js の fmt と揃える */
+/* 実施形態の文字列 → 種別コード（real / long / online）。
+   ⚠ サーバー側の App\Support\ProjectFormats::countCode と同じ規則にそろえること。
+     片方だけ変えると、危険日の警告だけ判定が変わる（気づきにくい）。
+   ⚠ 2026-09-01 baba訂正：「ヘルプのみ」はオンラインではない。
+     ヘルプのみ＝どの拠点が手伝うかという運用の話で、実施形態ではない。
+     リアルのイベントは、ヘルプで入っていてもリアル＝危険日にもリアルとして数える。 */
 window.ECS_fmtCode = function(formatText){
   var t = String(formatText || '');
-  if (t.indexOf('オンライン') >= 0 || t.indexOf('ヘルプのみ') >= 0) return 'online';
+  if (t.indexOf('オンライン') >= 0) return 'online';
   if (t.indexOf('リアルロング') >= 0) return 'long';
-  return 'real'; // リアル・ARENA・体験会・巻き取り 等はリアル系として扱う
+  return 'real'; // リアル・ARENA・体験会・巻き取り・ヘルプのみ 等はリアル系として扱う
 };
 
 /* その日の案件配列 items=[{scale,fmt,need,name}] を渡すと危険判定を返す */

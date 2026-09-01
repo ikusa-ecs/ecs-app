@@ -113,4 +113,116 @@ class RecruitStatusTest extends TestCase
         $this->assertTrue(RecruitStatus::isFull($p->required_count, $job['filled']),
             'スタッフ画面では満員なのに、社員側の判定では満員になっていない');
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // 「🔒 この人数で足りている」（2026-09-01 スタッフからのご意見）
+    //
+    // ⚠ 運営人数はセールスが書いた数字なので**変えない**。人数が埋まっていなくても
+    //   アサイン担当が「これで足りている」と決められるようにし、そのとき
+    //   「募集中 あと◯名」を消す。
+    // ⚠ 確定にするだけでは締めない＝**本当に人が足りなくて募集を続けたい案件がある**（baba）。
+    // ─────────────────────────────────────────────────────────────
+
+    /** 人数が足りていなくても募集だけ締められる。⚠ 運営人数は変えない。 */
+    public function test_closing_the_recruitment_keeps_the_planned_headcount(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'id' => 'E-010', 'role' => 'employee', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+        $p = Project::create([
+            'id' => 'P-CLOSE', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => Carbon::today()->copy()->addDays(6)->toDateString(), 'office' => '東京',
+            'status' => '確定', 'staff_published' => true, 'is_recruiting' => true,
+            'required_count' => 8,
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/projects/cells', ['id' => 'P-CLOSE', 'recruit' => false])
+            ->assertOk();
+
+        $p->refresh();
+        $this->assertFalse((bool) $p->is_recruiting, '募集が締まっていない');
+        $this->assertSame(8, (int) $p->required_count,
+            '⚠ 運営人数を書き換えています。セールスが入れた予定はそのまま残すこと。');
+        $this->assertSame('確定', $p->status, 'アサイン状況まで変えている');
+    }
+
+    /** 締めたら「募集中 あと◯名」を出さない（社員の画面とスタッフの画面をそろえる）。 */
+    public function test_the_label_is_empty_once_the_recruitment_is_closed(): void
+    {
+        $p = new Project(['required_count' => 8]);
+        $p->staff_published = true;
+
+        $p->is_recruiting = true;
+        $this->assertSame('募集中（あと2名）', RecruitStatus::label($p, 6));
+
+        $p->is_recruiting = false;
+        $this->assertSame('', RecruitStatus::label($p, 6),
+            '募集を締めたのに「募集中 あと◯名」が残っている');
+    }
+
+    /**
+     * ⚠ 「確定にする」だけでは募集を締めない。
+     *   本当に人が足りていなくて、確定にしても募集を続けたい案件があるため（2026-09-01 baba）。
+     */
+    public function test_confirming_alone_does_not_close_the_recruitment(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'id' => 'E-011', 'role' => 'employee', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+        $p = Project::create([
+            'id' => 'P-FIX', 'project_name' => '謎解き', 'content_names' => ['謎解き'],
+            'start_date' => Carbon::today()->copy()->addDays(6)->toDateString(), 'office' => '東京',
+            'status' => '調整中', 'staff_published' => true, 'is_recruiting' => true,
+            'required_count' => 8,
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/projects/cells', ['id' => 'P-FIX', 'status' => '確定'])
+            ->assertOk();
+
+        $p->refresh();
+        $this->assertSame('確定', $p->status);
+        $this->assertTrue((bool) $p->is_recruiting,
+            '⚠ 確定にしただけで募集を締めています。人が足りず募集を続けたい案件があります。');
+    }
+
+    /** 締めたあとも「＋ 追加募集する」で戻せる（確定後の追加募集はよくある・baba）。 */
+    public function test_the_recruitment_can_be_reopened(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'id' => 'E-012', 'role' => 'employee', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+        $p = Project::create([
+            'id' => 'P-REOPEN', 'project_name' => '水合戦', 'content_names' => ['水合戦'],
+            'start_date' => Carbon::today()->copy()->addDays(6)->toDateString(), 'office' => '東京',
+            'status' => '確定', 'staff_published' => true, 'is_recruiting' => false,
+            'required_count' => 8,
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/projects/cells', ['id' => 'P-REOPEN', 'recruit' => true])
+            ->assertOk();
+
+        $this->assertTrue((bool) $p->refresh()->is_recruiting, '募集を再開できていない');
+    }
+
+    /** 画面側の仕掛けが残っているか（@verbatim の中なので消えても気づけない）。 */
+    public function test_the_board_has_the_close_button(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'id' => 'E-013', 'role' => 'employee', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($admin)->get('/assign')
+            ->assertOk()
+            ->assertSee('function closeRecruit', false)
+            ->assertSee('この人数で足りている', false)
+            // 募集を続けているかがボードに渡っていないと、締めてもバッジが消えない。
+            ->assertSee('function bRecruit', false);
+    }
 }

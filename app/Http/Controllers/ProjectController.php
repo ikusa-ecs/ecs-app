@@ -437,6 +437,11 @@ class ProjectController extends Controller
             'copyFrom' => $copyFrom,
             'parentProjects' => $parentProjects,
             'salesOwners' => $salesOwners,
+            // 新規登録のときの営業担当の初期値＝ログイン中の社員（2026-09-01）。
+            // ⚠ これまで画面に 'baba' と直書きしてあり、誰が登録しても baba さんが入っていた
+            //   （案内文には「既定はログイン中の社員です」と書いてあったのに合っていなかった）。
+            //   スタッフ・見本アカウントのときは空にする（勝手に他人を入れない）。
+            'meName' => (string) (auth()->user()?->role === 'employee' ? auth()->user()->name : ''),
             'offices' => $offices,
             'defaultOffice' => $defaultOffice,
             'contentOptions' => $contentOptions,
@@ -838,6 +843,8 @@ class ProjectController extends Controller
             // アサイン状況。日別ボードの「✓ 確定にする」から保存する（2026-08-21 baba）。
             // 下書き・キャンセルはここでは扱わない（案件登録・削除の流れで決まるものなので混ぜない）。
             'status' => ['nullable', 'in:未着手,調整中,確定,完了'],
+            // スタッフ募集を続けるか（日別ボードの「募集を再開する」）。2026-09-01。
+            'recruit' => ['nullable', 'boolean'],
             // 制作・記録（案件一覧の詳細でその場保存）
             'pub_logo' => ['nullable', 'string', 'max:20'],
             'pub_camera' => ['nullable', 'string', 'max:20'],
@@ -896,8 +903,18 @@ class ProjectController extends Controller
         }
 
         // アサイン状況（未着手／調整中／確定／完了）。日別ボードの「✓ 確定にする」がここへ来る。
+        // ⚠ 確定にしても募集は締めない。人数が足りていなくて募集を続けたい案件があるため（2026-09-01 baba）。
+        //   締めるのは下の recruit（「🔒 この人数で足りている」）＝別の意思表示。
         if ($request->filled('status')) {
             $project->status = $request->input('status');
+        }
+
+        // スタッフ募集を締める／再開する。
+        // 日別ボードの「🔒 この人数で足りている」＝false、「＋ 追加募集する」＝true。
+        // ⚠ 運営人数（required_count）は触らない＝セールスが書いた予定をそのまま残す（2026-09-01 baba）。
+        //   考え方は App\Support\RecruitStatus のコメントにまとめてある。
+        if ($request->has('recruit')) {
+            $project->is_recruiting = $request->boolean('recruit');
         }
 
         // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ／引き継ぎ／台本）。
