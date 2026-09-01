@@ -266,7 +266,13 @@
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
           <span style="color:#15803d; font-weight:700;">緑＝D/SD担当</span>／<span style="color:#2c6ca0; font-weight:700;">青＝FC等で稼働</span>／<span style="color:#9c8f80; font-weight:700;">グレー＝未アサイン</span>／<span style="color:#92600a; font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:#7a6a58; font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:#6d28d9; font-weight:700;">新＝新人</span>。
           名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>・<span style="color:#6e5b49;font-weight:700;">茶＝その他</span>）。
-          右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定はイベプラだけ）。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。
+          右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。<br>
+          <b>2026-09-01 に変えたところ</b>＝
+          ① <b>その日「×」「希望休」を出している方は並べません</b>（マスの下に「お休み ◯名」と出ます）。
+          ② <b>他の拠点の方は並べません</b>（以前は、一度この拠点の案件で担当に入ると全部の日に出ていました）。
+          ③ <b>すでに担当に入っている方でも、イベプラでなければ並べません</b>。
+          変えたいときは<b>「＋全社員を表示」</b>を押してください。担当が外れることはありません（誰が担当かは案件カードの「D:」に出ています）。
+          ④ <b>お休みの日なのに担当に入っている方には、赤い「休」の印</b>を出します（いちばん気づきたい間違いなので隠しません）。
         </div>
       </details>
 
@@ -355,6 +361,8 @@
   window.ECS_DIR_OTHERS  = @json($others ?? []);  // 社員一覧に居ない人（スタッフ等）の名前
   window.ECS_EMP_BUSY    = @json($empBusy);      // 他ロール(FC等)のアサイン状況: {Y-m-d:{社員ID:[role]}}
   window.ECS_DIR_USINGDB = @json($usingDb);      // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
+  window.ECS_DIR_OFFICE  = @json($officeScope);  // いま絞っている拠点（null＝全拠点）
+  window.ECS_DIR_DAYOFF  = @json($dayOff ?? []); // その日お休みの社員 {社員ID:{"Y-M-D":true}}
 </script>
 @verbatim
 <script>
@@ -467,14 +475,60 @@
   // 以前は「新人」も部署に関係なく並んでいた）。「＋全社員を表示」を押したときだけ全員。
   // ⚠ ただし その日すでに D/SD/FC に入っている人と、他の役割で稼動中の人は消さない。
   //   消すと「担当に入っているのに画面に居ない」状態になり、外すこともできなくなる。
-  function shownEmployees(dcs, busyMap, showAll){
+  // いま絞っている拠点（null／空＝全拠点）。
+  const DIR_OFFICE = (window.ECS_DIR_OFFICE || '');
+  // その社員が「いま見ている拠点の人」か。
+  // ⚠ 事務所が空の人は東京として扱う（名簿・案件と同じ決まり。サーバー側の OfficeScope と同じ）。
+  function sameOffice(e){
+    if (!DIR_OFFICE) return true;                       // 全拠点表示なら全員が対象
+    const o = (e.office || '').trim();
+    if (o === DIR_OFFICE) return true;
+    return o === '' && DIR_OFFICE === '東京';           // 未設定は東京あつかい
+  }
+  // その日お休み（×／希望休）の社員か。
+  // ⚠ この画面はこれまで出勤可能日をまったく見ていなかった（休みの人がふつうに並んでいた）。
+  const DAYOFF = window.ECS_DIR_DAYOFF || {};
+  function isDayOff(id, y, m, d){
+    const k = y + '-' + (m + 1) + '-' + d;
+    return !!(DAYOFF[id] && DAYOFF[id][k]);
+  }
+
+  function shownEmployees(dcs, busyMap, showAll, y, m, d){
     const inUse = new Set();
     dcs.forEach(c => {
       if (c.dirId) inUse.add(c.dirId);
       if (c.sdId) inUse.add(c.sdId);
       (c.fcIds || []).forEach(id => inUse.add(id));
     });
-    return EMP.filter(e => showAll || e.planner || inUse.has(e.id) || busyMap[e.id]);
+    return EMP.filter(e => {
+      // ⚠ 他拠点の人は出さない（2026-09-01 baba報告）。
+      //   一度でもこの拠点の案件で担当に入ると、その人は拠点の絞り込みを飛び越えて
+      //   社員一覧に残る（サーバー側 keepIds。名前を出すために要る）。そこへ
+      //   「イベプラなら毎日出す」が重なって、**福岡のイベプラが東京の全部の日に並んでいた**。
+      if (!sameOffice(e)) return false;
+
+      // ⚠ 「＋全社員を表示」を押していないときは**イベプラだけ**。
+      //   すでに担当に入っている人も出さない（2026-09-01 baba要望）。
+      //   担当が外れる心配はない＝保存は案件が持っているD/SD/FCから作るので、
+      //   画面のチップとは関係がない。誰が担当かは案件カードに「D: 名前」と出ている。
+      //   その人を変えたいときは「＋全社員を表示」を押す。
+      if (!showAll && !e.planner) return false;
+
+      // その日お休み（×／希望休）の人は出さない（2026-09-01 baba要望）。件数だけ下に出す。
+      // ⚠ ただし **その日すでに担当に入っている人は、お休みでも出す**（赤い「休」印つき）。
+      //   お休みの人を担当にしてしまっているのは、いちばん気づきたい間違いなので隠さない。
+      if (y !== undefined && isDayOff(e.id, y, m, d) && !inUse.has(e.id) && !busyMap[e.id]) return false;
+
+      return true;
+    });
+  }
+
+  // その日お休みで、一覧から外した人の数（「お休み ◯名」と出すため）。
+  // ⚠ 黙って消すと「あの人が居ない」と探すことになるので、必ず数を見せる。
+  function dayOffCount(dcs, busyMap, showAll, y, m, d){
+    const shownIds = new Set(shownEmployees(dcs, busyMap, showAll, y, m, d).map(e => e.id));
+    return EMP.filter(e => !shownIds.has(e.id) && sameOffice(e) && (showAll || e.planner)
+      && isDayOff(e.id, y, m, d)).length;
   }
 
   // ===== 件数ふきだし（その日の案件一覧）=====
@@ -527,7 +581,7 @@
 
       if (inMonth && cnt) {
         const busyMap = EMP_BUSY[realYmd(d)] || {};   // その日にFC等でアサイン済みの社員→[role]
-        const emps = shownEmployees(dcs, busyMap, showAll);
+        const emps = shownEmployees(dcs, busyMap, showAll, d.getFullYear(), d.getMonth(), d.getDate());
         inner += '<div class="emp-list">' + emps.map(e => {
           const info = empDayInfo(e.id, dcs);
           const isFc = dcs.some(c => (c.fcIds || []).includes(e.id));   // この日FC担当（ライブ）
@@ -539,13 +593,22 @@
                          + otherRoles.map(r => `<span class="e-role">${r}</span>`).join('');
           const multi = info.count >= 2 ? `<span class="e-multi">掛${info.count}</span>` : '';
           const newb = e.newbie ? '<span class="e-newbie">新</span>' : '';
+          // ⚠ お休みの日なのに担当に入っている人。いちばん気づきたい間違いなので赤で出す。
+          const offMark = isDayOff(e.id, d.getFullYear(), d.getMonth(), d.getDate())
+            ? '<span class="dc-offwarn" title="この日は「×」または「希望休」を出しています">休</span>' : '';
           // 名前の文字色＝部署（イベプラ/セールス/クリエイティブ）
           // 色分けのコードはサーバー（App\Support\Departments）が付ける。
           // イベプラ／セールス／クリエイティブ以外は 'other' にまとまる。ここに部署名を書かない。
           const depCls = 'dep-' + (e.deptCode || 'none');
           return `<div class="emp-chip ${cls} ${depCls}" onclick="openPick(event,'${e.id}','${key}')">`
-               + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}</div>`;
+               + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}${offMark}</div>`;
         }).join('') + '</div>';
+
+        // お休みで一覧から外した人の数。⚠ 黙って消すと「あの人が居ない」と探すことになる。
+        const offN = dayOffCount(dcs, busyMap, showAll, d.getFullYear(), d.getMonth(), d.getDate());
+        if (offN > 0) {
+          inner += `<div class="c-dayoff" title="この日「×」または「希望休」を出している方です。「＋全社員を表示」でも出てきません。">お休み ${offN}名</div>`;
+        }
       } else if (inMonth) {
         inner += `<div class="cell-empty">—</div>`;
       }
