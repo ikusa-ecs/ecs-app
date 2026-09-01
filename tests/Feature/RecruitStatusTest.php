@@ -227,6 +227,37 @@ class RecruitStatusTest extends TestCase
             // 案件の詳細へ行くボタン（2026-09-01 baba要望）。
             // ⚠ 案件名のリンクだけだと押せることに気づけない、というご意見だった。
             ->assertSee('function detailBtnHtml', false)
-            ->assertSee('案件の詳細 →', false);
+            ->assertSee('案件の詳細 →', false)
+            // 実施形態のバッジ（2026-09-01 baba要望）。
+            ->assertSee('function fmtBadgeHtml', false);
+    }
+
+    /**
+     * 日別ボードに実施形態が渡っている（2026-09-01 baba要望）。
+     * ⚠ 色の振り分けはサーバーがやる（正本＝ProjectFormats::badgeCode）。
+     *   画面側で判定を書き直すと、案件一覧と色が食い違う。
+     */
+    public function test_the_board_receives_the_event_format(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'id' => 'E-014', 'role' => 'employee', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+        Project::create([
+            'id' => 'P-FMT', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => Carbon::today()->copy()->addDays(5)->toDateString(), 'office' => '東京',
+            'status' => '調整中', 'format' => 'リアルロング',
+        ]);
+
+        $this->actingAsPerson($admin)->get('/assign')
+            ->assertOk()
+            ->assertViewHas('boardCases', function ($cases) {
+                $c = collect($cases)->firstWhere('id', 'P-FMT');
+
+                return $c
+                    && ($c['format'] ?? null) === 'リアルロング'
+                    // ⚠ リアルロングを「リアル」と同じ色にしない（手当が変わるところなので見分けが要る）。
+                    && ($c['fmtCls'] ?? null) === 'fmt-long';
+            });
     }
 }

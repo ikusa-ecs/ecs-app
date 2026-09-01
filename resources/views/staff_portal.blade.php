@@ -235,6 +235,46 @@
     .m-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
     .m-card h3 { margin: 0 0 4px; font-size: 15px; }
     .m-card .sub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+    /* 募集中の案件：リスト／カレンダーの切替（2026-09-01 baba要望）。
+       稼働希望のカレンダーと同じ見た目の土台（.cal-head / .cal-grid / .dow）を使い、
+       マスの中に案件を並べるぶんだけ専用の指定を足す。 */
+    .job-views { display: flex; gap: 8px; margin: 4px 0 10px; }
+    .jv-tab {
+      padding: 7px 16px; border: 1px solid var(--line); border-radius: 999px;
+      background: #fff; cursor: pointer; font-size: 13px; font-weight: 700; color: #6b5544;
+      font-family: inherit;
+    }
+    .jv-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .jc-nav {
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      width: 34px; height: 34px; font-size: 18px; cursor: pointer; font-family: inherit; color: var(--brand-dark);
+    }
+    .jc-nav:hover { background: #f3ece0; }
+    /* ⚠ マスは正方形にしない（.cell と違う）。案件のチップが入るので高さが要る。 */
+    .jc-cell {
+      min-height: 66px; border-radius: 9px; border: 1px solid var(--line); background: #fff;
+      padding: 3px; display: flex; flex-direction: column; gap: 2px; overflow: hidden;
+    }
+    .jc-cell.empty { border: none; background: none; }
+    .jc-cell .dnum { font-size: 11px; color: var(--muted); font-weight: 700; }
+    .jc-cell.sun .dnum { color: var(--danger); }
+    .jc-cell.sat .dnum { color: var(--brand); }
+    .jc-cell.today { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+    .jc-job {
+      border: 1px solid var(--line); border-radius: 6px; background: #fff;
+      padding: 2px 4px; font-size: 10px; line-height: 1.3; cursor: pointer;
+      text-align: left; font-family: inherit; color: var(--ink); width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .jc-job.open    { background: var(--ok-soft);     border-color: #bbe3c6; }
+    .jc-job.applied { background: var(--brand-soft);  border-color: var(--brand); font-weight: 700; }
+    .jc-job.closed  { background: #f1ece3; color: var(--muted); }
+    .jc-job.extra   { box-shadow: inset 3px 0 0 var(--danger); }
+    .jc-hint { font-size: 11.5px; color: var(--muted); margin: 10px 2px 0; }
+    /* リストへ飛んだときに、どれか分かるように光らせる */
+    @keyframes jobFlash { from { background: var(--brand-soft); } to { background: transparent; } }
+    .job-row.flash { animation: jobFlash 1.8s ease-out; }
+
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
     .cal-head .mon { font-size: 16px; font-weight: 700; }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
@@ -441,8 +481,30 @@
           <button type="button" class="jf-tg extra" id="jfExtra" onclick="toggleExtraOnly()">🔥 追加案件のみ</button>
         </div>
 
+        {{-- 表示の切替（リスト／カレンダー）。2026-09-01 baba要望。
+             上の絞り込みは、どちらの表示にも同じように効く。 --}}
+        <div class="job-views">
+          <button type="button" class="jv-tab active" id="jvList" onclick="switchJobView('list')">📋 リスト</button>
+          <button type="button" class="jv-tab" id="jvCal" onclick="switchJobView('cal')">📅 カレンダー</button>
+        </div>
+
         <div class="sec-title" id="jobSecTitle">募集中の案件</div>
         <div class="job-grid" id="jobGrid"></div>
+
+        {{-- カレンダー表示。日付のマスに、その日の募集案件を並べる。 --}}
+        <div id="jobCal" style="display:none;">
+          <div class="cal-head">
+            <button type="button" class="jc-nav" onclick="shiftJobMonth(-1)" title="前の月へ">‹</button>
+            <div class="mon" id="jobCalMon">—</div>
+            <button type="button" class="jc-nav" onclick="shiftJobMonth(1)" title="次の月へ">›</button>
+          </div>
+          <div class="cal-grid" id="jobCalGrid">
+            <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
+          </div>
+          <p class="jc-hint">案件をタップすると、リストのその案件へ移動します（エントリーはそこからできます）。</p>
+          <div class="empty-note" id="jobCalEmpty" style="display:none;">この月には、条件に合う案件がありません。「‹ ›」で前後の月を見てください。</div>
+        </div>
+
         <div class="empty-note" id="jobEmpty" style="display:none;">条件に合う案件がありません。</div>
       </div>
 
@@ -878,6 +940,8 @@
         }
 
         const row = document.createElement('div');
+        // カレンダーから「この案件へ」飛べるように、行に印を付けておく（2026-09-01）。
+        row.id = 'job-' + j.id;
         row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.state === 'applied' ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '');
         row.innerHTML = `
           <div class="jr-head">
@@ -927,6 +991,99 @@
       document.getElementById('jobEmpty').style.display = list.length === 0 ? '' : 'none';
       document.getElementById('jobSecTitle').textContent = `募集中の案件（${list.length}件）`;
       updateOpenCount();
+
+      // カレンダー表示のときは、同じ「絞り込みを通った案件」でカレンダーも描き直す。
+      // ⚠ 絞り込みは renderJobs の1か所だけで行う＝リストとカレンダーで結果が食い違わない。
+      if (jobView === 'cal') renderJobCal(list);
+    }
+
+    // ===== 募集中の案件：カレンダー表示（2026-09-01 baba要望）=====
+    // ⚠ 絞り込みはここでは行わない。renderJobs が絞り込んだ結果をそのまま受け取る。
+    let jobView = 'list';                                             // 'list' か 'cal'
+    const jobCalCursor = new Date(today.getFullYear(), today.getMonth(), 1);   // 見ている月の1日
+
+    function switchJobView(view) {
+      jobView = view;
+      document.getElementById('jvList').classList.toggle('active', view === 'list');
+      document.getElementById('jvCal').classList.toggle('active', view === 'cal');
+      document.getElementById('jobGrid').style.display = (view === 'list') ? '' : 'none';
+      document.getElementById('jobCal').style.display  = (view === 'cal')  ? '' : 'none';
+      // 「条件に合う案件がありません」はリストのときだけ（カレンダーは月ごとに別の案内を出す）。
+      if (view === 'cal') document.getElementById('jobEmpty').style.display = 'none';
+      renderJobs();
+    }
+
+    function shiftJobMonth(n) {
+      jobCalCursor.setMonth(jobCalCursor.getMonth() + n);
+      renderJobs();
+    }
+
+    function renderJobCal(list) {
+      const y = jobCalCursor.getFullYear();
+      const m = jobCalCursor.getMonth();          // 0始まり
+      document.getElementById('jobCalMon').textContent = y + '年 ' + (m + 1) + '月';
+
+      const grid = document.getElementById('jobCalGrid');
+      // 曜日の見出し（先頭7つ）は残して、日付のマスだけ作り直す。
+      while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+      // その月の案件を日ごとにまとめる。
+      const byDay = {};
+      let monthCount = 0;
+      list.forEach(j => {
+        if (j.date.getFullYear() !== y || j.date.getMonth() !== m) return;
+        (byDay[j.date.getDate()] = byDay[j.date.getDate()] || []).push(j);
+        monthCount++;
+      });
+
+      const first = new Date(y, m, 1);
+      const days = new Date(y, m + 1, 0).getDate();
+      // 1日までの空きマス（日曜始まり＝稼働希望のカレンダーと同じ並び）。
+      for (let i = 0; i < first.getDay(); i++) {
+        const e = document.createElement('div');
+        e.className = 'jc-cell empty';
+        grid.appendChild(e);
+      }
+
+      for (let d = 1; d <= days; d++) {
+        const cell = document.createElement('div');
+        const dow = new Date(y, m, d).getDay();
+        cell.className = 'jc-cell' + (dow === 0 ? ' sun' : (dow === 6 ? ' sat' : ''))
+          + ((y === today.getFullYear() && m === today.getMonth() && d === today.getDate()) ? ' today' : '');
+        const num = document.createElement('div');
+        num.className = 'dnum';
+        num.textContent = d;
+        cell.appendChild(num);
+
+        (byDay[d] || []).forEach(j => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'jc-job ' + j.state + (j.extra ? ' extra' : '');
+          b.textContent = j.content;
+          b.title = j.content + '／' + j.client + '（' + (stateBadge[j.state] || stateBadge.open).t + '）';
+          b.onclick = function () { jumpToJob(j.id); };
+          cell.appendChild(b);
+        });
+
+        grid.appendChild(cell);
+      }
+
+      document.getElementById('jobCalEmpty').style.display = monthCount === 0 ? '' : 'none';
+    }
+
+    // カレンダーの案件をタップ → リスト表示に戻して、その案件まで動かす。
+    // ⚠ エントリーはリストのカードから行う（同じボタンを2か所に作らないため）。
+    let jobFlashTimer = null;
+    function jumpToJob(id) {
+      switchJobView('list');
+      const row = document.getElementById('job-' + id);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.remove('flash');
+      void row.offsetWidth;   // 同じ案件を続けて押しても光らせ直すための再描画
+      row.classList.add('flash');
+      if (jobFlashTimer) clearTimeout(jobFlashTimer);
+      jobFlashTimer = setTimeout(() => row.classList.remove('flash'), 1800);
     }
 
     // コメントの保存（案件IDごとに本文と開閉状態を覚えておく＝再描画で消えない）

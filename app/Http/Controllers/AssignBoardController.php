@@ -386,6 +386,12 @@ class AssignBoardController extends Controller
                 // 確度（Aヨミ/Bヨミ/Cヨミ）。⚠ 確度が低い案件は無くなることがあるので、
                 //   アサインを詰める前に気づけるようカードにも出す（2026-08-28 baba要望）。
                 'yomi' => (string) ($p->yomi ?? ''),
+                // 実施形態（リアル／リアルロング／オンライン 等）。2026-09-01 baba要望。
+                // アサインを詰めるときに、現地かオンラインかで声を掛ける人が変わるため。
+                // ⚠ バッジの色分けはサーバー側で決める。正本＝App\Support\ProjectFormats::badgeCode
+                //   （画面ごとに判定を書くと、片方だけ直して食い違う）。
+                'format' => (string) ($p->format ?? ''),
+                'fmtCls' => \App\Support\ProjectFormats::badgeCode($p->format),
                 // ⚠ スタッフの画面で使っている必要人数（未入力なら既定の人数）。正本＝RecruitStatus。
                 //   これで「締切（満員）／募集中」を判定する＝社員とスタッフで言うことを合わせる。
                 //   運営人数を増やせば、その場でまた「募集中」に戻る（公開し直さなくてよい）。

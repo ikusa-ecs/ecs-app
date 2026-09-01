@@ -77,6 +77,17 @@
     .day-head .day-bulk.pub { background: #16a34a; border-color: #15803d; color: #fff; }
     .day-head .day-bulk.pub:hover { background: #15803d; }
 
+    /* 実施形態のバッジ（2026-09-01 baba要望）。
+       ⚠ 色は案件一覧・スタッフ画面と同じにそろえる（画面ごとに色が違うと見間違える）。
+       ⚠ どの色にするかの判定はサーバー（ProjectFormats::badgeCode）が決めて fmtCls で渡す。 */
+    .fbadge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; }
+    .fbadge.fmt-real   { background: #e7f0e9; color: #3f7d52; }  /* リアル */
+    .fbadge.fmt-long   { background: #fdecd9; color: #b4530a; }  /* リアルロング */
+    .fbadge.fmt-online { background: #e3edf7; color: #2c6ca0; }  /* オンライン */
+    .fbadge.fmt-arena  { background: #efe6f6; color: #6d28d9; }  /* ARENA場所貸し */
+    .fbadge.fmt-other  { background: #e1f1ee; color: #0f766e; }  /* 他拠点 */
+    .fbadge.fmt-etc    { background: #ece3d4; color: #7a6a58; }  /* その他 */
+
     /* その日の案件カードを横に並べる */
     .case-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -1100,6 +1111,17 @@
     return `<span class="ymk ${y.c}" title="確度：${c.yomi}（まだ確定していない案件です）">${y.t}</span>`;
   }
 
+  // 実施形態のバッジ（2026-09-01 baba要望）。現地かオンラインかで声を掛ける人が変わるため、
+  // アサインを詰めるこの画面にも出す。
+  // ⚠ ここで実施形態を判定しない。色の振り分けはサーバーが済ませて fmtCls で渡している
+  //   （正本＝App\Support\ProjectFormats::badgeCode）。画面ごとに書くと必ず食い違う。
+  // ⚠ 未設定の案件には何も出さない（「リアル」と決めつけない）。
+  function fmtBadgeHtml(c){
+    const text = (c.format || '').trim();
+    if (!text) return '';
+    return `<span class="fbadge ${c.fmtCls || 'fmt-etc'}" title="実施形態">${escHtml(text)}</span>`;
+  }
+
   // 案件の詳細（登録・編集画面）へ行くボタン（2026-09-01 baba要望）。
   // ⚠ 案件名を押しても同じところへ行けるが、**リンクだと気づけない**というご意見。
   //   他のボタンと同じ並びに置いて、押せることが分かるようにする。
@@ -1789,7 +1811,7 @@
       </div>
       ${noteHtml}
       ${tagHtml ? `<div class="cc-tags">${tagHtml}</div>` : ''}
-      <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${posHtml}</div>
+      <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${fmtBadgeHtml(c)}${posHtml}</div>
       <div class="cc-fill">
         <div class="fbar"><i class="${barCls}" style="width:${Math.round(ratio*100)}%;"></i></div>
         <span class="fnum">${filled}<span class="need"> / ${c.need}名</span></span>
