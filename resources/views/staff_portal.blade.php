@@ -299,8 +299,16 @@
       padding: 3px 12px; font-size: 12px; cursor: pointer; font-family: inherit; color: #6b5544;
     }
     .jc-detail-close:hover { background: #f3ece0; }
-    /* いま開いている案件が、カレンダーのどれか分かるようにする */
-    .jc-job.picked { outline: 2px solid var(--brand); outline-offset: -2px; }
+    /* いま開いている案件が、カレンダーのどれか分かるようにする。
+       ⚠ 押しても見た目が変わらないと「反応しない」と思われる（2026-09-01 baba報告）。
+         枠だけだと細いので、影も付けてはっきり分かるようにする。 */
+    .jc-job.picked {
+      outline: 2px solid var(--brand); outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(161, 92, 46, .18);
+    }
+    /* 開いた中身が「いま開いたもの」だと分かるように、少しだけ光らせる */
+    @keyframes jcOpen { from { background: var(--brand-soft); } to { background: transparent; } }
+    .jc-detail.just-opened { animation: jcOpen 1.4s ease-out; }
 
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
     .cal-head .mon { font-size: 16px; font-weight: 700; }
@@ -874,6 +882,10 @@
     // extraOnly      … 追加案件だけに絞るか（上とは別に重ねられる）
     let jobStateFilter = '';
     let extraOnly = false;
+    // いま画面で押した案件（エントリーした／取り消した）。絞り込みから外れても一覧に残す。
+    // ⚠ 押した瞬間に消えると、できたのかどうか分からない（2026-09-01 baba指摘）。
+    //   絞り込みを選び直したときは消す＝ふつうの絞り込みに戻す。
+    const keepVisible = new Set();
 
     function syncToggleButtons() {
       document.getElementById('jfOpen').classList.toggle('on', jobStateFilter === 'open');
@@ -883,6 +895,7 @@
     // 同じボタンをもう一度押したら解除（＝すべて表示に戻る）。
     function setJobState(v) {
       jobStateFilter = (jobStateFilter === v) ? '' : v;
+      keepVisible.clear();   // 絞り込みを選び直したら、ふつうの絞り込みに戻す
       syncToggleButtons();
       renderJobs();
     }
@@ -998,7 +1011,12 @@
       const list = jobs
         .filter(j => !kw    || (j.content + j.client + j.place).includes(kw))
         .filter(j => !area  || j.area === area)
-        .filter(j => !state || j.state === state)
+        // ⚠ いま押した案件は、絞り込みから外れても一覧に残す（2026-09-01 baba指摘）。
+        //   「📋 募集中のみ」で絞っているときにエントリーすると「エントリー中」に変わり、
+        //   絞り込みから外れて**押した瞬間に一覧から消えて**いた。
+        //   押したものが消えると、エントリーできたのかどうか分からない。
+        //   絞り込みを選び直すか、画面を開き直せば、ふつうの絞り込みに戻る。
+        .filter(j => !state || j.state === state || keepVisible.has(j.id))
         .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
         // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
         .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
@@ -1143,12 +1161,26 @@
 
     function openJobDetail(id) {
       openJobId = id;
-      renderJobDetail();
+      // ⚠ カレンダーも描き直す。そうしないと、押した案件に印（枠）が付かず
+      //   「押しても何も起きない」ように見える（2026-09-01 baba報告）。
+      renderJobs();
+      // ⚠ 開いた中身はカレンダーの下に出るので、そのままだと画面の外にあって気づけない。
+      //   押したらそこまで動かす。これが無かったのが「反応しない」の正体。
+      const wrap = document.getElementById('jobCalDetail');
+      if (wrap && wrap.style.display !== 'none') {
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        wrap.classList.remove('just-opened');
+        void wrap.offsetWidth;   // 同じ案件を続けて押しても光らせ直すための再描画
+        wrap.classList.add('just-opened');
+      }
     }
 
     function closeJobDetail() {
       openJobId = null;
-      renderJobDetail();
+      renderJobs();
+      // 閉じたらカレンダーへ戻す（下に取り残されないように）。
+      const cal = document.getElementById('jobCal');
+      if (cal) cal.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function renderJobDetail() {
@@ -1245,6 +1277,8 @@
       body.append('action', willApply ? 'apply' : 'cancel');
       if (willApply) { body.append('intent', '希望'); body.append('note', note); }
 
+      // ⚠ 絞り込み中でも、押した案件は一覧に残す（消えると押せたのか分からない・2026-09-01 baba指摘）。
+      keepVisible.add(j.id);
       // 先に画面を反映。エントリーした瞬間にメモ（コメント）欄を開いて、その場で一言添えられるようにする。
       j.state = willApply ? 'applied' : 'open';
       if (willApply) {

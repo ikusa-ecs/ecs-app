@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
@@ -99,6 +100,11 @@ class AssignDirectorController extends Controller
                 'id' => $p->id,
                 'name' => $p->name,
                 'surname' => $this->surname($p->name),       // 例: '田中 健一' → '田中'
+                // 本人の拠点。⚠ 表示中の拠点と違う人には画面で札を出す（2026-09-01 baba報告）。
+                //   「東京と書いてあるのに福岡の人が出ている」＝すでに担当に入っているので
+                //   残している（keepIds）か、名簿の拠点が未設定か、のどちらか。
+                //   どちらなのかが画面で分かるようにする。空は未設定として空文字で渡す。
+                'office' => (string) ($p->office ?? ''),
                 'department' => $p->department,               // 実際の所属名（10種類）
                 'deptCode' => Departments::code($p->department), // 色分け用（3つ以外は other）
                 // 既定表示の対象＝イベプラ。兼務でイベプラに入っている人も含める。
@@ -186,11 +192,30 @@ class AssignDirectorController extends Controller
                 'kind' => $p->role === 'staff' ? 'スタッフ' : '社員以外',
             ]]);
 
+        // その日「お休み」の社員（2026-09-01 baba要望）。
+        // ⚠ それまでこの画面は出勤可能日（shift_preferences）を**まったく見ていなかった**。
+        //   休みの見た目（CSSの .c-dayoff / .dc-offwarn）だけがあって、中身が無い状態だった
+        //   ＝休みの人がふつうに候補として並んでいた（babaの指摘どおり）。
+        // 形： { "E-001": { "2026-9-6": true, ... }, ... }（画面のキーは "Y-M-D"・ゼロ埋めなし）
+        // ⚠ お休み＝「NG」と「希望休」だけ。「未定（△）」は休みにしない（入れるかもしれないため）。
+        $dayOff = [];
+        ShiftPreference::query()
+            ->whereIn('staff_id', $employees->pluck('id')->all())
+            ->whereIn('availability', ['NG', '希望休'])
+            ->get(['staff_id', 'date'])
+            ->each(function (ShiftPreference $sp) use (&$dayOff) {
+                if (! $sp->date) {
+                    return;
+                }
+                $dayOff[$sp->staff_id][$sp->date->year.'-'.$sp->date->month.'-'.$sp->date->day] = true;
+            });
+
         return view('assign_director', [
             'cases' => $cases,
             'employees' => $employees,
             'others' => $others,
             'empBusy' => $empBusy,
+            'dayOff' => $dayOff,
             'officeScope' => $officeScope,   // 今絞っている拠点（null＝全拠点）。画面の注記に使う。
             // 「DBに社員がいるか」（拠点で絞る前）。絞った結果が0人でも見本データに戻らないようにするための旗。
             // ※ これが false のとき（DBが空の環境）だけ、画面は従来どおり見本(cases.js)を表示する。

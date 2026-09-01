@@ -239,6 +239,32 @@ class RecruitStatusTest extends TestCase
     }
 
     /**
+     * ⚠ スタッフ画面のカレンダー：押したら「押した」と分かること（2026-09-01 baba報告）。
+     *   エラーは出ていないのに「クリックしても何も反応しない」と言われた。原因は2つ：
+     *   ・開いた中身がカレンダーの**下**に出るので、画面の外にあって気づけない（スクロールしていなかった）
+     *   ・押した案件に**印が付かない**（カレンダーを描き直していなかった）
+     */
+    public function test_the_staff_calendar_shows_that_it_was_tapped(): void
+    {
+        $blade = (string) file_get_contents(resource_path('views/staff_portal.blade.php'));
+
+        $this->assertStringContainsString('function openJobDetail', $blade);
+        // 押したら開いたところまで動かす。
+        $this->assertStringContainsString('wrap.scrollIntoView', $blade,
+            '押しても開いた中身までスクロールしないので、画面の外にあると気づけません。');
+        // 押した案件に印を付ける＝カレンダーを描き直す。
+        $this->assertStringContainsString('just-opened', $blade);
+        $this->assertStringContainsString('.jc-job.picked', $blade);
+
+        // ⚠ 絞り込み中でも、押した案件は一覧から消さない（2026-09-01 baba指摘）。
+        //   「募集中のみ」でエントリーすると『エントリー中』になって絞り込みから外れ、
+        //   押した瞬間に消えていた＝できたのかどうか分からない。
+        $this->assertStringContainsString('keepVisible.has(j.id)', $blade,
+            '絞り込み中にエントリーすると、その案件が一覧から消えてしまいます。');
+        $this->assertStringContainsString('keepVisible.add(j.id)', $blade);
+    }
+
+    /**
      * 日別ボードに実施形態が渡っている（2026-09-01 baba要望）。
      * ⚠ 色の振り分けはサーバーがやる（正本＝ProjectFormats::badgeCode）。
      *   画面側で判定を書き直すと、案件一覧と色が食い違う。
