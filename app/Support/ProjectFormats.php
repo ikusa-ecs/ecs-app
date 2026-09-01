@@ -34,15 +34,22 @@ final class ProjectFormats
     /**
      * 件数の集計に使う種別コード（real / long / online）。
      *
-     * ⚠ `public/ecs/data/cases.js` の `window.ECS_fmtCode` と同じ規則にそろえること。
      * ⚠ ARENA・体験会・巻き取りは**リアル系として数える**（従来どおり）。
      *   「数える／数えない」は実施形態ではなく App\Support\EventCount が決める。
+     *
+     * ⚠⚠ **「ヘルプのみ」はオンラインではない**（2026-09-01 baba訂正）。
+     *   ヘルプのみ＝**どの拠点が手伝うか**という運用の話で、実施形態ではない。
+     *   リアルのイベントは、ヘルプで入っていても**リアル**。実施形態は紐づくイベントに合わせる。
+     *   取込側も同じ扱い（`MonthlySheetReader::CROSS_OFFICE`＝拠点をまたいだ関わりとして読む）。
+     *   → ここでは何もしない＝「オンライン」と書いてあればオンライン、無ければリアル系に落ちる。
+     *   ⚠ `public/ecs/data/cases.js` の `window.ECS_fmtCode` には**まだ古い規則が残っている**
+     *     （ヘルプのみ→online）。凍結ファイルなので触っていない。危険日の警告だけ判定がずれる。
      */
     public static function countCode(?string $format): string
     {
         $t = (string) $format;
 
-        if (str_contains($t, 'オンライン') || str_contains($t, 'ヘルプのみ')) {
+        if (str_contains($t, 'オンライン')) {
             return 'online';
         }
         if (str_contains($t, 'リアルロング')) {

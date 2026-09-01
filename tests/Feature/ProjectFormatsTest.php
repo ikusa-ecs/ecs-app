@@ -32,7 +32,11 @@ class ProjectFormatsTest extends TestCase
         $this->assertSame('real', ProjectFormats::countCode('リアル'));
         $this->assertSame('long', ProjectFormats::countCode('リアルロング'));
         $this->assertSame('online', ProjectFormats::countCode('オンライン'));
-        $this->assertSame('online', ProjectFormats::countCode('イベント東(ヘルプのみ)'));
+        // ⚠⚠ 「ヘルプのみ」はオンラインではない（2026-09-01 baba訂正）。
+        //   ヘルプのみ＝どの拠点が手伝うかという運用の話で、実施形態ではない。
+        //   リアルのイベントは、ヘルプで入っていてもリアル。
+        $this->assertSame('real', ProjectFormats::countCode('イベント東(ヘルプのみ)'));
+        $this->assertSame('online', ProjectFormats::countCode('イベント東(オンライン・ヘルプのみ)'));
         $this->assertSame('real', ProjectFormats::countCode('ARENA場所貸し'));
         $this->assertSame('real', ProjectFormats::countCode('体験会'));
         // 昔の書き方（カッコ付き）でも読める。
@@ -128,7 +132,7 @@ class ProjectFormatsTest extends TestCase
         $js = (string) file_get_contents(public_path('ecs/data/cases.js'));
 
         $this->assertStringContainsString('ECS_fmtCode', $js);
-        foreach (['オンライン', 'ヘルプのみ', 'リアルロング'] as $keyword) {
+        foreach (['オンライン', 'リアルロング'] as $keyword) {
             $this->assertStringContainsString(
                 $keyword,
                 $js,
@@ -136,5 +140,12 @@ class ProjectFormatsTest extends TestCase
                     .'ProjectFormats::countCode と食い違うと、危険日の警告だけ判定が変わります。'
             );
         }
+
+        // ⚠ 分かっている食い違い（2026-09-01）＝cases.js はまだ「ヘルプのみ→オンライン」のまま。
+        //   PHP 側は baba訂正で「ヘルプのみは実施形態ではない」に直した。
+        //   cases.js は CLAUDE.md で凍結（触らない）と決まっているので、直すかは baba に確認してから。
+        //   影響＝**危険日の警告だけ**、ヘルプのみのリアル案件がリアルとして数えられない。
+        $this->assertStringContainsString('ヘルプのみ', $js,
+            'cases.js が直されたようです。直したなら、この見張りと ProjectFormats の注意書きも消してください。');
     }
 }
