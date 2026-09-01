@@ -144,11 +144,21 @@
     .jr-client { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 4px; }
     .jr-head .j-badge { margin-left: auto; }
 
+    /* 募集の状態の色は、ここ1か所で決める（2026-09-01）。
+       ⚠ リストのバッジとカレンダーのチップで**必ず同じ色**にする。
+         別々に書いていたため、カレンダーの「募集中」がリストの「エントリー中」と
+         同じ薄い緑になっていて、同じ画面で色の意味が食い違っていた（baba指摘）。 */
+    :root {
+      --job-open-bg: #16a34a;  --job-open-fg: #ffffff;   /* 募集中＝濃い緑に白文字 */
+      --job-applied-bg: var(--ok-soft); --job-applied-fg: #15803d; --job-applied-bd: #bbe3c6;  /* エントリー中＝薄い緑 */
+      --job-closed-bg: #ece3d4; --job-closed-fg: #7a6a58; /* 締切・満員＝薄い茶 */
+    }
+
     /* 募集状態バッジ */
     .j-badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
-    .j-badge.open    { background: #16a34a; color: #fff; }
-    .j-badge.applied { background: var(--ok-soft); color: #15803d; border: 1px solid #bbe3c6; }
-    .j-badge.closed  { background: #ece3d4; color: #7a6a58; }
+    .j-badge.open    { background: var(--job-open-bg); color: var(--job-open-fg); }
+    .j-badge.applied { background: var(--job-applied-bg); color: var(--job-applied-fg); border: 1px solid var(--job-applied-bd); }
+    .j-badge.closed  { background: var(--job-closed-bg); color: var(--job-closed-fg); }
 
     /* 2段目：実施形態・大型・リピートのタグ */
     .jr-tags { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -266,14 +276,31 @@
       text-align: left; font-family: inherit; color: var(--ink); width: 100%;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .jc-job.open    { background: var(--ok-soft);     border-color: #bbe3c6; }
-    .jc-job.applied { background: var(--brand-soft);  border-color: var(--brand); font-weight: 700; }
-    .jc-job.closed  { background: #f1ece3; color: var(--muted); }
+    /* ⚠ 色はリストのバッジ（.j-badge）とまったく同じにする。上の :root で1か所に決めてある。
+       別々に書いていたため、カレンダーの「募集中」がリストの「エントリー中」と同じ薄い緑になり、
+       同じ画面で色の意味が食い違っていた（2026-09-01 baba指摘）。 */
+    .jc-job.open    { background: var(--job-open-bg);    color: var(--job-open-fg); border-color: var(--job-open-bg); font-weight: 700; }
+    .jc-job.applied { background: var(--job-applied-bg); color: var(--job-applied-fg); border-color: var(--job-applied-bd); font-weight: 700; }
+    .jc-job.closed  { background: var(--job-closed-bg);  color: var(--job-closed-fg); border-color: var(--job-closed-bg); }
     .jc-job.extra   { box-shadow: inset 3px 0 0 var(--danger); }
-    .jc-hint { font-size: 11.5px; color: var(--muted); margin: 10px 2px 0; }
-    /* リストへ飛んだときに、どれか分かるように光らせる */
-    @keyframes jobFlash { from { background: var(--brand-soft); } to { background: transparent; } }
-    .job-row.flash { animation: jobFlash 1.8s ease-out; }
+    .jc-hint { font-size: 11.5px; color: var(--muted); margin: 8px 2px 0; }
+    /* 色の凡例。見本のチップは本物と同じ class なので、色を変えればここも一緒に変わる。 */
+    .jc-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 2px 0; }
+    .jc-legend .jc-job { width: auto; cursor: default; padding: 2px 8px; }
+    /* タップした案件を、カレンダーのすぐ下に開く（2026-09-01 baba指摘）。
+       ⚠ リストへ飛ばすと、カレンダーに戻るのに上までスクロールし直しになって面倒だった。 */
+    .jc-detail { margin-top: 12px; border-top: 2px solid var(--line); padding-top: 10px; }
+    .jc-detail-head {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px;
+    }
+    .jc-detail-close {
+      border: 1px solid var(--line); background: #fff; border-radius: 999px;
+      padding: 3px 12px; font-size: 12px; cursor: pointer; font-family: inherit; color: #6b5544;
+    }
+    .jc-detail-close:hover { background: #f3ece0; }
+    /* いま開いている案件が、カレンダーのどれか分かるようにする */
+    .jc-job.picked { outline: 2px solid var(--brand); outline-offset: -2px; }
 
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
     .cal-head .mon { font-size: 16px; font-weight: 700; }
@@ -501,8 +528,24 @@
           <div class="cal-grid" id="jobCalGrid">
             <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
           </div>
-          <p class="jc-hint">案件をタップすると、リストのその案件へ移動します（エントリーはそこからできます）。</p>
+          {{-- 色の意味は画面にも出す。文章だけで説明すると、色を変えたときに食い違うため。
+               ⚠ 見本のチップは本物と同じ class を使う＝色が変わればここも自動でそろう。 --}}
+          <div class="jc-legend">
+            <span class="jc-job open">募集中</span>
+            <span class="jc-job applied">エントリー中</span>
+            <span class="jc-job closed">締切・満員</span>
+            <span class="jc-job open extra">追加案件</span>
+          </div>
+          <p class="jc-hint">案件をタップすると、<b>すぐ下に中身が開きます</b>。エントリーもそのままできます（カレンダーは開いたままです）。</p>
           <div class="empty-note" id="jobCalEmpty" style="display:none;">この月には、条件に合う案件がありません。「‹ ›」で前後の月を見てください。</div>
+          {{-- タップした案件の中身。リストとまったく同じカードをここに出す（作り方は buildJobRow の1つだけ）。 --}}
+          <div id="jobCalDetail" class="jc-detail" style="display:none;">
+            <div class="jc-detail-head">
+              <span>タップした案件</span>
+              <button type="button" class="jc-detail-close" onclick="closeJobDetail()">✕ 閉じる</button>
+            </div>
+            <div class="job-grid" id="jobCalDetailBody"></div>
+          </div>
         </div>
 
         <div class="empty-note" id="jobEmpty" style="display:none;">条件に合う案件がありません。</div>
@@ -850,50 +893,11 @@
     }
 
     // ===== 募集案件の行を描画 =====
-    function renderJobs() {
-      const kw    = document.getElementById('jobKw').value.trim();
-      const area  = document.getElementById('jobArea').value;
-      const state = jobStateFilter;
-      const fromStr = document.getElementById('jobFrom').value;
-      const fromDate = fromStr ? (function(){ const p = fromStr.split('-'); return new Date(+p[0], (+p[1]) - 1, +p[2]); })() : null;
-      const grid  = document.getElementById('jobGrid');
-      grid.innerHTML = '';
-
-      const list = jobs
-        .filter(j => !kw    || (j.content + j.client + j.place).includes(kw))
-        .filter(j => !area  || j.area === area)
-        .filter(j => !state || j.state === state)
-        .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
-        // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
-        .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
-        .sort((a,b) => {
-          const pa = anchorJob(a), pb = anchorJob(b);
-          // 追加案件を先頭に
-          const ax = pa.extra ? 1 : 0, bx = pb.extra ? 1 : 0;
-          if (ax !== bx) return bx - ax;
-          // 本番の日付の近い順（予備日・リハは親の本番に合わせて並ぶ）
-          if (pa.date - pb.date !== 0) return pa.date - pb.date;
-          // 同じ本番グループ内：本番 → 予備日・リハ の順
-          const sa = (a.dayType === '予備日' || a.dayType === 'リハ') ? 1 : 0;
-          const sb = (b.dayType === '予備日' || b.dayType === 'リハ') ? 1 : 0;
-          return sa - sb;
-        });
-
-      // 追加募集のお知らせバナー（表示中の追加案件の件数）
-      const extraCount = list.filter(j => j.extra).length;
-      const en = document.getElementById('extraNotice');
-      if (extraCount > 0) {
-        en.style.display = '';
-        en.innerHTML = `📣 <b>追加募集が${extraCount}件</b>出ています。急ぎの募集が多いので、参加できる方はお早めにエントリーをお願いします。`;
-      } else {
-        en.style.display = 'none';
-      }
-
-      // ⚠ 1件でも描けない案件があっても、そこで止めない。
-      //   前は途中で止まると**残り全部が消える**のに画面は真っ白にならなかったので、
-      //   「公開したのに出てこない」に気づけなかった（2026-08-28 baba報告）。
-      let skipped = 0;
-      list.forEach(j => {
+    // カードを1枚つくる（2026-09-01 に切り出し）。
+    // ⚠ リストとカレンダーの両方で**この1つ**を使う。
+    //   カレンダー側に別のカードを作ると、エントリーボタンやコメント欄が2つになり、
+    //   片方だけ直して食い違う。描けなかったときは null を返す（黙って消さない）。
+    function buildJobRow(j) {
       try {
         const dy   = j.date.getDay();
         const dowC = dy === 0 ? 'sun' : (dy === 6 ? 'sat' : '');
@@ -940,7 +944,9 @@
         }
 
         const row = document.createElement('div');
-        // カレンダーから「この案件へ」飛べるように、行に印を付けておく（2026-09-01）。
+        // どの案件のカードか分かるように印を付けておく。
+        // ⚠ 同じ案件を2か所に出さない決まりなので id が重ならない
+        //   （カレンダー表示のときはリストを作らない）。
         row.id = 'job-' + j.id;
         row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.state === 'applied' ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '');
         row.innerHTML = `
@@ -973,13 +979,65 @@
             </div>
             <div class="jr-cmt-hint">担当（アサインする人）の画面に表示されます。エントリーしたあとでも直せます。</div>
           </div>`;
-        grid.appendChild(row);
+        return row;
       } catch (e) {
-        // ⚠ 黙って消さない。何件出せなかったかを画面に出して、担当へ言えるようにする。
-        skipped++;
         console.error('募集案件を表示できませんでした', j && j.id, e);
+        return null;
       }
-      });
+    }
+
+    function renderJobs() {
+      const kw    = document.getElementById('jobKw').value.trim();
+      const area  = document.getElementById('jobArea').value;
+      const state = jobStateFilter;
+      const fromStr = document.getElementById('jobFrom').value;
+      const fromDate = fromStr ? (function(){ const p = fromStr.split('-'); return new Date(+p[0], (+p[1]) - 1, +p[2]); })() : null;
+      const grid  = document.getElementById('jobGrid');
+      grid.innerHTML = '';
+
+      const list = jobs
+        .filter(j => !kw    || (j.content + j.client + j.place).includes(kw))
+        .filter(j => !area  || j.area === area)
+        .filter(j => !state || j.state === state)
+        .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
+        // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
+        .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
+        .sort((a,b) => {
+          const pa = anchorJob(a), pb = anchorJob(b);
+          // 追加案件を先頭に
+          const ax = pa.extra ? 1 : 0, bx = pb.extra ? 1 : 0;
+          if (ax !== bx) return bx - ax;
+          // 本番の日付の近い順（予備日・リハは親の本番に合わせて並ぶ）
+          if (pa.date - pb.date !== 0) return pa.date - pb.date;
+          // 同じ本番グループ内：本番 → 予備日・リハ の順
+          const sa = (a.dayType === '予備日' || a.dayType === 'リハ') ? 1 : 0;
+          const sb = (b.dayType === '予備日' || b.dayType === 'リハ') ? 1 : 0;
+          return sa - sb;
+        });
+
+      // 追加募集のお知らせバナー（表示中の追加案件の件数）
+      const extraCount = list.filter(j => j.extra).length;
+      const en = document.getElementById('extraNotice');
+      if (extraCount > 0) {
+        en.style.display = '';
+        en.innerHTML = `📣 <b>追加募集が${extraCount}件</b>出ています。急ぎの募集が多いので、参加できる方はお早めにエントリーをお願いします。`;
+      } else {
+        en.style.display = 'none';
+      }
+
+      // ⚠ 1件でも描けない案件があっても、そこで止めない。
+      //   前は途中で止まると**残り全部が消える**のに画面は真っ白にならなかったので、
+      //   「公開したのに出てこない」に気づけなかった（2026-08-28 baba報告）。
+      // ⚠ カレンダー表示のときはリストを作らない。
+      //   作ってしまうと、同じ案件のカードが2つになり（リストとカレンダーの下）、
+      //   同じ id が2つできて「コメント保存しました」の表示などが片方にしか出なくなる。
+      let skipped = 0;
+      if (jobView === 'list') {
+        list.forEach(j => {
+          const row = buildJobRow(j);
+          if (row) grid.appendChild(row); else skipped++;
+        });
+      }
 
       if (skipped > 0) {
         const warn = document.createElement('div');
@@ -1010,6 +1068,8 @@
       document.getElementById('jobCal').style.display  = (view === 'cal')  ? '' : 'none';
       // 「条件に合う案件がありません」はリストのときだけ（カレンダーは月ごとに別の案内を出す）。
       if (view === 'cal') document.getElementById('jobEmpty').style.display = 'none';
+      // リストに戻るときは、カレンダーの下に開いていた案件を閉じる（同じカードが2つ出ないように）。
+      if (view === 'list') { openJobId = null; renderJobDetail(); }
       renderJobs();
     }
 
@@ -1058,10 +1118,10 @@
         (byDay[d] || []).forEach(j => {
           const b = document.createElement('button');
           b.type = 'button';
-          b.className = 'jc-job ' + j.state + (j.extra ? ' extra' : '');
+          b.className = 'jc-job ' + j.state + (j.extra ? ' extra' : '') + (openJobId === j.id ? ' picked' : '');
           b.textContent = j.content;
           b.title = j.content + '／' + j.client + '（' + (stateBadge[j.state] || stateBadge.open).t + '）';
-          b.onclick = function () { jumpToJob(j.id); };
+          b.onclick = function () { openJobDetail(j.id); };
           cell.appendChild(b);
         });
 
@@ -1069,21 +1129,41 @@
       }
 
       document.getElementById('jobCalEmpty').style.display = monthCount === 0 ? '' : 'none';
+
+      // 開いている案件が、いま見ている月・絞り込みから外れたら閉じる（中身だけ残らないように）。
+      if (openJobId && !list.some(j => j.id === openJobId)) openJobId = null;
+      renderJobDetail();
     }
 
-    // カレンダーの案件をタップ → リスト表示に戻して、その案件まで動かす。
-    // ⚠ エントリーはリストのカードから行う（同じボタンを2か所に作らないため）。
-    let jobFlashTimer = null;
-    function jumpToJob(id) {
-      switchJobView('list');
-      const row = document.getElementById('job-' + id);
-      if (!row) return;
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      row.classList.remove('flash');
-      void row.offsetWidth;   // 同じ案件を続けて押しても光らせ直すための再描画
-      row.classList.add('flash');
-      if (jobFlashTimer) clearTimeout(jobFlashTimer);
-      jobFlashTimer = setTimeout(() => row.classList.remove('flash'), 1800);
+    // カレンダーの案件をタップ → **カレンダーはそのまま**、すぐ下に中身を開く（2026-09-01 baba指摘）。
+    // ⚠ 前はリスト表示へ飛ばしていたが、カレンダーに戻るのに上までスクロールし直しで面倒だった。
+    // ⚠ 出すカードは buildJobRow で作る＝リストとまったく同じもの。
+    //   カレンダー用に別のカードを作ると、エントリーボタンやコメント欄が2種類になって食い違う。
+    let openJobId = null;
+
+    function openJobDetail(id) {
+      openJobId = id;
+      renderJobDetail();
+    }
+
+    function closeJobDetail() {
+      openJobId = null;
+      renderJobDetail();
+    }
+
+    function renderJobDetail() {
+      const wrap = document.getElementById('jobCalDetail');
+      const body = document.getElementById('jobCalDetailBody');
+      if (!wrap || !body) return;
+      body.innerHTML = '';
+
+      const j = openJobId ? jobById[openJobId] : null;
+      if (!j) { wrap.style.display = 'none'; return; }
+
+      const row = buildJobRow(j);
+      if (!row) { wrap.style.display = 'none'; return; }
+      body.appendChild(row);
+      wrap.style.display = '';
     }
 
     // コメントの保存（案件IDごとに本文と開閉状態を覚えておく＝再描画で消えない）
