@@ -197,4 +197,71 @@ class DirectorBoardFilterTest extends TestCase
             ->post('/assign-director/save', ['ym' => '2026-10', 'office' => '東京'])
             ->assertRedirect('/assign-director?ym=2026-10&office=%E6%9D%B1%E4%BA%AC');
     }
+
+    /**
+     * 都度保存（2026-09-02 baba要望）。
+     * ⚠ 「保存ボタンの押し忘れで決めた担当が消えた」が2回起きたため、
+     *   D/SD/FCを押したその場で1案件ぶんだけ送る形にした。
+     *   ここが壊れると**また黙って消える**ので、送り先・返事・画面の仕掛けを見張る。
+     */
+    public function test_one_project_can_be_saved_on_its_own_and_answers_in_json(): void
+    {
+        $admin = $this->admin();
+        $emp = PersonFactory::new()->create([
+            'id' => 'E-D1', 'role' => 'employee', 'name' => '佐藤 大輔',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+        Project::create([
+            'id' => 'P-AS1', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => '2026-10-03', 'office' => '東京', 'status' => '調整中',
+        ]);
+
+        // 画面を作り直さず、返事だけ返す（＝1つ押すたびにカレンダーが再読み込みされない）。
+        $this->actingAsPerson($admin)
+            ->postJson('/assign-director/save', [
+                'ym' => '2026-10', 'office' => '東京',
+                'dir' => ['P-AS1' => 'E-D1'],
+            ])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'saved' => 1, 'skipped' => 0]);
+
+        $this->assertDatabaseHas('assignments', [
+            'project_id' => 'P-AS1', 'staff_id' => 'E-D1', 'role' => 'D',
+        ]);
+    }
+
+    /** ⚠ 開催日が無い案件は台帳に書けない＝だまって消えないよう「保存できなかった件数」を返す。 */
+    public function test_a_project_without_a_date_is_reported_back(): void
+    {
+        $admin = $this->admin();
+        PersonFactory::new()->create([
+            'id' => 'E-D2', 'role' => 'employee', 'office' => '東京',
+            'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+        Project::create([
+            'id' => 'P-NODATE', 'project_name' => '日付なし', 'content_names' => ['運動会'],
+            'start_date' => null, 'office' => '東京', 'status' => '調整中',
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/assign-director/save', ['dir' => ['P-NODATE' => 'E-D2']])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'saved' => 0, 'skipped' => 1]);
+    }
+
+    /** 画面側の仕掛け（@verbatim の中なので消えても気づけない）。 */
+    public function test_the_screen_saves_on_every_click(): void
+    {
+        $this->actingAsPerson($this->admin())->get('/assign-director')
+            ->assertOk()
+            // 押したその場で送る
+            ->assertSee('function autoSave', false)
+            ->assertSee('autoSave(caseId);', false)
+            // 失敗を見落とさないための仕掛け
+            ->assertSee('⚠ 保存できていません', false)
+            ->assertSee('beforeunload', false)
+            ->assertSee('id="dirRetryBtn"', false)
+            // ⚠ 押し忘れの元になる「保存ボタン」は置かない
+            ->assertDontSee('id="saveDirBtn"', false);
+    }
 }

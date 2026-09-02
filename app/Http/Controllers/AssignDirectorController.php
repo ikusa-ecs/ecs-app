@@ -445,6 +445,20 @@ class AssignDirectorController extends Controller
             $msg .= "（他の拠点の案件 {$blocked} 件は編集できないため保存していません）";
         }
 
+        // ⚠ 都度保存（自動保存）からの呼び出しは、画面を作り直さずに返事だけ返す。
+        //   （2026-09-02 baba要望「保存を押し忘れて消えた」＝押した瞬間に1案件ぶん送ってくる）
+        //   ここで画面ごと返すと、担当を1つ押すたびにカレンダーが再読み込みされてしまう。
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'saved' => $saved,
+                'skipped' => count($skipped),
+                'blocked' => $blocked,
+                'message' => $msg,
+                'at' => now()->format('H:i'),
+            ]);
+        }
+
         // ⚠ 保存したら、**見ていた月へ戻す**（2026-09-02 baba報告）。
         //   これが無いと、保存のたびに既定の月へ飛ばされて「8月に戻っちゃう」ことになる。
         //   拠点の切替も持ち回す（管理者が拠点を選んで作業しているため）。

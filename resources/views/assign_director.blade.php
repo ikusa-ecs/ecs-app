@@ -40,6 +40,18 @@
     }
     .btn-save-dir:hover { filter: brightness(1.05); }
 
+    /* 都度保存の状態表示（2026-09-02）。⚠ 失敗を見落とすと「消えた」に戻るので、失敗だけ赤く強く出す。 */
+    .save-state {
+      display: inline-flex; align-items: center; gap: 5px;
+      border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 700;
+      border: 1px solid transparent; white-space: nowrap;
+    }
+    .save-state.ok     { background: #eef7f0; border-color: #cfe6d6; color: #15803d; }
+    .save-state.saving { background: #fff7e8; border-color: #f2dcb4; color: #92600a; }
+    .save-state.ng     { background: #fdecec; border-color: #f3c0c0; color: #b91c1c; }
+    .save-state.ng     { animation: saveBlink 1s steps(1) infinite; }
+    @keyframes saveBlink { 50% { background: #fff; } }
+
     /* 全体：カレンダー（左・広め）＋ 担当バランス集計（右・固定幅） */
     .dir-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
     @media (max-width: 1080px) { .dir-layout { grid-template-columns: 1fr; } }
@@ -291,7 +303,10 @@
           <b>SD と FC は何人でも付けられます</b>（2026-09-02 追加。大型案件はコンテンツごとにSDが2名いたりするため）。<b>D は1案件1名</b>です。<br>
           <span style="color:#15803d; font-weight:700;">緑＝D/SD担当</span>／<span style="color:#2c6ca0; font-weight:700;">青＝FC等で稼働</span>／<span style="color:#9c8f80; font-weight:700;">グレー＝未アサイン</span>／<span style="color:#92600a; font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:#7a6a58; font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:#6d28d9; font-weight:700;">新＝新人</span>。
           名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>・<span style="color:#6e5b49;font-weight:700;">茶＝その他</span>）。
-          右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。<br>
+          右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。<br>
+          <b>保存ボタンはありません。押したその場で保存されます</b>（2026-09-02 変更。保存の押し忘れで決めた担当が消えていたため）。
+          右上に<b>「保存しました ○:○○」</b>と出ていれば保存できています。
+          <span style="color:#b91c1c;font-weight:700;">赤い「⚠ 保存できていません」</span>が出たときだけ、<b>「保存し直す」</b>を押してください（保存先＝アサイン台帳）。<br>
           <b>2026-09-01 に変えたところ</b>＝
           ① <b>その日「×」「希望休」を出している方は並べません</b>（マスの下に「お休み ◯名」と出ます）。
           ② <b>他の拠点の方は並べません</b>（以前は、一度この拠点の案件で担当に入ると全部の日に出ていました）。
@@ -312,7 +327,10 @@
         </div>
         <div class="spacer"></div>
         <label class="chk"><input type="checkbox" id="showAllEmp" onchange="render()"> ＋全社員を表示（既定はイベプラだけ）</label>
-        <button type="button" id="saveDirBtn" class="btn-save-dir">D／SDを保存</button>
+        <!-- 都度保存（2026-09-02 baba要望）。押した瞬間に保存するので、保存ボタンは無い。
+             ここは「いま保存できているか」を出すだけの表示。失敗したときだけ再送ボタンを出す。 -->
+        <span id="dirSaveState" class="save-state ok">自動保存</span>
+        <button type="button" id="dirRetryBtn" class="btn-save-dir" style="display:none;">保存し直す</button>
       </div>
 
       <!-- 凡例（色とマークの意味） -->
@@ -747,6 +765,8 @@
     }
     render();
     renderPick();
+    // ⚠ 押したその場で保存する（2026-09-02）。保存ボタンは無い＝押し忘れで消えないように。
+    autoSave(caseId);
   }
   // ===== 人ごとのメモ（2026-09-02 baba要望）=====
   // 例：「10/3 大型入ってるからアサインしない」。社員名を押したときのふきだしに出す。
@@ -939,34 +959,128 @@
     }
   }
 
-  // ===== 保存（選んだD/SDを assignments に送る。すべて社員ID基準）=====
-  const saveBtn = document.getElementById('saveDirBtn');
-  if (saveBtn) {
-    saveBtn.addEventListener('click', function(){
-      if (!USING_DB) {
-        alert('いまは見本データのため保存できません。DBに案件・社員が登録されると保存できるようになります。');
-        return;
+  // ===== 都度保存（2026-09-02 baba要望）=====
+  // ⚠ もともとは「D／SDを保存」ボタンを押すまで何も保存していなかったため、
+  //   押し忘れたまま画面を離れて**決めた担当が消える事故が2回**起きた。
+  //   そこで、D/SD/FCを押した**その瞬間に、その案件1件ぶんだけ**サーバーへ送る形にした。
+  // ⚠ 送るのは「押した案件のいまの状態まるごと」（D・SD全員・FC全員）。
+  //   差分ではなく丸ごとなので、通信が前後しても最後に送ったものが正しく残る。
+  // ⚠ 失敗をだまって流すと結局「消えた」になる。失敗したら赤く点滅させ、
+  //   ページを閉じようとしたら引き止め、「保存し直す」で送り直せるようにしてある。
+  const SAVE = {
+    waiting: new Map(),   // 案件ID => true（まだ送れていない案件）
+    busy: false,
+    stopped: false,       // 失敗したら止める（同じ失敗を延々くり返さないため）
+    warned: false,
+  };
+  const saveState = document.getElementById('dirSaveState');
+  const retryBtn  = document.getElementById('dirRetryBtn');
+
+  function setSaveState(kind, text){
+    if (!saveState) return;
+    saveState.className = 'save-state ' + kind;
+    saveState.textContent = text;
+    if (retryBtn) retryBtn.style.display = (kind === 'ng') ? '' : 'none';
+  }
+
+  /** 1案件ぶんの送信内容を作る（保存フォームと同じ形＝サーバー側は1つの入口のまま）。 */
+  function caseFormData(c){
+    const form = document.getElementById('dirSaveForm');
+    const fd = new FormData();
+    fd.append('_token', window.ECS_CSRF || '');
+    fd.append('ym', (document.getElementById('dirYm') || {}).value || '');
+    const off = form ? form.querySelector('input[name="office"]') : null;
+    fd.append('office', off ? off.value : '');
+    fd.append('dir[' + c.id + ']', c.dirId || '');
+    (c.sdIds || []).forEach(id => fd.append('sd[' + c.id + '][]', id));
+    (c.fcIds || []).forEach(id => fd.append('fc[' + c.id + '][]', id));
+    return fd;
+  }
+
+  /** 押されたら呼ぶ。すぐ送る（順番に1件ずつ）。 */
+  function autoSave(caseId){
+    if (!USING_DB) {
+      if (!SAVE.warned) {
+        SAVE.warned = true;
+        alert('いまは見本データのため保存されません。DBに案件・社員が登録されると自動で保存されるようになります。');
       }
-      const box = document.getElementById('dirSaveInputs');
-      box.innerHTML = '';
-      cases.forEach(c => {
-        // 日付の無い案件はサーバ側でスキップされる（assignmentsは日付必須）
-        box.insertAdjacentHTML('beforeend',
-          `<input type="hidden" name="dir[${c.id}]" value="${c.dirId || ''}">` +
-          '');
-        // SDは複数可（2026-09-02）。FCと同じく1人1行で送る。
-        (c.sdIds || []).forEach(id => {
-          box.insertAdjacentHTML('beforeend',
-            `<input type="hidden" name="sd[${c.id}][]" value="${id}">`);
-        });
-        (c.fcIds || []).forEach(id => {
-          box.insertAdjacentHTML('beforeend',
-            `<input type="hidden" name="fc[${c.id}][]" value="${id}">`);
-        });
+      setSaveState('ng', '見本データ＝保存されません');
+      if (retryBtn) retryBtn.style.display = 'none';
+      return;
+    }
+    SAVE.waiting.set(caseId, true);
+    SAVE.stopped = false;
+    pumpSave();
+  }
+
+  function pumpSave(){
+    if (SAVE.busy || SAVE.stopped) return;
+    const next = SAVE.waiting.keys().next();
+    if (next.done) return;
+
+    const caseId = next.value;
+    SAVE.waiting.delete(caseId);
+    const c = cases.find(x => x.id === caseId);
+    if (!c) { pumpSave(); return; }
+
+    SAVE.busy = true;
+    setSaveState('saving', '保存中…');
+
+    fetch('/assign-director/save', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: caseFormData(c),
+      credentials: 'same-origin',
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('通信エラー ' + r.status)))
+      .then(j => {
+        if (!j || !j.ok) throw new Error((j && j.message) || '保存できませんでした');
+        SAVE.busy = false;
+        if (SAVE.waiting.size === 0) {
+          // ⚠ 開催日が未設定の案件は台帳に書けない（assignmentsは日付が必須）。
+          //   だまって消えると事故なので、そのときだけ知らせる。
+          if (j.skipped > 0) {
+            setSaveState('ng', '開催日が未設定のため保存できません');
+            SAVE.stopped = true;
+            alert('この案件は開催日が入っていないため、担当を保存できませんでした。\n案件の詳細で開催日を入れてから決めてください。');
+            return;
+          }
+          if (j.blocked > 0) {
+            setSaveState('ng', '他の拠点の案件は保存できません');
+            SAVE.stopped = true;
+            return;
+          }
+          setSaveState('ok', '保存しました ' + (j.at || ''));
+        }
+        pumpSave();
+      })
+      .catch(e => {
+        SAVE.busy = false;
+        SAVE.stopped = true;
+        SAVE.waiting.set(caseId, true);   // 送れなかったぶんは残す（保存し直すで再送）
+        setSaveState('ng', '⚠ 保存できていません');
+        alert('担当を保存できませんでした（' + e.message + '）。\n\n' +
+              '画面の上の「保存し直す」を押してください。\n' +
+              'それでも直らないときは、いったん画面を開き直してから決め直してください。');
       });
-      document.getElementById('dirSaveForm').submit();
+  }
+
+  if (retryBtn) {
+    retryBtn.addEventListener('click', function(){
+      SAVE.stopped = false;
+      // 念のため、いま画面にある案件を全部送り直す（どれが送れていないか分からなくなったとき用）。
+      cases.forEach(c => SAVE.waiting.set(c.id, true));
+      pumpSave();
     });
   }
+
+  // ⚠ 送れていないものが残ったまま閉じられると、また「消えた」になる。ブラウザに引き止めてもらう。
+  window.addEventListener('beforeunload', function(ev){
+    if (SAVE.waiting.size > 0 || SAVE.busy) {
+      ev.preventDefault();
+      ev.returnValue = '';
+    }
+  });
 
   // 初期描画
   rememberMonth();
