@@ -55,16 +55,25 @@ class AssignDirectorController extends Controller
 
         // この案件のD/SDを assignments から引く（role='D' / 'SD'）。
         // project_id => ['D'=>['id'=>staff_id,'status'=>...], 'SD'=>...]
+        // ⚠ SDは**複数可**（2026-09-02 baba要望）。大型案件はコンテンツごとにSDが2名いたりする。
+        //   Dは1案件1名のまま（複数にすると「誰が責任者か」が分からなくなる）。
         $dirByProject = Assignment::whereIn('project_id', $projectIds)
             ->whereIn('role', [AssignmentRole::D, AssignmentRole::SD])
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id', 'role', 'status'])
             ->groupBy('project_id')
             ->map(function ($rows) {
-                $out = [];
+                $out = ['D' => null, 'SD' => [], 'sdStatus' => null];
                 foreach ($rows as $r) {
-                    $out[$r->role] = ['id' => $r->staff_id, 'status' => $r->status];
+                    if ($r->role === AssignmentRole::D) {
+                        $out['D'] = ['id' => $r->staff_id, 'status' => $r->status];
+                    } else {
+                        $out['SD'][] = $r->staff_id;
+                        $out['sdStatus'] ??= $r->status;
+                    }
                 }
+                $out['SD'] = array_values(array_unique($out['SD']));
+
                 return $out;
             });
 
@@ -80,7 +89,10 @@ class AssignDirectorController extends Controller
         // 拠点で絞っても「すでにD/SD/FCに入っている他拠点の社員」は残す。
         // 理由：保存は「いま画面に出ている人で上書き」なので、候補から消えると保存時に担当が外れてしまう。
         $keepIds = $dirByProject
-            ->flatMap(fn ($roles) => collect($roles)->pluck('id')->all())
+            ->flatMap(fn ($roles) => array_merge(
+                $roles['D'] ? [$roles['D']['id']] : [],
+                $roles['SD'] ?? []
+            ))
             ->merge($fcByProject->flatten())
             ->filter()
             ->unique()
@@ -146,11 +158,12 @@ class AssignDirectorController extends Controller
                     'scale' => $p->scale ?? '中型',
                     'format' => $format,
                     'fmt' => $fmt,
-                    'dirId' => $decided['D']['id'] ?? null,    // D の社員ID
-                    'sdId' => $decided['SD']['id'] ?? null,    // SD の社員ID
+                    'dirId' => $decided['D']['id'] ?? null,    // D の社員ID（1名）
+                    // ⚠ SDは複数可（2026-09-02 baba要望）。大型はコンテンツごとに2名いたりする。
+                    'sdIds' => $decided['SD'] ?? [],           // SD の社員ID（複数可）
                     'fcIds' => $fcByProject->get($p->id, []),  // FC の社員ID（複数可）
                     'dStatus' => $decided['D']['status'] ?? null,
-                    'sStatus' => $decided['SD']['status'] ?? null,
+                    'sStatus' => $decided['sdStatus'] ?? null,
                     'dayType' => $p->date_type ?? '本番',
                     'status' => $p->status ?? '',
                     'guests' => $p->guest_count,
@@ -266,8 +279,10 @@ class AssignDirectorController extends Controller
         $data = $request->validate([
             'dir' => ['nullable', 'array'],
             'dir.*' => ['nullable', 'string'],
+            // ⚠ SDは複数可（2026-09-02 baba要望）＝案件ID => [社員ID, ...]。
+            //   ⚠ 社員IDを1つだけ（文字列）で送ってくる呼び出しも受ける＝古い形で壊れないように。
+            //     どちらで来ても、下で配列にそろえる。
             'sd' => ['nullable', 'array'],
-            'sd.*' => ['nullable', 'string'],
             'fc' => ['nullable', 'array'],
             'fc.*' => ['nullable', 'array'],
             'fc.*.*' => ['nullable', 'string'],
@@ -314,10 +329,15 @@ class AssignDirectorController extends Controller
                 }
                 $date = Carbon::parse($start)->format('Y-m-d');
 
-                // いま選ばれているD/SDの社員ID（未定／なしは空）
+                // いま選ばれているD（1名）とSD（複数可）の社員ID（未定／なしは空）
                 $dId = trim((string) ($dirs[$pid] ?? ''));
-                $sId = trim((string) ($sds[$pid] ?? ''));
-                $keep = array_values(array_filter([$dId, $sId], fn ($x) => $x !== ''));
+                // ⚠ 文字列1つでも配列でも受ける（古い形で呼ばれても壊れないように）。
+                $rawSd = $sds[$pid] ?? [];
+                $sIds = array_values(array_unique(array_filter(
+                    array_map(fn ($x) => trim((string) $x), is_array($rawSd) ? $rawSd : [$rawSd]),
+                    fn ($x) => $x !== '' && $x !== $dId   // 同じ人をDとSDの両方にはしない
+                )));
+                $keep = array_values(array_filter(array_merge([$dId], $sIds), fn ($x) => $x !== ''));
 
                 // 以前のD/SDで「今回は選ばれていない人」の行だけ消す（担当を外す操作を反映）。
                 // ※ 日付は whereDate で「日付部分」だけ照合する（DB保存は 00:00:00 付きのため、
@@ -331,10 +351,16 @@ class AssignDirectorController extends Controller
                 // 選ばれたD/SDを保存。同じ案件×人×日が既にあれば role/status を更新するだけ。
                 // ※ 既存行を探すときも whereDate で「日付部分」だけ照合する（DB保存は 00:00:00 付き。
                 //   updateOrCreate は date を完全一致で探すため取りこぼし→新規作成→重複エラーになる）。
-                foreach ([AssignmentRole::D => $dId, AssignmentRole::SD => $sId] as $role => $staffId) {
-                    if ($staffId === '') {
-                        continue;   // 未定／なし＝行を作らない
-                    }
+                // 役割と社員IDの組（Dは1名・SDは複数）。
+                $pairs = [];
+                if ($dId !== '') {
+                    $pairs[] = [AssignmentRole::D, $dId];
+                }
+                foreach ($sIds as $sid) {
+                    $pairs[] = [AssignmentRole::SD, $sid];
+                }
+
+                foreach ($pairs as [$role, $staffId]) {
                     $existing = Assignment::where('project_id', $pid)
                         ->where('staff_id', $staffId)
                         ->whereDate('date', $date)
@@ -360,9 +386,11 @@ class AssignDirectorController extends Controller
                 // 古い列（projects.director_id / sd_id）へ「写し」を書く＝移行①（2026-08-05 baba確定）。
                 // 表示がまだ古い列を読んでいる画面（案件一覧・アサイン表など）に、
                 // D決め画面で決めた担当がちゃんと出るようにするため。写しをやめるのは移行③。
+                // ⚠ 古い列（projects.sd_id）は1人ぶんしか持てないので、**先頭のSDだけ**を写す。
+                //   本当のSDは assignments 側（複数行）。写しを読んでいる画面は「1人目」を見ることになる。
                 $projectModel = Project::find($pid);
                 if ($projectModel) {
-                    DirectorSync::mirrorToProject($projectModel, $dId ?: null, $sId ?: null);
+                    DirectorSync::mirrorToProject($projectModel, $dId ?: null, $sIds[0] ?? null);
                 }
 
                 // FC（複数可）を同期：いま選ばれているFC集合に揃える。
@@ -378,7 +406,8 @@ class AssignDirectorController extends Controller
                     ->delete();
                 foreach ($fcIds as $sid) {
                     // 同じ人が同案件でD/SDに就いている場合は、その役割を優先（FCは付けない）。
-                    if ($sid === $dId || $sid === $sId) {
+                    // ⚠ SDは複数になったので、配列で見る（2026-09-02）。
+                    if ($sid === $dId || in_array($sid, $sIds, true)) {
                         continue;
                     }
                     $existing = Assignment::where('project_id', $pid)

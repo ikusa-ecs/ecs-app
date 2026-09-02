@@ -288,6 +288,7 @@
           <b>各日に「イベプラの社員」を並べ、名前をクリックして担当（D／SD）を決める画面です。</b>
           日付の横の<b>●件数</b>にカーソルを当てると、その日の案件一覧が出ます。
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
+          <b>SD と FC は何人でも付けられます</b>（2026-09-02 追加。大型案件はコンテンツごとにSDが2名いたりするため）。<b>D は1案件1名</b>です。<br>
           <span style="color:#15803d; font-weight:700;">緑＝D/SD担当</span>／<span style="color:#2c6ca0; font-weight:700;">青＝FC等で稼働</span>／<span style="color:#9c8f80; font-weight:700;">グレー＝未アサイン</span>／<span style="color:#92600a; font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:#7a6a58; font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:#6d28d9; font-weight:700;">新＝新人</span>。
           名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>・<span style="color:#6e5b49;font-weight:700;">茶＝その他</span>）。
           右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。最後に<b>「D／SDを保存」</b>で確定（保存先＝アサイン台帳）。<br>
@@ -442,12 +443,12 @@
     : ECS_CASES.filter(c => !c.archived && !c.draft).map(c => ({
         ...c,
         dirId: (c.dir && c.dir !== '未定') ? c.dir : null,
-        sdId:  (c.sd  && c.sd  !== 'なし') ? c.sd  : null,
+        sdIds: (c.sd  && c.sd  !== 'なし') ? [c.sd] : [],
       }));
   const cases = SRC.map(c => ({
       id:c.id, off:c.off, name:c.name, client:c.client, content:c.content,
       scale:c.scale, format:c.format||'', fmt:c.fmt,
-      dirId:c.dirId || null, sdId:c.sdId || null,
+      dirId:c.dirId || null, sdIds: Array.isArray(c.sdIds) ? c.sdIds.slice() : (c.sdId ? [c.sdId] : []),
       fcIds: Array.isArray(c.fcIds) ? c.fcIds.slice() : [],   // FC（複数可・この画面で増減）
       dayType:c.dayType, status:c.status,
       guests:c.guests, teams:c.teams, repeat:c.repeat,
@@ -525,7 +526,7 @@
     let count = 0, big = false;
     dcs.forEach(c => {
       if (c.dirId === empId) { count++; if (c.scale === '大型') big = true; }
-      if (c.sdId  === empId) { count++; if (c.scale === '大型') big = true; }
+      if ((c.sdIds || []).includes(empId)) { count++; if (c.scale === '大型') big = true; }
     });
     return { count, big };
   }
@@ -556,7 +557,7 @@
     const inUse = new Set();
     dcs.forEach(c => {
       if (c.dirId) inUse.add(c.dirId);
-      if (c.sdId) inUse.add(c.sdId);
+      (c.sdIds || []).forEach(id => inUse.add(id));
       (c.fcIds || []).forEach(id => inUse.add(id));
     });
     return EMP.filter(e => {
@@ -597,7 +598,7 @@
     const rows = dcs.map(c => {
       const t = timeOf(c);
       const dTxt = c.dirId ? ('D: ' + empName(c.dirId)) : '<span style="color:#b45309">D未定</span>';
-      const sTxt = c.sdId ? ('｜SD: ' + empName(c.sdId)) : '';
+      const sTxt = (c.sdIds || []).length ? ('｜SD: ' + c.sdIds.map(empName).join('・')) : '';
       const meta = ['🎯' + c.content, c.client, t].filter(Boolean).join(' / ');
       // 案件名を押したら案件の詳細（編集画面）へ。見本データのときは飛べる先が無いのでそのまま（2026-08-21 baba）。
       const nameHtml = USING_DB
@@ -710,25 +711,38 @@
     if (!PICK) return;
     const c = cases.find(x => x.id === caseId); if (!c) return;
     const id = PICK.empId;
+    c.fcIds = c.fcIds || [];
+    c.sdIds = c.sdIds || [];
+
+    // ⚠ SDは**複数可**（2026-09-02 baba要望）。大型案件はコンテンツごとにSDが2名いたりする。
+    //   Dは1案件1名のまま（複数にすると「誰が責任者か」が分からなくなる）。
+    // ⚠ 同じ案件で同じ人が2つの役割に就くことはない（D↔SD↔FCは入れ替え）。
+    const dropFrom = (except) => {
+      if (except !== 'D' && c.dirId === id) c.dirId = null;
+      if (except !== 'SD') c.sdIds = c.sdIds.filter(x => x !== id);
+      if (except !== 'FC') c.fcIds = c.fcIds.filter(x => x !== id);
+    };
+
     if (role === 'FC') {
-      c.fcIds = c.fcIds || [];
-      const i = c.fcIds.indexOf(id);
-      if (i >= 0) {
-        c.fcIds.splice(i, 1);                 // 再クリックで解除
+      if (c.fcIds.includes(id)) {
+        c.fcIds = c.fcIds.filter(x => x !== id);   // 再クリックで解除
       } else {
-        c.fcIds.push(id);                     // FCに就く（他案件は兼任OK）
-        if (c.dirId === id) c.dirId = null;   // 同案件のD/SDからは外す（1案件1役割）
-        if (c.sdId === id) c.sdId = null;
+        dropFrom('FC');
+        c.fcIds.push(id);
+      }
+    } else if (role === 'SD') {
+      if (c.sdIds.includes(id)) {
+        c.sdIds = c.sdIds.filter(x => x !== id);   // 再クリックで解除
+      } else {
+        dropFrom('SD');
+        c.sdIds.push(id);                          // 何人でも付けられる
       }
     } else {
-      const key = role === 'D' ? 'dirId' : 'sdId';
-      if (c[key] === id) {
-        c[key] = null;                        // 再クリックで解除
+      if (c.dirId === id) {
+        c.dirId = null;                            // 再クリックで解除
       } else {
-        c[key] = id;                          // D/SDに就く（他案件は兼任OK）
-        c.fcIds = (c.fcIds || []).filter(x => x !== id);   // 同案件のFCからは外す
-        const other = role === 'D' ? 'sdId' : 'dirId';
-        if (c[other] === id) c[other] = null;              // 同案件でDとSDの掛け持ちは不可
+        dropFrom('D');
+        c.dirId = id;
       }
     }
     render();
@@ -813,15 +827,18 @@
     if (!PICK) { el.style.display = 'none'; return; }
     const emp = empById[PICK.empId];
     const dcs = dayCases(PICK.dateKey);
-    const mine = dcs.filter(c => c.dirId === PICK.empId || c.sdId === PICK.empId || (c.fcIds || []).includes(PICK.empId)).length;
+    const mine = dcs.filter(c => c.dirId === PICK.empId || (c.sdIds || []).includes(PICK.empId) || (c.fcIds || []).includes(PICK.empId)).length;
     const rows = dcs.length ? dcs.map(c => {
-      const dOn = c.dirId === PICK.empId, sOn = c.sdId === PICK.empId, fcOn = (c.fcIds || []).includes(PICK.empId);
-      const dTaken = c.dirId && !dOn, sTaken = c.sdId && !sOn;
+      const dOn = c.dirId === PICK.empId, sOn = (c.sdIds || []).includes(PICK.empId), fcOn = (c.fcIds || []).includes(PICK.empId);
+      // ⚠ SDは複数可（2026-09-02 baba要望）なので「他の人に取られている」は無い。
+      //   すでに入っている人がいれば名前を並べて出すだけ。
+      const dTaken = c.dirId && !dOn;
+      const sNames = (c.sdIds || []).filter(id => id !== PICK.empId).map(empName).join('・');
       return `<div class="dp-case">
           <div class="dp-info"><div class="dp-nm">${c.scale==='大型'?'⭐':''}${c.name}</div><div class="dp-ct">🎯${c.content}</div></div>
           <div class="dp-btns">
             <button class="dp-btn d ${dOn?'on':''} ${dTaken?'taken':''}" onclick="toggleRole('${c.id}','D')">D${dTaken?`<span class="who"> ${empName(c.dirId)}</span>`:''}</button>
-            <button class="dp-btn sd ${sOn?'on':''} ${sTaken?'taken':''}" onclick="toggleRole('${c.id}','SD')">SD${sTaken?`<span class="who"> ${empName(c.sdId)}</span>`:''}</button>
+            <button class="dp-btn sd ${sOn?'on':''}" onclick="toggleRole('${c.id}','SD')" title="SDは何人でも付けられます">SD${sNames?`<span class="who"> ${sNames}</span>`:''}</button>
             <button class="dp-btn fc ${fcOn?'on':''}" onclick="toggleRole('${c.id}','FC')">FC</button>
           </div>
         </div>`;
@@ -861,7 +878,7 @@
       if (!inTarget(c)) return;
       const isBig = c.scale === '大型';
       if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); r.d++; r.total++; if (isBig) r.bigD++; }
-      if (c.sdId && isEmp(c.sdId))   { const r = ensure(c.sdId);  r.total++; if (isBig) r.bigSD++; }
+      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); r.total++; if (isBig) r.bigSD++; });
       (c.fcIds || []).forEach(id => { if (isEmp(id)) ensure(id).total++; });
     });
 
@@ -936,7 +953,12 @@
         // 日付の無い案件はサーバ側でスキップされる（assignmentsは日付必須）
         box.insertAdjacentHTML('beforeend',
           `<input type="hidden" name="dir[${c.id}]" value="${c.dirId || ''}">` +
-          `<input type="hidden" name="sd[${c.id}]" value="${c.sdId || ''}">`);
+          '');
+        // SDは複数可（2026-09-02）。FCと同じく1人1行で送る。
+        (c.sdIds || []).forEach(id => {
+          box.insertAdjacentHTML('beforeend',
+            `<input type="hidden" name="sd[${c.id}][]" value="${id}">`);
+        });
         (c.fcIds || []).forEach(id => {
           box.insertAdjacentHTML('beforeend',
             `<input type="hidden" name="fc[${c.id}][]" value="${id}">`);

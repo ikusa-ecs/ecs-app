@@ -179,4 +179,74 @@ class DirectorSyncTest extends TestCase
         $this->assertNull($created->director_id, 'CSVのディレクター列を取り込んでしまっている');
         $this->assertSame(0, Assignment::where('project_id', $created->id)->count());
     }
+
+    /**
+     * ⚠ SDは複数入れられる（2026-09-02 baba要望）。
+     *   大型案件はコンテンツごとにSDが2名いたりする。Dは1名のまま。
+     */
+    public function test_multiple_sd_can_be_saved(): void
+    {
+        $manager = PersonFactory::new()->manager()->create();
+        $director = PersonFactory::new()->create(['id' => 'E-D1']);
+        $sd1 = PersonFactory::new()->create(['id' => 'E-S1']);
+        $sd2 = PersonFactory::new()->create(['id' => 'E-S2']);
+        $project = ProjectFactory::new()->create(['start_date' => '2026-09-02']);
+
+        $this->actingAsPerson($manager)->post('/assign-director/save', [
+            'dir' => [$project->id => $director->id],
+            'sd' => [$project->id => [$sd1->id, $sd2->id]],
+            'status' => '仮',
+        ])->assertRedirect();
+
+        $sds = Assignment::where('project_id', $project->id)->where('role', 'SD')
+            ->pluck('staff_id')->sort()->values()->all();
+        $this->assertSame(['E-S1', 'E-S2'], $sds, 'SDが2名入っていない');
+
+        // ⚠ 古い列は1人ぶんしか持てないので、先頭のSDだけ写す（本当のSDは assignments 側）。
+        $this->assertSame('E-S1', $project->fresh()->sd_id);
+
+        // 画面にも2名で渡る。
+        $this->actingAsPerson($manager)->get('/assign-director')
+            ->assertOk()
+            ->assertViewHas('cases', function ($cases) use ($project) {
+                $c = collect($cases)->firstWhere('id', $project->id);
+
+                return $c && count($c['sdIds']) === 2;
+            });
+    }
+
+    /** SDを1人だけ外しても、もう1人は残る。 */
+    public function test_removing_one_sd_keeps_the_other(): void
+    {
+        $manager = PersonFactory::new()->manager()->create();
+        PersonFactory::new()->create(['id' => 'E-S1']);
+        PersonFactory::new()->create(['id' => 'E-S2']);
+        $project = ProjectFactory::new()->create(['start_date' => '2026-09-02']);
+
+        $this->actingAsPerson($manager)->post('/assign-director/save', [
+            'sd' => [$project->id => ['E-S1', 'E-S2']],
+        ])->assertRedirect();
+
+        $this->actingAsPerson($manager)->post('/assign-director/save', [
+            'sd' => [$project->id => ['E-S2']],
+        ])->assertRedirect();
+
+        $sds = Assignment::where('project_id', $project->id)->where('role', 'SD')
+            ->pluck('staff_id')->all();
+        $this->assertSame(['E-S2'], $sds);
+    }
+
+    /** ⚠ 古い形（社員IDを1つだけ文字列で送る）でも受ける＝他の入口が壊れない。 */
+    public function test_a_single_sd_string_still_works(): void
+    {
+        $manager = PersonFactory::new()->manager()->create();
+        PersonFactory::new()->create(['id' => 'E-S9']);
+        $project = ProjectFactory::new()->create(['start_date' => '2026-09-02']);
+
+        $this->actingAsPerson($manager)->post('/assign-director/save', [
+            'sd' => [$project->id => 'E-S9'],
+        ])->assertRedirect();
+
+        $this->assertSame('E-S9', $project->fresh()->sd_id);
+    }
 }
