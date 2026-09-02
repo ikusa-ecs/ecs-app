@@ -297,24 +297,34 @@
     /* スマホのときだけ出す案内。 */
     .jc-only-sp { display: none; }
 
-    /* ⚠ スマホは7列のカレンダーだと1マスが50pxほどしかなく、
-       集合〜解散や場所を入れると読めない（2026-09-02 baba指摘）。
-       スマホでは**日付ごとの縦並び**に切り替える。日付順に並ぶので、
-       「自分の予定と見くらべる」というカレンダーの目的はそのまま果たせる。 */
+    /* ⚠ スマホは7列のままカレンダーの形にする（2026-09-02 baba指示）。
+       いちど「日付ごとの縦並び」にしたが、**リストとほぼ同じになってしまった**のでやめた。
+       ⚠ ただし1マスが50pxほどしかないので、**集合〜解散と場所はスマホでは出さない**
+         （入れると文字が潰れて読めない）。押すと下の一覧に全部出る。
+       ⚠ 小さい帯は指で押しにくいので、**マスごと押せる**ようにしてある（JS側）。 */
     @media (max-width: 720px) {
-      #jobCalGrid { grid-template-columns: 1fr; gap: 6px; }
-      #jobCalGrid .dow { display: none; }          /* 曜日の見出しの行は使わない */
-      .jc-cell.empty, .jc-cell.no-job { display: none; }   /* 月初の空きマス・案件が無い日は出さない */
-      .jc-cell { min-height: 0; padding: 8px 10px; }
-      .jc-cell .dnum { font-size: 14px; }
-      .jc-dow { display: inline; font-size: 12px; font-weight: 400; }
-      /* 文字を読める大きさにする（1行に収める必要が無くなるので折り返してよい）。 */
-      .jc-job { font-size: 14px; padding: 7px 9px; }
-      .jc-job .jc-nm { white-space: normal; }
-      .jc-job .jc-sub { font-size: 12px; white-space: normal; }
-      .jc-legend .jc-job { font-size: 12px; padding: 3px 9px; }
+      #jobCalGrid { gap: 3px; }
+      .jc-cell { min-height: 58px; padding: 2px; cursor: pointer; }
+      .jc-cell.empty { cursor: default; }
+      /* ⚠ 案件が無い日のマスも出す＝カレンダーの形（並び）を崩さないため。 */
+      .jc-cell .dnum { font-size: 10px; }
+      .jc-job { font-size: 9.5px; padding: 1px 3px; line-height: 1.25; }
+      /* 集合〜解散・場所はスマホでは隠す（マスに入りきらない）。押すと下の一覧で見られる。 */
+      .jc-job .jc-sub { display: none; }
+      .jc-legend .jc-job { font-size: 11px; padding: 3px 8px; }
+      .jc-legend .jc-job .jc-sub { display: none; }
       .jc-only-sp { display: inline; }
+      /* 1日に案件が多いときは、はみ出さずに「＋◯件」でまとめる。 */
+      .jc-more { font-size: 9px; color: var(--muted); text-align: center; }
     }
+    /* PCでは全部そのまま出す（「＋◯件」も4件目以降の折りたたみも使わない）。 */
+    .jc-more { display: none; }
+    @media (max-width: 720px) {
+      .jc-more { display: block; }
+      .jc-job.jc-over { display: none; }   /* スマホは3件まで。残りは「＋◯件」でまとめる */
+    }
+    /* いま開いている日のマス。どの日を見ているかが分かるようにする。 */
+    .jc-cell.picked-day { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(161, 92, 46, .18); }
     /* 色の凡例。見本のチップは本物と同じ class なので、色を変えればここも一緒に変わる。 */
     .jc-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 2px 0; }
     .jc-legend .jc-job { width: auto; cursor: default; padding: 2px 8px; }
@@ -577,13 +587,13 @@
           </div>
           <p class="jc-hint">
             案件をタップすると、<b>すぐ下に一覧が開いて、その案件のところまで動きます</b>。ほかの案件もそのまま見られて、エントリーもできます。<br>
-            <span class="jc-only-sp">スマホでは、この月の<b>案件がある日だけ</b>を日付順に並べています（「‹ ›」で月を変えられます）。</span>
+            <span class="jc-only-sp">スマホでは幅が足りないので、マスの中には<b>案件名だけ</b>を出しています。<b>集合〜解散と場所は、押すと下の一覧に出ます</b>（日付のマスのどこを押しても開きます）。</span>
           </p>
           <div class="empty-note" id="jobCalEmpty" style="display:none;">この月には、条件に合う案件がありません。「‹ ›」で前後の月を見てください。</div>
           {{-- タップした案件の中身。リストとまったく同じカードをここに出す（作り方は buildJobRow の1つだけ）。 --}}
           <div id="jobCalDetail" class="jc-detail" style="display:none;">
             <div class="jc-detail-head">
-              <span>案件の一覧（押した案件のところへ動きます）</span>
+              <span id="jobCalDetailDay">押した日の案件</span>
               <button type="button" class="jc-detail-close" onclick="closeJobDetail()">✕ 閉じる</button>
             </div>
             <div class="job-grid" id="jobCalDetailBody"></div>
@@ -1178,21 +1188,31 @@
         const dow = new Date(y, m, d).getDay();
         cell.className = 'jc-cell' + (dow === 0 ? ' sun' : (dow === 6 ? ' sat' : ''))
           + ((y === today.getFullYear() && m === today.getMonth() && d === today.getDate()) ? ' today' : '');
+        const dayKey = y + '-' + m + '-' + d;
+        const ofDay = byDay[d] || [];
+        if (openDayKey === dayKey && ofDay.length) cell.classList.add('picked-day');
+
         const num = document.createElement('div');
         num.className = 'dnum';
-        // ⚠ スマホでは日付ごとの縦並びにするので、曜日が無いと何日か分からない。
-        //   PCでは列の見出しに曜日が出ているので、この曜日はCSSで隠す。
-        num.innerHTML = (m + 1) + '/' + d + '<span class="jc-dow">（' + '日月火水木金土'[dow] + '）</span>';
+        num.innerHTML = d + '<span class="jc-dow">（' + '日月火水木金土'[dow] + '）</span>';
         cell.appendChild(num);
 
-        // 案件が無い日はスマホでは出さない（縦に空の日が並ぶと探せない）。
-        if (!(byDay[d] || []).length) cell.classList.add('no-job');
+        // ⚠ 案件の帯は小さくて指で押しにくいので、**マスのどこを押しても**その日の一覧が開く。
+        if (ofDay.length) {
+          cell.onclick = function () { openDayDetail(dayKey); };
+        }
 
-        (byDay[d] || []).forEach(j => {
+        // ⚠ スマホは1マスが50pxほどしかないので、並べるのは3件まで。
+        //   残りは「＋◯件」でまとめる（はみ出すとマスが崩れて、下の日が見えなくなる）。
+        //   PCでは全部そのまま出す（CSSで「＋◯件」を隠している）。
+        const LIMIT = 3;
+        ofDay.forEach((j, k) => {
           const b = document.createElement('button');
           b.type = 'button';
-          b.className = 'jc-job ' + j.state + (j.extra ? ' extra' : '') + (openJobId === j.id ? ' picked' : '');
-          // コンテンツ名だけでなく、集合〜解散と場所も出す（2026-09-02 baba要望）。
+          b.className = 'jc-job ' + j.state + (j.extra ? ' extra' : '')
+            + (openJobId === j.id ? ' picked' : '') + (k >= LIMIT ? ' jc-over' : '');
+          // 案件名のほかに、集合〜解散と場所も出す（2026-09-02 baba要望）。
+          // ⚠ スマホでは幅が足りないので、時間と場所はCSSで隠して案件名だけにする。
           // ⚠ 集合時間はスタッフ向けの時間を使う（担当が公開ボードで別に入れていればそちら）。
           //   リストのカードと同じ関数（staffMeetOf）を通す＝2つの時間を持たない。
           const jcTime = staffMeetOf(j.id, j.meet) + '〜' + (j.leave || '—');
@@ -1201,17 +1221,26 @@
             + (j.place ? '<span class="jc-sub">📍 ' + escAttr(j.place) + '</span>' : '');
           b.title = j.content + '／' + j.client + '／' + jcTime + '／' + (j.place || '場所未定')
             + '（' + (stateBadge[j.state] || stateBadge.open).t + '）';
-          b.onclick = function () { openJobDetail(j.id); };
+          b.onclick = function (ev) { ev.stopPropagation(); openJobDetail(j.id); };
           cell.appendChild(b);
         });
+        if (ofDay.length > LIMIT) {
+          const more = document.createElement('div');
+          more.className = 'jc-more';
+          more.textContent = '＋' + (ofDay.length - LIMIT) + '件';
+          cell.appendChild(more);
+        }
 
         grid.appendChild(cell);
       }
 
       document.getElementById('jobCalEmpty').style.display = monthCount === 0 ? '' : 'none';
 
-      // 開いている案件が、いま見ている月・絞り込みから外れたら閉じる（中身だけ残らないように）。
-      if (openJobId && !list.some(j => j.id === openJobId)) openJobId = null;
+      // 開いている日が、いま見ている月・絞り込みから外れたら閉じる（中身だけ残らないように）。
+      if (openDayKey && !list.some(j => jobDayKey(j) === openDayKey)) {
+        openDayKey = null;
+        openJobId = null;
+      }
       renderJobDetail();
     }
 
@@ -1219,9 +1248,30 @@
     // ⚠ 前はリスト表示へ飛ばしていたが、カレンダーに戻るのに上までスクロールし直しで面倒だった。
     // ⚠ 出すカードは buildJobRow で作る＝リストとまったく同じもの。
     //   カレンダー用に別のカードを作ると、エントリーボタンやコメント欄が2種類になって食い違う。
-    let openJobId = null;
+    // 開いているのは「日」（2026-09-02 baba指示）。
+    // ⚠ はじめ「押した1件だけ」→ 次に「全部の一覧」と作ったが、どちらも違った。
+    //   正しくは**押した日の一覧**。カレンダーなので、その日に何があるかが知りたい。
+    let openDayKey = null;   // 'Y-M-D'
+    let openJobId = null;    // その中で押した案件（そこまで動かして光らせる）
+
+    function jobDayKey(j) {
+      return j.date.getFullYear() + '-' + j.date.getMonth() + '-' + j.date.getDate();
+    }
+
+    // 日付のマスを押した（案件の帯そのものでなくてもよい＝指で押しやすいように）。
+    function openDayDetail(dayKey) {
+      openDayKey = dayKey;
+      openJobId = null;
+      renderJobs();
+      const wrap = document.getElementById('jobCalDetail');
+      if (wrap && wrap.style.display !== 'none') {
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
 
     function openJobDetail(id) {
+      const j = jobById[id];
+      openDayKey = j ? jobDayKey(j) : null;
       openJobId = id;
       // ⚠ カレンダーも描き直す。そうしないと、押した案件に印（枠）が付かず
       //   「押しても何も起きない」ように見える（2026-09-01 baba報告）。
@@ -1244,6 +1294,7 @@
     }
 
     function closeJobDetail() {
+      openDayKey = null;
       openJobId = null;
       renderJobs();
       // 閉じたらカレンダーへ戻す（下に取り残されないように）。
@@ -1262,13 +1313,23 @@
       if (!wrap || !body) return;
       body.innerHTML = '';
 
-      if (!openJobId || !jobById[openJobId]) { wrap.style.display = 'none'; return; }
+      if (!openDayKey) { wrap.style.display = 'none'; return; }
 
-      jobsShown.forEach(j => {
+      // ⚠ 出すのは**押した日の案件だけ**（2026-09-02 baba指示）。
+      const ofDay = jobsShown.filter(j => jobDayKey(j) === openDayKey);
+      ofDay.forEach(j => {
         const row = buildJobRow(j);
         if (row) body.appendChild(row);
       });
-      if (!body.children.length) { wrap.style.display = 'none'; return; }
+      if (!body.children.length) { openDayKey = null; wrap.style.display = 'none'; return; }
+
+      // 見出しに「何日ぶんか」を出す（一覧だけ見ても、どの日か分かるように）。
+      const d0 = ofDay[0].date;
+      const head = document.getElementById('jobCalDetailDay');
+      if (head) {
+        head.textContent = (d0.getMonth() + 1) + '月' + d0.getDate() + '日（'
+          + '日月火水木金土'[d0.getDay()] + '）の案件 ' + ofDay.length + '件';
+      }
       wrap.style.display = '';
     }
 

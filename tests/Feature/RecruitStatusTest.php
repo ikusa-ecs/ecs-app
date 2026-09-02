@@ -253,9 +253,12 @@ class RecruitStatusTest extends TestCase
         // ⚠ 一覧を全部出すようにしたので（2026-09-02）、動かさないとどれを押したのか分からない。
         $this->assertStringContainsString('target.scrollIntoView', $blade,
             '押しても案件のところまでスクロールしないので、どれを押したのか分かりません。');
-        // 一覧は「押した1件だけ」ではなく、絞り込みを通った案件を全部出す。
-        $this->assertStringContainsString('jobsShown.forEach', $blade,
-            'カレンダーの下に1件しか出していません（ほかの案件を見るのに戻ることになります）。');
+        // ⚠ 出すのは「押した1件だけ」でも「全部」でもなく、**押した日の一覧**（2026-09-02 baba指示）。
+        //   例：9/29 を押したら、その日の5件が出る。
+        $this->assertStringContainsString('jobDayKey(j) === openDayKey', $blade,
+            'カレンダーの下に「押した日の一覧」を出していません。');
+        // 案件の帯は小さくて指で押しにくいので、マスのどこを押しても開く。
+        $this->assertStringContainsString('function openDayDetail', $blade);
         // 押した案件に印を付ける＝カレンダーを描き直す。
         $this->assertStringContainsString('just-opened', $blade);
         $this->assertStringContainsString('.jc-job.picked', $blade);
