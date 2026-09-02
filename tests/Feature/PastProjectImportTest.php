@@ -274,6 +274,28 @@ class PastProjectImportTest extends TestCase
         $this->assertSame('same', $res['rows'][0]['dup']['kind']);
     }
 
+    /**
+     * ⚠ **顧客名が違えば、それは別の案件**（2026-09-01 baba明言）。
+     *   集合時間が違っても「似た案件ですか？」とは聞かない＝黙って別案件として登録する。
+     *   ここが緩むと、別のお客様の案件を上書きして消してしまう。
+     */
+    public function test_a_different_client_is_never_asked_about(): void
+    {
+        $me = $this->manager();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([$this->row([10 => 'A社', 13 => '08:00'])]),
+        ])->assertRedirect('/past-import');
+
+        // 同じ日・同じコンテンツ・集合時間だけ違う。ただし顧客名が違う。
+        $res = $this->actingAsPerson($me)->post('/past-import/preview', [
+            'csv' => $this->csv([$this->row([10 => 'B社', 13 => '13:00'])]),
+        ])->assertOk()->json();
+
+        $this->assertSame('', $res['rows'][0]['dup']['kind'],
+            '顧客名が違うのに「似た案件」と聞いています。別のお客様の案件を上書きしかねません。');
+    }
+
     /** 顧客名が違えば別案件として新しく作る（同じ日・同じコンテンツでも）。 */
     public function test_different_client_becomes_separate_project(): void
     {
