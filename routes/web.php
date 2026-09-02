@@ -216,6 +216,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // ※ 2026-06-25 並行作業：サブエージェント2が AssignDirectorController を作成中。
     Route::get('/assign-director', [AssignDirectorController::class, 'index']);
     Route::post('/assign-director/save', [AssignDirectorController::class, 'save']);
+    // 人ごとのメモ（2026-09-02 baba要望）。D決めで社員名を押したときのふきだしから保存する。
+    // ⚠ 業務のメモ（できるポジション・NGペアと同じ扱い）なので社員以上。個人情報ではない。
+    Route::post('/assign-director/person-note', [AssignDirectorController::class, 'savePersonNote']);
     // 社員の出勤可能日（S-018）。社員が自分の参加希望日を入力・保存する。
     // ※ 2026-06-25 並行作業：サブエージェント1が EmployeeAvailabilityController を作成中。
     Route::get('/employee-availability', [EmployeeAvailabilityController::class, 'index']);

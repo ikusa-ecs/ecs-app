@@ -12,6 +12,7 @@ use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
 use App\Support\Departments;
 use App\Support\OfficeScope;
+use App\Support\PersonNotes;
 use App\Support\ProjectAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -216,11 +217,37 @@ class AssignDirectorController extends Controller
             'others' => $others,
             'empBusy' => $empBusy,
             'dayOff' => $dayOff,
+            // 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに出す。
+            // 例：「10/3 大型入ってるからアサインしない」。正本＝App\Support\PersonNotes。
+            'personNotes' => PersonNotes::forMany($employees->pluck('id')->all()),
             'officeScope' => $officeScope,   // 今絞っている拠点（null＝全拠点）。画面の注記に使う。
             // 「DBに社員がいるか」（拠点で絞る前）。絞った結果が0人でも見本データに戻らないようにするための旗。
             // ※ これが false のとき（DBが空の環境）だけ、画面は従来どおり見本(cases.js)を表示する。
             'usingDb' => Person::employees()->exists(),
         ]);
+    }
+
+    /**
+     * 人ごとのメモを保存する（POST /assign-director/person-note）。2026-09-02 baba要望。
+     *
+     * ⚠ 他人のメモも書ける＝これは「その人あての個人情報」ではなく、
+     *   アサインを決めるための**業務のメモ**（できるポジション・NGペアと同じ扱い）。
+     *   社員以上なら書ける（ルートの区画で社員以上に絞ってある）。
+     */
+    public function savePersonNote(Request $request)
+    {
+        $data = $request->validate([
+            'person_id' => ['required', 'string', 'exists:people,id'],
+            'note' => ['nullable', 'string', 'max:'.PersonNotes::MAX],
+        ], [], ['note' => 'メモ']);
+
+        $note = PersonNotes::put(
+            $data['person_id'],
+            $data['note'] ?? '',
+            optional(\Illuminate\Support\Facades\Auth::user())->id
+        );
+
+        return response()->json(['ok' => true, 'note' => $note]);
     }
 
     /**

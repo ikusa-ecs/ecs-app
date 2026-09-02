@@ -130,6 +130,64 @@ class DirectorBoardFilterTest extends TestCase
             ->assertSee('name="ym"', false);
     }
 
+    /**
+     * 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに書く。
+     * 例：「10/3 大型入ってるからアサインしない」。
+     * ⚠ 個人情報ではなく**アサインを決めるための業務のメモ**なので、社員以上が書ける。
+     */
+    public function test_a_person_note_can_be_saved_and_shown(): void
+    {
+        $admin = $this->admin();
+        $emp = PersonFactory::new()->create([
+            'id' => 'E-N1', 'role' => 'employee', 'name' => '佐藤 大輔',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/assign-director/person-note',
+                ['person_id' => 'E-N1', 'note' => '10/3 大型入ってるからアサインしない'])
+            ->assertOk()->assertJson(['ok' => true]);
+
+        $this->actingAsPerson($admin)->get('/assign-director')
+            ->assertOk()
+            ->assertViewHas('personNotes', function ($notes) {
+                return ($notes['E-N1']['note'] ?? null) === '10/3 大型入ってるからアサインしない'
+                    // 誰が書いたかも出す（古い情報を見分けるため）。
+                    && ($notes['E-N1']['by'] ?? '') !== '';
+            });
+    }
+
+    /** ⚠ 空にしたら消える（空のメモ行を残さない＝「メモあり」の印が付いたままにならない）。 */
+    public function test_an_empty_person_note_is_removed(): void
+    {
+        $admin = $this->admin();
+        PersonFactory::new()->create([
+            'id' => 'E-N2', 'role' => 'employee', 'office' => '東京',
+            'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/assign-director/person-note', ['person_id' => 'E-N2', 'note' => 'あとで消す'])
+            ->assertOk();
+        $this->actingAsPerson($admin)
+            ->postJson('/assign-director/person-note', ['person_id' => 'E-N2', 'note' => '   '])
+            ->assertOk();
+
+        $this->assertSame(0, \App\Models\PersonNote::where('person_id', 'E-N2')->count());
+    }
+
+    /** 担当バランスに「合計」が出る（D・SD・FC＋OP等も足した数）。 */
+    public function test_the_balance_table_has_a_total(): void
+    {
+        $this->actingAsPerson($this->admin())->get('/assign-director')
+            ->assertOk()
+            ->assertSee('num total', false)
+            ->assertSee('D・SD・FC・OP・MCなど', false)
+            // メモの仕掛け
+            ->assertSee('function editPersonNote', false)
+            ->assertSee('function personNoteHtml', false);
+    }
+
     /** 保存したら、見ていた月へ戻る（既定の月へ飛ばされない）。 */
     public function test_saving_returns_to_the_month_you_were_looking_at(): void
     {

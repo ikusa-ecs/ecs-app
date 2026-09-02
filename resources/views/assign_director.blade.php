@@ -116,6 +116,23 @@
     .dc-pick .pk.sd-row .lbl { font-size: 9.5px; width: 26px; color: var(--muted); background: #ece3d4; padding: 1px 0; }
     .dc-pick .pk.sd-row select { flex: 1; padding: 2px 5px; border: 1px solid var(--line); border-radius: 6px; font-size: 10.5px; color: var(--muted); font-family: inherit; background: #fbf8f2; min-width: 0; }
 
+    /* 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに出す。 */
+    .dp-note {
+      display: flex; align-items: flex-start; gap: 6px;
+      background: #fdf3e2; border: 1px solid #ecd9b6; border-radius: 8px;
+      padding: 6px 8px; margin: 0 0 8px; font-size: 11.5px; line-height: 1.5; color: #8a5a10;
+    }
+    .dp-note .pn-txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .dp-note .pn-empty { color: var(--muted); }
+    .dp-note .pn-by { color: var(--muted); font-size: 10.5px; margin-left: 4px; }
+    .dp-note .pn-edit {
+      border: 1px solid var(--line); background: #fff; border-radius: 6px;
+      padding: 1px 7px; font-size: 12px; cursor: pointer; font-family: inherit; flex-shrink: 0;
+    }
+    .dp-note .pn-edit:hover { background: #f3ece0; }
+    /* メモがある人の印（カレンダーのチップ）。押さないと気づけないので小さく出す。 */
+    .emp-chip .e-memo { font-size: 9px; flex-shrink: 0; }
+
     .dc-offwarn { font-size: 9.5px; font-weight: 700; color: #b91c1c; background: var(--danger-soft); border-radius: 5px; padding: 1px 5px; }
 
     /* ===== 確定案件＝休みタグのように名前だけのチップ。クリックで詳細が開く ===== */
@@ -345,12 +362,13 @@
           <h3>📊 担当バランス</h3>
           <span class="live"><span class="dot"></span>この画面と連動中</span>
           <!-- ⚠ カレンダーには前後の月の日も出るので、数え方をはっきり書いておく（2026-09-02 baba指示）。 -->
-          <p class="agg-note"><b>Dに入っている方だけ</b>を並べています。数えているのは <b>いま見ている月ぶんだけ</b>です（カレンダーに出ている前後の月の日は数えません）。</p>
+          <p class="agg-note">並べているのは<b>社員だけ</b>です。数えているのは <b>いま見ている月ぶんだけ</b>です（カレンダーに出ている前後の月の日は数えません）。</p>
           <table class="agg-tbl">
             <thead>
               <tr>
                 <th class="nm">社員</th>
                 <th>D計</th>
+                <th title="D・SD・FC・OP・MCなど、この月に担当する全部の数">合計</th>
                 <th>大型D</th>
                 <th>大型SD</th>
               </tr>
@@ -362,8 +380,9 @@
             <tfoot id="aggFoot"></tfoot>
           </table>
           <p class="agg-note">
-            この月のDの担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<br>
-            ※ <b>大型SD</b>は、Dにも入っている方のぶんだけ出ます（SDだけの方はこの表に並びません）。<br>
+            この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<br>
+            <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
+            ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
           </p>
         </div>
@@ -382,6 +401,8 @@
   window.ECS_DIR_USINGDB = @json($usingDb);      // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
   window.ECS_DIR_OFFICE  = @json($officeScope);  // いま絞っている拠点（null＝全拠点）
   window.ECS_DIR_DAYOFF  = @json($dayOff ?? []); // その日お休みの社員 {社員ID:{"Y-M-D":true}}
+  window.ECS_DIR_NOTES   = @json($personNotes ?? []); // 人ごとのメモ {社員ID:{note,by,at}}
+  window.ECS_CSRF        = '{{ csrf_token() }}';
 </script>
 @verbatim
 <script>
@@ -641,6 +662,9 @@
                          + otherRoles.map(r => `<span class="e-role">${r}</span>`).join('');
           const multi = info.count >= 2 ? `<span class="e-multi">掛${info.count}</span>` : '';
           const newb = e.newbie ? '<span class="e-newbie">新</span>' : '';
+          // メモがある人には印を出す（押さないと気づけないため）。
+          const memo = (PNOTES[e.id] && PNOTES[e.id].note)
+            ? `<span class="e-memo" title="${escAttrText(PNOTES[e.id].note)}">📝</span>` : '';
           // ⚠ お休みの日なのに担当に入っている人。いちばん気づきたい間違いなので赤で出す。
           const offMark = isDayOff(e.id, d.getFullYear(), d.getMonth(), d.getDate())
             ? '<span class="dc-offwarn" title="この日は「×」または「希望休」を出しています">休</span>' : '';
@@ -649,7 +673,7 @@
           // イベプラ／セールス／クリエイティブ以外は 'other' にまとまる。ここに部署名を書かない。
           const depCls = 'dep-' + (e.deptCode || 'none');
           return `<div class="emp-chip ${cls} ${depCls}" onclick="openPick(event,'${e.id}','${key}')">`
-               + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}${offMark}</div>`;
+               + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}${memo}${offMark}</div>`;
         }).join('') + '</div>';
 
         // お休みで一覧から外した人。⚠ 黙って消すと「あの人が居ない」と探すことになる。
@@ -710,6 +734,74 @@
     render();
     renderPick();
   }
+  // ===== 人ごとのメモ（2026-09-02 baba要望）=====
+  // 例：「10/3 大型入ってるからアサインしない」。社員名を押したときのふきだしに出す。
+  // ⚠ 保存の正本はサーバー（App\Support\PersonNotes）。ここは出すだけ・持ち方を増やさない。
+  // ⚠ これは「その人の個人情報」ではなく**アサインを決めるための業務のメモ**なので、
+  //   できるポジション・NGペアと同じく社員以上が書ける。
+  const PNOTES = window.ECS_DIR_NOTES || {};
+
+  // ⚠ メモは自由に書ける文字なので、必ずエスケープしてから画面に出す。
+  //   これが無いと < や " を書いただけで画面が崩れる（この画面には部品が無かったので用意した）。
+  function escHtml(t){
+    return String(t == null ? '' : t)
+      .split('&').join('&amp;')
+      .split('<').join('&lt;')
+      .split('>').join('&gt;')
+      .split('"').join('&quot;')
+      .split("'").join('&#39;');
+  }
+  // title="" の中に入れる用（改行はスペースにする）。
+  // ⚠ 改行を書くときは String.fromCharCode を使う。
+  //   「バックスラッシュ＋n」をシェル経由で書き込むと**本物の改行に化けて**、
+  //   その行で文字列が閉じずJavaScriptが丸ごと止まる（この画面でも実際に踏んだ）。
+  function escAttrText(t){
+    const LF = String.fromCharCode(10), CR = String.fromCharCode(13);
+    return escHtml(String(t == null ? '' : t).split(CR).join(LF).split(LF).join(' '));
+  }
+
+  function personNoteHtml(empId){
+    const n = PNOTES[empId];
+    const has = n && n.note;
+    const body = has
+      ? escHtml(n.note) + (n.by ? `<span class="pn-by">（${escHtml(n.by)} ${escHtml(n.at)}）</span>` : '')
+      : '<span class="pn-empty">メモなし</span>';
+    return `<div class="dp-note ${has ? 'has' : ''}">
+        <span class="pn-txt">📝 ${body}</span>
+        <button class="pn-edit" onclick="editPersonNote('${empId}')" title="この方へのメモを書く・直す">✎</button>
+      </div>`;
+  }
+
+  function editPersonNote(empId){
+    const cur = (PNOTES[empId] && PNOTES[empId].note) || '';
+    const emp = empById[empId];
+    // ⚠ 改行は String.fromCharCode(10) で作る（上の escAttrText と同じ理由）。
+    const LF = String.fromCharCode(10);
+    const input = prompt(
+      (emp ? emp.name : empId) + ' さんへのメモ' + LF
+      + '例）10/3 大型入ってるからアサインしない' + LF + LF
+      + '※ 空にすると消えます。ほかの社員にも見えます。', cur);
+    if (input === null) return;                 // キャンセル
+    const note = input.trim();
+
+    // 先に画面へ出す（保存を待たない）。失敗したら元に戻す。
+    const before = PNOTES[empId];
+    if (note) { PNOTES[empId] = { note: note, by: '', at: '' }; } else { delete PNOTES[empId]; }
+    renderPick(); render();
+
+    fetch('/assign-director/person-note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ person_id: empId, note: note })
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .catch(e => {
+        if (before) { PNOTES[empId] = before; } else { delete PNOTES[empId]; }
+        renderPick(); render();
+        alert('メモを保存できませんでした（' + e + '）。もう一度お試しください。');
+      });
+  }
+
   function renderPick(){
     let el = document.getElementById('dpickPop');
     if (!el) {
@@ -734,7 +826,9 @@
           </div>
         </div>`;
     }).join('') : '<div class="dp-empty">この日に案件はありません</div>';
-    el.innerHTML = `<h4>${emp ? emp.name : PICK.empId} を担当に</h4>${rows}`
+    el.innerHTML = `<h4>${emp ? emp.name : PICK.empId} を担当に</h4>`
+      + personNoteHtml(PICK.empId)
+      + rows
       + (mine >= 2 ? `<div class="dp-warn">⚠ この日 ${mine} 件の掛け持ちです</div>` : '')
       + `<div class="dp-close"><button onclick="closePick()">閉じる</button></div>`;
     el.style.display = 'block';
@@ -757,19 +851,35 @@
   // ⚠ 大型SDは、Dに入っている人の行にだけ出る（SDだけの人は並べない）。
   function computeAgg(){
     const map = {};
-    function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), d:0, bigD:0, bigSD:0 }; return map[id]; }
+    function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), d:0, total:0, bigD:0, bigSD:0 }; return map[id]; }
+
+    // ⚠ 行に出すのは**社員だけ**（2026-09-01 baba）。FCに入っているスタッフを混ぜない
+    //   ＝Dの偏りを見る表なので、名簿の人が全員並ぶと読み取れなくなる。
+    const isEmp = id => !!empById[id];
+
     cases.forEach(c => {
       if (!inTarget(c)) return;
       const isBig = c.scale === '大型';
-      if (c.dirId) { const r = ensure(c.dirId); r.d++; if (isBig) r.bigD++; }
-    });
-    // 大型SDは「Dにも入っている人」のぶんだけ足す（Dの表なので、行は増やさない）。
-    cases.forEach(c => {
-      if (!inTarget(c)) return;
-      if (c.scale === '大型' && c.sdId && map[c.sdId]) map[c.sdId].bigSD++;
+      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); r.d++; r.total++; if (isBig) r.bigD++; }
+      if (c.sdId && isEmp(c.sdId))   { const r = ensure(c.sdId);  r.total++; if (isBig) r.bigSD++; }
+      (c.fcIds || []).forEach(id => { if (isEmp(id)) ensure(id).total++; });
     });
 
-    return Object.values(map).sort((a, b) => (b.d - a.d) || (b.bigD - a.bigD));
+    // ⚠ 合計には **D・SD・FC 以外（OP・MCなど）も入れる**（2026-09-02 baba要望）。
+    //   「合計数をみてアサインを考える」ので、この画面で選べない役割も数に入れないと意味がない。
+    //   元は EMP_BUSY（その日その人が入っている D/SD/FC 以外の役割）。
+    //   ⚠ 数えるのは**いま見ている月ぶんだけ**（カレンダーに出ている前後の月は数えない）。
+    Object.keys(EMP_BUSY).forEach(dateKey => {
+      const p = dateKey.split('-').map(Number);
+      if (p[0] !== TARGET.y || (p[1] - 1) !== TARGET.m) return;
+      Object.keys(EMP_BUSY[dateKey]).forEach(id => {
+        if (!isEmp(id)) return;
+        ensure(id).total += EMP_BUSY[dateKey][id].length;
+      });
+    });
+
+    // 合計の多い順 → D計の多い順（偏りを見る表なので、まず合計）。
+    return Object.values(map).sort((a, b) => (b.total - a.total) || (b.d - a.d));
   }
   function renderAgg(){
     const rows = computeAgg();
@@ -779,7 +889,7 @@
     const foot = document.getElementById('aggFoot');
     if (foot) foot.innerHTML = '';
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="4" style="color:var(--muted); font-size:11.5px; padding:8px 4px;">'
+      body.innerHTML = '<tr><td colspan="5" style="color:var(--muted); font-size:11.5px; padding:8px 4px;">'
         + 'この月は、まだDが決まっている案件がありません。</td></tr>';
       return;
     }
@@ -792,6 +902,7 @@
           <div class="agg-bar"><i style="width:${Math.round(r.d / maxD * 100)}%;"></i></div>
         </td>
         <td class="num dcnt">${r.d}</td>
+        <td class="num total">${r.total}</td>
         <td class="num">${r.bigD}</td>
         <td class="num">${r.bigSD}</td>`;
       body.appendChild(tr);
@@ -805,6 +916,7 @@
       foot.innerHTML = `<tr class="agg-total">
         <td class="nm">合計（${rows.length}名）</td>
         <td class="num dcnt">${sum('d')}</td>
+        <td class="num total">${sum('total')}</td>
         <td class="num">${sum('bigD')}</td>
         <td class="num">${sum('bigSD')}</td></tr>`;
     }
