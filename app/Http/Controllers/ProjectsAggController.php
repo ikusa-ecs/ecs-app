@@ -9,6 +9,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * 社員・ディレクター集計（/projects-agg・案件一覧から開く別ウィンドウ）。
@@ -38,9 +39,23 @@ class ProjectsAggController extends Controller
             ->pluck('id')
             ->all();
 
+        // 数える月（2026-09-02 baba要望）。既定＝今月。?ym=2026-10 で切り替える。
+        // ⚠ それまでは**全期間の合計**だったので、「今月は誰が多いか」が読めなかった
+        //   （D決めの担当バランスは月単位なのに、この表だけ全期間で数が合わなかった）。
+        $period = $this->targetPeriod($request);
+        $from = $period->copy()->startOfMonth();
+        $to = $period->copy()->endOfMonth();
+
+        // その月に開催する案件だけを対象にする。
+        // ⚠ 数えるのは**案件の開催日**（アサインの日ではない）。2日案件でも1件として数えるため。
+        $monthProjectIds = Project::whereBetween('start_date', [$from->toDateString(), $to->toDateString()])
+            ->pluck('id')
+            ->all();
+
         // D/SD の担当（キャンセル除く）。
         $rows = Assignment::whereIn('role', ['D', 'SD'])
             ->where('status', '!=', 'キャンセル')
+            ->whereIn('project_id', $monthProjectIds)
             ->when($office, fn ($q) => $q->whereIn('staff_id', $officeEmployeeIds))
             ->get(['project_id', 'staff_id', 'role']);
 
@@ -154,7 +169,27 @@ class ProjectsAggController extends Controller
             'rows' => $list,
             'summary' => $summary,
             'officeScope' => $office,   // 今絞っている拠点（null＝全拠点）。注記と切替スイッチに使う
+            // 数えている月（2026-09-02 baba要望）。見出しと前後の月へのリンクに使う。
+            'period' => $period->format('Y-m'),
+            'periodLabel' => $period->format('Y年n月'),
+            'prevPeriod' => $period->copy()->subMonth()->format('Y-m'),
+            'nextPeriod' => $period->copy()->addMonth()->format('Y-m'),
         ]);
+    }
+
+    /**
+     * 数える月。?ym=2026-10 が来ればその月、来なければ今月（2026-09-02 baba要望）。
+     * ⚠ 勝手な月にしない＝読めない形は今月として扱う（去年の数字が黙って出るのを防ぐ）。
+     */
+    private function targetPeriod(Request $request): Carbon
+    {
+        $ym = (string) $request->query('ym', '');
+        if (preg_match('/^(\d{4})-(\d{1,2})$/', $ym, $m)
+            && (int) $m[2] >= 1 && (int) $m[2] <= 12) {
+            return Carbon::create((int) $m[1], (int) $m[2], 1)->startOfDay();
+        }
+
+        return Carbon::today()->startOfMonth();
     }
 
     /**

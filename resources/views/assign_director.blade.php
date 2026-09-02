@@ -147,6 +147,8 @@
     .cell-empty { font-size: 10px; color: #cbbfae; text-align: center; padding-top: 6px; }
 
     .agg-note { font-size: 11px; color: var(--muted); margin: 4px 0 6px; line-height: 1.5; }
+    /* 合計の行（2026-09-02 baba要望）。人の行と見分けが付くように上に線を引く。 */
+    .agg-tbl tr.agg-total td { border-top: 2px solid var(--line); font-weight: 700; background: #faf6ee; }
 
     /* ===== 担当バランス集計（右パネル・ライブ） ===== */
     .agg-panel { position: sticky; top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -314,6 +316,10 @@
 @endverbatim
       <!-- 保存フォーム（JSが dir[案件ID]/sd[案件ID] の hidden を作って送る） -->
       <form id="dirSaveForm" method="POST" action="/assign-director/save" style="display:none;">
+        {{-- ⚠ 保存したあと、見ていた月・拠点に戻ってくるための持ち回し（2026-09-02 baba報告）。
+             これが無いと、保存のたびに既定の月へ飛ばされる。 --}}
+        <input type="hidden" name="ym" id="dirYm" value="">
+        <input type="hidden" name="office" value="{{ $officeScope ?? '' }}">
         @csrf
         {{--
           状態（仮／確定）はこの画面では送らない。
@@ -350,6 +356,10 @@
               </tr>
             </thead>
             <tbody id="aggBody"></tbody>
+            <!-- 合計（2026-09-02 baba要望）。この月に何件のDが決まっているかが分かる。
+                 ⚠ ここはBladeを解釈しない区間なので、コメントもHTMLの形で書くこと
+                   （Bladeのコメントで書くと、その文字がそのまま画面に出る。今回それを踏んだ）。 -->
+            <tfoot id="aggFoot"></tfoot>
           </table>
           <p class="agg-note">
             この月のDの担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<br>
@@ -432,18 +442,32 @@
   function realYmd(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
 
   // ===== 対象の月を決める（案件が一番多い月＝メインの月を自動で選ぶ）=====
+  // 最初に出す月。
+  // ⚠ 以前は「案件が一番多い月」にしていたが、実データが入ると**過去の月**になり、
+  //   画面を開くたび・保存するたびに**8月へ戻ってしまう**（2026-09-02 baba報告）。
+  //   ふつうに使うときに見たいのは「今月」なので、既定は今月にする。
+  // ⚠ URL に ?ym=2026-10 が付いていればその月（保存したあとに戻ってこられるように）。
   function pickTargetMonth(){
-    const cnt = {};
-    cases.forEach(c => { const d = addDays(c.off); const k = d.getFullYear()+'-'+d.getMonth(); cnt[k] = (cnt[k]||0)+1; });
-    let best = null, bestN = -1;
-    Object.keys(cnt).forEach(k => { if (cnt[k] > bestN) { bestN = cnt[k]; best = k; } });
-    if (!best) { const t = addDays(0); return { y:t.getFullYear(), m:t.getMonth() }; }
-    const [y, m] = best.split('-').map(Number);
-    return { y, m };
+    const q = new URLSearchParams(location.search).get('ym') || '';
+    const mm = q.match(/^(\d{4})-(\d{1,2})$/);
+    if (mm) {
+      const y = Number(mm[1]), m = Number(mm[2]) - 1;
+      if (m >= 0 && m <= 11) return { y, m };
+    }
+    const t = addDays(0);
+    return { y: t.getFullYear(), m: t.getMonth() };
   }
-  // 最初に出す月＝案件が一番多い月。◀▶ で前後の月に移せる（2026-08-21 baba要望。
-  // これまでは「モックのため切替はしません」と出るだけで、他の月のD決めができなかった）。
   let TARGET = pickTargetMonth();
+
+  // いま見ている月を URL に残す（画面を読み込み直しても同じ月に戻る）。
+  // ⚠ 履歴は増やさない（replaceState）＝「戻る」で月が1つずつ戻ると使いにくい。
+  function rememberMonth(){
+    const p = new URLSearchParams(location.search);
+    p.set('ym', TARGET.y + '-' + String(TARGET.m + 1).padStart(2, '0'));
+    history.replaceState(null, '', location.pathname + '?' + p.toString());
+    const box = document.getElementById('dirYm');
+    if (box) box.value = TARGET.y + '-' + String(TARGET.m + 1).padStart(2, '0');
+  }
   function monthLabel(){
     const n = cases.filter(inTarget).length;
     document.getElementById('monLabel').textContent =
@@ -453,6 +477,7 @@
   function shiftMonth(n){
     const d = new Date(TARGET.y, TARGET.m + n, 1);
     TARGET = { y: d.getFullYear(), m: d.getMonth() };
+    rememberMonth();
     monthLabel();
     render();       // カレンダー（中で renderAgg も呼ばれる）
     renderPick();   // 下の「案件を選ぶ」パネル
@@ -751,6 +776,8 @@
     const maxD = Math.max(1, ...rows.map(r => r.d));
     const body = document.getElementById('aggBody');
     body.innerHTML = '';
+    const foot = document.getElementById('aggFoot');
+    if (foot) foot.innerHTML = '';
     if (!rows.length) {
       body.innerHTML = '<tr><td colspan="4" style="color:var(--muted); font-size:11.5px; padding:8px 4px;">'
         + 'この月は、まだDが決まっている案件がありません。</td></tr>';
@@ -769,6 +796,18 @@
         <td class="num">${r.bigSD}</td>`;
       body.appendChild(tr);
     });
+
+    // 合計（2026-09-02 baba要望）。
+    // ⚠ 「この月に何件のDが決まっているか」が分かると、一人あたりの多い少ないが読める。
+    //   ⚠ 数えるのは、いま見ている月ぶんだけ（上の computeAgg と同じ範囲）。
+    if (foot) {
+      const sum = k => rows.reduce((n, r) => n + r[k], 0);
+      foot.innerHTML = `<tr class="agg-total">
+        <td class="nm">合計（${rows.length}名）</td>
+        <td class="num dcnt">${sum('d')}</td>
+        <td class="num">${sum('bigD')}</td>
+        <td class="num">${sum('bigSD')}</td></tr>`;
+    }
   }
 
   // ===== 保存（選んだD/SDを assignments に送る。すべて社員ID基準）=====
@@ -796,6 +835,7 @@
   }
 
   // 初期描画
+  rememberMonth();
   monthLabel();
   render();
 </script>

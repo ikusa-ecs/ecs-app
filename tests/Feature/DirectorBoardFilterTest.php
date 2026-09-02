@@ -111,4 +111,32 @@ class DirectorBoardFilterTest extends TestCase
             // お休みなのに担当に入っている人の赤い印
             ->assertSee('dc-offwarn', false);
     }
+
+    /**
+     * ⚠ 最初に出す月は「今月」（2026-09-02 baba報告）。
+     *   以前は「案件が一番多い月」にしていたため、実データが入ると過去の月になり、
+     *   **画面を開くたび・保存するたびに8月へ戻って**しまった。
+     */
+    public function test_the_board_opens_on_this_month(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAsPerson($admin)->get('/assign-director')
+            ->assertOk()
+            // 「案件が一番多い月」を選ぶ作りに戻っていないこと。
+            ->assertDontSee('bestN', false)
+            // URL の ?ym= で月を持ち回す＝保存したあとも同じ月に戻ってくる。
+            ->assertSee('function rememberMonth', false)
+            ->assertSee('name="ym"', false);
+    }
+
+    /** 保存したら、見ていた月へ戻る（既定の月へ飛ばされない）。 */
+    public function test_saving_returns_to_the_month_you_were_looking_at(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAsPerson($admin)
+            ->post('/assign-director/save', ['ym' => '2026-10', 'office' => '東京'])
+            ->assertRedirect('/assign-director?ym=2026-10&office=%E6%9D%B1%E4%BA%AC');
+    }
 }

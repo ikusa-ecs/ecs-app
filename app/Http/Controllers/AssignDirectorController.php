@@ -389,7 +389,19 @@ class AssignDirectorController extends Controller
             $msg .= "（他の拠点の案件 {$blocked} 件は編集できないため保存していません）";
         }
 
-        return redirect('/assign-director')->with('status', $msg);
+        // ⚠ 保存したら、**見ていた月へ戻す**（2026-09-02 baba報告）。
+        //   これが無いと、保存のたびに既定の月へ飛ばされて「8月に戻っちゃう」ことになる。
+        //   拠点の切替も持ち回す（管理者が拠点を選んで作業しているため）。
+        $back = '/assign-director';
+        $query = array_filter([
+            'ym' => preg_match('/^\d{4}-\d{2}$/', (string) $request->input('ym')) ? $request->input('ym') : null,
+            'office' => $request->input('office') ?: null,
+        ]);
+        if ($query) {
+            $back .= '?'.http_build_query($query);
+        }
+
+        return redirect($back)->with('status', $msg);
     }
 
     /** 氏名から姓だけを取り出す（'田中 健一' → '田中'。全角/半角スペース対応）。 */

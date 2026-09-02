@@ -12,6 +12,14 @@
     .agg-top h1 { font-size: 18px; margin: 0; }
     .agg-top .month-nav { display: flex; align-items: center; gap: 8px; }
     .agg-top .month-nav button { border: 1px solid var(--line); background: #fff; border-radius: 8px; width: 30px; height: 30px; font-size: 15px; cursor: pointer; font-family: inherit; }
+    /* 月の切替（2026-09-02 追加）。リンクだがボタンに見せる。 */
+    .agg-top .month-nav .mon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      width: 30px; height: 30px; font-size: 15px; text-decoration: none; color: var(--ink);
+    }
+    .agg-top .month-nav .mon-btn.wide { width: auto; padding: 0 10px; font-size: 12.5px; font-weight: 700; }
+    .agg-top .month-nav .mon-btn:hover { background: #f3ece0; }
     .agg-top .month-nav .mon { font-size: 14px; font-weight: 700; min-width: 96px; text-align: center; }
     .agg-top .spacer { flex: 1; }
     .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
@@ -34,8 +42,13 @@
 <body>
   <div class="agg-top">
     <h1>📊 社員・ディレクター集計</h1>
+    {{-- 月の切替（2026-09-02 baba要望）。それまでは全期間の合計で、
+         「今月は誰が多いか」が読めなかった（D決めの担当バランスは月単位なので数も合わなかった）。 --}}
     <div class="month-nav">
-      <span class="mon" id="monLabel">D／SD担当 累計</span>
+      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $prevPeriod, 'office' => $officeScope])) }}" title="前の月へ">◀</a>
+      <span class="mon" id="monLabel">{{ $periodLabel }}</span>
+      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $nextPeriod, 'office' => $officeScope])) }}" title="次の月へ">▶</a>
+      <a class="mon-btn wide" href="?{{ http_build_query(array_filter(['office' => $officeScope])) }}" title="今月に戻す">今月</a>
     </div>
     <div class="spacer"></div>
     <span class="live off" id="live"><span class="dot"></span><span id="liveText">案件一覧と未接続</span></span>
@@ -46,7 +59,8 @@
 
   <p class="note">
     <b>D決め画面（/assign-director）</b>で保存したD／SD担当の実績を、社員ごとに数えた本物の集計です。<br>
-    下書きの案件は数えません。表示は累計（全期間）です。
+    下書きの案件は数えません。<b>数えているのは「{{ $periodLabel }}に開催する案件」だけ</b>です（2026-09-02 から月ごとになりました）。
+    ◀ ▶ で月を変えられます。
     @if ($officeScope)
       <br><b>{{ $officeScope }}所属の社員</b>だけを並べています。件数は<b>その社員が担当した案件すべて</b>（他拠点への応援も含む）です。
     @endif
@@ -54,7 +68,7 @@
 
   @if (($summary['records'] ?? 0) > 0)
   <p class="note" style="margin:-4px 0 12px; font-size:13.5px; color:var(--ink);">
-    全部で <b>{{ $summary['records'] }}</b> 件（D <b>{{ $summary['d'] }}</b> 件・SD <b>{{ $summary['sd'] }}</b> 件）／対象 社員 <b>{{ $summary['staff'] }}</b> 名・案件 <b>{{ $summary['projects'] }}</b> 件
+    <b>{{ $periodLabel }}</b>は全部で <b>{{ $summary['records'] }}</b> 件（D <b>{{ $summary['d'] }}</b> 件・SD <b>{{ $summary['sd'] }}</b> 件）／対象 社員 <b>{{ $summary['staff'] }}</b> 名・案件 <b>{{ $summary['projects'] }}</b> 件
   </p>
   @endif
 
