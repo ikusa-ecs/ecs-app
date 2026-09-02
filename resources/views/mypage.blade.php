@@ -474,6 +474,26 @@
         </div>
       @endif
 
+      {{-- 氏名・所属・身長など（2026-09-01 baba要望「本人の情報は本人がマイページから直せるように」）。
+
+           ⚠ とくに入社年月日は、これまで初回の初期設定でしか入れられず、
+             間違えても本人が直せなかった（生年月日を入れてしまった方が出た）。
+           ⚠ 保存先は `/profile/basic`。`/profile` へ送ると、この画面に出していない欄
+             （スタッフの一言アピール等）まで空で上書きされる。
+           ⚠ 入力欄はマイプロフィールと**同じ共通部品**（書き写すと片方だけ直して食い違う）。 --}}
+      <div class="panel mp-wrap" style="margin-top:12px;">
+        <div class="panel-head"><h2>氏名・所属・身長など</h2></div>
+        <p class="sec-count">名簿に出るあなたの情報です。当日の衣装の準備や、リマインドの宛先に使います。<b>いつでも直せます。</b></p>
+
+        <form method="POST" action="/profile/basic" style="padding:4px 2px 2px; max-width:560px;">
+          @csrf
+          @include('partials.profile_basic_fields')
+          <div style="margin-top:16px;">
+            <button class="btn primary" type="submit">保存する</button>
+          </div>
+        </form>
+      </div>
+
       <div class="panel mp-wrap" style="margin-top:12px;">
         <div class="panel-head">
           <h2>できること・やってみたいこと</h2>

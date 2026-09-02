@@ -25,6 +25,10 @@ final class ProfileBasics
     /** そのまま入れる欄（空欄は null）。 */
     private const TEXTS = [
         'name_kana', 'email', 'chatwork_id', 'office',
+        // 入社年月日（2026-09-01 baba要望）。これまで初回の初期設定でしか入れられず、
+        // ⚠ 間違えても本人が直せなかった（「生年月日を入れてしまった」方が出た）。
+        //   名簿の並び順と区分（新人／中堅／ベテラン）の計算に使う。
+        'hire_date',
         'height', 'shoe_size', 'shirt_size', 'prefecture', 'nearest_station',
     ];
 
@@ -40,6 +44,7 @@ final class ProfileBasics
         // チャットワークID＝リマインドの宛先。数字のみ（桁が多いので文字列で持つ）。
         'chatwork_id' => ['nullable', 'string', 'max:32', 'regex:/^[0-9]+$/'],
         'office' => ['nullable', 'string', 'max:50'],
+        'hire_date' => ['nullable', 'date'],
         'height' => ['nullable', 'string', 'max:20'],
         'shoe_size' => ['nullable', 'string', 'max:20'],
         'shirt_size' => ['nullable', 'string', 'max:20'],
@@ -57,6 +62,7 @@ final class ProfileBasics
         'email' => 'メールアドレス',
         'chatwork_id' => 'チャットワークID',
         'office' => '事務所',
+        'hire_date' => '入社年月日',
         'height' => '身長',
         'shoe_size' => '靴（足袋）のサイズ',
         'shirt_size' => '服（衣装）のサイズ',

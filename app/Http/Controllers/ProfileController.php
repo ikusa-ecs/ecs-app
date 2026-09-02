@@ -103,4 +103,30 @@ class ProfileController extends Controller
         return back()->with('status', 'プロフィールを保存しました。');
     }
 
+    /**
+     * マイページから「氏名・所属・身長など」だけを保存する（2026-09-01 baba要望）。
+     *
+     * 【なぜ】「本人の情報は、本人ならマイページから直せるように」（baba）。
+     * とくに**入社年月日**は初回の初期設定でしか入れられず、間違えても本人が直せなかった
+     * （「入社年月日のつもりで生年月日を入れてしまった」方が出た）。
+     *
+     * ⚠ ここで触るのは ProfileBasics が持つ列だけ。
+     *   スタッフだけの項目（一言アピール等）と本人の申告6項目には触らない
+     *   ＝マイページに出していない欄を、空で消してしまわないため。
+     */
+    public function updateBasic(Request $request)
+    {
+        $user = Auth::user();
+
+        if (TestAccounts::isTest($user)) {
+            return back()->with('status', 'テスト用アカウントはプロフィールを保存できません（見本のため）。');
+        }
+
+        $request->validate(ProfileBasics::RULES, ProfileBasics::MESSAGES, ProfileBasics::LABELS);
+
+        ProfileBasics::apply($user, $request->all());
+        $user->save();
+
+        return back()->with('status', '氏名・所属などを保存しました。');
+    }
 }

@@ -55,6 +55,19 @@
 
 {{-- 身長・靴・服（衣装）サイズ・都道府県・最寄り駅：当日のユニフォーム／衣装の準備の参考。
      もともと新規登録で聞いていた項目。社員・スタッフ共通。 --}}
+{{-- 入社年月日（2026-09-01 baba要望）。
+     ⚠ これまで初回の初期設定（/onboarding）でしか入れられず、**間違えても本人が直せなかった**。
+       実際に「入社年月日のつもりで生年月日を入れてしまった」方が出た。
+     ⚠ 名簿の並び順（社歴の長い人が上）と、区分（新人／中堅／ベテラン）の計算に使う値。 --}}
+<div class="form-row">
+  <label>{{ $me->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日' }}</label>
+  <input type="date" name="hire_date" value="{{ $me->hire_date?->format('Y-m-d') }}">
+  <span class="hint">
+    名簿の並び順（社歴の長い方が上）と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日で構いません。<br>
+    <b>⚠ 生年月日ではありません。</b>IKUSAで働き始めた日を入れてください。
+  </span>
+</div>
+
 <div class="form-row">
   <label>身長</label>
   <input type="text" name="height" value="{{ $me->height }}" placeholder="例）170（cm）">

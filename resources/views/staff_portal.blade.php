@@ -260,9 +260,10 @@
       width: 34px; height: 34px; font-size: 18px; cursor: pointer; font-family: inherit; color: var(--brand-dark);
     }
     .jc-nav:hover { background: #f3ece0; }
-    /* ⚠ マスは正方形にしない（.cell と違う）。案件のチップが入るので高さが要る。 */
+    /* ⚠ マスは正方形にしない（.cell と違う）。案件のチップが入るので高さが要る。
+       ⚠ 集合〜解散と場所も出すので、さらに高さが要る（2026-09-02 baba要望）。 */
     .jc-cell {
-      min-height: 66px; border-radius: 9px; border: 1px solid var(--line); background: #fff;
+      min-height: 92px; border-radius: 9px; border: 1px solid var(--line); background: #fff;
       padding: 3px; display: flex; flex-direction: column; gap: 2px; overflow: hidden;
     }
     .jc-cell.empty { border: none; background: none; }
@@ -274,8 +275,15 @@
       border: 1px solid var(--line); border-radius: 6px; background: #fff;
       padding: 2px 4px; font-size: 10px; line-height: 1.3; cursor: pointer;
       text-align: left; font-family: inherit; color: var(--ink); width: 100%;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      overflow: hidden;
     }
+    /* 1行目＝コンテンツ名。2行目＝集合〜解散。3行目＝場所（2026-09-02 baba要望）。
+       ⚠ どれも1行に収める（はみ出すとマスが崩れる）。入りきらないときは「…」にする。 */
+    .jc-job .jc-nm, .jc-job .jc-sub {
+      display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .jc-job .jc-nm { font-weight: 700; }
+    .jc-job .jc-sub { font-size: 9px; font-weight: 400; opacity: .85; }
     /* ⚠ 色はリストのバッジ（.j-badge）とまったく同じにする。上の :root で1か所に決めてある。
        別々に書いていたため、カレンダーの「募集中」がリストの「エントリー中」と同じ薄い緑になり、
        同じ画面で色の意味が食い違っていた（2026-09-01 baba指摘）。 */
@@ -284,6 +292,29 @@
     .jc-job.closed  { background: var(--job-closed-bg);  color: var(--job-closed-fg); border-color: var(--job-closed-bg); }
     .jc-job.extra   { box-shadow: inset 3px 0 0 var(--danger); }
     .jc-hint { font-size: 11.5px; color: var(--muted); margin: 8px 2px 0; }
+    /* PCでは列の見出しに曜日が出ているので、マスの中の曜日は隠す。 */
+    .jc-dow { display: none; }
+    /* スマホのときだけ出す案内。 */
+    .jc-only-sp { display: none; }
+
+    /* ⚠ スマホは7列のカレンダーだと1マスが50pxほどしかなく、
+       集合〜解散や場所を入れると読めない（2026-09-02 baba指摘）。
+       スマホでは**日付ごとの縦並び**に切り替える。日付順に並ぶので、
+       「自分の予定と見くらべる」というカレンダーの目的はそのまま果たせる。 */
+    @media (max-width: 720px) {
+      #jobCalGrid { grid-template-columns: 1fr; gap: 6px; }
+      #jobCalGrid .dow { display: none; }          /* 曜日の見出しの行は使わない */
+      .jc-cell.empty, .jc-cell.no-job { display: none; }   /* 月初の空きマス・案件が無い日は出さない */
+      .jc-cell { min-height: 0; padding: 8px 10px; }
+      .jc-cell .dnum { font-size: 14px; }
+      .jc-dow { display: inline; font-size: 12px; font-weight: 400; }
+      /* 文字を読める大きさにする（1行に収める必要が無くなるので折り返してよい）。 */
+      .jc-job { font-size: 14px; padding: 7px 9px; }
+      .jc-job .jc-nm { white-space: normal; }
+      .jc-job .jc-sub { font-size: 12px; white-space: normal; }
+      .jc-legend .jc-job { font-size: 12px; padding: 3px 9px; }
+      .jc-only-sp { display: inline; }
+    }
     /* 色の凡例。見本のチップは本物と同じ class なので、色を変えればここも一緒に変わる。 */
     .jc-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 2px 0; }
     .jc-legend .jc-job { width: auto; cursor: default; padding: 2px 8px; }
@@ -308,7 +339,7 @@
     }
     /* 開いた中身が「いま開いたもの」だと分かるように、少しだけ光らせる */
     @keyframes jcOpen { from { background: var(--brand-soft); } to { background: transparent; } }
-    .jc-detail.just-opened { animation: jcOpen 1.4s ease-out; }
+    .jc-detail.just-opened, .job-row.just-opened { animation: jcOpen 1.8s ease-out; }
 
     .cal-head { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
     .cal-head .mon { font-size: 16px; font-weight: 700; }
@@ -544,12 +575,15 @@
             <span class="jc-job closed">締切・満員</span>
             <span class="jc-job open extra">追加案件</span>
           </div>
-          <p class="jc-hint">案件をタップすると、<b>すぐ下に中身が開きます</b>。エントリーもそのままできます（カレンダーは開いたままです）。</p>
+          <p class="jc-hint">
+            案件をタップすると、<b>すぐ下に一覧が開いて、その案件のところまで動きます</b>。ほかの案件もそのまま見られて、エントリーもできます。<br>
+            <span class="jc-only-sp">スマホでは、この月の<b>案件がある日だけ</b>を日付順に並べています（「‹ ›」で月を変えられます）。</span>
+          </p>
           <div class="empty-note" id="jobCalEmpty" style="display:none;">この月には、条件に合う案件がありません。「‹ ›」で前後の月を見てください。</div>
           {{-- タップした案件の中身。リストとまったく同じカードをここに出す（作り方は buildJobRow の1つだけ）。 --}}
           <div id="jobCalDetail" class="jc-detail" style="display:none;">
             <div class="jc-detail-head">
-              <span>タップした案件</span>
+              <span>案件の一覧（押した案件のところへ動きます）</span>
               <button type="button" class="jc-detail-close" onclick="closeJobDetail()">✕ 閉じる</button>
             </div>
             <div class="job-grid" id="jobCalDetailBody"></div>
@@ -696,6 +730,18 @@
                 </select>
               </div>
               <div class="field"><label>最寄り駅</label><input id="pfStation" type="text" placeholder="例）JR千葉駅"></div>
+            </div>
+            <!-- IKUSAで働き始めた年月（2026-09-01 baba要望「本人の情報は本人が直せるように」）。
+                 ⚠ これまで初回の初期設定でしか入れられず、間違えても本人が直せなかった
+                   （入社年月日のつもりで生年月日を入れてしまった方が出た）。
+                 ⚠ 名簿の並び順と区分（新人／中堅／ベテラン）の計算に使う値。 -->
+            <div class="field">
+              <label>IKUSAで働き始めた年月</label>
+              <input id="pfHire" type="date">
+              <span class="sub" style="display:block; margin-top:4px;">
+                名簿の並び順と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日で構いません。
+                <b>⚠ 生年月日ではありません。</b>
+              </span>
             </div>
             <div class="field"><label>一言アピール</label><textarea id="pfAppeal" rows="2" placeholder="例）元気な進行が得意です！"></textarea></div>
             <div class="field"><label>好きなコンテンツ</label><input id="pfLike" type="text" placeholder="例）運動会・水合戦"></div>
@@ -1070,12 +1116,16 @@
 
       // カレンダー表示のときは、同じ「絞り込みを通った案件」でカレンダーも描き直す。
       // ⚠ 絞り込みは renderJobs の1か所だけで行う＝リストとカレンダーで結果が食い違わない。
+      jobsShown = list;
       if (jobView === 'cal') renderJobCal(list);
     }
 
     // ===== 募集中の案件：カレンダー表示（2026-09-01 baba要望）=====
     // ⚠ 絞り込みはここでは行わない。renderJobs が絞り込んだ結果をそのまま受け取る。
     let jobView = 'list';                                             // 'list' か 'cal'
+    // いま絞り込みを通っている案件（カレンダーの下に出す一覧で使い回す）。
+    // ⚠ 絞り込みは renderJobs の1か所だけ＝リストとカレンダーで出るものが食い違わない。
+    let jobsShown = [];
     const jobCalCursor = new Date(today.getFullYear(), today.getMonth(), 1);   // 見ている月の1日
 
     function switchJobView(view) {
@@ -1130,15 +1180,27 @@
           + ((y === today.getFullYear() && m === today.getMonth() && d === today.getDate()) ? ' today' : '');
         const num = document.createElement('div');
         num.className = 'dnum';
-        num.textContent = d;
+        // ⚠ スマホでは日付ごとの縦並びにするので、曜日が無いと何日か分からない。
+        //   PCでは列の見出しに曜日が出ているので、この曜日はCSSで隠す。
+        num.innerHTML = (m + 1) + '/' + d + '<span class="jc-dow">（' + '日月火水木金土'[dow] + '）</span>';
         cell.appendChild(num);
+
+        // 案件が無い日はスマホでは出さない（縦に空の日が並ぶと探せない）。
+        if (!(byDay[d] || []).length) cell.classList.add('no-job');
 
         (byDay[d] || []).forEach(j => {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'jc-job ' + j.state + (j.extra ? ' extra' : '') + (openJobId === j.id ? ' picked' : '');
-          b.textContent = j.content;
-          b.title = j.content + '／' + j.client + '（' + (stateBadge[j.state] || stateBadge.open).t + '）';
+          // コンテンツ名だけでなく、集合〜解散と場所も出す（2026-09-02 baba要望）。
+          // ⚠ 集合時間はスタッフ向けの時間を使う（担当が公開ボードで別に入れていればそちら）。
+          //   リストのカードと同じ関数（staffMeetOf）を通す＝2つの時間を持たない。
+          const jcTime = staffMeetOf(j.id, j.meet) + '〜' + (j.leave || '—');
+          b.innerHTML = '<span class="jc-nm">' + escAttr(j.content) + '</span>'
+            + '<span class="jc-sub">🕘 ' + escAttr(jcTime) + '</span>'
+            + (j.place ? '<span class="jc-sub">📍 ' + escAttr(j.place) + '</span>' : '');
+          b.title = j.content + '／' + j.client + '／' + jcTime + '／' + (j.place || '場所未定')
+            + '（' + (stateBadge[j.state] || stateBadge.open).t + '）';
           b.onclick = function () { openJobDetail(j.id); };
           cell.appendChild(b);
         });
@@ -1166,12 +1228,18 @@
       renderJobs();
       // ⚠ 開いた中身はカレンダーの下に出るので、そのままだと画面の外にあって気づけない。
       //   押したらそこまで動かす。これが無かったのが「反応しない」の正体。
+      // 押した案件のカードまで動かして、そこを光らせる。
+      // ⚠ 一覧は全部出しているので、動かさないと「どれを押したのか」が分からない。
+      const row = document.getElementById('job-' + id);
       const wrap = document.getElementById('jobCalDetail');
-      if (wrap && wrap.style.display !== 'none') {
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        wrap.classList.remove('just-opened');
-        void wrap.offsetWidth;   // 同じ案件を続けて押しても光らせ直すための再描画
-        wrap.classList.add('just-opened');
+      const target = row || wrap;
+      if (target && wrap && wrap.style.display !== 'none') {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (row) {
+          row.classList.remove('just-opened');
+          void row.offsetWidth;   // 同じ案件を続けて押しても光らせ直すための再描画
+          row.classList.add('just-opened');
+        }
       }
     }
 
@@ -1183,18 +1251,24 @@
       if (cal) cal.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    // カレンダーの下に出す一覧。
+    // ⚠ 押した1件だけでなく**絞り込みを通った案件を全部**出す（2026-09-02 baba要望）。
+    //   1件だけだと、ほかの案件を見るのにいちいちカレンダーへ戻ることになる。
+    //   押した案件のところまで動かして、その1件を光らせる。
+    // ⚠ カードは buildJobRow（リストとまったく同じもの）で作る。
     function renderJobDetail() {
       const wrap = document.getElementById('jobCalDetail');
       const body = document.getElementById('jobCalDetailBody');
       if (!wrap || !body) return;
       body.innerHTML = '';
 
-      const j = openJobId ? jobById[openJobId] : null;
-      if (!j) { wrap.style.display = 'none'; return; }
+      if (!openJobId || !jobById[openJobId]) { wrap.style.display = 'none'; return; }
 
-      const row = buildJobRow(j);
-      if (!row) { wrap.style.display = 'none'; return; }
-      body.appendChild(row);
+      jobsShown.forEach(j => {
+        const row = buildJobRow(j);
+        if (row) body.appendChild(row);
+      });
+      if (!body.children.length) { wrap.style.display = 'none'; return; }
       wrap.style.display = '';
     }
 
@@ -1633,6 +1707,7 @@
     // 入力欄のID ↔ people 列名の対応
     const PF_MAP = {
       pfHeight:'height', pfShoe:'shoe_size', pfWear:'shirt_size', pfPref:'prefecture', pfStation:'nearest_station',
+      pfHire:'hire_date',
       pfAppeal:'appeal', pfLike:'liked_contents', pfDislike:'disliked_contents',
       pfStrongPosFree:'strong_positions', pfWeakPosFree:'weak_positions',
       pfOtherLang:'other_languages', pfToolOther:'online_tools_other', pfNote:'profile_note'

@@ -249,9 +249,13 @@ class RecruitStatusTest extends TestCase
         $blade = (string) file_get_contents(resource_path('views/staff_portal.blade.php'));
 
         $this->assertStringContainsString('function openJobDetail', $blade);
-        // 押したら開いたところまで動かす。
-        $this->assertStringContainsString('wrap.scrollIntoView', $blade,
-            '押しても開いた中身までスクロールしないので、画面の外にあると気づけません。');
+        // 押したら、その案件のカードまで動かす。
+        // ⚠ 一覧を全部出すようにしたので（2026-09-02）、動かさないとどれを押したのか分からない。
+        $this->assertStringContainsString('target.scrollIntoView', $blade,
+            '押しても案件のところまでスクロールしないので、どれを押したのか分かりません。');
+        // 一覧は「押した1件だけ」ではなく、絞り込みを通った案件を全部出す。
+        $this->assertStringContainsString('jobsShown.forEach', $blade,
+            'カレンダーの下に1件しか出していません（ほかの案件を見るのに戻ることになります）。');
         // 押した案件に印を付ける＝カレンダーを描き直す。
         $this->assertStringContainsString('just-opened', $blade);
         $this->assertStringContainsString('.jc-job.picked', $blade);

@@ -96,6 +96,10 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // マイページのカードから「本人の申告6項目」だけを保存する（2026-08-31）。
     // ⚠ /profile へ送ると氏名や身長まで空で上書きされるので、入口を分けている。
     Route::post('/profile/extras', [ProfileController::class, 'updateExtras'])->name('profile.extras');
+    // マイページから「氏名・所属・身長など」だけを保存する（2026-09-01 baba要望）。
+    // ⚠ /profile へ送ると、その画面に出していない欄（スタッフの一言アピール等）まで
+    //   空で上書きされる。だから入口を分けている。
+    Route::post('/profile/basic', [ProfileController::class, 'updateBasic'])->name('profile.basic');
 });
 
 // ══════════════════════════════════════════════════════════════════

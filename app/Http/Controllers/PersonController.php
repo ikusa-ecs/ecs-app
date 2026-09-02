@@ -9,6 +9,7 @@ use App\Models\StaffRoleEligibility;
 use App\Support\AssignmentRole;
 use App\Support\Departments;
 use App\Support\ExperienceCount;
+use App\Support\PersonAccess;
 use App\Support\LoginInvite;
 use App\Support\OfficeScope;
 use App\Support\SpotStaff;
@@ -175,6 +176,12 @@ class PersonController extends Controller
             return response()->json(['ok' => false, 'message' => '社員が見つかりませんでした。'], 404);
         }
 
+        // ⚠ 他の人の情報を直せるのは管理者以上（2026-09-01 baba決定）。自分の情報は自分で直せる。
+        //   決まりの正本＝App\Support\PersonAccess（画面ごとに書くと必ずズレる）。
+        if ($deny = PersonAccess::denyJson($person)) {
+            return $deny;
+        }
+
         $data = $request->validate([
             'height' => ['nullable', 'string', 'max:20'],  // 身長（cm）
             'shoe_size' => ['nullable', 'string', 'max:20'],  // 靴のサイズ
@@ -240,14 +247,17 @@ class PersonController extends Controller
             $person->office = $office !== '' ? $office : null;
         }
 
-        // 入社年月日＝管理者以上（2026-08-28 baba要望）。
+        // 入社年月日＝**本人**か管理者以上（2026-09-01 baba決定で本人を追加）。
         // ⚠ 区分（新人／中堅／ベテラン）はこの日付から**その場で計算**している（保存していない）。
-        //   なので入社日が間違っていると、新入社員がベテランに見える。直せる場所がここまで無かった。
+        //   なので入社日が間違っていると、新入社員がベテランに見える。
+        // ⚠ もともと管理者以上だけだったため、**間違えた本人が直せなかった**
+        //   （「入社年月日のつもりで生年月日を入れてしまった」方が出た）。
+        //   判定の正本＝App\Support\PersonAccess（自分＝OK／他人＝管理者以上）。
         if ($request->has('hire_date')) {
-            if (! in_array(optional(Auth::user())->permission, ['manager', 'admin'], true)) {
+            if (! PersonAccess::canEdit($person)) {
                 return response()->json([
                     'ok' => false,
-                    'message' => '入社年月日を直せるのは管理者以上です。',
+                    'message' => '他の方の入社年月日を直せるのは管理者以上です。ご自身のぶんはマイプロフィールから直せます。',
                 ], 403);
             }
             $person->hire_date = ($data['hire_date'] ?? null) ?: null;

@@ -266,6 +266,8 @@ class StaffPortalController extends Controller
             'shirt_size' => $me->shirt_size,
             'prefecture' => $me->prefecture,
             'nearest_station' => $me->nearest_station,
+            // IKUSAで働き始めた年月（2026-09-01 baba要望）。本人が直せるようにするため出す。
+            'hire_date' => $me->hire_date?->format('Y-m-d'),
             'appeal' => $me->appeal,
             'liked_contents' => $me->liked_contents,
             'disliked_contents' => $me->disliked_contents,
@@ -305,6 +307,9 @@ class StaffPortalController extends Controller
             'shirt_size' => ['nullable', 'string', 'max:20'],
             'prefecture' => ['nullable', 'string', 'max:20'],
             'nearest_station' => ['nullable', 'string', 'max:100'],
+            // IKUSAで働き始めた年月（2026-09-01 baba要望）。
+            // ⚠ これまで初回の初期設定でしか入れられず、間違えても本人が直せなかった。
+            'hire_date' => ['nullable', 'date'],
             'appeal' => ['nullable', 'string', 'max:1000'],
             'liked_contents' => ['nullable', 'string', 'max:1000'],
             'disliked_contents' => ['nullable', 'string', 'max:1000'],
