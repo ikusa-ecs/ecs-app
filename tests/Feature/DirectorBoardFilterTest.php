@@ -101,8 +101,13 @@ class DirectorBoardFilterTest extends TestCase
             ->assertSee('function sameOffice', false)
             // お休みを出さない＋件数を出す
             ->assertSee('function isDayOff', false)
-            ->assertSee('function dayOffCount', false)
-            ->assertSee('お休み ${offN}名', false)
+            ->assertSee('function dayOffPeople', false)
+            // ⚠ 数だけでなく名前も出す（2026-09-02 baba要望）。誰が休みか分からないと結局調べることになる。
+            ->assertSee('お休み ${offList.length}名（${names}）', false)
+            // カレンダーに前後の月の日も出す（前後の予定を見ながら決めるため）。
+            // ⚠ ただし集計（担当バランス）は月単位のまま。
+            ->assertSee('/ 7) + 1;', false)
+            ->assertSee('いま見ている月ぶんだけ')
             // お休みなのに担当に入っている人の赤い印
             ->assertSee('dc-offwarn', false);
     }

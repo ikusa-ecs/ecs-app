@@ -63,7 +63,10 @@
     .cal-cell .c-date .sun { color: var(--danger); }
     .cal-cell .c-date .sat { color: var(--brand); }
     /* その日の希望休（ディレクター） */
-    .c-dayoff { font-size: 9.5px; font-weight: 700; color: #b4530a; background: #fdecd9; border-radius: 5px; padding: 0 5px; white-space: nowrap; }
+    /* その日の希望休（ディレクター）。⚠ 名前も出すので、折り返せるようにする
+       （nowrap のままだとマスからはみ出して、カレンダーの並びが崩れる）。 */
+    .c-dayoff { font-size: 9.5px; font-weight: 700; color: #b4530a; background: #fdecd9; border-radius: 5px;
+                padding: 1px 5px; line-height: 1.4; overflow-wrap: anywhere; }
 
     /* 1日の中の案件カード（小） */
     .dcase {
@@ -142,6 +145,8 @@
     .dc-tip .t-pos { margin-top: 5px; }
 
     .cell-empty { font-size: 10px; color: #cbbfae; text-align: center; padding-top: 6px; }
+
+    .agg-note { font-size: 11px; color: var(--muted); margin: 4px 0 6px; line-height: 1.5; }
 
     /* ===== 担当バランス集計（右パネル・ライブ） ===== */
     .agg-panel { position: sticky; top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -272,7 +277,9 @@
           ② <b>他の拠点の方は並べません</b>（以前は、一度この拠点の案件で担当に入ると全部の日に出ていました）。
           ③ <b>すでに担当に入っている方でも、イベプラでなければ並べません</b>。
           変えたいときは<b>「＋全社員を表示」</b>を押してください。担当が外れることはありません（誰が担当かは案件カードの「D:」に出ています）。
-          ④ <b>お休みの日なのに担当に入っている方には、赤い「休」の印</b>を出します（いちばん気づきたい間違いなので隠しません）。
+          ④ <b>お休みの日なのに担当に入っている方には、赤い「休」の印</b>を出します（いちばん気づきたい間違いなので隠しません）。<br>
+          <b>2026-09-02 に変えたところ</b>＝カレンダーに<b>前の月の終わりと、次の月の最初1週間</b>も出します（前後の予定を見ながら決められるように）。
+          薄い色のマスが当月外です。<b>「📊 担当バランス」の数は、いま見ている月ぶんだけ</b>を数えています。
         </div>
       </details>
 
@@ -331,12 +338,13 @@
         <div class="agg-panel">
           <h3>📊 担当バランス</h3>
           <span class="live"><span class="dot"></span>この画面と連動中</span>
+          <!-- ⚠ カレンダーには前後の月の日も出るので、数え方をはっきり書いておく（2026-09-02 baba指示）。 -->
+          <p class="agg-note"><b>Dに入っている方だけ</b>を並べています。数えているのは <b>いま見ている月ぶんだけ</b>です（カレンダーに出ている前後の月の日は数えません）。</p>
           <table class="agg-tbl">
             <thead>
               <tr>
                 <th class="nm">社員</th>
                 <th>D計</th>
-                <th>FC</th>
                 <th>大型D</th>
                 <th>大型SD</th>
               </tr>
@@ -344,8 +352,9 @@
             <tbody id="aggBody"></tbody>
           </table>
           <p class="agg-note">
-            この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<b>FC</b>＝この月にFCでアサインされた数。<br>
-            ※「リアルD」「オンラインD」も本番では集計します（別ウィンドウの「社員・ディレクター集計」と同じ数え方です）。
+            この月のDの担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<br>
+            ※ <b>大型SD</b>は、Dにも入っている方のぶんだけ出ます（SDだけの方はこの表に並びません）。<br>
+            ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
           </p>
         </div>
       </div>
@@ -452,7 +461,11 @@
   // この月の案件だけ対象にしているか
   function inTarget(c){ const d = addDays(c.off); return d.getFullYear() === TARGET.y && d.getMonth() === TARGET.m; }
   // 日付キー(y-m-d) → その日の案件
-  function dayCases(key){ return cases.filter(c => inTarget(c) && ymd(addDays(c.off)) === key); }
+  // ⚠ ここで当月に絞らない（2026-09-02 baba要望）。カレンダーには前の月の終わりと
+  //   **次の月の最初1週間**も出すので、その日の案件も出す必要がある
+  //   （9/30のDを決めるとき、10/1が見えないと前後の予定が分からない）。
+  // ⚠ **集計（担当バランス）は月単位のまま**（baba指示）。そちらは inTarget で絞っている。
+  function dayCases(key){ return cases.filter(c => ymd(addDays(c.off)) === key); }
 
   // 時間（本番の開始〜終了。無ければ集合〜解散）
   function timeOf(c){
@@ -523,12 +536,14 @@
     });
   }
 
-  // その日お休みで、一覧から外した人の数（「お休み ◯名」と出すため）。
-  // ⚠ 黙って消すと「あの人が居ない」と探すことになるので、必ず数を見せる。
-  function dayOffCount(dcs, busyMap, showAll, y, m, d){
+  // その日お休みで、一覧から外した人（「お休み 1名（関根）」と出すため）。
+  // ⚠ 黙って消すと「あの人が居ない」と探すことになるので、必ず出す。
+  // ⚠ 数だけだと誰が休みか分からず、結局この画面を離れて調べることになる
+  //   （2026-09-02 baba要望で名前も出すようにした）。名前は苗字だけ（マスが狭いため）。
+  function dayOffPeople(dcs, busyMap, showAll, y, m, d){
     const shownIds = new Set(shownEmployees(dcs, busyMap, showAll, y, m, d).map(e => e.id));
     return EMP.filter(e => !shownIds.has(e.id) && sameOffice(e) && (showAll || e.planner)
-      && isDayOff(e.id, y, m, d)).length;
+      && isDayOff(e.id, y, m, d));
   }
 
   // ===== 件数ふきだし（その日の案件一覧）=====
@@ -557,7 +572,9 @@
     const startDow = (first.getDay() + 6) % 7;                 // 月曜=0
     const gridStart = new Date(TARGET.y, TARGET.m, 1 - startDow);
     const last = new Date(TARGET.y, TARGET.m + 1, 0);
-    const weeks = Math.ceil((startDow + last.getDate()) / 7);
+    // ⚠ 月の最後の週のあとに、**もう1週間ぶん**出す（2026-09-02 baba要望）。
+    //   「9/30までしか出ていないので10月の最初1週間も見たい」＝前後の予定を見ながら決めるため。
+    const weeks = Math.ceil((startDow + last.getDate()) / 7) + 1;
     const todayKey = ymd(addDays(0));
 
     grid.innerHTML = '';
@@ -571,15 +588,21 @@
       const cell = document.createElement('div');
       cell.className = 'cal-cell' + (inMonth ? '' : ' other') + (key === todayKey ? ' today' : '');
 
-      const dcs = inMonth ? dayCases(key) : [];
+      // ⚠ 当月外の日（前の月の終わり・次の月の始め）も中身を出す（2026-09-02 baba要望）。
+      //   それまでは空にしていたので、**9/30のDを決めるときに10/1が見えなかった**。
+      //   前後の予定（連勤・前日設営・翌日の大型）を見ながら決められるようにする。
+      //   背景は薄いまま＝当月かどうかはひと目で分かる。
+      const dcs = dayCases(key);
       const cnt = dcs.length;
       const undec = dcs.filter(c => !c.dirId).length;   // この日の「D未定」の数
       const countHtml = cnt
         ? `<span class="c-count ${undec ? 'has-undecided' : ''}">${cnt}件${undec ? '（' + undec + '）' : ''}</span>${dayTip(dcs)}`
         : '';
-      let inner = `<div class="c-date"><span class="${dowC}">${d.getDate()}</span>${countHtml}</div>`;
+      // 当月外の日は「10/1」のように月から出す（数字だけだと何月か分からない）。
+      const dLabel = inMonth ? d.getDate() : ((d.getMonth() + 1) + '/' + d.getDate());
+      let inner = `<div class="c-date"><span class="${dowC}">${dLabel}</span>${countHtml}</div>`;
 
-      if (inMonth && cnt) {
+      if (cnt) {
         const busyMap = EMP_BUSY[realYmd(d)] || {};   // その日にFC等でアサイン済みの社員→[role]
         const emps = shownEmployees(dcs, busyMap, showAll, d.getFullYear(), d.getMonth(), d.getDate());
         inner += '<div class="emp-list">' + emps.map(e => {
@@ -604,10 +627,16 @@
                + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}${offMark}</div>`;
         }).join('') + '</div>';
 
-        // お休みで一覧から外した人の数。⚠ 黙って消すと「あの人が居ない」と探すことになる。
-        const offN = dayOffCount(dcs, busyMap, showAll, d.getFullYear(), d.getMonth(), d.getDate());
-        if (offN > 0) {
-          inner += `<div class="c-dayoff" title="この日「×」または「希望休」を出している方です。「＋全社員を表示」でも出てきません。">お休み ${offN}名</div>`;
+        // お休みで一覧から外した人。⚠ 黙って消すと「あの人が居ない」と探すことになる。
+        // ⚠ 名前も出す（2026-09-02 baba要望）。数だけだと誰が休みか分からない。
+        //   多い日は名前が長くなるので、3人までにして残りは「ほか◯名」。
+        const offList = dayOffPeople(dcs, busyMap, showAll, d.getFullYear(), d.getMonth(), d.getDate());
+        if (offList.length > 0) {
+          const names = offList.slice(0, 3).map(e => e.surname).join('・')
+            + (offList.length > 3 ? '　ほか' + (offList.length - 3) + '名' : '');
+          const allNames = offList.map(e => e.name).join('・');
+          inner += `<div class="c-dayoff" title="この日「×」または「希望休」を出している方です（${allNames}）。「＋全社員を表示」でも出てきません。">`
+                 + `お休み ${offList.length}名（${names}）</div>`;
         }
       } else if (inMonth) {
         inner += `<div class="cell-empty">—</div>`;
@@ -694,25 +723,39 @@
   // 「＋全社員を表示」を押しているときは全員。
   // ⚠ いずれにしても**実際にD/SD/FCに入っている人は必ず出す**（下のループで ensure される）。
   //   数字を持っている人を隠すと、合計が合わない表になる。
+  // 担当バランス＝「Dの偏りを見る」ための表（2026-09-02 baba指示で作り直し）。
+  // ⚠ **Dに入っている人だけ**を並べる。FCの列は出さない。
+  //   ここはDを誰に振るかを決める画面なので、FCの件数やスタッフが混ざると
+  //   「Dが偏っていないか」が読み取りにくくなる。
+  // ⚠ **数えるのはいま見ている月ぶんだけ**（inTarget）。カレンダーには前後の月の日も
+  //   出しているが、それは数えない（baba指示）。
+  // ⚠ 大型SDは、Dに入っている人の行にだけ出る（SDだけの人は並べない）。
   function computeAgg(){
-    const showAll = document.getElementById('showAllEmp').checked;
     const map = {};
-    function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), d:0, fc:0, bigD:0, bigSD:0 }; return map[id]; }
-    EMP.filter(e => showAll || e.planner).forEach(e => ensure(e.id));   // 0件の人も表に出す
+    function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), d:0, bigD:0, bigSD:0 }; return map[id]; }
     cases.forEach(c => {
       if (!inTarget(c)) return;
       const isBig = c.scale === '大型';
       if (c.dirId) { const r = ensure(c.dirId); r.d++; if (isBig) r.bigD++; }
-      if (c.sdId && isBig) { ensure(c.sdId).bigSD++; }
-      (c.fcIds || []).forEach(id => { ensure(id).fc++; });   // FC（この画面の選択に連動）
     });
-    return Object.values(map).sort((a, b) => (b.d - a.d) || (b.fc - a.fc) || (b.bigD - a.bigD));
+    // 大型SDは「Dにも入っている人」のぶんだけ足す（Dの表なので、行は増やさない）。
+    cases.forEach(c => {
+      if (!inTarget(c)) return;
+      if (c.scale === '大型' && c.sdId && map[c.sdId]) map[c.sdId].bigSD++;
+    });
+
+    return Object.values(map).sort((a, b) => (b.d - a.d) || (b.bigD - a.bigD));
   }
   function renderAgg(){
     const rows = computeAgg();
     const maxD = Math.max(1, ...rows.map(r => r.d));
     const body = document.getElementById('aggBody');
     body.innerHTML = '';
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="4" style="color:var(--muted); font-size:11.5px; padding:8px 4px;">'
+        + 'この月は、まだDが決まっている案件がありません。</td></tr>';
+      return;
+    }
     rows.forEach(r => {
       const most = r.d === maxD && r.d > 0;
       const tr = document.createElement('tr');
@@ -722,7 +765,6 @@
           <div class="agg-bar"><i style="width:${Math.round(r.d / maxD * 100)}%;"></i></div>
         </td>
         <td class="num dcnt">${r.d}</td>
-        <td class="num">${r.fc}</td>
         <td class="num">${r.bigD}</td>
         <td class="num">${r.bigSD}</td>`;
       body.appendChild(tr);
