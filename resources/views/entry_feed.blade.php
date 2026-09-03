@@ -40,6 +40,11 @@
     .tag.tmp    { background: #eef0f2; color: #6b7280; }
     .tag.todo   { background: #fdf3e2; color: #8a5a10; }
     .tag.many   { background: #eef2ff; color: #3730a3; }
+    /* その日の稼働希望（2026-09-03 baba要望）。⚠ NG は食い違いなので赤く目立たせる。 */
+    .tag.ok     { background: #e7f6ec; color: #166534; }
+    .tag.ng     { background: #fdecec; color: #b91c1c; }
+    .tag.none   { background: transparent; color: #b9b0a4; font-weight: 400; }
+    .ef .wish   { white-space: nowrap; }
     .ef-note { color: #6e5b49; font-size: 12px; }
     .ef-empty { color: var(--muted, #8a7a6b); padding: 26px 0; text-align: center; }
     .ef-link { font-size: 12px; white-space: nowrap; }
@@ -80,6 +85,7 @@
         <tr>
           <th>届いた日時</th>
           <th>スタッフ</th>
+          <th>その日の希望</th>
           <th>エントリー先の案件</th>
           <th>本人の一言</th>
           <th>状態</th>
@@ -95,6 +101,18 @@
               @if ($r['isNew'])<span class="tag new" title="入社1年未満">🌱 新人</span>@endif
               @if ($r['entryCount'] >= 3)<span class="tag many" title="この期間で {{ $r['entryCount'] }} 件エントリーしています">{{ $r['entryCount'] }}件</span>@endif
               <div class="ef-note">{{ $r['staffId'] }}／{{ $r['level'] }}</div>
+            </td>
+            {{-- その日の稼働希望カレンダー（2026-09-03 baba要望）。
+                 ⚠ エントリー（応募）と稼働希望は**別の入力**。両方見ないと、
+                   手は挙げたのにカレンダーはNG、という食い違いに気づけない。 --}}
+            <td class="wish">
+              @if ($r['wish'] === 'ok')
+                <span class="tag ok" title="稼働希望カレンダーで、この日を終日〇にしています">終日〇</span>
+              @elseif ($r['wish'] === 'ng')
+                <span class="tag ng" title="⚠ エントリーはありますが、稼働希望カレンダーではこの日をNG（または希望休）にしています。本人に確かめてください">⚠ NG</span>
+              @else
+                <span class="tag none" title="この日の稼働希望を出していません（未定・未提出）">—</span>
+              @endif
             </td>
             <td>
               <b>{{ $r['date'] }}（{{ $r['dow'] }}）</b> {{ $r['projectName'] }}
@@ -117,7 +135,7 @@
             </td>
           </tr>
         @empty
-          <tr><td colspan="6" class="ef-empty">この条件に合うエントリーはありません。</td></tr>
+          <tr><td colspan="7" class="ef-empty">この条件に合うエントリーはありません。</td></tr>
         @endforelse
       </tbody>
     </table>

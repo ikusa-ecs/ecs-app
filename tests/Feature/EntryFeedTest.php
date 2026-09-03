@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\Assignment;
+use App\Models\ShiftPreference;
 use Database\Factories\PersonFactory;
 use Database\Factories\ProjectFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -121,4 +122,69 @@ class EntryFeedTest extends TestCase
 
         $this->actingAsPerson($staff)->get('/entry-feed')->assertRedirect('/staff-portal');
     }
+    /**
+     * その日の稼働希望（終日〇／NG）が分かること（2026-09-03 baba要望）。
+     *
+     * ⚠ エントリー（応募）と稼働希望カレンダーは**別の入力**。
+     *   両方見ないと「手は挙げてくれたが、その日はNGにしている」人に気づけない。
+     *   ⚠ 出していない人（未定・未提出）は「—」＝〇でもNGでもないことを分けて出す。
+     */
+    public function test_the_feed_shows_the_shift_wish_for_that_day(): void
+    {
+        $day = Carbon::today()->addDays(10);
+        $p = $this->project(['start_date' => $day->format('Y-m-d')]);
+
+        $yes = PersonFactory::new()->staff()->create(['name' => 'マルの人']);
+        $no = PersonFactory::new()->staff()->create(['name' => 'エヌジーの人']);
+        $none = PersonFactory::new()->staff()->create(['name' => 'ダシテナイ人']);
+
+        foreach ([$yes, $no, $none] as $s) {
+            Application::create([
+                'staff_id' => $s->id, 'project_id' => $p->id, 'intent' => '希望',
+                'applied_at' => Carbon::now(),
+            ]);
+        }
+        ShiftPreference::create([
+            'staff_id' => $yes->id, 'period' => $day->format('Y-m'),
+            'date' => $day->format('Y-m-d'), 'availability' => '稼働可',
+        ]);
+        ShiftPreference::create([
+            'staff_id' => $no->id, 'period' => $day->format('Y-m'),
+            'date' => $day->format('Y-m-d'), 'availability' => 'NG',
+        ]);
+
+        $res = $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk();
+        $rows = collect($res->original->getData()['rows'])->keyBy('staffName');
+
+        $this->assertSame('ok', $rows['マルの人']['wish']);
+        $this->assertSame('ng', $rows['エヌジーの人']['wish'], '手は挙げたのにNG、という食い違いに気づけません。');
+        $this->assertNull($rows['ダシテナイ人']['wish'], '希望を出していない人まで〇／NGに見えてはいけません。');
+
+        // 画面にも出ていること（列ごと消えたら誰も気づけない）。
+        $res->assertSee('その日の希望')->assertSee('終日〇')->assertSee('⚠ NG');
+    }
+
+    /** 別の日のNGを、案件の日のNGと取りちがえないこと。 */
+    public function test_a_wish_on_another_day_is_not_used(): void
+    {
+        $day = Carbon::today()->addDays(10);
+        $p = $this->project(['start_date' => $day->format('Y-m-d')]);
+        $s = PersonFactory::new()->staff()->create(['name' => 'ベツノヒの人']);
+
+        Application::create([
+            'staff_id' => $s->id, 'project_id' => $p->id, 'intent' => '希望',
+            'applied_at' => Carbon::now(),
+        ]);
+        ShiftPreference::create([
+            'staff_id' => $s->id, 'period' => $day->copy()->addDay()->format('Y-m'),
+            'date' => $day->copy()->addDay()->format('Y-m-d'), 'availability' => 'NG',
+        ]);
+
+        $rows = collect(
+            $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk()->original->getData()['rows']
+        )->keyBy('staffName');
+
+        $this->assertNull($rows['ベツノヒの人']['wish'], '別の日の希望を、案件の日のものとして出しています。');
+    }
+
 }

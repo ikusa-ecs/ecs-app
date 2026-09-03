@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\OfficeScope;
+use App\Support\ShiftWish;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -62,13 +63,21 @@ class EntryFeedController extends Controller
         $people = Person::whereIn('id', $apps->pluck('staff_id')->unique())->get()->keyBy('id');
         $contentNames = Content::pluck('content_name', 'id');
 
+        // その人が、その案件の日に「終日〇」を出しているか（2026-09-03 baba要望）。
+        // ⚠ 出し方の正本は App\Support\ShiftWish（エントリー一覧 /entries と同じもの）。
+        //   画面ごとに書くと、片方だけ直して食い違う。
+        $wishByKey = ShiftWish::forDays(
+            $apps->pluck('staff_id')->unique()->all(),
+            $projects->pluck('start_date')->filter()->map(fn ($d) => $d->format('Y-m-d'))->all()
+        );
+
         // すでにアサイン済みか（キャンセル以外）＝「対応済み」の目印に使う。
         $assigned = Assignment::whereIn('project_id', $projects->keys())
             ->where('status', '!=', 'キャンセル')
             ->get(['project_id', 'staff_id', 'status'])
             ->groupBy(fn ($a) => $a->project_id . '|' . $a->staff_id);
 
-        $rows = $apps->map(function (Application $a) use ($projects, $people, $contentNames, $assigned) {
+        $rows = $apps->map(function (Application $a) use ($projects, $people, $contentNames, $assigned, $wishByKey) {
             $p = $projects->get($a->project_id);
             $person = $people->get($a->staff_id);
 
@@ -83,9 +92,13 @@ class EntryFeedController extends Controller
                 ? '確定'
                 : ($assigned->has($key) ? '仮' : null);
 
+            // 稼働希望カレンダーの、その日の答え。'ok'＝終日〇／'ng'＝NG・希望休／null＝出していない。
+            $wishCode = ShiftWish::of($wishByKey, $a->staff_id, $p->start_date?->format('Y-m-d'));
+
             return [
                 'staffId'    => $a->staff_id,
                 'staffName'  => $person->name ?? $a->staff_id,
+                'wish'       => $wishCode,   // 終日〇を出しているか（2026-09-03 baba要望）
                 'level'      => optional($person)->skill_level ?? '—',
                 'isNew'      => $this->isNewcomer($person),
                 'entryCount' => 0,                     // あとで人ごとの件数を入れる

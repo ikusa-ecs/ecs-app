@@ -75,6 +75,39 @@
     .ent-table th, .ent-table td { padding:3px 7px; text-align:left; border-bottom:1px solid #f0e8dd; }
     .ent-table th { font-size:11.5px; color:#a08a73; font-weight:600; }
     .ent-table tr.assigned { background:#f6f1e9; }
+    /* 空いている人カレンダー（2026-09-03 baba要望）。
+       カレンダーを見れば、その日「終日〇」を出しているスタッフの名前が並ぶ。 */
+    .wc-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 10px; }
+    .wc-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+    .wc-dow { text-align:center; font-size:11.5px; font-weight:700; color:#a08a73; padding:2px 0; }
+    .wc-dow.wc-sun { color:#c05a5a; }
+    .wc-dow.wc-sat { color:#4a6ea8; }
+    .wc-cell { min-height:92px; border:1px solid #ece2d4; border-radius:8px; background:#fff; padding:4px 5px; }
+    .wc-cell.wc-blank { border:none; background:transparent; }
+    .wc-cell.wc-today { border-color:var(--brand,#b5673a); box-shadow:inset 0 0 0 1px var(--brand,#b5673a); }
+    .wc-cell.wc-sun { background:#fdf7f6; }
+    .wc-cell.wc-sat { background:#f7f9fd; }
+    .wc-head { display:flex; align-items:center; justify-content:space-between; }
+    .wc-d { font-size:12px; font-weight:700; color:#6e5b49; }
+    .wc-n { font-size:10px; font-weight:700; color:#15803d; background:#e7f6ec; border-radius:999px; padding:0 6px; }
+    .wc-cases { margin:2px 0 3px; }
+    .wc-cases a { display:block; font-size:10px; color:#8a5a33; background:#f6ede2; border-radius:4px;
+      padding:1px 4px; margin-bottom:2px; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .wc-names { display:flex; flex-wrap:wrap; gap:2px 4px; }
+    .wc-p { font-size:11px; color:#3a2d20; }
+    .wc-p.ent { color:#b5824a; font-weight:700; }        /* エントリー済み */
+    .wc-p.asg { color:#b9b0a4; text-decoration:line-through; }   /* もうアサイン済み */
+    .wc-none { font-size:11px; color:#d8cbb8; }
+    @media (max-width:720px){
+      .wc-grid { grid-template-columns:repeat(7,1fr); gap:2px; }
+      .wc-cell { min-height:64px; padding:2px 3px; }
+      .wc-p { font-size:10px; }
+    }
+
+    /* その日の稼働希望（2026-09-03 baba要望）。⚠ NG は食い違いなので赤く目立たせる。 */
+    .e-wish { font-size:11px; font-weight:700; padding:1px 7px; border-radius:20px; white-space:nowrap; }
+    .e-wish.ok { background:#e7f6ec; color:#166534; }
+    .e-wish.ng { background:#fdecec; color:#b91c1c; }
     .e-lv { font-size:11px; padding:1px 7px; border-radius:20px; }
     .e-lv.new { background:#e3e0ef; color:#5b4d8a; }
     .e-lv.mid { background:#eee3d4; color:#6e5b49; }
@@ -167,13 +200,14 @@
 @verbatim
       <div class="mock-note">
         <b>どの案件に、誰がエントリー（希望）してくれているか</b>を確認する画面です（DBの本物データ）。<br>
-        上の「この日から」で表示開始日を選べます。<b>「案件ごと」</b>＝案件単位の応募者一覧／<b>「月ごと」</b>＝スタッフ（縦）×案件（横）の一覧表で見られます。
+        上の「この日から」で表示開始日を選べます。<b>「案件ごと」</b>＝案件単位の応募者一覧／<b>「月ごと」</b>＝スタッフ（縦）×案件（横）の一覧表／<b>「空いている人」</b>＝カレンダーの日付に、その日<b>終日〇</b>を出しているスタッフの名前が並びます。
       </div>
 
       <!-- 見方の切替タブ -->
       <div class="ent-tabs">
         <button class="ent-tab active" id="tab-bycase"  onclick="switchView('bycase')">📋 案件ごと</button>
         <button class="ent-tab"        id="tab-bymonth" onclick="switchView('bymonth')">🗓 月ごと</button>
+        <button class="ent-tab"        id="tab-wishcal" onclick="switchView('wishcal')">📅 空いている人</button>
       </div>
 
       <!-- 絞り込み -->
@@ -209,6 +243,9 @@
       <!-- 月ごと -->
       <div class="view" id="view-bymonth"></div>
 
+      <!-- 空いている人（カレンダー） -->
+      <div class="view" id="view-wishcal"></div>
+
       <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
         ※ <b>アサイン済み</b>＝すでにその案件のメンバーに入れた人。<b>エントリー中</b>＝希望はくれたがまだ未割当の人。<br>
         ※ 募集状態は「確定／必要人数を満たした」案件を<b>締切</b>、それ以外を<b>募集中</b>として表示しています。
@@ -223,6 +260,10 @@
 <script>window.ECS_STAFF_POOL = @json($staffPool);</script>
 <!-- DBの案件＋応募者（実データ）。空のときは見本cases.jsにフォールバック。 -->
 <script>window.ECS_ENTRIES_CASES = @json($entriesCases ?? []);</script>
+{{-- 日付ごとの「終日〇を出しているスタッフ」（2026-09-03 baba要望）。
+     ⚠ 出す人の決まりは日別ボードの希望者カラムとそろえてある（スタッフだけ・在籍中・自拠点）。
+     正本は App\Support\ShiftWish と AssignBoardController::wishCalendar。 --}}
+<script>window.ECS_WISH_CAL = @json($wishCalendar ?? []);</script>
 <!-- DBに案件があるか（拠点で絞って0件になっても見本データに戻さないための旗）。 -->
 <script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
 <!-- エントリー一覧「月ごと」からのアサイン保存（A案）用。 -->
@@ -298,10 +339,10 @@
   let currentView = 'bycase';
   function switchView(v){
     currentView = v;
-    document.getElementById('tab-bycase').classList.toggle('active', v === 'bycase');
-    document.getElementById('tab-bymonth').classList.toggle('active', v === 'bymonth');
-    document.getElementById('view-bycase').classList.toggle('active', v === 'bycase');
-    document.getElementById('view-bymonth').classList.toggle('active', v === 'bymonth');
+    ['bycase', 'bymonth', 'wishcal'].forEach(k => {
+      document.getElementById('tab-' + k).classList.toggle('active', v === k);
+      document.getElementById('view-' + k).classList.toggle('active', v === k);
+    });
     render();
   }
 
@@ -347,8 +388,92 @@
     const list = targetCases().filter(passFilter);
     renderSummary(list);
     if (currentView === 'bycase') renderByCase(list);
+    else if (currentView === 'wishcal') renderWishCal();
     else renderByMonth(list);
   }
+
+  // ===== ③ 空いている人（カレンダー） =====
+  // 2026-09-03 baba要望「カレンダーを見れば終日〇の人の名前が載っている、が理想」。
+  // ⚠ 出す人の決まりはサーバー側（AssignBoardController::wishCalendar）が持つ。
+  //   ここに条件を書き足さないこと（日別ボードの希望者カラムと食い違う）。
+  let WISH_MONTH = null;   // 表示中の月（Date・1日）
+
+  function wishMonthStart(){
+    if (!WISH_MONTH) { const t = new Date(); WISH_MONTH = new Date(t.getFullYear(), t.getMonth(), 1); }
+    return WISH_MONTH;
+  }
+  function wishMoveMonth(n){
+    const m = wishMonthStart();
+    WISH_MONTH = new Date(m.getFullYear(), m.getMonth() + n, 1);
+    renderWishCal();
+  }
+  function wishIso(d){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // その日の案件名（カレンダーのマスの上に小さく出す＝誰を探しているのかが分かる）
+  function wishCasesOn(iso){
+    return targetCases().filter(c => !c.archived && isoOf(caseDate(c.off)) === iso);
+  }
+
+  function renderWishCal(){
+    const box = document.getElementById('view-wishcal');
+    if (!box) return;
+    const cal = window.ECS_WISH_CAL || {};
+    const m = wishMonthStart();
+    const y = m.getFullYear(), mo = m.getMonth();
+    const first = new Date(y, mo, 1);
+    const last = new Date(y, mo + 1, 0);
+    const todayIso = wishIso(new Date());
+
+    let cells = '';
+    for (let i = 0; i < first.getDay(); i++) cells += '<div class="wc-cell wc-blank"></div>';
+    for (let d = 1; d <= last.getDate(); d++) {
+      const date = new Date(y, mo, d);
+      const iso = wishIso(date);
+      const people = cal[iso] || [];
+      const dow = date.getDay();
+      const free = people.filter(p => p.st === '').length;
+
+      const cs = wishCasesOn(iso);
+      const caseHtml = cs.length
+        ? `<div class="wc-cases">${cs.map(c => `<a href="#ent-${c.id}" onclick="switchView('bycase')" title="${escAttr(c.name)}">${esc(c.name)}</a>`).join('')}</div>`
+        : '';
+
+      const names = people.length
+        ? `<div class="wc-names">${people.map(p =>
+            `<span class="wc-p ${p.st}" title="${escAttr(p.name + '（' + (lvLabel[p.lv] || '') + '／' + (p.pos || '—') + '）' + (p.st === 'asg' ? '・この日はもうアサイン済み' : (p.st === 'ent' ? '・この日の案件にエントリー済み' : '')))}">${esc(p.name)}</span>`
+          ).join('')}</div>`
+        : '<div class="wc-none">—</div>';
+
+      cells += `<div class="wc-cell${iso === todayIso ? ' wc-today' : ''}${dow === 0 ? ' wc-sun' : ''}${dow === 6 ? ' wc-sat' : ''}">
+          <div class="wc-head"><span class="wc-d">${d}</span>${people.length ? `<span class="wc-n" title="終日〇 ${people.length}名／まだ何も決まっていない人 ${free}名">${free}/${people.length}</span>` : ''}</div>
+          ${caseHtml}${names}
+        </div>`;
+    }
+
+    const total = Object.keys(cal).reduce((s, k) => s + cal[k].length, 0);
+    box.innerHTML = `
+      <div class="wc-bar">
+        <button type="button" class="f-today" onclick="wishMoveMonth(-1)">◀ 前の月</button>
+        <b>${y}年${mo + 1}月</b>
+        <button type="button" class="f-today" onclick="wishMoveMonth(1)">次の月 ▶</button>
+        <span class="muted" style="font-size:11.5px; margin-left:8px;">
+          その日 <b>終日〇</b> を出しているスタッフの名前です。
+          <span class="wc-p" style="margin:0 2px;">黒</span>＝まだ何も決まっていない／
+          <span class="wc-p ent" style="margin:0 2px;">オレンジ</span>＝エントリー済み／
+          <span class="wc-p asg" style="margin:0 2px;">グレー</span>＝もうアサイン済み。
+          マスの右上は「声を掛けられる人数／終日〇の人数」。
+        </span>
+      </div>
+      <div class="wc-grid">
+        <div class="wc-dow wc-sun">日</div><div class="wc-dow">月</div><div class="wc-dow">火</div><div class="wc-dow">水</div>
+        <div class="wc-dow">木</div><div class="wc-dow">金</div><div class="wc-dow wc-sat">土</div>
+        ${cells}
+      </div>
+      ${total ? '' : '<div class="empty-note">この先の稼働希望がまだ登録されていません。スタッフの方が「稼働希望」を出すと、ここに名前が並びます。</div>'}`;
+  }
+
 
   function renderSummary(list){
     const totalEnt = list.reduce((s,c) => s + entrantsOf(c).length, 0);
@@ -360,6 +485,15 @@
       <div class="sum-card"><div class="num">${totalEnt}</div><div class="lbl">エントリー総数（のべ）</div></div>
       <div class="sum-card"><div class="num">${totalAsg}<span style="font-size:14px;color:#a08a73;">/${totalNeed}</span></div><div class="lbl">アサイン済み／必要人数</div></div>
       <div class="sum-card"><div class="num ${shortCases?'warn':''}">${shortCases}</div><div class="lbl">まだ募集中の案件</div></div>`;
+  }
+
+  // その日の稼働希望（2026-09-03 baba要望）。'ok'＝終日〇／'ng'＝NG・希望休／その他＝出していない。
+  // ⚠ エントリー（応募）と稼働希望カレンダーは**別の入力**。両方見ないと、
+  //   手は挙げてくれたのにカレンダーはNG、という食い違いに気づけない。
+  function wishTag(w){
+    if (w === 'ok') return '<span class="e-wish ok" title="稼働希望カレンダーで、この日を終日〇にしています">終日〇</span>';
+    if (w === 'ng') return '<span class="e-wish ng" title="⚠ エントリーはありますが、稼働希望カレンダーではこの日をNG（または希望休）にしています。本人に確かめてください">⚠ NG</span>';
+    return '<span class="muted" title="この日の稼働希望を出していません（未定・未提出）">—</span>';
   }
 
   // ① 案件ごと
@@ -374,6 +508,7 @@
         <tr class="${e.assigned?'assigned':''}">
           <td>${e.no}</td>
           <td>${esc(e.name)}</td>
+          <td>${wishTag(e.wish)}</td>
           <td><span class="e-lv ${e.lv}">${lvLabel[e.lv]}</span></td>
           <td>${posTag(e.pos)}</td>
           <td><span class="e-stat ${e.assigned?'assigned':'waiting'}">${e.assigned?'✓ アサイン済み':'エントリー中'}</span></td>
@@ -397,7 +532,7 @@
             <span class="c${shortCls}">アサイン済み <b>${Math.min(c.filled,c.need)}</b>名</span>
           </div>
           <table class="ent-table">
-            <thead><tr><th>No</th><th>名前</th><th>区分</th><th>できるポジション</th><th>状態</th><th>本人メモ</th><th>担当メモ</th></tr></thead>
+            <thead><tr><th>No</th><th>名前</th><th>その日の希望</th><th>区分</th><th>できるポジション</th><th>状態</th><th>本人メモ</th><th>担当メモ</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`;

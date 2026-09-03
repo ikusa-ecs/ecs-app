@@ -13,6 +13,7 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ShiftWish;
 use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -34,6 +35,9 @@ use Illuminate\Support\Facades\DB;
  */
 class AssignBoardController extends Controller
 {
+    /** カレンダー表示（📅 空いている人）で先まで見せる日数。3か月ぶん。 */
+    private const WISH_CALENDAR_DAYS = 92;
+
     /** 役割キー → ボード表示用のポジション名（assignments.role の値に対応）。 */
     private const POS_LABELS = [
         'D' => 'D', 'SD' => 'SD', 'MC' => 'MC', 'OP' => 'OP',
@@ -98,9 +102,98 @@ class AssignBoardController extends Controller
         return view('entries', [
             'staffPool' => $this->staffPool($office),
             'entriesCases' => $this->entriesCases($office),
+            // カレンダー表示（📅 空いている人）用＝日付ごとの「終日〇を出している人」。
+            'wishCalendar' => $this->wishCalendar($office),
+            'wishCalendarDays' => self::WISH_CALENDAR_DAYS,
             'officeScope' => $office,
             'usingDb' => Project::exists(),
         ]);
+    }
+
+    /**
+     * エントリー一覧の「📅 空いている人」カレンダー用（2026-09-03 baba要望
+     * 「カレンダーを見れば終日〇の人の名前が載っている、が理想」）。
+     *
+     * 返り値＝ 'Y-m-d' => [ ['id','name','lv','pos','st'], ... ]
+     *   st ＝ 'asg'（その日すでにアサイン済み）／'ent'（エントリー済み・まだアサインされていない）／''（まだ何も）
+     *
+     * ⚠ 出す人の決まりは日別ボードの希望者カラムと同じにそろえる。ずれると
+     *   「ボードには出るのにカレンダーには出ない」で混乱する。
+     *   ・スタッフだけ（社員はふだんイベントに出ないので出さない）
+     *   ・退職・無効にした人は出さない
+     *   ・拠点で絞って見ているときは自拠点だけ（事務所が未設定の人は東京で見たときに出る）
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function wishCalendar(?string $office = null): array
+    {
+        $from = Carbon::today();
+        $to = $from->copy()->addDays(self::WISH_CALENDAR_DAYS);
+
+        $byDay = ShiftWish::okStaffByDay($from->format('Y-m-d'), $to->format('Y-m-d'));
+        if (! $byDay) {
+            return [];
+        }
+
+        $ids = collect($byDay)->flatten()->unique()->values()->all();
+
+        // 出してよい人（スタッフ・在籍中・拠点）。ここで一度に絞る。
+        $allowed = OfficeScope::applyToPeople(Person::staff(), $office)
+            ->whereIn('id', $ids)
+            ->where(fn ($q) => $q->where('active', true)->orWhereNull('active'))
+            ->with('roleEligibilities:staff_id,position')
+            ->get()
+            ->keyBy('id');
+
+        if ($allowed->isEmpty()) {
+            return [];
+        }
+
+        // その日すでにアサインされている人（キャンセル以外）。
+        $asg = Assignment::whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
+            ->where('status', '!=', 'キャンセル')
+            ->get(['staff_id', 'date'])
+            ->groupBy(fn ($a) => Carbon::parse($a->date)->format('Y-m-d'))
+            ->map(fn ($rows) => array_flip($rows->pluck('staff_id')->all()))
+            ->all();
+
+        // その日の案件にエントリー（応募）している人。
+        $projectDay = Project::whereNotNull('start_date')
+            ->whereBetween('start_date', [$from->format('Y-m-d'), $to->format('Y-m-d').' 23:59:59'])
+            ->notCancelled()
+            ->pluck('start_date', 'id')
+            ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
+            ->all();
+
+        $ent = [];
+        if ($projectDay) {
+            foreach (Application::whereIn('project_id', array_keys($projectDay))->get(['project_id', 'staff_id']) as $a) {
+                $ent[$projectDay[$a->project_id]][$a->staff_id] = true;
+            }
+        }
+
+        $out = [];
+        foreach ($byDay as $day => $staffIds) {
+            foreach (array_unique($staffIds) as $sid) {
+                $person = $allowed->get($sid);
+                if (! $person) {
+                    continue;   // 社員・退職者・他拠点
+                }
+                $out[$day][] = [
+                    'id' => $sid,
+                    'name' => $person->name ?? $sid,
+                    'lv' => $this->lvCode($person->skill_level),
+                    'pos' => $this->primaryPos($person),
+                    'st' => isset($asg[$day][$sid]) ? 'asg' : (isset($ent[$day][$sid]) ? 'ent' : ''),
+                ];
+            }
+            if (isset($out[$day])) {
+                // まだ何も決まっていない人を先に＝声を掛けられる人が上に来る。
+                usort($out[$day], fn ($a, $b) => [$a['st'] === '' ? 0 : 1, $a['name']] <=> [$b['st'] === '' ? 0 : 1, $b['name']]);
+            }
+        }
+
+        return $out;
     }
 
     /** ピックアップ /pickup。案件＋候補者（応募＋当日稼働可）＋現メンバーを DB から渡す。 */
@@ -586,6 +679,15 @@ class AssignBoardController extends Controller
             $apps->pluck('staff_id')->merge($assignedRows->pluck('staff_id'))->unique()->all()
         );
 
+        // その人が、その案件の日に「終日〇」を出しているか（2026-09-03 baba要望）。
+        // ⚠ エントリー（応募）と稼働希望カレンダーは**別の入力**。両方見ないと
+        //   「手は挙げてくれたが、その日はNGにしている」人に気づけない。
+        //   出し方の正本＝App\Support\ShiftWish（エントリー新着 /entry-feed と同じもの）。
+        $wishByKey = ShiftWish::forDays(
+            $apps->pluck('staff_id')->unique()->all(),
+            $projects->pluck('start_date')->filter()->map(fn ($d) => $d->format('Y-m-d'))->all()
+        );
+
         $appsByProject = $apps->groupBy('project_id');
         // 案件×人 → 本人の応募メモ（applications.note）。
         $noteByProject = $apps->groupBy('project_id')->map(fn ($rows) => $rows->pluck('note', 'staff_id')->all());
@@ -614,7 +716,7 @@ class AssignBoardController extends Controller
             return $map;
         });
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
             $entryNotes = $noteByProject->get($p->id, []);         // [staff_id => 本人の応募メモ]
@@ -624,11 +726,13 @@ class AssignBoardController extends Controller
             // 応募者リスト（applications → 表示用 {no, name, lv, pos, assigned, status, entryNote, remark}）。
             $entrants = ($appsByProject->get($p->id) ?? collect())
                 ->pluck('staff_id')->unique()->values()
-                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks) {
+                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p) {
                     $person = $people->get($sid);
 
                     return [
                         'no' => $i + 1,
+                        // その日の稼働希望（'ok'＝終日〇／'ng'＝NG・希望休／null＝出していない）。
+                        'wish' => ShiftWish::of($wishByKey, $sid, $p->start_date?->format('Y-m-d')),
                         'id' => $sid,                              // スタッフID（エントリー一覧からのアサイン保存に使う）
                         'name' => $person->name ?? $sid,
                         'lv' => $this->lvCode($person?->skill_level),
