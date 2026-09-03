@@ -270,6 +270,11 @@
        色は横に出るバッジと同じにそろえる（社員＝青／派遣＝紫）。 */
     .m-name.emp   { color: #2c6ca0; font-weight: 700; }
     .m-name.haken { color: #6d28d9; font-weight: 700; }
+    /* 社員だけまとめて確定にするボタン（2026-09-03 baba要望）。 */
+    .fix-emp { margin-left: 6px; border: 1px solid #2c6ca0; background: #eef4fb; color: #2c6ca0;
+      border-radius: 999px; padding: 1px 9px; font-size: 10.5px; font-weight: 700;
+      cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .fix-emp:hover { background: #2c6ca0; color: #fff; }
     /* 保存済みの派遣依頼（2026-09-03）。直す・消すのは派遣一覧から＝ここは見るだけ。 */
     .hk-row { background: #f8f4fd; border-radius: 6px; padding: 2px 4px; }
     .hk-row.off { opacity: .5; }
@@ -893,6 +898,39 @@
       })
       .catch(() => { alert('通信エラーでメンバーを確定にできませんでした。'); return 0; });
   }
+  // 社員だけまとめて確定にする（2026-09-03 baba要望）。
+  // ⚠ 社員はスタッフ画面への公開に関係ないので、先に確定にしてしまいたい、が背景。
+  //   スタッフは触らない＝公開の段取りを崩さないため。入口は confirm-members と同じ1つ（only=employee）。
+  function fixEmployees(id){
+    const c = cases.find(x => x.id === id);
+    if (!c) return;
+    const kari = c.assigned.filter(m => m.status === '仮' && m.type === 'emp' && m.id);
+    if (!kari.length) { alert('「仮」の社員はいません。'); return; }
+    // ⚠ 確認文の改行は String.fromCharCode(10) で作る。
+    //   「\」＋「n」で書くと、置換の途中で本物の改行に化けてこの画面のJSが丸ごと死ぬことがある
+    //   （2026-09-03 にここで実際にやった。過去にも本番で同じ事故がある）。
+    const NL = String.fromCharCode(10);
+    if (!confirm('「' + c.name + '」の社員 ' + kari.length + '名を「確定」にします。' + NL
+      + '（' + kari.map(m => m.name).join('・') + '）' + NL + NL
+      + 'スタッフは変わりません。よろしいですか？')) return;
+    if (!USING_DB){ kari.forEach(m => { m.status = '確定'; }); render(); return; }   // 見本データのときは画面だけ
+
+    fetch('/projects/confirm-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: c.id, only: 'employee' })
+    })
+      .then(r => r.json())
+      .then(res => {
+        // ⚠ 失敗をだまって流さない。「確定にしたつもりで仮のまま」がいちばん困る。
+        if (!res || !res.ok) { alert('社員を確定にできませんでした。' + (res && res.message ? NL + res.message : '')); return; }
+        kari.forEach(m => { m.status = '確定'; });
+        render();
+        alert('✓ 社員 ' + (res.confirmed || kari.length) + '名を「確定」にしました。');
+      })
+      .catch(() => alert('通信エラーで社員を確定にできませんでした。'));
+  }
+
   // 公開ずみの案件で、あとから足した「仮」の人をまとめて確定にする（2026-08-28 baba指摘）。
   // ⚠ スタッフの画面に出るのは「確定」の人だけ。仮のままだと本人に伝わらない。
   //   公開のときと同じ入口（confirmAllMembers）を使う＝確定のやり方を2つ作らない。
@@ -1848,9 +1886,14 @@
     }).join('');
     // 「仮」の人数（この人たちはスタッフの画面に出ないので、見出しで気づけるようにする・2026-08-21 baba）
     const kariN = members.filter(m => m.status === '仮').length;
+    // 「仮」の社員の人数（2026-09-03 baba要望）。社員だけ先にまとめて確定にできるようにする。
+    const kariEmpN = members.filter(m => m.status === '仮' && m.type === 'emp' && m.id).length;
+    const fixEmpBtn = kariEmpN
+      ? `<button class="fix-emp" title="この案件の「仮」の社員 ${kariEmpN}名を、まとめて「確定」にします（スタッフは変わりません）。" onclick="fixEmployees('${c.id}')">社員${kariEmpN}名を確定</button>`
+      : '';
     const memCol =
       `<div class="cc-col">
-         <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span>${kariN ? `<span class="kari-warn" title="「仮」の人はスタッフの画面に出ません。名前の横の「仮」を押すと確定にできます。">仮 ${kariN}名</span>` : ''}</div>
+         <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span>${kariN ? `<span class="kari-warn" title="「仮」の人はスタッフの画面に出ません。名前の横の「仮」を押すと確定にできます。">仮 ${kariN}名</span>` : ''}${fixEmpBtn}</div>
          <div class="col-list">${memRows || '<div class="mem-none">メンバー未割当</div>'}${dispatchRowsHtml(c)}</div>
          ${editMode ? `<div class="add-row">
              <button class="mini" onclick="openPicker('${c.id}','employee')" title="社員を名前でしぼって、チェックした人をまとめて入れます">＋社員を追加</button>

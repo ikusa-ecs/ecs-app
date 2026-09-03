@@ -605,7 +605,14 @@ class AssignmentController extends Controller
      */
     public function confirmMembers(Request $request)
     {
-        $data = $request->validate(['project_id' => ['required', 'string']]);
+        $data = $request->validate([
+            'project_id' => ['required', 'string'],
+            // only=employee のときは**社員だけ**確定にする（2026-09-03 baba要望
+            // 「日別ボードで社員をまとめて確定にするボタンが欲しい」）。
+            // ⚠ 社員はスタッフ画面への公開に関係ないので、先に確定にしてしまいたい、が背景。
+            //   省略したときは今までどおり全員（公開のときの動きを変えない）。
+            'only' => ['nullable', 'in:employee,staff'],
+        ]);
 
         $project = Project::find($data['project_id']);
         if (! $project) {
@@ -624,6 +631,15 @@ class AssignmentController extends Controller
             ->whereDate('date', $date)
             ->where('status', '仮')
             ->get();
+
+        // 社員だけ／スタッフだけに絞る（2026-09-03）。
+        // ⚠ 名簿に無いIDは「スタッフ」として扱う＝社員だけ確定のときに巻き込まない。
+        //   派遣は assignments に入らないのでここには来ない。
+        $only = (string) ($data['only'] ?? '');
+        if ($only !== '') {
+            $roles = Person::whereIn('id', $rows->pluck('staff_id')->unique())->pluck('role', 'id');
+            $rows = $rows->filter(fn ($r) => (string) ($roles[$r->staff_id] ?? 'staff') === $only)->values();
+        }
 
         // ⚠ 1件ずつ save する（まとめて update すると保存イベントが動かず、
         //   確定の記録＝confirmed_at / confirmed_by が付かない）。
