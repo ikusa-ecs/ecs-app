@@ -163,6 +163,45 @@ class HireDateInputTest extends TestCase
         $this->assertContains(2018, $years, 'いま登録されている一番古い入社（2018年）が選べません。');
     }
 
+    /**
+     * 「生年月日ではありません」の注意が、入れられる画面すべてに出ていること。
+     * ⚠ 2026-09-03、注意書きがあってもなお生年月日を入れた方が出たので赤い枠で目立たせた。
+     *   薄い説明文に戻すと同じ事故が起きる。
+     */
+    public function test_every_screen_warns_that_this_is_not_a_birthday(): void
+    {
+        $me = $this->emp('E-HD9');
+        $warn = '生年月日ではありません';
+
+        // マイプロフィール・マイページ・初回の初期設定
+        $this->actingAsPerson($me)->get('/profile')->assertOk()->assertSee($warn);
+        $this->actingAsPerson($me)->get('/mypage')->assertOk()->assertSee($warn);
+        $this->actingAsPerson($this->emp('E-HD10'))->get('/employees')->assertOk()->assertSee($warn);
+
+        $staff = $this->staff('S-HD3');
+        $this->actingAsPerson($staff)->get('/staff-portal')->assertOk()->assertSee($warn);
+    }
+
+    /**
+     * 選んだ内容を「勤続◯年◯か月」に言い換えて見せる仕掛けがあること。
+     * ⚠ 生年月日を選ぶと「勤続21年」と出て、ひと目でおかしいと分かる＝いちばん効く歯止め。
+     */
+    public function test_the_screens_show_how_long_the_person_has_worked(): void
+    {
+        $me = $this->emp('E-HD11');
+
+        $this->actingAsPerson($me)->get('/profile')
+            ->assertOk()
+            ->assertSee('hire-date-echo', false)
+            ->assertSee('生年月日を選んでいませんか', false);
+
+        // 名簿は詳細を開いたときに欄を作るので、出し直す呼び出しが要る。
+        $this->actingAsPerson($me)->get('/employees')
+            ->assertOk()
+            ->assertSee('hire-date-echo', false)
+            ->assertSee('window.ecsHireDateRefresh()', false);
+    }
+
     /** 画面に3つのプルダウンが出ていること（欄が消えたら誰も入れられない）。 */
     public function test_the_screens_show_the_dropdowns(): void
     {

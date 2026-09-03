@@ -29,6 +29,8 @@
   {{-- 入社年月日で選べる年（新しい順）。正本は App\Support\HireDate＝JSに年を書き足さない。 --}}
   window.ECS_HIRE_YEARS = @json(\App\Support\HireDate::years());
 </script>
+{{-- 入社年月日の「勤続◯年◯か月」の案内。他の4画面と同じものを使う（正本は1か所）。 --}}
+@include('partials.hire_date_script')
 {{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
 <style>
     {!! \App\Support\Departments::badgeCss('.dept') !!}
@@ -478,14 +480,24 @@
     // ⚠ 2026-09-03「入力しにくい」＝カレンダーが今月から開くので、2018年まで戻すのに
     //   「前の月」を何十回も押すことになっていた。年・月・日のプルダウンに変えた。
     const part = hireParts(date);
+    // ⚠ 「生年月日ではありません」の注意と「勤続◯年◯か月」の言い換えは、
+    //   partials/hire_date_selects（他の4画面）と**同じ見た目・同じ仕掛け**にしてある。
+    //   class 名（hire-date-field / hire-date-echo）と name（hire_y…）を変えると案内が出なくなる。
     return `<h4>入社年月日</h4>
       <div style="font-size:13px; margin-bottom:6px;">いまの登録：${shown}</div>
-      <div class="size-row" style="gap:10px;">
-        <label class="size-item">入社年月日：
-          <select class="size-input" style="width:auto;" id="hireY-${idx}">${yearOptions(part.y)}</select>
-          <select class="size-input" style="width:auto;" id="hireM-${idx}">${numOptions(1, 12, part.m, '月', true)}</select>
-          <select class="size-input" style="width:auto;" id="hireD-${idx}">${numOptions(1, 31, part.d || '1', '日', false)}</select>
-        </label>
+      <div class="hire-date-field">
+        <div class="hire-date-warn" style="margin:0 0 6px; padding:6px 10px; border-radius:8px;
+             background:#fdecec; border:1px solid #f3b7b7; color:#a12121; font-size:13px; font-weight:700; line-height:1.6;">
+          ⚠ ここは<u>生年月日ではありません</u>。<b>IKUSAで働き始めた日</b>を選んでください。
+        </div>
+        <div class="size-row" style="gap:10px;">
+          <label class="size-item">入社年月日：
+            <select class="size-input" style="width:auto;" name="hire_y" id="hireY-${idx}">${yearOptions(part.y)}</select>
+            <select class="size-input" style="width:auto;" name="hire_m" id="hireM-${idx}">${numOptions(1, 12, part.m, '月', true)}</select>
+            <select class="size-input" style="width:auto;" name="hire_d" id="hireD-${idx}">${numOptions(1, 31, part.d || '1', '日', false)}</select>
+          </label>
+        </div>
+        <div class="hire-date-echo" style="margin-top:5px; font-size:13px; color:#7a6f63;"></div>
       </div>
       <div class="save-row" style="margin-top:10px;">
         <button class="btn primary sm" onclick="saveHireDate(${idx}, this)">入社年月日を保存</button>
@@ -650,6 +662,8 @@
     dr.style.display = open ? '' : 'none';
     const toggle = tbody.querySelector(`tr.main-row[data-idx="${idx}"] .row-toggle`);
     if (toggle) toggle.innerHTML = open ? '詳細 ▴' : '詳細 ▾';
+    // 入社年月日の「勤続◯年◯か月」を出し直す（詳細は開いたときに作られるため）。
+    if (window.ecsHireDateRefresh) window.ecsHireDateRefresh();
   }
 
   // ===== 経験コンテンツ／Dの経験コンテンツの編集 =====

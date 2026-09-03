@@ -753,7 +753,6 @@
               @include('partials.hire_date_selects', ['value' => null, 'idPrefix' => 'pfHire'])
               <span class="sub" style="display:block; margin-top:4px;">
                 名簿の並び順と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日のままで構いません。
-                <b>⚠ 生年月日ではありません。</b>
               </span>
             </div>
             <div class="field"><label>一言アピール</label><textarea id="pfAppeal" rows="2" placeholder="例）元気な進行が得意です！"></textarea></div>

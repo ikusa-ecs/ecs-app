@@ -109,7 +109,7 @@
              名簿と権限一覧の並び順（社歴順＝古い人が上）にも使う。 --}}
         <div class="field">
           <label>
-            {{ $me->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日' }}
+            {{ $me->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日（IKUSAで働き始めた日）' }}
             @if ($me->role !== 'staff')<span class="req">必須</span>@endif
           </label>
           {{-- 2026-09-03 「入力しにくい」＝カレンダーが今月から開いて何年も戻すのが大変だったので、
