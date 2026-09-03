@@ -128,7 +128,8 @@
     .dc-pick .pk.sd-row .lbl { font-size: 9.5px; width: 26px; color: var(--muted); background: #ece3d4; padding: 1px 0; }
     .dc-pick .pk.sd-row select { flex: 1; padding: 2px 5px; border: 1px solid var(--line); border-radius: 6px; font-size: 10.5px; color: var(--muted); font-family: inherit; background: #fbf8f2; min-width: 0; }
 
-    /* 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに出す。 */
+    /* 人ごと・その日ごとのメモ（2026-09-02 baba要望／2026-09-03「その日だけ」に変更）。
+       社員名を押したときのふきだしに、押した日のメモを出す。 */
     .dp-note {
       display: flex; align-items: flex-start; gap: 6px;
       background: #fdf3e2; border: 1px solid #ecd9b6; border-radius: 8px;
@@ -313,6 +314,8 @@
           ③ <b>すでに担当に入っている方でも、イベプラでなければ並べません</b>。
           変えたいときは<b>「＋全社員を表示」</b>を押してください。担当が外れることはありません（誰が担当かは案件カードの「D:」に出ています）。
           ④ <b>お休みの日なのに担当に入っている方には、赤い「休」の印</b>を出します（いちばん気づきたい間違いなので隠しません）。<br>
+          <b>メモ</b>＝社員名を押したふきだしの下に、<b>その日のメモ</b>を書けます（例：10/3 に「大型入ってるからアサインしない」）。
+          <b>書いた日にだけ</b>出ます（2026-09-03 変更。以前は全部の日に出ていました）。メモのある日は名前に📝が付きます。<br>
           <b>2026-09-02 に変えたところ</b>＝カレンダーに<b>前の月の終わりと、次の月の最初1週間</b>も出します（前後の予定を見ながら決められるように）。
           薄い色のマスが当月外です。<b>「📊 担当バランス」の数は、いま見ている月ぶんだけ</b>を数えています。
         </div>
@@ -420,7 +423,8 @@
   window.ECS_DIR_USINGDB = @json($usingDb);      // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
   window.ECS_DIR_OFFICE  = @json($officeScope);  // いま絞っている拠点（null＝全拠点）
   window.ECS_DIR_DAYOFF  = @json($dayOff ?? []); // その日お休みの社員 {社員ID:{"Y-M-D":true}}
-  window.ECS_DIR_NOTES   = @json($personNotes ?? []); // 人ごとのメモ {社員ID:{note,by,at}}
+  {{-- ⚠ メモは「社員ID → 日付 → 中身」の2段（2026-09-03）。1段に戻すと全部の日に同じメモが出る。 --}}
+  window.ECS_DIR_NOTES   = @json($personNotes ?? []); // {社員ID:{'2026-10-03':{note,by,at}}}
   window.ECS_CSRF        = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -681,9 +685,10 @@
                          + otherRoles.map(r => `<span class="e-role">${r}</span>`).join('');
           const multi = info.count >= 2 ? `<span class="e-multi">掛${info.count}</span>` : '';
           const newb = e.newbie ? '<span class="e-newbie">新</span>' : '';
-          // メモがある人には印を出す（押さないと気づけないため）。
-          const memo = (PNOTES[e.id] && PNOTES[e.id].note)
-            ? `<span class="e-memo" title="${escAttrText(PNOTES[e.id].note)}">📝</span>` : '';
+          // ⚠ メモは**その日のぶんだけ**（2026-09-03 baba報告）。印もその日だけ出す。
+          const dayNote = noteOf(e.id, realYmd(d));
+          const memo = dayNote
+            ? `<span class="e-memo" title="${escAttrText(dayNote.note)}">📝</span>` : '';
           // ⚠ お休みの日なのに担当に入っている人。いちばん気づきたい間違いなので赤で出す。
           const offMark = isDayOff(e.id, d.getFullYear(), d.getMonth(), d.getDate())
             ? '<span class="dc-offwarn" title="この日は「×」または「希望休」を出しています">休</span>' : '';
@@ -691,7 +696,7 @@
           // 色分けのコードはサーバー（App\Support\Departments）が付ける。
           // イベプラ／セールス／クリエイティブ以外は 'other' にまとまる。ここに部署名を書かない。
           const depCls = 'dep-' + (e.deptCode || 'none');
-          return `<div class="emp-chip ${cls} ${depCls}" onclick="openPick(event,'${e.id}','${key}')">`
+          return `<div class="emp-chip ${cls} ${depCls}" onclick="openPick(event,'${e.id}','${key}','${realYmd(d)}')">`
                + `<span class="e-dot"></span><span class="e-nm">${e.surname}</span>${star}${roleTags}${multi}${newb}${memo}${offMark}</div>`;
         }).join('') + '</div>';
 
@@ -719,9 +724,9 @@
 
   // ===== 担当ピッカー（社員名クリック→その日の案件を選んで D/SD 確定）=====
   let PICK = null;   // { empId, dateKey, x, y }
-  function openPick(ev, empId, dateKey){
+  function openPick(ev, empId, dateKey, realKey){
     ev.stopPropagation();
-    PICK = { empId, dateKey, x: ev.clientX, y: ev.clientY };
+    PICK = { empId, dateKey, realKey, x: ev.clientX, y: ev.clientY };
     renderPick();
   }
   function closePick(){ PICK = null; const el = document.getElementById('dpickPop'); if (el) el.style.display = 'none'; }
@@ -768,12 +773,20 @@
     // ⚠ 押したその場で保存する（2026-09-02）。保存ボタンは無い＝押し忘れで消えないように。
     autoSave(caseId);
   }
-  // ===== 人ごとのメモ（2026-09-02 baba要望）=====
-  // 例：「10/3 大型入ってるからアサインしない」。社員名を押したときのふきだしに出す。
+  // ===== 人ごと・その日ごとのメモ（2026-09-02 baba要望／2026-09-03「その日だけ」に変更）=====
+  // 10/3 のところに「大型入ってるからアサインしない」。社員名を押したときのふきだしに出す。
+  // ⚠ メモは**押した日のもの**（PNOTES[社員ID][日付]）。
+  //   最初は1人1行で持っていたため、**カレンダーの全部の日に同じメモが出て**しまい、
+  //   かえって分からなくなった（2026-09-03 baba報告）。日付を外さないこと。
   // ⚠ 保存の正本はサーバー（App\Support\PersonNotes）。ここは出すだけ・持ち方を増やさない。
   // ⚠ これは「その人の個人情報」ではなく**アサインを決めるための業務のメモ**なので、
   //   できるポジション・NGペアと同じく社員以上が書ける。
   const PNOTES = window.ECS_DIR_NOTES || {};
+
+  /** その人のその日のメモを取り出す（無ければ null）。日付は 'Y-m-d'。 */
+  function noteOf(empId, realKey){
+    return (PNOTES[empId] && PNOTES[empId][realKey]) || null;
+  }
 
   // ⚠ メモは自由に書ける文字なので、必ずエスケープしてから画面に出す。
   //   これが無いと < や " を書いただけで画面が崩れる（この画面には部品が無かったので用意した）。
@@ -794,43 +807,51 @@
     return escHtml(String(t == null ? '' : t).split(CR).join(LF).split(LF).join(' '));
   }
 
-  function personNoteHtml(empId){
-    const n = PNOTES[empId];
+  /** 'Y-m-d' → '10/3'（画面に出す用）。 */
+  function mdOf(realKey){
+    const p = String(realKey || '').split('-');
+    return p.length === 3 ? (Number(p[1]) + '/' + Number(p[2])) : String(realKey || '');
+  }
+
+  function personNoteHtml(empId, realKey){
+    const n = noteOf(empId, realKey);
     const has = n && n.note;
     const body = has
       ? escHtml(n.note) + (n.by ? `<span class="pn-by">（${escHtml(n.by)} ${escHtml(n.at)}）</span>` : '')
-      : '<span class="pn-empty">メモなし</span>';
+      : '<span class="pn-empty">この日のメモはありません</span>';
     return `<div class="dp-note ${has ? 'has' : ''}">
-        <span class="pn-txt">📝 ${body}</span>
-        <button class="pn-edit" onclick="editPersonNote('${empId}')" title="この方へのメモを書く・直す">✎</button>
+        <span class="pn-txt">📝 <b>${mdOf(realKey)}</b> ${body}</span>
+        <button class="pn-edit" onclick="editPersonNote('${empId}','${realKey}')" title="この日のメモを書く・直す">✎</button>
       </div>`;
   }
 
-  function editPersonNote(empId){
-    const cur = (PNOTES[empId] && PNOTES[empId].note) || '';
+  function editPersonNote(empId, realKey){
+    const before = noteOf(empId, realKey);
+    const cur = (before && before.note) || '';
     const emp = empById[empId];
     // ⚠ 改行は String.fromCharCode(10) で作る（上の escAttrText と同じ理由）。
     const LF = String.fromCharCode(10);
     const input = prompt(
-      (emp ? emp.name : empId) + ' さんへのメモ' + LF
-      + '例）10/3 大型入ってるからアサインしない' + LF + LF
-      + '※ 空にすると消えます。ほかの社員にも見えます。', cur);
+      (emp ? emp.name : empId) + ' さん ／ ' + mdOf(realKey) + ' のメモ' + LF
+      + '例）大型入ってるからアサインしない' + LF + LF
+      + '※ このメモは ' + mdOf(realKey) + ' にだけ出ます。空にすると消えます。ほかの社員にも見えます。', cur);
     if (input === null) return;                 // キャンセル
     const note = input.trim();
 
     // 先に画面へ出す（保存を待たない）。失敗したら元に戻す。
-    const before = PNOTES[empId];
-    if (note) { PNOTES[empId] = { note: note, by: '', at: '' }; } else { delete PNOTES[empId]; }
+    if (!PNOTES[empId]) PNOTES[empId] = {};
+    if (note) { PNOTES[empId][realKey] = { note: note, by: '', at: '' }; } else { delete PNOTES[empId][realKey]; }
     renderPick(); render();
 
     fetch('/assign-director/person-note', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
-      body: JSON.stringify({ person_id: empId, note: note })
+      body: JSON.stringify({ person_id: empId, date: realKey, note: note })
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .catch(e => {
-        if (before) { PNOTES[empId] = before; } else { delete PNOTES[empId]; }
+        if (!PNOTES[empId]) PNOTES[empId] = {};
+        if (before) { PNOTES[empId][realKey] = before; } else { delete PNOTES[empId][realKey]; }
         renderPick(); render();
         alert('メモを保存できませんでした（' + e + '）。もう一度お試しください。');
       });
@@ -864,7 +885,7 @@
         </div>`;
     }).join('') : '<div class="dp-empty">この日に案件はありません</div>';
     el.innerHTML = `<h4>${emp ? emp.name : PICK.empId} を担当に</h4>`
-      + personNoteHtml(PICK.empId)
+      + personNoteHtml(PICK.empId, PICK.realKey)
       + rows
       + (mine >= 2 ? `<div class="dp-warn">⚠ この日 ${mine} 件の掛け持ちです</div>` : '')
       + `<div class="dp-close"><button onclick="closePick()">閉じる</button></div>`;

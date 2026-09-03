@@ -241,8 +241,10 @@ class AssignDirectorController extends Controller
     }
 
     /**
-     * 人ごとのメモを保存する（POST /assign-director/person-note）。2026-09-02 baba要望。
+     * 人ごと・その日ごとのメモを保存する（POST /assign-director/person-note）。2026-09-02 baba要望。
      *
+     * ⚠ 日付は必須（2026-09-03 baba報告）。日付なしで持っていたときは
+     *   **カレンダーの全部の日に同じメモが出て**しまい、かえって分からなくなった。
      * ⚠ 他人のメモも書ける＝これは「その人あての個人情報」ではなく、
      *   アサインを決めるための**業務のメモ**（できるポジション・NGペアと同じ扱い）。
      *   社員以上なら書ける（ルートの区画で社員以上に絞ってある）。
@@ -251,16 +253,18 @@ class AssignDirectorController extends Controller
     {
         $data = $request->validate([
             'person_id' => ['required', 'string', 'exists:people,id'],
+            'date' => ['required', 'date_format:Y-m-d'],
             'note' => ['nullable', 'string', 'max:'.PersonNotes::MAX],
-        ], [], ['note' => 'メモ']);
+        ], [], ['note' => 'メモ', 'date' => '日付']);
 
         $note = PersonNotes::put(
             $data['person_id'],
+            $data['date'],
             $data['note'] ?? '',
             optional(\Illuminate\Support\Facades\Auth::user())->id
         );
 
-        return response()->json(['ok' => true, 'note' => $note]);
+        return response()->json(['ok' => true, 'note' => $note, 'date' => $data['date']]);
     }
 
     /**

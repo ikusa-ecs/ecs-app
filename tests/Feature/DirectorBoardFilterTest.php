@@ -131,30 +131,71 @@ class DirectorBoardFilterTest extends TestCase
     }
 
     /**
-     * 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに書く。
-     * 例：「10/3 大型入ってるからアサインしない」。
+     * 人ごと・その日ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに書く。
+     * 例：10/3 のところに「大型入ってるからアサインしない」。
      * ⚠ 個人情報ではなく**アサインを決めるための業務のメモ**なので、社員以上が書ける。
      */
     public function test_a_person_note_can_be_saved_and_shown(): void
     {
         $admin = $this->admin();
-        $emp = PersonFactory::new()->create([
+        PersonFactory::new()->create([
             'id' => 'E-N1', 'role' => 'employee', 'name' => '佐藤 大輔',
             'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
         ]);
 
         $this->actingAsPerson($admin)
             ->postJson('/assign-director/person-note',
-                ['person_id' => 'E-N1', 'note' => '10/3 大型入ってるからアサインしない'])
+                ['person_id' => 'E-N1', 'date' => '2026-10-03', 'note' => '大型入ってるからアサインしない'])
             ->assertOk()->assertJson(['ok' => true]);
 
         $this->actingAsPerson($admin)->get('/assign-director')
             ->assertOk()
             ->assertViewHas('personNotes', function ($notes) {
-                return ($notes['E-N1']['note'] ?? null) === '10/3 大型入ってるからアサインしない'
+                return ($notes['E-N1']['2026-10-03']['note'] ?? null) === '大型入ってるからアサインしない'
                     // 誰が書いたかも出す（古い情報を見分けるため）。
-                    && ($notes['E-N1']['by'] ?? '') !== '';
+                    && ($notes['E-N1']['2026-10-03']['by'] ?? '') !== '';
             });
+    }
+
+    /**
+     * ⚠ メモは**書いた日にだけ**出る（2026-09-03 baba報告）。
+     *   1人1行で持っていたとき、カレンダーの全部の日に同じメモが出て分からなくなった。
+     *   ここが壊れると同じことが再発する。
+     */
+    public function test_a_note_belongs_to_one_day_only(): void
+    {
+        $admin = $this->admin();
+        PersonFactory::new()->create([
+            'id' => 'E-N3', 'role' => 'employee', 'name' => '関根 一郎',
+            'office' => '東京', 'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+
+        foreach ([['2026-10-03', '大型'], ['2026-10-10', '直行直帰']] as [$date, $note]) {
+            $this->actingAsPerson($admin)
+                ->postJson('/assign-director/person-note',
+                    ['person_id' => 'E-N3', 'date' => $date, 'note' => $note])
+                ->assertOk();
+        }
+
+        $notes = \App\Support\PersonNotes::forMany(['E-N3']);
+        $this->assertSame('大型', $notes['E-N3']['2026-10-03']['note']);
+        $this->assertSame('直行直帰', $notes['E-N3']['2026-10-10']['note']);
+        // 書いていない日には出ない
+        $this->assertArrayNotHasKey('2026-10-04', $notes['E-N3']);
+    }
+
+    /** ⚠ 日付なしでは保存させない（また全部の日に出るメモができてしまう）。 */
+    public function test_a_note_without_a_date_is_rejected(): void
+    {
+        $admin = $this->admin();
+        PersonFactory::new()->create([
+            'id' => 'E-N4', 'role' => 'employee', 'office' => '東京',
+            'department' => 'イベプラ', 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($admin)
+            ->postJson('/assign-director/person-note', ['person_id' => 'E-N4', 'note' => '日付なし'])
+            ->assertStatus(422);
     }
 
     /** ⚠ 空にしたら消える（空のメモ行を残さない＝「メモあり」の印が付いたままにならない）。 */
@@ -167,10 +208,12 @@ class DirectorBoardFilterTest extends TestCase
         ]);
 
         $this->actingAsPerson($admin)
-            ->postJson('/assign-director/person-note', ['person_id' => 'E-N2', 'note' => 'あとで消す'])
+            ->postJson('/assign-director/person-note',
+                ['person_id' => 'E-N2', 'date' => '2026-10-03', 'note' => 'あとで消す'])
             ->assertOk();
         $this->actingAsPerson($admin)
-            ->postJson('/assign-director/person-note', ['person_id' => 'E-N2', 'note' => '   '])
+            ->postJson('/assign-director/person-note',
+                ['person_id' => 'E-N2', 'date' => '2026-10-03', 'note' => '   '])
             ->assertOk();
 
         $this->assertSame(0, \App\Models\PersonNote::where('person_id', 'E-N2')->count());
@@ -185,7 +228,11 @@ class DirectorBoardFilterTest extends TestCase
             ->assertSee('D・SD・FC・OP・MCなど', false)
             // メモの仕掛け
             ->assertSee('function editPersonNote', false)
-            ->assertSee('function personNoteHtml', false);
+            ->assertSee('function personNoteHtml', false)
+            // ⚠ メモはその日のぶんだけ（2026-09-03）。日付を渡す仕掛けが残っていること。
+            ->assertSee('function noteOf', false)
+            ->assertSee('noteOf(e.id, realYmd(d))', false)
+            ->assertSee('date: realKey', false);
     }
 
     /** 保存したら、見ていた月へ戻る（既定の月へ飛ばされない）。 */

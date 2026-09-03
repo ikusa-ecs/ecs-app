@@ -30,7 +30,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: ['paste', 'pasted']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // ⚠ 画面から裏で送る保存（fetch）は、失敗したときも**必ずJSONで返す**（2026-09-03）。
+        //   これが 'api/*' だけだったため、入力の不備でエラーになっても
+        //   **ログイン画面へのリダイレクト（302）**が返っていた。
+        //   fetch から見ると 302 は「成功」に見える＝**保存できていないのに「保存しました」と出る**。
+        //   D決めの都度保存・メモがまさにこれに当たるので、
+        //   Accept: application/json（＝裏での保存）のときはJSONで返す。
+        //   ⚠ ふつうの画面のフォーム送信は今までどおり（前のページへ戻ってエラー文を出す）。
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
     })->create();
