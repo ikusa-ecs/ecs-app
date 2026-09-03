@@ -58,6 +58,21 @@ class Project extends Model
      */
     protected static function booted(): void
     {
+        // 会場住所（location）から「都道府県・市区町村」を切り出して写す（2026-09-03）。
+        // ⚠ location は自由記述の1本なので、そのままでは場所で探せない
+        //   （体験先さがし /taiken-search で「千葉県流山市の近く」を出したい）。
+        // ⚠ 切り出し方の正本は App\Support\AddressParts。ここには書かない。
+        // ⚠ 都道府県が書かれていない住所は空のまま（推測で埋めない＝間違いに気づけなくなる）。
+        // ⚠ 保存する画面がいくつもあるので、入口はここ1つにする（画面ごとに書くと片方だけ抜ける）。
+        static::saving(function (Project $project) {
+            if (! $project->isDirty('location') && $project->exists) {
+                return;
+            }
+            $parts = \App\Support\AddressParts::of($project->location);
+            $project->prefecture = $parts['prefecture'] !== '' ? $parts['prefecture'] : null;
+            $project->city = $parts['city'] !== '' ? $parts['city'] : null;
+        });
+
         static::created(fn (Project $project) => ProjectHistoryRecorder::recordCreated($project));
         static::updated(fn (Project $project) => ProjectHistoryRecorder::recordUpdated($project));
         static::deleted(fn (Project $project) => ProjectHistoryRecorder::recordDeleted($project));

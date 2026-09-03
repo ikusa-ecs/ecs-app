@@ -39,6 +39,15 @@
       cursor: pointer; font-family: inherit;
     }
     .btn-save-dir:hover { filter: brightness(1.05); }
+    /* その月ぶんの社員をまとめて確定にするボタン（2026-09-03 baba要望）。
+       保存ボタンと見分けがつくよう、青系にしてある。 */
+    .btn-fix-month {
+      border: 1px solid #2c6ca0; background: #eef4fb; color: #2c6ca0;
+      border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .btn-fix-month:hover { background: #2c6ca0; color: #fff; }
+    .btn-fix-month:disabled { opacity: .5; cursor: default; }
 
     /* 都度保存の状態表示（2026-09-02）。⚠ 失敗を見落とすと「消えた」に戻るので、失敗だけ赤く強く出す。 */
     .save-state {
@@ -334,6 +343,11 @@
              ここは「いま保存できているか」を出すだけの表示。失敗したときだけ再送ボタンを出す。 -->
         <span id="dirSaveState" class="save-state ok">自動保存</span>
         <button type="button" id="dirRetryBtn" class="btn-save-dir" style="display:none;">保存し直す</button>
+        <!-- その月ぶんの社員をまとめて確定にする（2026-09-03 baba要望）。
+             使う場面＝D決めが終わってOKが出て、セールスにも共有した → その月ぶんを確定にする。
+             ⚠ スタッフは触らない（まだ声を掛けていない人の画面に案件が出てしまう）。 -->
+        <button type="button" id="fixMonthBtn" class="btn-fix-month"
+                title="いま見ている月の「仮」の社員を、まとめて「確定」にします。スタッフは変わりません。">この月の社員を確定</button>
       </div>
 
       <!-- 凡例（色とマークの意味） -->
@@ -358,7 +372,8 @@
         {{-- ⚠ 保存したあと、見ていた月・拠点に戻ってくるための持ち回し（2026-09-02 baba報告）。
              これが無いと、保存のたびに既定の月へ飛ばされる。 --}}
         <input type="hidden" name="ym" id="dirYm" value="">
-        <input type="hidden" name="office" value="{{ $officeScope ?? '' }}">
+        {{-- ⚠ 「この月の社員を確定」も同じ拠点で動かすので、JSから読めるようidを付けてある。 --}}
+        <input type="hidden" name="office" id="dirOfficeVal" value="{{ $officeScope ?? '' }}">
         @csrf
         {{--
           状態（仮／確定）はこの画面では送らない。
@@ -1092,6 +1107,54 @@
       // 念のため、いま画面にある案件を全部送り直す（どれが送れていないか分からなくなったとき用）。
       cases.forEach(c => SAVE.waiting.set(c.id, true));
       pumpSave();
+    });
+  }
+
+  // ===== この月の社員をまとめて確定にする（2026-09-03 baba要望）=====
+  // 使う場面＝D決めが終わってOKが出て、セールスにも共有した → その月ぶんを確定にする。
+  // ⚠ スタッフは触らない（まだ声を掛けていない人の画面に案件が出てしまう）。
+  // ⚠ 押す前に「誰が確定になるか」を必ず見せる（dry=1 で先に数と名前をもらう）。
+  //   まとめて動く操作なので、black box にしない。
+  const fixMonthBtn = document.getElementById('fixMonthBtn');
+  if (fixMonthBtn) {
+    fixMonthBtn.addEventListener('click', function(){
+      const NL = String.fromCharCode(10);
+      const ym = (document.getElementById('dirYm') || {}).value || '';
+      if (!ym) { alert('対象の月が分かりません。画面を開き直してからもう一度お試しください。'); return; }
+      const office = (document.getElementById('dirOfficeVal') || {}).value || '';
+      const label = ym.replace('-', '年') + '月';
+
+      function post(dry){
+        const body = new URLSearchParams();
+        body.append('ym', ym);
+        body.append('only', 'employee');
+        if (office) body.append('office', office);
+        if (dry) body.append('dry', '1');
+        return fetch('/assignments/confirm-month', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF || '' },
+          body: body.toString()
+        }).then(r => r.json().then(j => ({ ok: r.ok, j })));
+      }
+
+      fixMonthBtn.disabled = true;
+      post(true)
+        .then(({ ok, j }) => {
+          if (!ok || !j || !j.ok) { alert((j && j.message) || '調べられませんでした。'); return; }
+          if (!j.confirmed) { alert(label + 'に「仮」の社員はいません。'); return; }
+          const names = (j.names || []).join('・');
+          if (!confirm(label + 'の社員 ' + j.confirmed + '名を「確定」にします。' + NL
+            + '（' + names + '）' + NL + NL
+            + 'スタッフは変わりません。よろしいですか？')) return;
+          return post(false).then(({ ok, j }) => {
+            // ⚠ 失敗をだまって流さない。「確定にしたつもりで仮のまま」がいちばん困る。
+            if (!ok || !j || !j.ok) { alert((j && j.message) || '確定にできませんでした。'); return; }
+            alert('✓ ' + label + 'の社員 ' + j.confirmed + '名を「確定」にしました。');
+            location.reload();
+          });
+        })
+        .catch(() => alert('通信に失敗しました。もう一度お試しください。'))
+        .then(() => { fixMonthBtn.disabled = false; });
     });
   }
 

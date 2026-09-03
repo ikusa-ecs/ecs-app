@@ -260,6 +260,11 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // この案件のメンバーを全員「確定」にする（2026-08-26）。日別ボードの「確定にする」「スタッフに公開」から呼ぶ。
     // 公開してもメンバーは自動で確定にならないため、「公開したのにスタッフに出ない」を防ぐ。
     Route::post('/projects/confirm-members', [AssignmentController::class, 'confirmMembers']);
+    // その月ぶんをまとめて確定にする（2026-09-03 baba要望）。
+    // 使う場面＝D決めが終わってOKが出て、セールスにも共有した → その月ぶんを確定にする。
+    // ⚠ 既定は社員だけ（スタッフまで確定にすると、まだ声を掛けていない人の画面に出てしまう）。
+    // ⚠ dry=1 は書き込まず、何名・誰が確定になるかだけ返す（押す前に人が読めるように）。
+    Route::post('/assignments/confirm-month', [AssignmentController::class, 'confirmMonth']);
     // 派遣依頼（2026-09-03 baba要望）。
     // ⚠ それまで日別ボードの「＋派遣」は**画面の中だけ**で、DBに何も残っていなかった
     //   （押しても読み込み直すと消えていた）。入れる場所は今までどおり日別ボードの「＋派遣」。

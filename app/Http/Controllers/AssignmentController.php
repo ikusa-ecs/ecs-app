@@ -649,4 +649,71 @@ class AssignmentController extends Controller
 
         return response()->json(['ok' => true, 'confirmed' => $rows->count()]);
     }
+    /**
+     * その月ぶんを、まとめて「確定」にする（2026-09-03 baba要望）。
+     *
+     * 【使う場面】D決めが終わってOKが出て、セールスにも共有した → その月ぶんを確定にする。
+     *   ⚠ 案件を1つずつ開いて確定にしていくのが手間だった、が背景。
+     *
+     * ⚠ 既定は **社員だけ**（only=employee）。スタッフまで確定にすると、
+     *   まだ声を掛けていない方の画面に案件が出てしまい、公開の段取りが崩れる。
+     * ⚠ dry=1 のときは**書き込まず**、何名になるかと名前だけ返す
+     *   （押す前に「誰が確定になるか」を人が読めるようにするため）。
+     * ⚠ 拠点は必ず見る。他拠点の案件をURL直打ちで確定にできないようにする。
+     */
+    public function confirmMonth(Request $request)
+    {
+        $data = $request->validate([
+            'ym' => ['required', 'regex:/^\d{4}-\d{2}$/'],
+            'only' => ['nullable', 'in:employee,staff'],
+            'office' => ['nullable', 'string', 'max:50'],
+            'dry' => ['nullable', 'boolean'],
+        ], [], ['ym' => '対象の月']);
+
+        $only = (string) ($data['only'] ?? 'employee');
+        $dry = (bool) ($data['dry'] ?? false);
+
+        try {
+            $start = Carbon::createFromFormat('Y-m-d', $data['ym'].'-01')->startOfMonth();
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'message' => '対象の月が正しくありません。'], 422);
+        }
+        $end = $start->copy()->endOfMonth();
+
+        // その月の「仮」のアサイン。⚠ 拠点で見てよい案件だけに絞る。
+        $rows = Assignment::whereBetween('date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->where('status', '仮')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return response()->json(['ok' => true, 'confirmed' => 0, 'names' => [], 'message' => 'この月に「仮」の担当はいません。']);
+        }
+
+        $projects = Project::whereIn('id', $rows->pluck('project_id')->unique())->get()->keyBy('id');
+        $people = Person::whereIn('id', $rows->pluck('staff_id')->unique())->get()->keyBy('id');
+
+        $rows = $rows->filter(function (Assignment $r) use ($projects, $people, $only) {
+            $p = $projects->get($r->project_id);
+            if (! $p || ! ProjectAccess::canEdit($p)) {
+                return false;   // 他拠点の案件は触らない
+            }
+            // ⚠ 名簿に無いIDは「スタッフ」として扱う＝社員だけのときに巻き込まない。
+            return (string) (optional($people->get($r->staff_id))->role ?? 'staff') === $only;
+        })->values();
+
+        $names = $rows->map(fn (Assignment $r) => optional($people->get($r->staff_id))->name ?? $r->staff_id)
+            ->unique()->sort()->values()->all();
+
+        if ($dry) {
+            return response()->json(['ok' => true, 'confirmed' => $rows->count(), 'names' => $names, 'dry' => true]);
+        }
+
+        // ⚠ 1件ずつ save する（まとめて update すると保存イベントが動かず、
+        //   確定の記録＝confirmed_at / confirmed_by が付かない）。
+        foreach ($rows as $row) {
+            $row->update(['status' => '確定'] + AssignmentStamp::forUpdate($row, '確定'));
+        }
+
+        return response()->json(['ok' => true, 'confirmed' => $rows->count(), 'names' => $names]);
+    }
 }
