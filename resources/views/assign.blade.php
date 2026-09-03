@@ -298,6 +298,13 @@
     /* すでにこの案件のメンバーに入れた希望者＝グレーアウト（二重アサイン防止・残りの人を探しやすく） */
     .cand-row.picked { opacity: 0.45; background: #f1ece4; border-radius: 6px; padding: 2px 4px; }
     .cand-row.picked .m-name { text-decoration: line-through; }
+    /* ⚠ その日、**別の案件**にもう入っている人（2026-09-03 baba要望）。
+       これまでは押したあとの確認ダイアログでしか分からず、押してから気づいていた。
+       赤い枠で囲って、どの案件に入っているかを名前のとなりに出す。 */
+    .cand-row.busy { background: #fdecec; border: 1px solid #f3b7b7; border-radius: 6px; padding: 2px 4px; }
+    .cstat.busy { background: var(--danger-soft); color: #b91c1c; }
+    .cstat.busy-where { background: #fff; color: #b91c1c; border: 1px solid #f3b7b7; font-weight: 400;
+      max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 
     /* 手動編集の操作 */
     .edit-btn { border: 1px solid var(--line); background: #fff; color: var(--ink);
@@ -319,6 +326,12 @@
     .pick-box .pk-item:hover { background: var(--brand-soft); }
     .pick-box .pk-item input { width: auto; margin: 0; }
     .pick-box .pk-item .lv { color: var(--muted, #8a7a6b); font-size: 11px; }
+    /* ⚠ その日、別の案件にもう入っている人（2026-09-03 baba要望）。一覧の下へ回して赤く出す。 */
+    .pick-box .pk-item.busy { background: #fdecec; }
+    .pick-box .pk-item.busy:hover { background: #fbdcdc; }
+    .pick-box .pk-item .busy-tag { color: #b91c1c; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .pick-box .pk-item .busy-where { color: #b91c1c; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pick-box .pk-sep { padding: 4px 8px; font-size: 11px; font-weight: 700; color: #b91c1c; background: #fdecec; border-top: 1px solid #f3b7b7; }
     .pick-box .pk-none { padding: 10px 8px; font-size: 12px; color: var(--muted, #8a7a6b); }
     .pick-box .pk-foot { display: flex; align-items: center; gap: 6px; }
     .pick-box .pk-foot .sp { flex: 1; }
@@ -668,6 +681,27 @@
     );
   }
 
+  // 同じ日の「他の案件」に入っている人 → 入っている案件名の一覧。
+  // ⚠ 2026-09-03 baba要望「すでにアサインされてる人はもっとわかりやすく」。
+  //   これまでは追加を押したあとの確認ダイアログでしか分からず、**押してから気づいて**いた。
+  //   選ぶ前に「⛔ 別案件」と、どの案件かを出すために使う。
+  function takenSameDayWhere(c){
+    const m = new Map();
+    cases.filter(x => x.off === c.off && x.id !== c.id).forEach(x => {
+      x.assigned.forEach(a => {
+        if (!m.has(a.name)) m.set(a.name, []);
+        const arr = m.get(a.name);
+        if (arr.indexOf(x.name) === -1) arr.push(x.name);
+      });
+    });
+    return m;
+  }
+
+  // 「⛔ 別案件」の見せ方（希望者カラムと追加パネルで同じ文言にする）。
+  function busyTitle(name, where){
+    return name + ' さんは、この日すでに「' + where.join('」「') + '」に入っています。';
+  }
+
   // 自動アサイン＝希望者から、同じ日にかぶらない人を必要数ぶん埋める。
   // DBボード（ECS_BOARD）＝この案件の実際の希望者（id付き）から選び、1人ずつ本物のアサインとして保存する
   //   ＝追加後すぐ担当/巡回/備考を編集できる。見本フォールバックのときだけ従来の合成プールを使う。
@@ -950,8 +984,19 @@
     const c = cases.find(x => x.id === PICK.caseId);
     const taken = new Set(c ? c.assigned.map(m => m.name) : []);
     const q = PICK.q.trim();
-    return roster.filter(pp => pp.role === PICK.kind && !taken.has(pp.name)
+    const list = roster.filter(pp => pp.role === PICK.kind && !taken.has(pp.name)
       && (!q || String(pp.name).indexOf(q) !== -1));
+
+    // ⚠ その日、別の案件にもう入っている人は**下へ回す**（2026-09-03 baba要望）。
+    //   これまでは名簿の五十音順に混ざっていて、押して確認が出てはじめて気づいていた。
+    //   消してしまうと「事情があって重ねたい」ときに困るので、消さずに下げて赤くする。
+    const busyWhere = c ? takenSameDayWhere(c) : new Map();
+    const free = [], busy = [];
+    list.forEach(pp => {
+      const where = busyWhere.get(pp.name);
+      (where ? busy : free).push(Object.assign({}, pp, { busyWhere: where || null }));
+    });
+    return free.concat(busy);
   }
 
   function renderPicker(){
@@ -980,12 +1025,27 @@
         + (PICK.kind === 'employee' ? '社員' : 'スタッフ')
         + 'は名簿にいません（すでにこの案件に入っている人は出ません）。</div>';
     } else {
-      box.innerHTML = list.map(pp =>
-        '<label class="pk-item"><input type="checkbox" ' + (PICK.checked.has(pp.id) ? 'checked' : '')
-        + ' onchange="pickToggle(\'' + pp.id + '\', this.checked)">'
-        + '<span>' + escHtml(pp.name) + '</span>'
-        + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span></label>'
-      ).join('');
+      // ⚠ 別案件に入っている人は下にまとまる（pickCandidates で並べ替え済み）。
+      //   その境目に見出しを1本入れて、どこから先が「その日もう埋まっている人」か分かるようにする。
+      let sepDone = false;
+      box.innerHTML = list.map(pp => {
+        const where = pp.busyWhere;
+        let head = '';
+        if (where && !sepDone) {
+          sepDone = true;
+          head = '<div class="pk-sep">⛔ ここから下は、この日すでに別の案件に入っている人です</div>';
+        }
+        const tip = where ? busyTitle(pp.name, where) : '';
+        return head
+          + '<label class="pk-item' + (where ? ' busy' : '') + '"'
+          + (tip ? ' title="' + escHtml(tip) + '"' : '') + '>'
+          + '<input type="checkbox" ' + (PICK.checked.has(pp.id) ? 'checked' : '')
+          + ' onchange="pickToggle(\'' + pp.id + '\', this.checked)">'
+          + '<span>' + escHtml(pp.name) + '</span>'
+          + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span>'
+          + (where ? '<span class="busy-tag">⛔ 別案件</span><span class="busy-where">' + escHtml(where.join('・')) + '</span>' : '')
+          + '</label>';
+      }).join('');
     }
     renderPickFoot();
   }
@@ -1736,21 +1796,37 @@
 
     // この日の希望者（応募＋カレンダー〇）＝色分け。手動編集中は ＋ でメンバーへ。
     const dp = dayPeople(c.off, dayCases).filter(p => p.applied.includes(c.id) || p.cal);
+    // ⚠ その日、別の案件にもう入っている人（2026-09-03 baba要望）。
+    //   希望を出していても、その日はもう埋まっている＝声を掛けても入れない。
+    //   「選ぶ前に分かる」ようにするのが目的なので、行ごと赤くして案件名まで出す。
+    const busyWhere = takenSameDayWhere(c);
+    let busyCount = 0;
     const candRows = dp.map(p => {
       // すでにこの案件のメンバーに入っている人＝アサイン済み（グレーアウト・＋ボタン無し）
       const picked = c.assigned.some(m => m.name === p.name);
+      const where  = (!picked && busyWhere.get(p.name)) || null;
+      if (where) busyCount++;
       const st = candStatus(p);
+      const busyTag = where
+        ? `<span class="cstat busy" title="${escHtml(busyTitle(p.name, where))}">⛔ 別案件</span>`
+          + `<span class="cstat busy-where" title="${escHtml(busyTitle(p.name, where))}">${escHtml(where.join('・'))}</span>`
+        : '';
       const statTag = picked ? '<span class="cstat done">✓ アサイン済み</span>' : st.tag;
-      const rowCls  = picked ? 'picked' : st.cls;
-      const addBtn = (editMode && !picked) ? `<span class="c-add" title="メンバーに入れる" onclick="addCandidate('${c.id}','${p.id||''}','${encodeURIComponent(p.name)}','${p.lv}','${encodeURIComponent(p.pos||'')}','${p.roleCode||''}')">＋</span>` : '';
+      const rowCls  = picked ? 'picked' : (where ? 'busy' : st.cls);
+      const addTitle = where ? busyTitle(p.name, where) + ' それでも入れるときは押してください。' : 'メンバーに入れる';
+      const addBtn = (editMode && !picked) ? `<span class="c-add" title="${escHtml(addTitle)}" onclick="addCandidate('${c.id}','${p.id||''}','${encodeURIComponent(p.name)}','${p.lv}','${encodeURIComponent(p.pos||'')}','${p.roleCode||''}')">＋</span>` : '';
       // 本人が応募時に書いた一言。アサインの判断材料なので必ず見せる（2026-08-21 baba）。
       const cmt = (p.notes && p.notes[c.id]) ? p.notes[c.id] : '';
       const cmtHtml = cmt ? `<div class="cand-note" title="本人からの一言">💬 ${escHtml(cmt)}</div>` : '';
-      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${statTag}${addBtn}${cmtHtml}</div>`;
+      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${busyTag}${statTag}${addBtn}${cmtHtml}</div>`;
     }).join('');
+    // 見出しに「うち◯名は別案件」と出す＝開かなくても、実際に声を掛けられる人数が分かる。
+    const candHead = busyCount
+      ? `希望者（${dp.length}名 <span style="color:#b91c1c;">うち${busyCount}名は別案件</span>）`
+      : `希望者（${dp.length}名）`;
     const candCol =
       `<div class="cc-col">
-         <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> 希望者（${dp.length}名）</span></div>
+         <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> ${candHead}</span></div>
          <div class="col-list">${candRows || '<div class="mem-none">希望者はいません。</div>'}</div>
        </div>`;
 
