@@ -599,6 +599,32 @@
           </div>
           <div><a class="line-btn" href="/password" style="text-decoration:none; display:inline-block;">パスワードを変更する</a></div>
         </div>
+@endverbatim
+
+        {{-- 2段階認証でおぼえた端末の解除（2026-09-03）。
+             ログアウトしてもおぼえたままにする方針なので、自分で切り離せる道をここに置く。
+             ⚠ この辺りは「そのまま出す区間」の中なので、いったん閉じて、
+                この段落の終わりでまた開き直している（閉じ忘れるとボタンが動かない）。 --}}
+        @if (session('status') === 'device-forgotten')
+          <div style="background:#e7f6ec; color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:10px 13px; font-size:13px; margin:10px 0;">
+            この端末の記憶を解除しました。次にログインしたときは、確認コードの入力が必要になります。
+          </div>
+        @endif
+
+        <div class="set-row">
+          <div>
+            <span class="set-label">2段階認証（この端末の記憶）</span>
+            <span class="set-note">コード入力のときに「次回から省略する」にチェックを入れた端末は、30日間コードを聞かれません。解除すると次回からまた聞かれます。</span>
+          </div>
+          <div>
+            <form method="POST" action="/device/forget" style="margin:0;"
+                  onsubmit="return confirm('この端末の記憶を解除します。次にログインしたときは確認コードの入力が必要になります。よろしいですか？');">
+              @csrf
+              <button class="line-btn" type="submit">この端末の記憶を解除する</button>
+            </form>
+          </div>
+        </div>
+@verbatim
 
         <div class="set-row">
           <div>

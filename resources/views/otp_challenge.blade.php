@@ -52,6 +52,19 @@
           全角で入っていても大丈夫です。空白が混ざっていても読み取ります。
         </span>
       </div>
+
+      {{-- この端末をおぼえる（2026-09-03）。
+           ⚠ checked を付けない＝初期はOFF。共用パソコンでうっかりおぼえさせないため。 --}}
+      <label style="display:flex; align-items:flex-start; gap:7px; font-size:12.5px; color:var(--ink); margin:12px 0 4px; cursor:pointer;">
+        <input type="checkbox" name="remember_device" value="1" style="margin-top:2px; flex-shrink:0;">
+        <span>
+          この端末では次回からコードを省略する（30日間）
+          <span style="display:block; color:var(--muted); font-size:11.5px; margin-top:2px;">
+            自分のパソコン・スマホのときだけ入れてください。共用の端末では入れないでください。
+          </span>
+        </span>
+      </label>
+
       <button class="btn primary" type="submit" style="width:100%; justify-content:center; margin-top:6px;">ログイン</button>
     </form>
 

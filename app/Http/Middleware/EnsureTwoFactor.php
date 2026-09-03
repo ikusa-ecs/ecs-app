@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Support\TestAccounts;
+use App\Support\TwoFactorDevice;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +28,16 @@ class EnsureTwoFactor
         if ($user
             && ! TestAccounts::isTest($user)
             && ! $request->session()->get('twofa_ok')) {
+            // 「この端末では次回からコードを省略する」でおぼえた端末なら、コード入力をとばして通す。
+            // ⚠ 必ず**いまログインしている本人**と突き合わせる（TwoFactorDevice::matches の中で照合）。
+            //   別の人のクッキーが残っていても、その人のものでなければ効かない。
+            //   クッキーが無い・壊れている・期限切れ（30日）・別人 → これまで通りコード入力へ。
+            if (TwoFactorDevice::matches($request, $user)) {
+                $request->session()->put('twofa_ok', true);
+
+                return $next($request);
+            }
+
             // ⚠ 画面の中からの保存（エントリー・稼働希望など）は JSON を待っている。
             //   そこへログインの画面（HTML）を返すと、画面側は中身を読めず
             //   「保存に失敗しました（SyntaxError: Unexpected token '<' …）」という

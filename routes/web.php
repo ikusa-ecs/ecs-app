@@ -60,6 +60,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/otp', [OtpController::class, 'show'])->name('otp.challenge');
     Route::post('/otp', [OtpController::class, 'verify']);
     Route::post('/otp/resend', [OtpController::class, 'resend']);
+
+    // 「この端末の記憶を解除する」（マイページ／スタッフ画面のボタンから）。
+    // ⚠ ここは twofa を付けない。おぼえた端末を自分で切り離すための道なので、
+    //   コードを入れないと押せない、では本末転倒になる。
+    Route::post('/device/forget', [OtpController::class, 'forgetDevice'])->name('device.forget');
 });
 
 // ── 初回ログインの初期設定（パスワード設定＋プロフィール入力）──

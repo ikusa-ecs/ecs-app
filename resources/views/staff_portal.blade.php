@@ -831,6 +831,21 @@
             <button class="line-btn" onclick="location.href='/profile'">マイプロフィールを編集する</button>
             <button class="line-btn" onclick="location.href='/password'">パスワードを変更する</button>
             <button class="line-btn" onclick="window.open('/guide-staff','_blank','noopener')">📋 使い方ガイドを見る</button>
+
+            {{-- 2段階認証でおぼえた端末の解除（2026-09-03）。
+                 ログアウトしてもおぼえたままにする方針なので、自分で切り離せる道をここに置く。
+                 ⚠ マイページは社員用でスタッフには出ない。スタッフはここが唯一の解除口。 --}}
+            @if (session('status') === 'device-forgotten')
+              <p style="background:#e7f6ec; color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:10px 13px; font-size:12.5px; margin:10px 0;">
+                この端末の記憶を解除しました。次にログインしたときは、確認コードの入力が必要になります。
+              </p>
+            @endif
+            <form method="POST" action="/device/forget" style="margin:0;"
+                  onsubmit="return confirm('この端末の記憶を解除します。次にログインしたときは確認コードの入力が必要になります。よろしいですか？');">
+              @csrf
+              <button class="line-btn" type="submit" style="width:100%;">この端末の記憶を解除する（2段階認証）</button>
+            </form>
+
             <button class="line-btn danger" onclick="doLogout()">ログアウト</button>
           </div>
 

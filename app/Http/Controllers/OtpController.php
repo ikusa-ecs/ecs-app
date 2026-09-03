@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\LoginCodeMail;
+use App\Support\TwoFactorDevice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -92,7 +93,33 @@ class OtpController extends Controller
         $request->session()->forget('twofa');
         $request->session()->put('twofa_ok', true);
 
-        return redirect()->intended($this->homeFor(Auth::user()));
+        $response = redirect()->intended($this->homeFor(Auth::user()));
+
+        // 「この端末では次回からコードを省略する（30日間）」にチェックが入っていたときだけ、
+        // 本人と結びついた印をクッキーに置く（次からコード入力をとばせる）。
+        // ⚠ チェックは初期OFF。共用パソコンでうっかりおぼえさせないため。
+        if ($request->boolean('remember_device')) {
+            $cookie = TwoFactorDevice::issue(Auth::user());
+
+            if ($cookie) {
+                $response->withCookie($cookie);
+            }
+        }
+
+        return $response;
+    }
+
+    /**
+     * 「この端末の記憶を解除する」（マイページ／スタッフ画面のボタン）。
+     *
+     * ログアウトしてもおぼえたままにする方針なので（自分のスマホで毎回消えると意味がない）、
+     * 自分で解除できる道をここ1本にまとめる。押した端末のクッキーだけを消す。
+     */
+    public function forgetDevice(Request $request)
+    {
+        return back()
+            ->with('status', 'device-forgotten')
+            ->withCookie(TwoFactorDevice::forget());
     }
 
     /** コードを再送する。 */
