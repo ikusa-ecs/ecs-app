@@ -336,6 +336,10 @@ class AssignBoardController extends Controller
                         'lv' => $this->lvCode(optional($person)->skill_level),
                         'pos' => $this->primaryPos($person),
                         'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
+                        // 社員かどうか（2026-09-03 baba要望）。
+                        // ⚠ 社員は「基本イベントには出ない」ので、希望者カラムでは**たたんで**出す。
+                        //   スタッフと混ざって並ぶと、声を掛ける相手を探すのに邪魔になる。
+                        'emp' => (optional($person)->role === 'employee'),
                         // 本人が応募時に書いた一言。アサインする人に見えないと意味がないので渡す（2026-08-21 baba）。
                         'note' => (string) ($a->note ?? ''),
                     ];
@@ -450,6 +454,9 @@ class AssignBoardController extends Controller
                 'lv' => $this->lvCode(optional($person)->skill_level),
                 'pos' => $this->primaryPos($person),
                 'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
+                // 社員かどうか（2026-09-03 baba要望）。⚠ 社員の出勤可能日もこの同じ表
+                //   （shift_preferences）に入るので、印を付けないとスタッフと見分けられない。
+                'emp' => (optional($person)->role === 'employee'),
             ];
         }
 

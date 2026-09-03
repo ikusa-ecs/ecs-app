@@ -302,9 +302,16 @@
        これまでは押したあとの確認ダイアログでしか分からず、押してから気づいていた。
        赤い枠で囲って、どの案件に入っているかを名前のとなりに出す。 */
     .cand-row.busy { background: #fdecec; border: 1px solid #f3b7b7; border-radius: 6px; padding: 2px 4px; }
-    .cstat.busy { background: var(--danger-soft); color: #b91c1c; }
-    .cstat.busy-where { background: #fff; color: #b91c1c; border: 1px solid #f3b7b7; font-weight: 400;
-      max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+    /* ⚠ 印は ⛔ だけ（2026-09-03 baba「幅を取るのでストップマークだけでいい」）。
+       どの案件に入っているかは、マウスを乗せたとき（title）に出す。 */
+    .cstat.busy { background: var(--danger-soft); color: #b91c1c; padding: 1px 5px; }
+    /* 社員はふだんイベントに出ないので、希望者カラムではたたんでおく（2026-09-03 baba要望）。 */
+    .cand-emp { margin-top: 6px; border-top: 1px dashed var(--line); padding-top: 4px; }
+    .cand-emp > summary { cursor: pointer; font-size: 11px; color: var(--muted, #8a7a6b); list-style: none; padding: 2px 0; }
+    .cand-emp > summary::-webkit-details-marker { display: none; }
+    .cand-emp > summary::before { content: 'b8 '; }
+    .cand-emp[open] > summary::before { content: 'be '; }
+    .cand-emp > summary:hover { color: var(--brand-dark, #8a5a33); }
 
     /* 手動編集の操作 */
     .edit-btn { border: 1px solid var(--line); background: #fff; color: var(--ink);
@@ -330,7 +337,6 @@
     .pick-box .pk-item.busy { background: #fdecec; }
     .pick-box .pk-item.busy:hover { background: #fbdcdc; }
     .pick-box .pk-item .busy-tag { color: #b91c1c; font-size: 11px; font-weight: 700; white-space: nowrap; }
-    .pick-box .pk-item .busy-where { color: #b91c1c; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pick-box .pk-sep { padding: 4px 8px; font-size: 11px; font-weight: 700; color: #b91c1c; background: #fdecec; border-top: 1px solid #f3b7b7; }
     .pick-box .pk-none { padding: 10px 8px; font-size: 12px; color: var(--muted, #8a7a6b); }
     .pick-box .pk-foot { display: flex; align-items: center; gap: 6px; }
@@ -607,17 +613,19 @@
     if (ECS_BOARD) {
       const byName = {};
       dayCases.forEach(c => (c.applicants || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false, notes:{} });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, emp:!!a.emp, applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;                 // id を取りこぼさない（DB保存に必要）
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
+        if (a.emp) e.emp = true;                        // 社員の印（希望者カラムでたたむのに使う）
         if (!e.applied.includes(c.id)) e.applied.push(c.id);
         if (!e.notes) e.notes = {};
         if (a.note) e.notes[c.id] = a.note;             // 本人が応募時に書いた一言（案件ごと）
       }));
       ((window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[off]) || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, applied:[], cal:false, notes:{} });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, emp:!!a.emp, applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
+        if (a.emp) e.emp = true;
         e.cal = true;
       });
       return Object.values(byName);
@@ -1043,7 +1051,7 @@
           + ' onchange="pickToggle(\'' + pp.id + '\', this.checked)">'
           + '<span>' + escHtml(pp.name) + '</span>'
           + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span>'
-          + (where ? '<span class="busy-tag">⛔ 別案件</span><span class="busy-where">' + escHtml(where.join('・')) + '</span>' : '')
+          + (where ? '<span class="busy-tag">⛔</span>' : '')
           + '</label>';
       }).join('');
     }
@@ -1798,19 +1806,32 @@
     const dp = dayPeople(c.off, dayCases).filter(p => p.applied.includes(c.id) || p.cal);
     // ⚠ その日、別の案件にもう入っている人（2026-09-03 baba要望）。
     //   希望を出していても、その日はもう埋まっている＝声を掛けても入れない。
-    //   「選ぶ前に分かる」ようにするのが目的なので、行ごと赤くして案件名まで出す。
+    //   ⚠ 案件名まで出すと横幅を取ると言われたので、印は ⛔ だけにする（2026-09-03）。
+    //     どの案件に入っているかは、マウスを乗せたとき（title）に出す。
     const busyWhere = takenSameDayWhere(c);
-    let busyCount = 0;
-    const candRows = dp.map(p => {
+
+    // すでに埋まっている度合い。0＝空いている／1＝その日の別案件／2＝この案件のメンバー。
+    // ⚠ これで「下へ回す」並べ替えをする（2026-09-03 baba要望）。
+    //   上から順に見れば、まだ声を掛けられる人だけになる。
+    function busyRank(p){
+      if (c.assigned.some(m => m.name === p.name)) return 2;
+      if (busyWhere.has(p.name)) return 1;
+      return 0;
+    }
+    // 空いている人を先に。同じ組の中の並びは元のまま（勝手に入れ替えない）。
+    function sortFreeFirst(list){
+      return list.map((p, i) => ({ p: p, i: i }))
+                 .sort((a, b) => (busyRank(a.p) - busyRank(b.p)) || (a.i - b.i))
+                 .map(x => x.p);
+    }
+
+    // 1行ぶんの HTML。
+    function candRowHtml(p){
       // すでにこの案件のメンバーに入っている人＝アサイン済み（グレーアウト・＋ボタン無し）
       const picked = c.assigned.some(m => m.name === p.name);
       const where  = (!picked && busyWhere.get(p.name)) || null;
-      if (where) busyCount++;
       const st = candStatus(p);
-      const busyTag = where
-        ? `<span class="cstat busy" title="${escHtml(busyTitle(p.name, where))}">⛔ 別案件</span>`
-          + `<span class="cstat busy-where" title="${escHtml(busyTitle(p.name, where))}">${escHtml(where.join('・'))}</span>`
-        : '';
+      const busyTag = where ? `<span class="cstat busy" title="${escHtml(busyTitle(p.name, where))}">⛔</span>` : '';
       const statTag = picked ? '<span class="cstat done">✓ アサイン済み</span>' : st.tag;
       const rowCls  = picked ? 'picked' : (where ? 'busy' : st.cls);
       const addTitle = where ? busyTitle(p.name, where) + ' それでも入れるときは押してください。' : 'メンバーに入れる';
@@ -1819,15 +1840,27 @@
       const cmt = (p.notes && p.notes[c.id]) ? p.notes[c.id] : '';
       const cmtHtml = cmt ? `<div class="cand-note" title="本人からの一言">💬 ${escHtml(cmt)}</div>` : '';
       return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${busyTag}${statTag}${addBtn}${cmtHtml}</div>`;
-    }).join('');
-    // 見出しに「うち◯名は別案件」と出す＝開かなくても、実際に声を掛けられる人数が分かる。
-    const candHead = busyCount
-      ? `希望者（${dp.length}名 <span style="color:#b91c1c;">うち${busyCount}名は別案件</span>）`
-      : `希望者（${dp.length}名）`;
+    }
+
+    // ⚠ 社員は「基本イベントには出ない」ので、たたんでおく（2026-09-03 baba要望）。
+    //   社員の出勤可能日もスタッフと同じ表（shift_preferences）に入るため、
+    //   混ぜて並べると、声を掛ける相手を探すのに邪魔になる。
+    const dpStaff = sortFreeFirst(dp.filter(p => !p.emp));
+    const dpEmp   = sortFreeFirst(dp.filter(p => p.emp));
+    const freeCount = dpStaff.filter(p => busyRank(p) === 0).length;
+
+    const staffRows = dpStaff.map(candRowHtml).join('');
+    const empRows = dpEmp.length
+      ? `<details class="cand-emp"><summary>社員 ${dpEmp.length}名（ふだんイベントには出ません）</summary>${dpEmp.map(candRowHtml).join('')}</details>`
+      : '';
+    // 見出しは「まだ声を掛けられる人が何人か」を先に出す。
+    const candHead = (dpStaff.length && freeCount < dpStaff.length)
+      ? `希望者（${dpStaff.length}名 <span style="color:#15803d;">空き${freeCount}名</span>）`
+      : `希望者（${dpStaff.length}名）`;
     const candCol =
       `<div class="cc-col">
          <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> ${candHead}</span></div>
-         <div class="col-list">${candRows || '<div class="mem-none">希望者はいません。</div>'}</div>
+         <div class="col-list">${staffRows || '<div class="mem-none">希望者はいません。</div>'}${empRows}</div>
        </div>`;
 
     // ===== 状態を進めるボタン =====
