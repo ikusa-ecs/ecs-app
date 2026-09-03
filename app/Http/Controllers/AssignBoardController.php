@@ -45,6 +45,13 @@ class AssignBoardController extends Controller
 
     /** アサインボード（日別）/assign。案件＋割当メンバー＋希望者・稼働可・今月件数を DB から渡す。
      *  ?from=YYYY-MM-DD が来たら、その日を基準（先頭）に 3週間分を表示する（既定＝今日）。 */
+    /**
+     * 稼働可/希望の一覧を作った結果の覚え書き（同じ問い合わせを2回しないため）。
+     *
+     * @var array<string, array{byDay: array<int, mixed>, hidden: array<int, int>}>
+     */
+    private array $availCache = [];
+
     public function assign(Request $request)
     {
         $anchor = $this->boardAnchor($request);
@@ -56,6 +63,9 @@ class AssignBoardController extends Controller
             'roster' => $this->rosterPeople($office),
             'boardCases' => $this->boardCases($anchor, $office),
             'boardAvail' => $this->boardAvail($anchor, $office), // off → その日に稼働可/希望のスタッフ一覧
+            // 拠点がちがうので出していない人数（off → 人数）。
+            // ⚠ 黙って消すと「終日〇を出したのに希望者に出てこない」になるので、理由を画面に出す。
+            'boardAvailHidden' => $this->boardAvailHidden($anchor, $office),
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
             'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
             'roleOptions' => AssignmentRole::positionLabels(), // ポジション編集プルダウンの選択肢（正本）
@@ -423,31 +433,79 @@ class AssignBoardController extends Controller
      * ボードの各日（off）の「稼働可/希望スタッフ一覧」を shift_preferences から作る。
      * 返り値＝ off(整数) => [{name, lv, pos}, ...]。希望者カラムの「終日〇」と稼働可人数に使う。
      *
+     * ⚠ 出さない人が2種類ある（2026-09-03）。どちらも**黙って消える**と
+     *   「終日〇を出したのに希望者に出てこない」になるので、
+     *   拠点ちがいのぶんだけは人数を数えて画面に伝える（boardAvailHidden）。
+     *   ・退職・無効にした人 …… 出さない（baba決定 2026-09-03）
+     *   ・拠点がちがう人 …… 出さない（拠点ごとに分けて見る方針のまま・baba決定 2026-09-03）
+     *
      * @return array<int, array<int, array<string, string>>>
      */
     private function boardAvail(Carbon $anchor, ?string $office = null): array
     {
+        return $this->boardAvailAll($anchor, $office)['byDay'];
+    }
+
+    /**
+     * 「拠点がちがうので出していない人」の日ごとの人数。
+     * ⚠ これを画面に出さないと、なぜ出てこないのか誰にも分からない。
+     *
+     * @return array<int, int>
+     */
+    private function boardAvailHidden(Carbon $anchor, ?string $office = null): array
+    {
+        return $this->boardAvailAll($anchor, $office)['hidden'];
+    }
+
+    /**
+     * 稼働可/希望の一覧と、拠点ちがいで隠した人数を、いっぺんに作る。
+     * ⚠ 同じ問い合わせを2回しないよう、1回だけ作って覚えておく。
+     *
+     * @return array{byDay: array<int, array<int, array<string, mixed>>>, hidden: array<int, int>}
+     */
+    private function boardAvailAll(Carbon $anchor, ?string $office = null): array
+    {
+        $key = $anchor->format('Y-m-d').'|'.($office ?? '');
+        if (isset($this->availCache[$key])) {
+            return $this->availCache[$key];
+        }
+
         $end = $anchor->copy()->addDays(21);
 
-        // 希望者カラムに出す「候補プール」なので、拠点で絞るときは自拠点のスタッフだけにする。
         $prefs = ShiftPreference::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
             ->whereIn('availability', ['稼働可', '希望'])
-            ->when($office, fn ($q) => $q->whereIn(
-                'staff_id',
-                OfficeScope::applyToPeople(Person::staff(), $office)->pluck('id')->all()
-            ))
             ->get(['staff_id', 'date']);
 
         if ($prefs->isEmpty()) {
-            return [];
+            return $this->availCache[$key] = ['byDay' => [], 'hidden' => []];
         }
 
         $people = $this->peopleWithPos($prefs->pluck('staff_id')->unique()->all());
 
+        // 拠点で絞るときに「出してよい人」の一覧。
+        // ⚠ 社員もスタッフも同じ決まりで絞る。以前はスタッフだけを対象にしていたため、
+        //   拠点で絞って見ると社員が丸ごと消え、全拠点で見ると出る＝見る人で違う状態だった。
+        $allowed = $office
+            ? array_flip(OfficeScope::applyToPeople(Person::query(), $office)->pluck('id')->all())
+            : null;
+
         $out = [];
+        $hidden = [];
         foreach ($prefs as $pref) {
             $off = $this->offDays($pref->date, $anchor);
             $person = $people->get($pref->staff_id);
+
+            // 退職・無効にした人は候補に出さない（2026-09-03 baba決定）。
+            // 「＋スタッフを追加」の一覧では前から除かれているので、そちらに合わせる。
+            if ($person && $person->active === false) {
+                continue;
+            }
+
+            if ($allowed !== null && ! isset($allowed[$pref->staff_id])) {
+                $hidden[$off] = ($hidden[$off] ?? 0) + 1;
+                continue;
+            }
+
             $out[$off][] = [
                 'id' => $pref->staff_id,                        // DB保存に使う（希望者→メンバー化）
                 'name' => $person->name ?? $pref->staff_id,
@@ -460,7 +518,7 @@ class AssignBoardController extends Controller
             ];
         }
 
-        return $out;
+        return $this->availCache[$key] = ['byDay' => $out, 'hidden' => $hidden];
     }
 
     /**

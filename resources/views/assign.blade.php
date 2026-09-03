@@ -312,6 +312,8 @@
     .cand-emp > summary::before { content: 'b8 '; }
     .cand-emp[open] > summary::before { content: 'be '; }
     .cand-emp > summary:hover { color: var(--brand-dark, #8a5a33); }
+    /* 拠点がちがうので出していない人数（2026-09-03）。黙って消えると原因が分からないため。 */
+    .cand-hidden { margin-top: 6px; font-size: 11px; color: var(--muted, #8a7a6b); cursor: help; }
 
     /* 手動編集の操作 */
     .edit-btn { border: 1px solid var(--line); background: #fff; color: var(--ink);
@@ -449,6 +451,9 @@
 <script>window.ECS_USINGDB = @json($usingDb ?? null);</script>
 <!-- 希望者カラム用：その日に稼働可/希望のスタッフ（off→一覧）と、今月のアサイン件数（名前→件数）。 -->
 <script>window.ECS_BOARD_AVAIL = @json($boardAvail ?? []);</script>
+{{-- 拠点がちがうので希望者に出していない人数（off → 人数）。
+     ⚠ 黙って消すと「終日〇を出したのに出てこない」になるので、理由を画面に出す（2026-09-03）。 --}}
+<script>window.ECS_BOARD_AVAIL_HIDDEN = @json($boardAvailHidden ?? []);</script>
 <script>window.ECS_BOARD_MONTH = @json($boardMonth ?? []);</script>
 <!-- 表示の基準日（先頭の日）。日付計算の起点・日付ピッカーの初期値に使う。 -->
 <script>window.ECS_BOARD_ANCHOR = @json($anchor ?? null);</script>
@@ -1857,10 +1862,16 @@
     const candHead = (dpStaff.length && freeCount < dpStaff.length)
       ? `希望者（${dpStaff.length}名 <span style="color:#15803d;">空き${freeCount}名</span>）`
       : `希望者（${dpStaff.length}名）`;
+    // ⚠ 拠点がちがうので出していない人がいるときは、その人数と理由を出す（2026-09-03）。
+    //   黙って消すと「終日〇を出したのに希望者に出てこない」になり、原因にたどり着けない。
+    const hiddenN = (window.ECS_BOARD_AVAIL_HIDDEN || {})[c.off] || 0;
+    const hiddenHtml = hiddenN
+      ? `<div class="cand-hidden" title="この画面はいまの拠点で絞って見ています。ほかの拠点の方を出すには、上の拠点の選び方を変えるか、その方の事務所を直してください。">ほかの拠点のため ${hiddenN}名を出していません</div>`
+      : '';
     const candCol =
       `<div class="cc-col">
          <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> ${candHead}</span></div>
-         <div class="col-list">${staffRows || '<div class="mem-none">希望者はいません。</div>'}${empRows}</div>
+         <div class="col-list">${staffRows || '<div class="mem-none">希望者はいません。</div>'}${empRows}${hiddenHtml}</div>
        </div>`;
 
     // ===== 状態を進めるボタン =====
