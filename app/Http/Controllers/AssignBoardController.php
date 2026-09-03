@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ProjectDispatch;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
@@ -386,6 +387,13 @@ class AssignBoardController extends Controller
         // この案件群への応募（applications）＝希望者カラムの元。note＝本人が応募時に書いた一言。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id', 'note']);
 
+        // 派遣依頼（2026-09-03）。⚠ それまで「＋派遣」は画面の中だけで、読み込み直すと消えていた。
+        //   一覧は /dispatch-list。ここではメンバー欄に出すために読む。
+        $dispatchesByProject = ProjectDispatch::whereIn('project_id', $projectIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('project_id');
+
         // 関係する人（名前・区分・できる役割）をまとめて引く。
         $people = $this->peopleWithPos(
             $assignments->pluck('staff_id')->merge($apps->pluck('staff_id'))->unique()->all()
@@ -397,7 +405,7 @@ class AssignBoardController extends Controller
         // コンテンツ未登録の判定用＝マスタに存在するコンテンツID一覧。
         $validContentIds = Content::pluck('id')->all();
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds) {
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $dispatchesByProject) {
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -518,6 +526,16 @@ class AssignBoardController extends Controller
                 'draft' => false,
                 'assigned' => $assigned,
                 'applicants' => $applicants,   // 希望者カラムの元（応募者）
+                // 派遣依頼（2026-09-03）。メンバー欄に紫で出す。キャンセルも印つきで残す
+                // （頼んだ事実が消えると経緯が追えない）。一覧は /dispatch-list。
+                'dispatches' => ($dispatchesByProject->get($p->id) ?? collect())->map(fn ($d) => [
+                    'id' => $d->id,
+                    'agency' => $d->agency,
+                    'count' => $d->count,
+                    'role' => (string) ($d->role ?? ''),
+                    'status' => $d->status,
+                    'note' => (string) ($d->note ?? ''),
+                ])->values()->all(),
             ];
         })->values();
     }

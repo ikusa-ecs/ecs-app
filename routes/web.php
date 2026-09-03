@@ -15,6 +15,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AvailabilityImportController;
 use App\Http\Controllers\CountDeadlineReminderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\EmployeeAvailabilityController;
 use App\Http\Controllers\EntryFeedController;
 use App\Http\Controllers\ExperienceController;
@@ -259,6 +260,15 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // この案件のメンバーを全員「確定」にする（2026-08-26）。日別ボードの「確定にする」「スタッフに公開」から呼ぶ。
     // 公開してもメンバーは自動で確定にならないため、「公開したのにスタッフに出ない」を防ぐ。
     Route::post('/projects/confirm-members', [AssignmentController::class, 'confirmMembers']);
+    // 派遣依頼（2026-09-03 baba要望）。
+    // ⚠ それまで日別ボードの「＋派遣」は**画面の中だけ**で、DBに何も残っていなかった
+    //   （押しても読み込み直すと消えていた）。入れる場所は今までどおり日別ボードの「＋派遣」。
+    // /dispatch-list ＝頼んだ派遣を開催日順に並べたシート。
+    Route::get('/dispatch-list', [DispatchController::class, 'index']);
+    Route::post('/dispatches', [DispatchController::class, 'store']);
+    Route::post('/dispatches/{id}', [DispatchController::class, 'update']);
+    Route::delete('/dispatches/{id}', [DispatchController::class, 'destroy']);
+
     Route::get('/pickup', [AssignBoardController::class, 'pickup']);
     // ピックアップのメンバーを assignments にDB保存（担当メモ・巡回数も一緒に上書き）。
     Route::post('/pickup/save', [AssignBoardController::class, 'pickupSave']);

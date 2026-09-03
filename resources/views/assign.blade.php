@@ -270,6 +270,14 @@
        色は横に出るバッジと同じにそろえる（社員＝青／派遣＝紫）。 */
     .m-name.emp   { color: #2c6ca0; font-weight: 700; }
     .m-name.haken { color: #6d28d9; font-weight: 700; }
+    /* 保存済みの派遣依頼（2026-09-03）。直す・消すのは派遣一覧から＝ここは見るだけ。 */
+    .hk-row { background: #f8f4fd; border-radius: 6px; padding: 2px 4px; }
+    .hk-row.off { opacity: .5; }
+    .hk-row.off .m-name { text-decoration: line-through; }
+    .hk-st { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
+    .hk-st.asked { background: var(--warn-soft); color: #8a5a10; }
+    .hk-st.fixed { background: var(--ok-soft); color: #15803d; }
+    .hk-st.cancelled { background: #ece3d4; color: #7a6a58; }
     /* メンバーを外す × ／ 希望者を入れる ＋追加 */
     /* 同じ日に複数案件でかぶっている人＝赤文字。
        ⚠ 社員の青より後ろに書く＝かぶりの赤を優先する（気づかないと事故になるため）。 */
@@ -946,13 +954,58 @@
     render();
   }
   // 派遣を足す（人手不足時）
+  // ＋派遣（2026-09-03 baba要望でDB保存に変えた）。
+  // ⚠ それまでは画面の配列に足すだけで**保存していなかった**＝読み込み直すと消え、
+  //   「どの案件に派遣を頼んだか」の記録がどこにも無かった。一覧は /dispatch-list。
   function addHaken(caseId){
     const c = cases.find(x => x.id === caseId);
     if (!c) return;
-    const name = prompt('派遣の名前／派遣会社を入力してください（モック）', '派遣スタッフ');
-    if (!name) return;
-    c.assigned.push({ name: name.trim(), lv:'-', pos:'受付', type:'haken' });
-    render();
+    const name = prompt('派遣先（派遣会社名など）を入れてください。', '');
+    if (!name || !name.trim()) return;
+    const n = prompt('何名お願いしますか。（数字）', '1');
+    if (n === null) return;
+    const role = prompt('役割があれば入れてください（例：受付）。無ければ空のままでOKです。', '');
+    if (role === null) return;
+
+    const body = new URLSearchParams();
+    body.append('project_id', caseId);
+    body.append('agency', name.trim());
+    body.append('count', String(Math.max(1, parseInt(n, 10) || 1)));
+    if (role.trim()) body.append('role', role.trim());
+
+    fetch('/dispatches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF },
+      body: body.toString()
+    })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      // ⚠ 失敗をだまって流さない。「入れたつもりで残っていない」がいちばん困る。
+      if (!ok) { alert((j && j.message) || '派遣依頼を保存できませんでした。'); return; }
+      location.reload();   // 一覧・メンバー欄をそろえるため読み直す
+    })
+    .catch(() => alert('保存に失敗しました。通信を確認して、もう一度お試しください。'));
+  }
+
+  // 保存済みの派遣依頼を、メンバー欄の下に出す（2026-09-03）。
+  // ⚠ 消すのは派遣一覧（/dispatch-list）から。ここでは見るだけ＝押し間違いで記録が消えないように。
+  function dispatchRowsHtml(c){
+    const list = (c.dispatches || []);
+    if (!list.length) return '';
+    return list.map(d => {
+      const cancelled = d.status === 'キャンセル';
+      const tip = d.agency + '（' + d.count + '名'
+        + (d.role ? '・' + d.role : '') + '・' + d.status + '）'
+        + (d.note ? '／' + d.note : '')
+        + '　※直す・消すのは「派遣一覧」から';
+      return `<div class="mem-row hk-row${cancelled ? ' off' : ''}">`
+        + `<span class="m-no">派</span>`
+        + `<span class="m-name haken" title="${escAttr(tip)}">${escHtml(d.agency)}</span>`
+        + `<span class="m-type haken">派遣 ${d.count}名</span>`
+        + (d.role ? `<span class="m-pos">${escHtml(d.role)}</span>` : '')
+        + `<span class="hk-st ${d.status === '確定' ? 'fixed' : (cancelled ? 'cancelled' : 'asked')}">${escHtml(d.status)}</span>`
+        + `</div>`;
+    }).join('');
   }
 
   // ===== M-9：名簿（people.js）から選んで追加（社員・スタッフ）=====
@@ -1798,11 +1851,11 @@
     const memCol =
       `<div class="cc-col">
          <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span>${kariN ? `<span class="kari-warn" title="「仮」の人はスタッフの画面に出ません。名前の横の「仮」を押すと確定にできます。">仮 ${kariN}名</span>` : ''}</div>
-         <div class="col-list">${memRows || '<div class="mem-none">メンバー未割当</div>'}</div>
+         <div class="col-list">${memRows || '<div class="mem-none">メンバー未割当</div>'}${dispatchRowsHtml(c)}</div>
          ${editMode ? `<div class="add-row">
              <button class="mini" onclick="openPicker('${c.id}','employee')" title="社員を名前でしぼって、チェックした人をまとめて入れます">＋社員を追加</button>
              <button class="mini" onclick="openPicker('${c.id}','staff')" title="スタッフを名前でしぼって、チェックした人をまとめて入れます。LINEで入れると言われた方もここから。">＋スタッフを追加</button>
-             <button class="mini" onclick="addHaken('${c.id}')">＋派遣</button>
+             <button class="mini" onclick="addHaken('${c.id}')" title="派遣先・人数・役割を入れて保存します。あとから直すのは「派遣一覧」から。">＋派遣</button>
            </div>
            <div class="pick-box" id="pick-${c.id}" style="display:none;"></div>` : ''}
        </div>`;
