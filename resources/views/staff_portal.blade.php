@@ -747,9 +747,12 @@
                  ⚠ 名簿の並び順と区分（新人／中堅／ベテラン）の計算に使う値。 -->
             <div class="field">
               <label>IKUSAで働き始めた年月</label>
-              <input id="pfHire" type="date">
+              {{-- 2026-09-03「入力しにくい」＝カレンダーが今月から開くので何年も戻すのが大変だった。
+                   年・月・日のプルダウンに変えた。中身の正本は partials/hire_date_selects。
+                   ⚠ 選ばれている値を入れるのは下の loadProfile（保存済みの値はJSで受け取っているため）。 --}}
+              @include('partials.hire_date_selects', ['value' => null, 'idPrefix' => 'pfHire'])
               <span class="sub" style="display:block; margin-top:4px;">
-                名簿の並び順と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日で構いません。
+                名簿の並び順と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日のままで構いません。
                 <b>⚠ 生年月日ではありません。</b>
               </span>
             </div>
@@ -1768,7 +1771,6 @@
     // 入力欄のID ↔ people 列名の対応
     const PF_MAP = {
       pfHeight:'height', pfShoe:'shoe_size', pfWear:'shirt_size', pfPref:'prefecture', pfStation:'nearest_station',
-      pfHire:'hire_date',
       pfAppeal:'appeal', pfLike:'liked_contents', pfDislike:'disliked_contents',
       pfStrongPosFree:'strong_positions', pfWeakPosFree:'weak_positions',
       pfOtherLang:'other_languages', pfToolOther:'online_tools_other', pfNote:'profile_note'
@@ -1777,6 +1779,18 @@
     // 複数チェックの欄 ↔ people 列名の対応（選択肢そのものは Blade がサーバーから出している）
     const PF_CHECKS = { pfChallengeList:'challenge_positions', pfToolList:'online_tools' };
 
+    // 入社年月日（年・月・日の3つのプルダウン）を読み書きする。
+    // ⚠ 1本の日付に組み立て直すのはサーバー側（NormalizeHireDate）。ここでは3つのまま送る。
+    function hireSetFromDate(date) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date || ''));
+      const y = document.getElementById('pfHireY');
+      const mo = document.getElementById('pfHireM');
+      const d = document.getElementById('pfHireD');
+      if (y) y.value = m ? String(+m[1]) : '';
+      if (mo) mo.value = m ? String(+m[2]) : '';
+      if (d) d.value = m ? String(+m[3]) : '1';
+    }
+
     // DBに保存済みの本人プロフィールを各欄に入れる
     function loadProfile() {
       const d = window.ECS_MY_PROFILE || {};
@@ -1784,6 +1798,7 @@
         const el = document.getElementById(id);
         if (el && d[PF_MAP[id]] != null) el.value = d[PF_MAP[id]];
       });
+      hireSetFromDate(d.hire_date);
       // チェックボックス（保存済みの値と同じものにチェックを入れる）
       Object.keys(PF_CHECKS).forEach(id => {
         const box = document.getElementById(id);
@@ -1801,6 +1816,11 @@
       Object.keys(PF_MAP).forEach(id => {
         const el = document.getElementById(id);
         if (el) body.append(PF_MAP[id], el.value);
+      });
+      // 入社年月日は年・月・日の3つで送る（組み立てはサーバー側）。
+      ['Y', 'M', 'D'].forEach((s, i) => {
+        const el = document.getElementById('pfHire' + s);
+        if (el) body.append('hire_' + 'ymd'.charAt(i), el.value);
       });
       // チェックが入っているものだけ送る。1つも無いときは「空で送った」と伝えるため印を付ける
       // （何も送らないと「欄ごと無かった」ことになり、前の内容が消せなくなる）。

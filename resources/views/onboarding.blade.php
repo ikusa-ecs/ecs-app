@@ -112,9 +112,10 @@
             {{ $me->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日' }}
             @if ($me->role !== 'staff')<span class="req">必須</span>@endif
           </label>
-          <input type="date" name="hire_date" value="{{ old('hire_date', $me->hire_date?->format('Y-m-d')) }}"
-                 @if ($me->role !== 'staff') required @endif>
-          <span class="hint">名簿の並び順（社歴の長い人が上）と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日で構いません。</span>
+          {{-- 2026-09-03 「入力しにくい」＝カレンダーが今月から開いて何年も戻すのが大変だったので、
+               年・月・日のプルダウンに変えた。入力欄の中身は partials/hire_date_selects が正本。 --}}
+          @include('partials.hire_date_selects', ['value' => $me->hire_date, 'required' => $me->role !== 'staff'])
+          <span class="hint">名簿の並び順（社歴の長い人が上）と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日のままで構いません。</span>
         </div>
 
         <div class="field-row3">

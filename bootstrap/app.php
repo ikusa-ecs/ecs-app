@@ -28,6 +28,13 @@ return Application::configure(basePath: dirname(__DIR__))
         //   ＝ 氏名と日付の列が全部ずれて、**1人も読めない／別の人の日に入る**。
         //   エラーも出ないので気づけない。貼り付け欄は元の文字のまま受け取る。
         $middleware->trimStrings(except: ['paste', 'pasted']);
+
+        // 入社年月日は画面では「年・月・日の3つのプルダウン」で入れる（2026-09-03）。
+        // 届いた3つを、これまでどおりの hire_date（Y-m-d）1本に組み立て直す。
+        // ⚠ 入れられる画面が4つあるので、組み立てはここ1か所に集める（各画面に書き写すと食い違う）。
+        $middleware->web(append: [
+            \App\Http\Middleware\NormalizeHireDate::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // ⚠ 画面から裏で送る保存（fetch）は、失敗したときも**必ずJSONで返す**（2026-09-03）。

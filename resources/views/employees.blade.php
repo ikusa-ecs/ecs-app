@@ -26,6 +26,8 @@
        ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
   window.ECS_OFFICES = @json($offices ?? []);
   window.ECS_MY_OFFICE = @json($myOffice ?? '');
+  {{-- 入社年月日で選べる年（新しい順）。正本は App\Support\HireDate＝JSに年を書き足さない。 --}}
+  window.ECS_HIRE_YEARS = @json(\App\Support\HireDate::years());
 </script>
 {{-- 所属バッジの色。色をJSやCSSに直書きせず、正本（Departments）から作る。 --}}
 <style>
@@ -437,6 +439,28 @@
   // ⚠ 区分（新人／中堅／ベテラン）は**この日付からその場で計算**している（保存していない）。
   //   新人＝1年未満／中堅＝1年以上3年未満／ベテラン＝3年以上。
   //   入社日が間違っていると新入社員がベテランに見えるので、日付と区分を並べて出す。
+  // 'YYYY-MM-DD' → {y:'2024', m:'4', d:'1'}（空なら全部 ''）。
+  function hireParts(date){
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date || ''));
+    return m ? { y: String(+m[1]), m: String(+m[2]), d: String(+m[3]) } : { y: '', m: '', d: '' };
+  }
+  // 年のプルダウン。⚠ 年を書き足さない＝正本は App\Support\HireDate（window.ECS_HIRE_YEARS）。
+  function yearOptions(sel){
+    let h = '<option value="">— 年 —</option>';
+    (window.ECS_HIRE_YEARS || []).forEach(y => {
+      h += `<option value="${y}"${String(y) === String(sel) ? ' selected' : ''}>${y}年</option>`;
+    });
+    return h;
+  }
+  // 月・日のプルダウン。blank=true のときだけ「未選択」を先頭に置く（日は最初から1日）。
+  function numOptions(from, to, sel, unit, blank){
+    let h = blank ? `<option value="">— ${unit} —</option>` : '';
+    for (let n = from; n <= to; n++) {
+      h += `<option value="${n}"${String(n) === String(sel) ? ' selected' : ''}>${n}${unit}</option>`;
+    }
+    return h;
+  }
+
   // ⚠ 数え方をここに書かないこと（正本は Person::getSkillLevelAttribute）。区分はサーバーの値をそのまま出す。
   function hireDateHtml(p, idx){
     const date = p.hireDate || '';
@@ -451,11 +475,16 @@
         <div class="muted" style="font-size:12px;">※ 区分（新人／中堅／ベテラン）はこの日付から自動で決まります。直せるのは管理者以上です。</div>
         <hr style="border:none; border-top:1px dashed var(--line); margin:14px 0;">`;
     }
+    // ⚠ 2026-09-03「入力しにくい」＝カレンダーが今月から開くので、2018年まで戻すのに
+    //   「前の月」を何十回も押すことになっていた。年・月・日のプルダウンに変えた。
+    const part = hireParts(date);
     return `<h4>入社年月日</h4>
       <div style="font-size:13px; margin-bottom:6px;">いまの登録：${shown}</div>
       <div class="size-row" style="gap:10px;">
         <label class="size-item">入社年月日：
-          <input type="date" class="size-input" style="width:170px;" id="hire-${idx}" value="${escAttr(date)}">
+          <select class="size-input" style="width:auto;" id="hireY-${idx}">${yearOptions(part.y)}</select>
+          <select class="size-input" style="width:auto;" id="hireM-${idx}">${numOptions(1, 12, part.m, '月', true)}</select>
+          <select class="size-input" style="width:auto;" id="hireD-${idx}">${numOptions(1, 31, part.d || '1', '日', false)}</select>
         </label>
       </div>
       <div class="save-row" style="margin-top:10px;">
@@ -468,9 +497,13 @@
 
   function saveHireDate(idx, btn){
     const p = employees[idx];
-    const el = document.getElementById('hire-' + idx);
+    const val = id => (document.getElementById(id + '-' + idx) || {}).value || '';
     const body = new URLSearchParams();
-    body.append('hire_date', el ? el.value : '');
+    // ⚠ 年・月・日の3つで送る。1本の日付に組み立て直すのはサーバー側（NormalizeHireDate）＝
+    //   組み立て方を画面ごとに書き写さない。
+    body.append('hire_y', val('hireY'));
+    body.append('hire_m', val('hireM'));
+    body.append('hire_d', val('hireD'));
     if (btn) btn.disabled = true;
     fetch('/employees/' + encodeURIComponent(p.id) + '/profile', {
       method: 'POST',

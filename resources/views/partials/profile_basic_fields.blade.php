@@ -61,9 +61,11 @@
      ⚠ 名簿の並び順（社歴の長い人が上）と、区分（新人／中堅／ベテラン）の計算に使う値。 --}}
 <div class="form-row">
   <label>{{ $me->role === 'staff' ? 'IKUSAで働き始めた年月' : '入社年月日' }}</label>
-  <input type="date" name="hire_date" value="{{ $me->hire_date?->format('Y-m-d') }}">
+  {{-- 2026-09-03 「入力しにくい」＝カレンダーが今月から開いて何年も戻すのが大変だったので、
+       年・月・日のプルダウンに変えた。入力欄の中身は partials/hire_date_selects が正本。 --}}
+  @include('partials.hire_date_selects', ['value' => $me->hire_date])
   <span class="hint">
-    名簿の並び順（社歴の長い方が上）と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日で構いません。<br>
+    名簿の並び順（社歴の長い方が上）と、区分（新人／中堅／ベテラン）の計算に使います。日にちが分からなければ1日のままで構いません。<br>
     <b>⚠ 生年月日ではありません。</b>IKUSAで働き始めた日を入れてください。
   </span>
 </div>

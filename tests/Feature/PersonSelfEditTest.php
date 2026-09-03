@@ -51,7 +51,8 @@ class PersonSelfEditTest extends TestCase
 
         $this->actingAsPerson($me)->get('/profile')
             ->assertOk()
-            ->assertSee('name="hire_date"', false)
+            ->assertSee('name="hire_y"', false)
+            ->assertSee('name="hire_m"', false)
             ->assertSee('入社年月日');
     }
 
@@ -64,7 +65,7 @@ class PersonSelfEditTest extends TestCase
             ->assertOk()
             ->assertSee('氏名・所属・身長など')
             ->assertSee('action="/profile/basic"', false)
-            ->assertSee('name="hire_date"', false);
+            ->assertSee('name="hire_y"', false);
 
         $this->actingAsPerson($me)->post('/profile/basic', [
             'name' => $me->name,
