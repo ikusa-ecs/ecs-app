@@ -954,9 +954,9 @@
         need:c.need, filled:c.filled, meet:c.meet, leave:c.leave,
         enter:c.enter, evStart:c.evStart, evEnd:c.evEnd, evTbd:!!c.evTbd, offset:c.off,
         staffNotes:(c.staffNotes || ''),
-        // 自分が応募済みなら「エントリー中」を最優先で表示（そうすれば取り消しもできる）。
-        // 未応募なら満員→締切／調整中→エントリー中／それ以外→募集中。
-        state:(c.applied ? 'applied' : (c.filled >= c.need ? 'closed' : (c.state === 'adj' ? 'applied' : 'open'))),
+        // ⚠ 状態の決め方は calcState（下）に1か所だけ置く。ここでは材料だけ持つ。
+        //   full＝満員（人数が埋まった）／adj＝担当が調整中／applied＝自分が応募済み。
+        full:(c.filled >= c.need), adj:(c.state === 'adj'),
         applied:!!c.applied, myNote:(c.myNote || ''), myIntent:(c.myIntent || '希望'),
         extra:(c.category === '追加案件')
       };
@@ -967,7 +967,7 @@
     function atMidnight(d){ const x = new Date(d); x.setHours(0,0,0,0); return x; }
     function addDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
     const today = atMidnight(new Date());
-    jobs.forEach((j,i) => { j._i = i; j.date = addDays(today, j.offset); });
+    jobs.forEach((j,i) => { j._i = i; j.date = addDays(today, j.offset); j.state = calcState(j); });
     const jobById = {};
     jobs.forEach(j => { jobById[j.id] = j; });
     // 予備日・リハは親の本番に合わせて並べるためのアンカー（本番＝自分、予備日/リハ＝親の本番）
@@ -977,6 +977,19 @@
     }
 
     const stateBadge = { open:{c:'open', t:'募集中'}, applied:{c:'applied', t:'エントリー中'}, closed:{c:'closed', t:'締切・満員'} };
+
+    /**
+     * 案件のバッジに出す状態を決める（2026-09-07 baba指示）。
+     * ⚠ **「締切・満員」が最優先。**エントリー済みでも、埋まったら「締切・満員」と出す。
+     *   （前は「エントリー中」が最優先で、満員になっても募集中の一覧に残っていた）
+     * ⚠ ただし「自分が応募したかどうか」は state で判断しないこと。必ず **j.applied** を見る。
+     *   満員でも取り消せる必要があるし、稼働希望カレンダーの★も出し続ける必要がある。
+     */
+    function calcState(j) {
+      if (j.full) return 'closed';
+      if (j.applied || j.adj) return 'applied';
+      return 'open';
+    }
     // 実施形態のバッジ。⚠ ここに実施形態の一覧を書かない。
     //   前は { real:…, long:…, online:… } の対応表を引いていたため、
     //   ARENA場所貸し・体験会・未入力（＝表に無い値）で undefined になり、
@@ -1095,15 +1108,17 @@
         // エントリーボタン（状態で見た目が変わる）
         // ⚠ 押すのは armApply（2段階）。いきなり toggleApply を呼ばないこと
         //   ＝1回のタップで決まってしまい、誤タップでエントリーされる（2026-09-02 佐賀熙さん）。
+        // ⚠ 満員でも、自分が応募していれば「取り消す」を出す（押せないと取り消せなくなる）。
+        //   出せないのは「満員で、まだ応募していない」ときだけ。
         let btn;
-        if (j.state === 'closed') {
+        if (j.state === 'closed' && !j.applied) {
           btn = `<button class="apply-btn-sm disabled" disabled>締切・満員</button>`;
         } else if (applyArmed === j.id) {
           // 1回目を押したあと（5秒だけこの状態）。もう一度押すと本当に保存する。
-          btn = j.state === 'applied'
+          btn = j.applied
             ? `<button class="apply-btn-sm confirm" onclick="armApply(${j._i})">⚠ もう一度押すと取り消し</button>`
             : `<button class="apply-btn-sm confirm" onclick="armApply(${j._i})">⚠ もう一度押すとエントリー</button>`;
-        } else if (j.state === 'applied') {
+        } else if (j.applied) {
           btn = `<button class="apply-btn-sm cancel" onclick="armApply(${j._i})">エントリーを取り消す</button>`;
         } else if (window.ECS_MOCK_ONLY) {
           // ⚠ 体験用（見本）アカウントはエントリーが保存されない。押したあとに注意を出すだけだと
@@ -1119,11 +1134,12 @@
         // ⚠ 同じ案件を2か所に出さない決まりなので id が重ならない
         //   （カレンダー表示のときはリストを作らない）。
         row.id = 'job-' + j.id;
-        row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.state === 'applied' ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '');
+        // ⚠ 緑の印は「自分が応募したか」なので j.applied で付ける（満員でも付く）。
+        row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.applied ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '');
         row.innerHTML = `
           <div class="jr-head">
             <span class="jr-date">${dateStr}</span>
-            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.state === 'applied' ? '<span class="applied-mark">✅ エントリー済み</span>' : ''}</span>
+            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.applied ? '<span class="applied-mark">✅ エントリー済み</span>' : ''}</span>
             <span class="j-badge ${sb.c}">${sb.t}</span>
           </div>
           <div class="jr-tags">${tags}</div>
@@ -1169,16 +1185,22 @@
       const list = jobs
         .filter(j => !kw    || (j.content + j.client + j.place).includes(kw))
         .filter(j => !area  || j.area === area)
-        // ⚠⚠ 「📋 募集中のみ」は【エントリー済みも残す】（2026-09-07 baba指示）。
-        //   エントリーすると状態が「エントリー中」に変わるので、素直に絞ると
-        //   **押した案件が一覧から消えて**しまい、応募できたのか分からない。
-        //   どれに応募したか見返しながら次を選びたいので、消さずに残す
-        //   （残った案件には緑の「✅ エントリー済み」が付くので見分けられる）。
-        //   ⚠ 「押した直後だけ残す」やり方（keepVisible）では画面を開き直すと消えるので、
-        //     絞り込みの意味そのものを「募集中＋自分がエントリー済み」に変えている。
-        //   ※ 締切・満員はこれまでどおり出さない。「★ エントリー中のみ」も今までどおり。
-        .filter(j => !state || j.state === state || keepVisible.has(j.id)
-                  || (state === 'open' && j.state === 'applied'))
+        // ⚠⚠ 絞り込みの決まり（2026-09-07 baba指示）。ここを変えるときは3つとも見ること。
+        //   「📋 募集中のみ」＝まだ入れる案件 ＋ 自分がエントリー済みの案件。
+        //     エントリーすると状態が「エントリー中」に変わるので、素直に絞ると押した案件が
+        //     一覧から消えてしまい、応募できたのか分からない。どれに応募したか見返しながら
+        //     選びたいので残す（緑の「✅ エントリー済み」が付くので見分けられる）。
+        //     ⚠ ただし**満員になったら外す**＝「締切・満員」が最優先（もう入れないため）。
+        //   「★ エントリー中のみ」＝自分がエントリーした案件**すべて**。
+        //     ⚠ 満員のものも必ず出す。ここから外すと、満員になった案件を取り消せなくなる。
+        //   ⚠ 状態（state）ではなく **j.applied** で判断する。満員だと state は 'closed' になる。
+        .filter(j => {
+          if (!state) return true;                       // すべて
+          if (keepVisible.has(j.id)) return true;        // いま押した案件は残す
+          if (state === 'applied') return j.applied || j.state === 'applied';
+          // state === 'open'
+          return j.state === 'open' || (j.applied && j.state !== 'closed');
+        })
         .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
         // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
         .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
@@ -1336,11 +1358,13 @@
           // ⚠ 集合時間はスタッフ向けの時間を使う（担当が公開ボードで別に入れていればそちら）。
           //   リストのカードと同じ関数（staffMeetOf）を通す＝2つの時間を持たない。
           const jcTime = staffMeetOf(j.id, j.meet) + '〜' + (j.leave || '—');
-          b.innerHTML = '<span class="jc-nm">' + escAttr(j.content) + '</span>'
+          // ⚠ 満員になると色は「締切・満員」になるので、自分が応募済みかどうかが色では分からない。
+          //   応募済みには ✅ を付けて見分けられるようにする（2026-09-07）。
+          b.innerHTML = '<span class="jc-nm">' + (j.applied ? '✅ ' : '') + escAttr(j.content) + '</span>'
             + '<span class="jc-sub">🕘 ' + escAttr(jcTime) + '</span>'
             + (j.place ? '<span class="jc-sub">📍 ' + escAttr(j.place) + '</span>' : '');
           b.title = j.content + '／' + j.client + '／' + jcTime + '／' + (j.place || '場所未定')
-            + '（' + (stateBadge[j.state] || stateBadge.open).t + '）';
+            + '（' + (stateBadge[j.state] || stateBadge.open).t + (j.applied ? '・エントリー済み' : '') + '）';
           b.onclick = function (ev) { ev.stopPropagation(); openJobDetail(j.id); };
           cell.appendChild(b);
         });
@@ -1492,7 +1516,8 @@
     function sendComment(id) {
       const j = jobs.find(x => x.id === id);
       if (!j) return;
-      if (j.state !== 'applied') {
+      // ⚠ state ではなく applied を見る（満員でも、応募していればコメントは残せる）。
+      if (!j.applied) {
         alert('先に「エントリーする」を押してください。エントリーした案件にだけコメントを残せます。');
         return;
       }
@@ -1537,8 +1562,10 @@
     // 画面は先に切り替えて体感を軽くし、保存に失敗したら元に戻して知らせる。
     function toggleApply(i) {
       const j = jobs[i];
-      const willApply = (j.state !== 'applied');
-      const before = j.state;
+      // ⚠ 応募したかどうかは applied で判断する。満員だと state は 'closed' になるので、
+      //   state を見ると「満員の案件を取り消したいのに、もう一度応募してしまう」ことになる。
+      const willApply = ! j.applied;
+      const before = j.applied;          // 失敗したときに戻す値（状態ではなく応募の有無）
       const note = (commentState[j.id] && commentState[j.id].text) || '';
 
       const body = new URLSearchParams();
@@ -1549,7 +1576,8 @@
       // ⚠ 絞り込み中でも、押した案件は一覧に残す（消えると押せたのか分からない・2026-09-01 baba指摘）。
       keepVisible.add(j.id);
       // 先に画面を反映。エントリーした瞬間にメモ（コメント）欄を開いて、その場で一言添えられるようにする。
-      j.state = willApply ? 'applied' : 'open';
+      j.applied = willApply;
+      j.state = calcState(j);
       if (willApply) {
         commentState[j.id] = commentState[j.id] || { text: '', open: false };
         commentState[j.id].open = true;
@@ -1573,7 +1601,8 @@
         //   変わってしまい、担当の画面には出ないので「エントリーしたのに出ない」と見えた
         //   （2026-08-21 baba指摘）。保存されていないことをはっきり知らせて元に戻す。
         if (res.saved === false) {
-          j.state = before;
+          j.applied = before;
+          j.state = calcState(j);
           renderJobs();
           if (typeof refreshEntryDay === 'function') refreshEntryDay(j, false);
           alert(res.message || 'このアカウントは体験用のため、エントリーは保存されません（見本）。実際に試すときは、発行されたスタッフのアカウントでログインしてください。');
@@ -1615,7 +1644,8 @@
     //   「エントリーできたつもり」になっていた（2026-08-28 baba報告）。
     //   案件のカードに赤い文字で残して、押し直すまで消えないようにする。
     function entryFailed(j, before, message) {
-      j.state = before;
+      j.applied = before;          // before は「押す前に応募していたか」（true/false）
+      j.state = calcState(j);
       j.saveError = message;
       renderJobs();
       alert(message);
@@ -1784,7 +1814,8 @@
       const d = addDays(today, j.off);
       if (inPrefMonth(d)) eventDays[d.getDate()] = j.content + ' ' + j.client;
     });
-    jobs.filter(j => j.state === 'applied').forEach(j => {
+    // ⚠ ★は「自分が応募した日」なので applied で拾う（満員になっても★は消さない）。
+    jobs.filter(j => j.applied).forEach(j => {
       const d = ECS_caseDate(j.offset);
       if (inPrefMonth(d) && !eventDays[d.getDate()]) entryDays[d.getDate()] = j.content + ' ' + j.client;
     });
@@ -1865,7 +1896,7 @@
         paintEntry(cell, d, entryDays[d]);
       } else {
         // 同じ日にまだ別のエントリーが残っていれば★は消さない
-        const other = jobs.find(x => x !== j && x.state === 'applied'
+        const other = jobs.find(x => x !== j && x.applied
           && (() => { const od = ECS_caseDate(x.offset); return inPrefMonth(od) && od.getDate() === d; })());
         if (other) { entryDays[d] = other.content + ' ' + other.client; paintEntry(cell, d, entryDays[d]); }
         else { delete entryDays[d]; paintEditable(cell, d); }

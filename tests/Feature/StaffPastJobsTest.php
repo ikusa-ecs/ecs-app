@@ -133,18 +133,45 @@ class StaffPastJobsTest extends TestCase
     }
 
     /**
-     * ⚠「📋 募集中のみ」でしぼっているときに、エントリーした案件が一覧から消えないこと
-     * （2026-09-07 baba指示）。エントリーすると状態が open → applied に変わるので、
-     * 素直にしぼると押した瞬間に消える。どれに応募したか見返しながら選びたいので残す。
+     * ⚠ 絞り込みの決まり（2026-09-07 baba指示）を守る。
+     *  ・「📋 募集中のみ」＝まだ入れる案件＋自分がエントリー済み。**ただし満員は外す**
+     *    （「締切・満員」が最優先）。
+     *  ・「★ エントリー中のみ」＝自分がエントリーした案件**すべて**（満員も出す）。
+     *    ここから外すと、満員になった案件を取り消せなくなる。
+     *  ⚠ 満員だと state は 'closed' になるので、応募したかどうかは **j.applied** で見る。
      */
-    public function test_open_filter_keeps_applied_jobs(): void
+    public function test_job_filters_follow_the_rules(): void
     {
         $blade = file_get_contents(resource_path('views/staff_portal.blade.php'));
 
         $this->assertStringContainsString(
-            "(state === 'open' && j.state === 'applied')",
+            "if (state === 'applied') return j.applied || j.state === 'applied';",
             $blade,
-            '「募集中のみ」にエントリー済みを残す条件が消えていないこと'
+            '「エントリー中のみ」は満員のものも出すこと'
+        );
+        $this->assertStringContainsString(
+            "return j.state === 'open' || (j.applied && j.state !== 'closed');",
+            $blade,
+            '「募集中のみ」はエントリー済みを残しつつ、満員は外すこと'
+        );
+    }
+
+    /**
+     * ⚠「締切・満員」が最優先であること（2026-09-07 baba指示）。
+     * 前は「エントリー中」が最優先で、満員になっても募集中の一覧に残っていた。
+     */
+    public function test_full_beats_applied_in_state(): void
+    {
+        $blade = file_get_contents(resource_path('views/staff_portal.blade.php'));
+
+        $this->assertStringContainsString('function calcState(j) {', $blade, '状態の決め方が1か所にあること');
+        // full を先に見ていること＝満員が最優先。
+        $pos = strpos($blade, 'function calcState(j) {');
+        $body = substr($blade, $pos, 300);
+        $this->assertLessThan(
+            strpos($body, 'j.applied'),
+            strpos($body, 'j.full'),
+            '満員（full）をエントリー済み（applied）より先に判定すること'
         );
     }
 
