@@ -76,6 +76,9 @@
     .day-head .day-bulk:hover { background: #f7f1e8; }
     .day-head .day-bulk.pub { background: #16a34a; border-color: #15803d; color: #fff; }
     .day-head .day-bulk.pub:hover { background: #15803d; }
+    /* まとめて自動アサイン（2026-09-07）。確定・公開と取り違えないよう別の色にする。 */
+    .day-head .day-bulk.auto { background: #fff7e6; border-color: #d8b070; color: #92400e; }
+    .day-head .day-bulk.auto:hover { background: #fdeccd; }
 
     /* 実施形態のバッジ（2026-09-01 baba要望）。
        ⚠ 色は案件一覧・スタッフ画面と同じにそろえる（画面ごとに色が違うと見間違える）。
@@ -742,10 +745,17 @@
   // 自動アサイン＝希望者から、同じ日にかぶらない人を必要数ぶん埋める。
   // DBボード（ECS_BOARD）＝この案件の実際の希望者（id付き）から選び、1人ずつ本物のアサインとして保存する
   //   ＝追加後すぐ担当/巡回/備考を編集できる。見本フォールバックのときだけ従来の合成プールを使う。
-  function autoAssign(id){
+  // silent＝true のときは、お知らせ（alert）を出さずに結果だけ返す。
+  // 「この日をまとめて自動アサイン」（bulkAutoDay）が案件ごとに呼ぶため
+  //   ＝1件ずつお知らせが出ると、案件の数だけ「OK」を押すことになる（2026-09-07 baba要望）。
+  // 返り値＝{ name, picked, need, total, skipped } ／ 見つからなければ null。
+  function autoAssign(id, silent){
     const c = cases.find(x => x.id === id);
-    if (!c) return;
-    if (filledOf(c) >= c.need) { alert('この案件はすでに必要人数を満たしています。'); return; }
+    if (!c) return null;
+    if (filledOf(c) >= c.need) {
+      if (silent) return { name: c.name, picked: 0, need: c.need, total: filledOf(c), skipped: true };
+      alert('この案件はすでに必要人数を満たしています。'); return null;
+    }
     const taken  = takenSameDay(c);
     const amap   = assignmentMap();
     const already = new Set(c.assigned.map(m => m.name));
@@ -778,8 +788,10 @@
           body: JSON.stringify({ project_id: c.id, staff_id: p.id, action: 'assign', role: rc, status: '仮' })
         }).then(r => r.json()).then(res => { if (!(res && res.ok)) render(); }).catch(() => render());
       });
-      render();
       const total = filledOf(c);
+      // まとめて実行のときは、ここで描き直さない・お知らせも出さない（呼び出し元が最後に1回やる）。
+      if (silent) return { name: c.name, picked: picked.length, need: c.need, total: total, skipped: false };
+      render();
       if (picked.length === 0) {
         alert('⚡ 自動で足せる希望者がいませんでした。\n（この案件の希望者が、すでにメンバー／同日かぶり／今月上限のいずれかです）\n→「手動編集」で名簿・社員・派遣から足してください。');
       } else if (total < c.need) {
@@ -787,7 +799,7 @@
       } else {
         alert('⚡ 自動アサインしました（希望者から ' + picked.length + '名）。\n「' + c.name + '」の必要人数を満たしました。担当や備考はこのあと手動編集で入れられます。');
       }
-      return;
+      return null;
     }
 
     // 見本フォールバック（DBでない）＝従来の合成プールから（保存はしない飾り）。
@@ -797,6 +809,7 @@
     c.assigned = picked.map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:'staff' }));
     if (c.state === 'todo') c.state = 'adj';
     if ((c.stat || c.state) === 'todo') c.stat = 'adj';
+    if (silent) return { name: c.name, picked: picked.length, need: c.need, total: picked.length, skipped: false };
     render();
     if (picked.length < c.need) {
       alert('⚡ 自動アサインしました（モック）。\n「' + c.name + '」に ' + picked.length + '名を割り当てました（必要 ' + c.need + '名に ' + (c.need - picked.length) + '名 不足）。');
@@ -1651,7 +1664,12 @@
   function dayBulkHtml(off, dayCases){
     const toFix = dayCases.filter(c => (c.stat || c.state) !== 'fix');
     const toPub = dayCases.filter(c => (c.stat || c.state) === 'fix' && !bPubOn(c));
+    // まだ人数が足りていない案件（確定・公開ずみで締めたものは除く）＝まとめて自動アサインの対象。
+    const toAuto = dayCases.filter(c => !bSettled(c) && filledOf(c) < c.need);
     let html = '';
+    if (toAuto.length) {
+      html += `<button class="day-bulk auto" onclick="bulkAutoDay(${off})" title="この日の「まだ人数が足りない」案件に、まとめて自動アサインします（希望を出している人から、同じ日にかぶらないように「仮」で入れます）">⚡ この日の${toAuto.length}件を自動アサイン</button>`;
+    }
     if (toFix.length) {
       html += `<button class="day-bulk" onclick="bulkFixDay(${off})" title="この日の「未着手・調整中」の案件を、まとめて確定にします（メンバーも全員「確定」になります）">✓ この日の${toFix.length}件を確定にする</button>`;
     }
@@ -1680,6 +1698,10 @@
 
   // 募集を続けているか（古いデータには recruit が無いので、無ければ「募集中」とみなす）。
   function bRecruit(c){ return (c.recruit !== undefined) ? !!c.recruit : true; }
+  // 「🔒 この人数で足りている」で募集を締めた案件（＝公開ずみ・募集オフ）。
+  // ⚠ カードの充足バーと同じ判定。まとめて自動アサインのときも、ここは触らない
+  //   （足りていると決めた案件に、あとから勝手に人を足さないため）。
+  function bSettled(c){ return bPubOn(c) && !bRecruit(c); }
 
   // カードに出す「いまスタッフからどう見えているか」の印。公開していない案件には出さない。
   // ⚠ 募集を締めた案件には何も出さない（2026-09-01 スタッフからのご意見）。
@@ -1713,6 +1735,38 @@
       + '\n\nメンバーの「仮」も全員「確定」になります（確定にしないと本人の画面に出ません）。'
       + shortMsg + '\n\nよろしいですか？')) return;
     bulkRun(list, c => oneFix(c), '確定にしました');
+  }
+
+  // その日の案件をまとめて自動アサインする（2026-09-07 baba要望
+  // 「日毎の自動アサインのボタンで一気にできたら理想」）。
+  //
+  // ⚠ 1件ずつ順に流す。autoAssign は「同じ日の他の案件にもう入っている人」を除くので、
+  //   順に流せば**同じ人が同じ日に2つの案件へ入ることはない**（並行に流すと重複する）。
+  // ⚠ 確定・公開ずみの案件には触らない（決まったものを後から動かさない）。
+  // ⚠ お知らせは最後に1回だけ。案件ごとに出すと、件数ぶん「OK」を押すことになる。
+  function bulkAutoDay(off){
+    const list = cases.filter(c => c.off === off && !bSettled(c) && filledOf(c) < c.need);
+    if (!list.length) { alert('この日に自動アサインできる案件はありません（すでに必要人数を満たしているか、確定・公開ずみです）。'); return; }
+    if (!confirm('この日の ' + list.length + '件に、まとめて自動アサインします。\n' + bulkNames(list)
+      + '\n\n希望を出している人の中から、同じ日にかぶらないように「仮」で入れます。'
+      + '\n（確定・公開ずみの案件には触りません。あとから手動で直せます）\n\nよろしいですか？')) return;
+
+    const results = [];
+    list.forEach(c => { const r = autoAssign(c.id, true); if (r) results.push(r); });
+    render();
+
+    const added = results.reduce((n, r) => n + r.picked, 0);
+    const short = results.filter(r => r.total < r.need);
+    let msg = '⚡ この日の ' + list.length + '件に、あわせて ' + added + '名を入れました（「仮」）。';
+    if (added === 0) {
+      msg += '\n\n入れられる希望者がいませんでした。\n（希望者がすでにメンバー／同じ日に別の案件へ入っている／今月の上限に達している、のいずれかです）';
+    }
+    if (short.length) {
+      msg += '\n\n⚠ まだ人数が足りない案件が ' + short.length + '件あります：\n'
+           + short.map(r => '・' + r.name + '（あと' + (r.need - r.total) + '名）').join('\n')
+           + '\n→「手動編集」で名簿・社員・派遣から足してください。';
+    }
+    alert(msg);
   }
 
   function bulkPubDay(off){
@@ -1863,7 +1917,7 @@
     //   バーを満たして緑にする（2026-09-01 baba指摘）。
     //   締めたのにバーが「足りていない」ままだと、まだ人を足すのかどうかが分からない。
     //   運営人数（セールスが書いた予定）は消さず、数字の横に「予定◯名」として残す。
-    const settled = bPubOn(c) && !bRecruit(c);
+    const settled = bSettled(c);
     const ratio = settled ? 1 : (c.need ? Math.min(1, filled / c.need) : 0);
     const barCls = (settled || filled >= c.need) ? 'full' : (ratio >= 0.7 ? 'mid' : 'low');
 
