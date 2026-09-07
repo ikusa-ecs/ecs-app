@@ -232,4 +232,68 @@ class MonthAutoAssignTest extends TestCase
             ->assertOk()
             ->assertSee('この画面を開いただけでは、何も保存されていません', false);
     }
+
+    /**
+     * ⚠「この日はアサインしない」で外した日は、計画に**出さない**（2026-09-07 baba要望）。
+     * 下見に出ると「入るもの」と勘違いする。実行のときも同じ日を外す。
+     */
+    public function test_skipped_day_is_excluded(): void
+    {
+        $month = Carbon::today()->startOfMonth();
+        $day1 = $month->copy()->addDays(10);
+        $day2 = $month->copy()->addDays(11);
+        ProjectFactory::new()->create([
+            'start_date' => $day1->format('Y-m-d'), 'required_count' => 1,
+            'project_name' => '外す日の案件', 'office' => '東京',
+        ]);
+        ProjectFactory::new()->create([
+            'start_date' => $day2->format('Y-m-d'), 'required_count' => 1,
+            'project_name' => '残す日の案件', 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->count(2)->create(['office' => '東京']);
+        foreach ($s as $one) {
+            $this->wish($one, $day1);
+            $this->wish($one, $day2);
+        }
+
+        $plan = (new MonthAutoAssign($month->format('Y-m'), null, [$day1->format('Y-m-d')]))->plan();
+
+        $names = collect($plan['projects'])->pluck('name')->all();
+        $this->assertNotContains('外す日の案件', $names);
+        $this->assertContains('残す日の案件', $names);
+    }
+
+    /** ⚠ 外した日も含めて日の一覧を返す（外さないと、チェックを戻せなくなる）。 */
+    public function test_candidate_days_include_skipped_ones(): void
+    {
+        $month = Carbon::today()->startOfMonth();
+        $day = $month->copy()->addDays(10);
+        ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+        ]);
+
+        $engine = new MonthAutoAssign($month->format('Y-m'), null, [$day->format('Y-m-d')]);
+
+        $this->assertArrayHasKey($day->format('Y-m-d'), $engine->candidateDays());
+        $this->assertSame(0, $engine->plan()['totals']['projects']);
+    }
+
+    /** ⚠ 実行のときも外した日は入れない（プレビューで外したのに入る、では意味がない）。 */
+    public function test_run_respects_skipped_days(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['office' => '東京']);
+        $this->wish($s, $day);
+
+        $this->actingAsPerson($me)->post('/auto-assign-month/run', [
+            'period' => $day->format('Y-m'),
+            'skip' => [$day->format('Y-m-d')],
+        ])->assertRedirect();
+
+        $this->assertSame(0, Assignment::count());
+    }
 }

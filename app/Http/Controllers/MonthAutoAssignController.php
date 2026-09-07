@@ -38,9 +38,15 @@ class MonthAutoAssignController extends Controller
         $office = OfficeScope::filter($request);
         $period = $this->targetPeriod($request);
 
-        $plan = (new MonthAutoAssign($period, $office))->plan();
+        $skipDays = $this->skipDays($request);
+
+        $engine = new MonthAutoAssign($period, $office, $skipDays);
+        $plan = $engine->plan();
 
         return view('auto_assign_month', [
+            // 「この日はアサインしない」のチェックを並べるための日の一覧（外した日も含む）。
+            'candidateDays' => $engine->candidateDays(),
+            'skipDays' => $skipDays,
             'period' => $period,
             'periodLabel' => Carbon::createFromFormat('Y-m-d', $period.'-01')->format('Y年n月'),
             'prevPeriod' => Carbon::createFromFormat('Y-m-d', $period.'-01')->subMonth()->format('Y-m'),
@@ -64,7 +70,7 @@ class MonthAutoAssignController extends Controller
 
         // ⚠ プレビューのあとに誰かが手で入れているかもしれないので、**作り直してから**保存する
         //   （画面が持っている古い計画をそのまま保存すると、二重に入る）。
-        $plan = (new MonthAutoAssign($period, $office))->plan();
+        $plan = (new MonthAutoAssign($period, $office, $this->skipDays($request)))->plan();
 
         $projects = Project::whereIn('id', collect($plan['projects'])->pluck('id'))
             ->get(['id', 'start_date'])->keyBy('id');
@@ -137,6 +143,27 @@ class MonthAutoAssignController extends Controller
         return redirect('/auto-assign-month?'.http_build_query(array_filter([
             'period' => $run->period, 'office' => $run->office,
         ])))->with('status', $msg);
+    }
+
+    /**
+     * 「この日はアサインしない」で外した日（2026-09-07 baba要望）。
+     *
+     * ⚠ 形が正しい日付だけを通す（URLを手で書き換えられても壊れないように）。
+     * ⚠ 実行のときも同じものを受け取る。プレビューで外したのに実行では入る、では意味がない。
+     *
+     * @return array<int, string>
+     */
+    private function skipDays(Request $request): array
+    {
+        $raw = $request->input('skip', []);
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(fn ($d) => (string) $d, $raw),
+            fn ($d) => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)
+        ));
     }
 
     /**

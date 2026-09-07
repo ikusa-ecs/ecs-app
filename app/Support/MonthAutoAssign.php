@@ -49,9 +49,15 @@ class MonthAutoAssign
 
     private Carbon $monthEnd;
 
+    /**
+     * @param  array<int, string>  $skipDays  自動アサインしない日（'Y-m-d' の並び・2026-09-07 baba要望）
+     *   ⚠ 「この日は自分で決めたい」「大事な案件だから機械に任せない」ときのため。
+     *     除いた日の案件は**計画にも出さない**（下見に出ると、入るものだと勘違いする）。
+     */
     public function __construct(
         private string $period,          // 'YYYY-MM'
         private ?string $office = null,  // null＝全拠点
+        private array $skipDays = [],
     ) {
         [$y, $m] = array_map('intval', explode('-', $period));
         $this->monthStart = Carbon::create($y, $m, 1)->startOfDay();
@@ -194,8 +200,28 @@ class MonthAutoAssign
         ];
     }
 
-    /** その月の「まだ足りない案件」。 */
-    private function targetProjects(): Collection
+    /**
+     * その月の「自動アサインの対象になりうる日」。**除外した日も含めて**返す。
+     * 画面のチェックボックス（この日はアサインしない）を並べるために使う。
+     *
+     * ⚠ 除外した日も出さないと、チェックを外して戻すことができなくなる。
+     *
+     * @return array<string, int> 'Y-m-d' => その日の対象案件数
+     */
+    public function candidateDays(): array
+    {
+        $out = [];
+        foreach ($this->targetProjects(false) as $p) {
+            $d = $p->start_date->format('Y-m-d');
+            $out[$d] = ($out[$d] ?? 0) + 1;
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /** その月の「まだ足りない案件」。$applySkip=false なら「この日はアサインしない」を無視する。 */
+    private function targetProjects(bool $applySkip = true): Collection
     {
         return OfficeScope::applyToProjects(Project::query(), $this->office)
             ->notCancelled()
@@ -206,7 +232,11 @@ class MonthAutoAssign
             ])
             ->orderBy('start_date')
             ->get()
-            ->filter(function (Project $p) {
+            ->filter(function (Project $p) use ($applySkip) {
+                // ⚠ 「この日はアサインしない」で外した日（2026-09-07 baba要望）。
+                if ($applySkip && in_array($p->start_date->format('Y-m-d'), $this->skipDays, true)) {
+                    return false;
+                }
                 if (in_array($p->status, ['下書き', '完了'], true) || $p->is_archived === true) {
                     return false;
                 }

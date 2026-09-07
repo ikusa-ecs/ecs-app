@@ -41,6 +41,20 @@
   .am-btn.undo { background:#fff; color:#b91c1c; border:1px solid #f0b9b9; }
   .am-btn.undo:hover { background:#fdecec; }
 
+  .am-skip { background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:10px 14px; margin:0 0 14px; }
+  .am-skip .s-label { font-size:12.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:7px; }
+  .am-skip .s-days { display:flex; flex-wrap:wrap; gap:6px; }
+  .am-skip .s-day { display:inline-flex; align-items:center; gap:4px; cursor:pointer;
+    border:1px solid var(--line-strong,#d8c4ae); border-radius:8px; padding:4px 9px; font-size:12.5px; background:#fff; }
+  .am-skip .s-day:hover { background:#f7f1e8; }
+  /* 外した日は「使わない」と一目で分かるように、灰色＋取り消し線にする。 */
+  .am-skip .s-day.off { background:#f2efea; color:#9b8e80; border-color:#ded4c6; text-decoration:line-through; }
+  .am-skip .s-day input { width:15px; height:15px; accent-color:var(--brand); cursor:pointer; }
+  .am-skip .s-day .dw { font-size:10.5px; opacity:.8; }
+  .am-skip .s-day .cn { font-size:10.5px; font-weight:700; background:#f0e6d8; color:#6e5b49; border-radius:999px; padding:0 5px; }
+  .am-skip .s-clear { display:inline-block; margin-top:8px; font-size:12px; color:var(--brand-dark); }
+
   .am-sec { font-size:15px; font-weight:700; margin:18px 0 8px; }
   .am-note { font-size:12px; color:var(--muted); line-height:1.7; margin:6px 0 0; }
 
@@ -85,8 +99,35 @@
   ・入るのはすべて<b>「仮」</b>です。そのあと手で直せます。<br>
   ・⚠ <b>確定・公開ずみの案件、「🔒 この人数で足りている」で締めた案件には触りません。</b><br>
   ・⚠ <b>その日がNGの人・同じ日に別案件へ入っている人・今月{{ $monthCap }}件に達している人は入れません。</b><br>
-  ・⚠ <b>運営人数が未入力（0）の案件は対象外</b>です（何人必要か決まっていないため）。
+  ・⚠ <b>運営人数が未入力（0）の案件は対象外</b>です（何人必要か決まっていないため）。<br>
+  ・<b>「この日はアサインしない」</b>にチェックを入れた日は、自動では入れません（自分で決めたい日に使ってください）。
 </div>
+
+{{-- 「この日はアサインしない」（2026-09-07 baba要望）。
+     ⚠ 外した日の案件は、下の下見にも出さない（出ると「入るもの」と勘違いするため）。
+     ⚠ チェックを変えたらその場で下見を作り直す（GETで開き直す）＝
+        「チェックしたのに件数が変わらない」を防ぐ。 --}}
+@if (count($candidateDays) > 0)
+<form method="GET" action="/auto-assign-month" class="am-skip" id="skipForm">
+  <input type="hidden" name="period" value="{{ $period }}">
+  @if ($officeScope)<input type="hidden" name="office" value="{{ $officeScope }}">@endif
+  <span class="s-label">この日はアサインしない（チェックした日は自動で入れません）：</span>
+  <div class="s-days">
+    @foreach ($candidateDays as $day => $cnt)
+      @php($d = \Illuminate\Support\Carbon::parse($day))
+      @php($off = in_array($day, $skipDays, true))
+      <label class="s-day {{ $off ? 'off' : '' }}">
+        <input type="checkbox" name="skip[]" value="{{ $day }}" {{ $off ? 'checked' : '' }}
+               onchange="document.getElementById('skipForm').submit();">
+        {{ $d->format('n/j') }}<span class="dw">{{ ['日','月','火','水','木','金','土'][$d->dayOfWeek] }}</span><span class="cn">{{ $cnt }}</span>
+      </label>
+    @endforeach
+  </div>
+  @if (count($skipDays) > 0)
+    <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => $officeScope])) }}">チェックを全部外す（{{ count($skipDays) }}日 除外中）</a>
+  @endif
+</form>
+@endif
 
 <div class="am-kpis">
   <div class="am-kpi">
@@ -109,6 +150,11 @@
     @csrf
     <input type="hidden" name="period" value="{{ $period }}">
     <input type="hidden" name="office" value="{{ $officeScope }}">
+    {{-- ⚠ 除外した日は実行にも必ず持っていく。ここを忘れると
+         「チェックしたのに入ってしまった」になる。 --}}
+    @foreach ($skipDays as $d)
+      <input type="hidden" name="skip[]" value="{{ $d }}">
+    @endforeach
     <button type="submit" class="am-btn go" {{ $plan['totals']['added'] === 0 ? 'disabled' : '' }}>
       ⚡ この計画で {{ $plan['totals']['added'] }}名を入れる（すべて「仮」）
     </button>
