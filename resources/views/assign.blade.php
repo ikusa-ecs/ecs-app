@@ -520,10 +520,13 @@
       // お客様（参加者）の人数・チーム数（2026-09-07 baba要望）。
       // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
       guest:c.guest, guestType:c.guestType, teams:c.teams, teamsTbd:c.teamsTbd,
+      // 必要ポジション（コンテンツ×規模）。⚠ 自動アサインがこれを見て枠を作る。
+      //   詰め替えを忘れると、また「MCが2人」「謎解きなのに軍師」に戻る。
+      template:(c.template || {}),
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
       // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
       //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
-      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, note:a.note })),
+      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), note:a.note })),
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。
@@ -645,18 +648,20 @@
     if (ECS_BOARD) {
       const byName = {};
       dayCases.forEach(c => (c.applicants || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, emp:!!a.emp, applied:[], cal:false, notes:{} });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), emp:!!a.emp, applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;                 // id を取りこぼさない（DB保存に必要）
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
+        if (a.roles && a.roles.length && !(e.roles||[]).length) e.roles = a.roles;
         if (a.emp) e.emp = true;                        // 社員の印（希望者カラムでたたむのに使う）
         if (!e.applied.includes(c.id)) e.applied.push(c.id);
         if (!e.notes) e.notes = {};
         if (a.note) e.notes[c.id] = a.note;             // 本人が応募時に書いた一言（案件ごと）
       }));
       ((window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[off]) || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, emp:!!a.emp, applied:[], cal:false, notes:{} });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), emp:!!a.emp, applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
+        if (a.roles && a.roles.length && !(e.roles||[]).length) e.roles = a.roles;
         if (a.emp) e.emp = true;
         e.cal = true;
       });
@@ -742,6 +747,35 @@
     return name + ' さんは、この日すでに「' + where.join('」「') + '」に入っています。';
   }
 
+  // ===== 必要ポジションの枠（2026-09-07 baba指摘で追加）=====
+  // ⚠ 必要ポジションに無い役割の枠は作らない。作ると「謎解きなのに軍師」が起きる。
+  // ⚠ すでに入っている人の役割は差し引く。引かないと「MCがもう1人いるのに、また入れる」になる。
+  // ⚠ 必要ポジションの合計より運営人数のほうが多いときは、余りを空（''）の枠にする。
+  //    空＝担当はあとで人が決める。ここで勝手に役割を付けない。
+  // ⚠ コンテンツ・規模が未入力で必要ポジションが分からない案件は、全部 空の枠にする。
+  const SLOT_ORDER = ['D','SD','MC','OP','SP','FC','RP','CK'];
+  function openSlotsOf(c, room){
+    const tpl = c.template || {};
+    const filled = {};
+    c.assigned.forEach(m => { const k = m.roleCode || ''; filled[k] = (filled[k] || 0) + 1; });
+    const slots = [];
+    SLOT_ORDER.forEach(role => {
+      const rest = (tpl[role] || 0) - (filled[role] || 0);
+      for (let i = 0; i < rest; i++) slots.push(role);
+    });
+    // 運営人数より多いぶんは切る。足りないぶんは役割の決まっていない枠。
+    const out = slots.slice(0, room);
+    while (out.length < room) out.push('');
+    return out;
+  }
+  // その人がその役割をできるか（名簿の「できるポジション」）。空の枠は誰でも入れる。
+  // ⚠ できる役割の一覧が届いていない古いデータのときは、主ポジションで見る（何も入らないより良い）。
+  function canDoRole(cand, role){
+    if (role === '') return true;
+    const list = (cand.roles && cand.roles.length) ? cand.roles : (cand.roleCode ? [cand.roleCode] : []);
+    return list.indexOf(role) >= 0;
+  }
+
   // 自動アサイン＝希望者から、同じ日にかぶらない人を必要数ぶん埋める。
   // DBボード（ECS_BOARD）＝この案件の実際の希望者（id付き）から選び、1人ずつ本物のアサインとして保存する
   //   ＝追加後すぐ担当/巡回/備考を編集できる。見本フォールバックのときだけ従来の合成プールを使う。
@@ -772,15 +806,32 @@
         .filter(p => p.id && !assignedIds.has(p.id) && !already.has(p.name) && !taken.has(p.name)
                      && monthCountOf(p.name, amap) < MONTH_CAP)
         .filter(p => { if (seenPick.has(p.id)) return false; seenPick.add(p.id); return true; });
-      const picked = pool.slice(0, room);
+      // ⚠⚠ ここが「必要ポジションを見て入れる」ところ（2026-09-07 baba指摘で作り直し）。
+      //   前は**その人の主ポジションをそのまま付けていた**ので、
+      //   「MCが2人いる」「謎解きなのに軍師がいる」が起きていた。
+      //   これからは**案件が必要としている枠**（コンテンツ×規模）を作って、そこへ入れる。
+      const slots = openSlotsOf(c, room);
+      const picked = [];
+      const usedIds = {};
+      slots.forEach(role => {
+        for (let i = 0; i < pool.length; i++) {
+          const cand = pool[i];
+          if (usedIds[cand.id]) continue;
+          // ⚠ 役割の決まった枠には「その役割ができる人」だけ。
+          if (role !== '' && !canDoRole(cand, role)) continue;
+          usedIds[cand.id] = true;
+          picked.push({ p: cand, role: role });
+          break;
+        }
+      });
       if (c.state === 'todo') c.state = 'adj';
       if ((c.stat || c.state) === 'todo') c.stat = 'adj';
-      // 基本1案件につきDは1名。すでにDがいる／2人目以降のDは役割を付けずに追加（あとで手動指定）。
-      let dCount = c.assigned.filter(m => m.roleCode === 'D').length;
-      picked.forEach(p => {
-        let rc = p.roleCode || '';
-        if (rc === 'D') { if (dCount >= 1) rc = ''; else dCount++; }
-        const posLabel = (window.ECS_ROLE_OPTIONS || {})[rc] || p.pos || rc;
+      picked.forEach(sel => {
+        const p = sel.p;
+        // ⚠ 入れる役割は**枠の役割**。その人の主ポジションではない。
+        //   空（''）＝必要ポジションの外の枠＝担当はあとで人が決める。
+        const rc = sel.role;
+        const posLabel = (window.ECS_ROLE_OPTIONS || {})[rc] || (rc === '' ? '未定' : rc);
         c.assigned.push({ id: p.id, name: p.name, lv: (p.lv || '-'), pos: posLabel, roleCode: rc, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: 'staff' });
         fetch(window.ECS_QUICK_URL, {
           method: 'POST',

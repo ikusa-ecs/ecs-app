@@ -37,6 +37,13 @@ class MonthAutoAssign
     public const MONTH_CAP = 20;
 
     /**
+     * 枠を埋める順（＝できる人が少ない役割から）。
+     * ⚠ D・SD・MC のような限られた役割を後回しにすると、できる人が別の枠に取られて埋まらない。
+     *   日別ボードの POS_PRIORITY と同じ並びにそろえている。
+     */
+    private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'SP', 'FC', 'RP', 'CK'];
+
+    /**
      * 「希望充足率が低い人ほど加点」の最大点。
      *
      * ⚠ AssignmentScorer の「本人が希望＝35点」より少し弱く置く。
@@ -91,7 +98,7 @@ class MonthAutoAssign
         $existing = Assignment::whereBetween('date', [
             $this->monthStart->format('Y-m-d').' 00:00:00',
             $this->monthEnd->format('Y-m-d').' 23:59:59',
-        ])->where('status', '!=', 'キャンセル')->get(['project_id', 'staff_id', 'date']);
+        ])->where('status', '!=', 'キャンセル')->get(['project_id', 'staff_id', 'date', 'role']);
 
         $projectNames = Project::whereIn('id', $existing->pluck('project_id')->unique())
             ->pluck('project_name', 'id');
@@ -99,10 +106,15 @@ class MonthAutoAssign
         $monthCount = [];        // staff_id => その月の件数（案件×日で数える）
         $busyByDay = [];         // 'Y-m-d' => [staff_id => 入っている案件名]
         $memberOf = [];          // project_id => [staff_id => true]
+        // ⚠ すでに入っている人の役割も数える。数えないと「MCがもう1人いるのに、また入れる」になる。
+        $roleFilled = [];        // project_id => [役割コード => 人数]
         foreach ($existing as $a) {
             $day = Carbon::parse($a->date)->format('Y-m-d');
             $monthCount[$a->staff_id] = ($monthCount[$a->staff_id] ?? 0) + 1;
             $busyByDay[$day][$a->staff_id] = $projectNames[$a->project_id] ?? $a->project_id;
+            if (! isset($memberOf[$a->project_id][$a->staff_id])) {
+                $roleFilled[$a->project_id][(string) $a->role] = ($roleFilled[$a->project_id][(string) $a->role] ?? 0) + 1;
+            }
             $memberOf[$a->project_id][$a->staff_id] = true;
         }
 
@@ -159,22 +171,44 @@ class MonthAutoAssign
             }
             usort($scored, fn ($a, $b) => $b['ev']['score'] <=> $a['ev']['score']);
 
+            // ── ⚠ ここからが「ポジションを見て埋める」ところ（2026-09-07 baba指摘で作り直し）──
+            //   前は**その人の主ポジションをそのまま付けていた**ので、
+            //   「MCが2人いる」「謎解きなのに軍師がいる」が起きていた。
+            //   これからは**案件が必要としている枠**（コンテンツ×規模）を作って、そこへ入れる。
+            $slots = $this->openSlots($p, $r['short'], $roleFilled[$p->id] ?? []);
+
             $picks = [];
-            foreach (array_slice($scored, 0, $r['short']) as $s) {
-                $sid = $s['id'];
-                $picks[] = [
-                    'id' => $sid,
-                    'name' => $s['person']->name,
-                    'role' => $this->roleOf($s['person']),
-                    'score' => $s['ev']['score'],
-                    'reasons' => $s['ev']['reasons'],
-                    'warnings' => $s['ev']['warnings'],
-                ];
-                // その場で状態を更新＝次の案件では「もう入っている人」になる。
-                $monthCount[$sid] = ($monthCount[$sid] ?? 0) + 1;
-                $addedByStaff[$sid] = ($addedByStaff[$sid] ?? 0) + 1;
-                $busyByDay[$day][$sid] = $p->project_name;
-                $memberOf[$p->id][$sid] = true;
+            $used = [];   // この案件で入れた人（同じ人を2つの枠に入れない）
+            foreach ($slots as $role) {
+                foreach ($scored as $s) {
+                    $sid = $s['id'];
+                    if (isset($used[$sid])) {
+                        continue;
+                    }
+                    // ⚠ 役割の決まった枠には「その役割ができる人」だけ。
+                    //   できない人を入れると、当日その役割が回らない。
+                    if ($role !== '' && ! $this->canDo($s['person'], $role)) {
+                        continue;
+                    }
+                    $used[$sid] = true;
+                    $picks[] = [
+                        'id' => $sid,
+                        'name' => $s['person']->name,
+                        // ⚠ 入れる役割は**枠の役割**。その人の主ポジションではない。
+                        //   空（''）＝必要ポジションの外の枠＝担当はあとで人が決める。
+                        'role' => $role,
+                        'score' => $s['ev']['score'],
+                        'reasons' => $s['ev']['reasons'],
+                        'warnings' => $s['ev']['warnings'],
+                    ];
+                    // その場で状態を更新＝次の案件では「もう入っている人」になる。
+                    $monthCount[$sid] = ($monthCount[$sid] ?? 0) + 1;
+                    $addedByStaff[$sid] = ($addedByStaff[$sid] ?? 0) + 1;
+                    $busyByDay[$day][$sid] = $p->project_name;
+                    $memberOf[$p->id][$sid] = true;
+                    $roleFilled[$p->id][$role] = ($roleFilled[$p->id][$role] ?? 0) + 1;
+                    break;
+                }
             }
 
             $out[] = [
@@ -190,6 +224,9 @@ class MonthAutoAssign
                 'short' => $r['short'],
                 'candCount' => $r['candCount'],
                 'picks' => $picks,
+                // 必要ポジション（コンテンツ×規模）と、今回つくった枠。画面に出す。
+                'template' => PositionTemplate::of($p),
+                'openSlots' => $slots,
                 // 埋めきれない案件は理由を出す（黙って足りないままにしない）。
                 'stillShort' => $r['short'] - count($picks),
             ];
@@ -401,19 +438,58 @@ class MonthAutoAssign
         return round((1 - $rate) * self::FAIRNESS_MAX, 2);
     }
 
-    /** 主ポジション（保存する役割コード）。決められなければ空（あとで人が入れる）。 */
-    private function roleOf(Person $p): string
+    /**
+     * この案件で「まだ空いている枠」を、埋める順に並べて返す（2026-09-07）。
+     *
+     * 例）必要＝D1・MC1・OP2、すでにDが1人 → ['MC','OP','OP']
+     *
+     * ⚠ 必要ポジションに無い役割は**枠を作らない**。作ると「謎解きなのに軍師」が起きる。
+     * ⚠ 必要ポジションの合計より運営人数（need）のほうが多いときは、余りを **空（''）** の枠にする。
+     *   空＝担当はあとで人が決める。ここで勝手に役割を付けない。
+     * ⚠ コンテンツ・規模が未入力で必要ポジションが分からない案件は、**全部 空の枠**にする
+     *   （分からないのに役割を決めない）。
+     * ⚠ 埋める順は「できる人が少ない役割から」。D・MC を後回しにすると埋まらない。
+     *
+     * @param  array<string, int>  $filledByRole すでに入っている人の役割ごとの人数
+     * @return array<int, string>  役割コードの並び（''＝役割の決まっていない枠）
+     */
+    private function openSlots(Project $p, int $short, array $filledByRole): array
     {
-        $can = $p->relationLoaded('roleEligibilities')
-            ? $p->roleEligibilities->pluck('position')->all()
-            : [];
-        foreach (['D', 'SD', 'MC', 'OP', 'SP', 'FC', 'RP', 'CK'] as $key) {
-            if (in_array($key, $can, true)) {
-                return $key;
+        $template = PositionTemplate::of($p);
+
+        $slots = [];
+        foreach ($template as $role => $count) {
+            $rest = $count - (int) ($filledByRole[$role] ?? 0);
+            for ($i = 0; $i < $rest; $i++) {
+                $slots[] = $role;
             }
         }
 
-        return '';
+        // ⚠ できる人が少ない役割から埋める（D・SD・MC など）。
+        //   あとに回すと、できる人が別の枠に取られて埋まらない。
+        $rank = array_flip(self::POS_PRIORITY);
+        usort($slots, fn ($a, $b) => ($rank[$a] ?? 99) <=> ($rank[$b] ?? 99));
+
+        // 運営人数より多いぶんは切る。足りないぶんは「役割の決まっていない枠」。
+        $slots = array_slice($slots, 0, $short);
+        while (count($slots) < $short) {
+            $slots[] = '';
+        }
+
+        return $slots;
+    }
+
+    /** その人がその役割をできるか（staff_role_eligibility）。空の枠は誰でも入れる。 */
+    private function canDo(Person $p, string $role): bool
+    {
+        if ($role === '') {
+            return true;
+        }
+        $can = $p->relationLoaded('roleEligibilities')
+            ? $p->roleEligibilities->pluck('position')->all()
+            : [];
+
+        return in_array($role, $can, true);
     }
 
     /**

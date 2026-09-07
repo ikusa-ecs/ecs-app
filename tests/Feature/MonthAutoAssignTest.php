@@ -430,4 +430,154 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame(3, $wlRow['wish']);
         $this->assertSame(1, $wlRow['entries']);
     }
+
+    /** 名簿に「できるポジション」を登録する。 */
+    private function canDo($staff, array $roles): void
+    {
+        foreach ($roles as $r) {
+            \App\Models\StaffRoleEligibility::create(['staff_id' => $staff->id, 'position' => $r]);
+        }
+    }
+
+    /** コンテンツの必要ポジションを登録する。 */
+    private function requireRoles(string $contentId, string $scale, array $roles): void
+    {
+        foreach ($roles as $pos => $n) {
+            \App\Models\ContentRoleRequirement::create([
+                'content_id' => $contentId, 'scale' => $scale, 'position' => $pos, 'count' => $n,
+            ]);
+        }
+    }
+
+    /**
+     * ⚠ 必要ポジションのとおりに入れること（2026-09-07 baba指摘）。
+     *
+     * 前は**その人の主ポジションをそのまま付けていた**ので、
+     * 「MCが2人いる」「謎解きなのに軍師がいる」が起きていた。
+     */
+    public function test_picks_follow_the_position_template(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-TEST', '中型', ['D' => 1, 'MC' => 1]);
+        $p = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 2,
+            'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
+        ]);
+
+        $d = PersonFactory::new()->staff()->create(['name' => 'Dできる', 'office' => '東京']);
+        $mc = PersonFactory::new()->staff()->create(['name' => 'MCできる', 'office' => '東京']);
+        $sp = PersonFactory::new()->staff()->create(['name' => '軍師だけ', 'office' => '東京']);
+        $this->canDo($d, ['D']);
+        $this->canDo($mc, ['MC']);
+        $this->canDo($sp, ['SP']);
+        foreach ([$d, $mc, $sp] as $one) {
+            $this->wish($one, $day);
+        }
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $picks = collect($plan['projects'])->firstWhere('id', $p->id)['picks'];
+
+        $byRole = collect($picks)->pluck('name', 'role')->all();
+        $this->assertSame('Dできる', $byRole['D'] ?? null);
+        $this->assertSame('MCできる', $byRole['MC'] ?? null);
+        // ⚠ 必要ポジションに無い「軍師」は入れない。
+        $this->assertNotContains('軍師だけ', collect($picks)->pluck('name')->all());
+    }
+
+    /** ⚠ 同じ役割を必要数より多く入れない（MCが2人になる、を防ぐ）。 */
+    public function test_does_not_exceed_a_role_count(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-TEST', '中型', ['MC' => 1]);
+        $p = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
+        ]);
+
+        foreach (['MC1', 'MC2'] as $n) {
+            $s = PersonFactory::new()->staff()->create(['name' => $n, 'office' => '東京']);
+            $this->canDo($s, ['MC']);
+            $this->wish($s, $day);
+        }
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $picks = collect($plan['projects'])->firstWhere('id', $p->id)['picks'];
+
+        $this->assertCount(1, $picks);
+        $this->assertSame('MC', $picks[0]['role']);
+    }
+
+    /** ⚠ すでに入っている人の役割も数える（MCがもう1人いるのに、また入れない）。 */
+    public function test_counts_roles_already_filled(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-TEST', '中型', ['MC' => 1, 'OP' => 1]);
+        $p = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 2,
+            'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
+        ]);
+
+        // すでにMCが1人入っている。
+        $already = PersonFactory::new()->staff()->create(['name' => 'もういるMC', 'office' => '東京']);
+        Assignment::create([
+            'project_id' => $p->id, 'staff_id' => $already->id,
+            'date' => $day->format('Y-m-d'), 'role' => 'MC', 'status' => '仮',
+        ]);
+
+        $mc = PersonFactory::new()->staff()->create(['name' => 'もう一人のMC', 'office' => '東京']);
+        $op = PersonFactory::new()->staff()->create(['name' => 'OPできる', 'office' => '東京']);
+        $this->canDo($mc, ['MC']);
+        $this->canDo($op, ['OP']);
+        $this->wish($mc, $day);
+        $this->wish($op, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $picks = collect($plan['projects'])->firstWhere('id', $p->id)['picks'];
+
+        $this->assertCount(1, $picks, 'あと1人だけ');
+        $this->assertSame('OP', $picks[0]['role'], '空いているのはOPの枠');
+        $this->assertSame('OPできる', $picks[0]['name']);
+    }
+
+    /**
+     * ⚠ 必要ポジションが分からない案件（コンテンツ・規模が未入力）は、
+     * 役割を決めずに人数だけ入れる。分からないのに勝手に役割を付けない。
+     */
+    public function test_without_a_template_the_role_is_left_blank(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $p = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'content_ids' => [], 'scale' => null, 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['name' => '誰か', 'office' => '東京']);
+        $this->canDo($s, ['SP']);
+        $this->wish($s, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $picks = collect($plan['projects'])->firstWhere('id', $p->id)['picks'];
+
+        $this->assertCount(1, $picks);
+        $this->assertSame('', $picks[0]['role'], '役割は空（あとで人が決める）');
+    }
+
+    /** ⚠ 役割ができる人がいなければ、その枠は空いたまま（できない人を入れない）。 */
+    public function test_leaves_the_slot_empty_when_nobody_can_do_it(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-TEST', '中型', ['MC' => 1]);
+        $p = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['name' => 'MCできない', 'office' => '東京']);
+        $this->canDo($s, ['FC']);
+        $this->wish($s, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $row = collect($plan['projects'])->firstWhere('id', $p->id);
+
+        $this->assertCount(0, $row['picks']);
+        $this->assertSame(1, $row['stillShort']);
+    }
 }

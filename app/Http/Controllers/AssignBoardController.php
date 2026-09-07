@@ -13,6 +13,7 @@ use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\OfficeScope;
+use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
 use App\Support\ShiftWish;
 use App\Support\RecruitStatus;
@@ -482,6 +483,7 @@ class AssignBoardController extends Controller
                         'lv' => $this->lvCode(optional($person)->skill_level),
                         'pos' => $this->primaryPos($person),
                         'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
+                        'roles' => $this->posCodes($person),            // できる役割ぜんぶ（自動アサインが使う）
                         // 社員かどうか（2026-09-03 baba要望）。
                         // ⚠ 社員は「基本イベントには出ない」ので、希望者カラムでは**たたんで**出す。
                         //   スタッフと混ざって並ぶと、声を掛ける相手を探すのに邪魔になる。
@@ -565,6 +567,10 @@ class AssignBoardController extends Controller
                 'meetPlace' => $p->assembly_type ?? '',
                 'tags' => $tags,
                 'pos' => [],   // ポジション充足ランプは次段（まずメンバー実データを優先）。
+                // 必要ポジション（コンテンツ×規模）。⚠ 自動アサインがこれを見て枠を作る。
+                //   正本＝App\Support\PositionTemplate（アサイン画面・月まとめと同じもの）。
+                //   ⚠ ここを渡し忘れると、また「MCが2人」「謎解きなのに軍師」が起きる。
+                'template' => PositionTemplate::of($p),
                 'archived' => false,
                 'draft' => false,
                 'assigned' => $assigned,
@@ -665,7 +671,8 @@ class AssignBoardController extends Controller
                 'name' => $person->name ?? $pref->staff_id,
                 'lv' => $this->lvCode(optional($person)->skill_level),
                 'pos' => $this->primaryPos($person),
-                'roleCode' => $this->primaryPosCode($person),   // 担当役割の初期値
+                'roleCode' => $this->primaryPosCode($person),
+                'roles' => $this->posCodes($person),   // できる役割ぜんぶ（自動アサインが使う）
                 // 社員かどうか（2026-09-03 baba要望）。⚠ 社員の出勤可能日もこの同じ表
                 //   （shift_preferences）に入るので、印を付けないとスタッフと見分けられない。
                 'emp' => (optional($person)->role === 'employee'),
@@ -826,6 +833,7 @@ class AssignBoardController extends Controller
                         'lv' => $this->lvCode($person?->skill_level),
                         'pos' => $this->primaryPos($person),       // 表示用ラベル
                         'roleCode' => $this->primaryPosCode($person), // 保存用の役割コード（D/OP/…）
+                        'roles' => $this->posCodes($person),           // できる役割ぜんぶ（自動アサインが使う）
                         'assigned' => in_array($sid, $assignedIds, true),
                         'status' => $assignedStatus[$sid] ?? null,   // '確定'/'仮'/null（未アサイン）
                         'entryNote' => $entryNotes[$sid] ?? '',      // 本人が応募時に書いた一言（読むだけ）
@@ -1149,6 +1157,23 @@ class AssignBoardController extends Controller
      * assignments.role にそのまま入れられるコードが欲しい場面（エントリー一覧からのアサイン保存）で使う。
      * できる役割が無ければ 'FC'。
      */
+    /**
+     * その人が「できる役割」の一覧（役割コード）。自動アサインでポジション枠に入れるときに使う。
+     *
+     * ⚠ 主ポジション（primaryPosCode）は1つだけだが、実際は複数できる人がいる。
+     *   1つしか渡さないと「MCもできるのに、MCの枠に入れられない」が起きる（2026-09-07）。
+     *
+     * @return array<int, string>
+     */
+    private function posCodes(?Person $person): array
+    {
+        if (! $person || ! $person->relationLoaded('roleEligibilities')) {
+            return [];
+        }
+
+        return $person->roleEligibilities->pluck('position')->unique()->values()->all();
+    }
+
     private function primaryPosCode(?Person $person): string
     {
         if (! $person) {

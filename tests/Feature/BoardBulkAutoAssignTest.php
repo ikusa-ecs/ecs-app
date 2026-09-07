@@ -76,4 +76,71 @@ class BoardBulkAutoAssignTest extends TestCase
             ->assertOk()
             ->assertSee('bulkAutoDay', false);
     }
+
+    /**
+     * ⚠ 日別ボードの自動アサインも「必要ポジション」を見ること（2026-09-07 baba指摘）。
+     *
+     * 前は**その人の主ポジションをそのまま付けていた**ので、
+     * 「MCが2人いる」「謎解きなのに軍師がいる」が起きていた。
+     * 中身は画面のJavaScriptなので、ここで確かめられるのは
+     * 「必要ポジションのデータが画面に届いているか」と「仕掛けが消えていないか」。
+     */
+    public function test_the_board_gets_the_position_template(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $day = \Illuminate\Support\Carbon::today()->addDays(3);
+        \App\Models\ContentRoleRequirement::create([
+            'content_id' => 'CT-TEST', 'scale' => '中型', 'position' => 'MC', 'count' => 1,
+        ]);
+        $p = \Database\Factories\ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 2,
+            'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
+        ]);
+
+        $card = collect(
+            $this->actingAsPerson($me)->get('/assign')->assertOk()->original->getData()['boardCases']
+        )->firstWhere('id', $p->id);
+
+        $this->assertSame(['MC' => 1], $card['template'], '必要ポジションが画面に届くこと');
+    }
+
+    /** ⚠ 画面での詰め替え・枠づくりの仕掛けが消えていないこと。 */
+    public function test_the_view_fills_by_slots(): void
+    {
+        $blade = $this->boardBlade();
+
+        // 詰め替え（忘れるとカードに届かない＝この画面でよくある事故）
+        $this->assertStringContainsString('template:(c.template || {})', $blade);
+        // 枠づくりと「その役割ができるか」
+        $this->assertStringContainsString('function openSlotsOf(c, room){', $blade);
+        $this->assertStringContainsString('function canDoRole(cand, role){', $blade);
+        // ⚠ 主ポジションをそのまま役割にしていないこと（ここに戻ると不具合が再発する）
+        $this->assertStringNotContainsString('let rc = p.roleCode || ', $blade,
+            '主ポジションをそのまま役割にしています。必要ポジションの枠から入れてください。');
+    }
+
+    /** ⚠ 「できる役割ぜんぶ」が届いていること（1つしか渡さないと枠に入れられない）。 */
+    public function test_candidates_carry_all_their_roles(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $day = \Illuminate\Support\Carbon::today()->addDays(3);
+        $p = \Database\Factories\ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['office' => '東京']);
+        foreach (['MC', 'FC'] as $r) {
+            \App\Models\StaffRoleEligibility::create(['staff_id' => $s->id, 'position' => $r]);
+        }
+        \App\Models\Application::create([
+            'project_id' => $p->id, 'staff_id' => $s->id, 'intent' => '希望',
+        ]);
+
+        $card = collect(
+            $this->actingAsPerson($me)->get('/assign')->assertOk()->original->getData()['boardCases']
+        )->firstWhere('id', $p->id);
+
+        $roles = $card['entrants'][0]['roles'] ?? ($card['applicants'][0]['roles'] ?? []);
+        sort($roles);
+        $this->assertSame(['FC', 'MC'], $roles);
+    }
 }

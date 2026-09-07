@@ -83,6 +83,12 @@
   .am-pick { display:inline-block; background:var(--brand-soft); color:var(--brand-dark);
     border-radius:999px; padding:1px 9px; margin:1px 3px 1px 0; font-size:11.5px; font-weight:700; }
   .am-pick .sc { font-weight:400; opacity:.75; margin-left:3px; }
+  /* 入る役割。⚠ その人の主ポジションではなく「枠の役割」。 */
+  .am-pick .rl { display:inline-block; background:#fff; color:var(--brand-dark);
+    border-radius:5px; padding:0 5px; margin-right:4px; font-size:10.5px; }
+  .am-tpl { font-size:11px; color:var(--muted); margin-top:3px; line-height:1.6; }
+  .am-slot { display:inline-block; background:#eef2ff; color:#4338ca; border-radius:5px;
+    padding:0 6px; margin:0 3px 2px 0; font-size:10.5px; font-weight:700; }
   .am-none { color:var(--muted); }
   .am-rate { font-variant-numeric:tabular-nums; }
   .am-up { color:#15803d; font-weight:700; }
@@ -242,6 +248,15 @@
             <td>
               <b>{{ $row['name'] }}</b><span class="am-ord" title="この計画で{{ $row['order'] }}番目に埋めました">{{ $row['order'] }}</span><br>
               <span class="am-none">{{ $row['client'] }}</span>
+              {{-- 必要ポジション（コンテンツ×規模）。⚠ 空のときは理由を出す。
+                   出さないと「なぜ役割が付かないのか」が分からない。 --}}
+              <div class="am-tpl">
+                @if (count($row['template']) > 0)
+                  必要：@foreach ($row['template'] as $rc => $n)<span class="am-slot">{{ \App\Support\AssignmentRole::label($rc) }}{{ $n }}</span>@endforeach
+                @else
+                  <span class="am-warn">必要ポジション未設定</span>（コンテンツか規模が入っていません。役割なしで人数だけ入れます）
+                @endif
+              </div>
             </td>
             <td class="num">{{ $row['need'] }}</td>
             <td class="num">{{ $row['filled'] }}</td>
@@ -249,7 +264,7 @@
             <td>
               @forelse ($row['picks'] as $pick)
                 <span class="am-pick" title="{{ implode('／', $pick['reasons']) }}{{ $pick['warnings'] ? '　⚠ '.implode('／', $pick['warnings']) : '' }}">
-                  {{ $pick['name'] }}<span class="sc">{{ $pick['score'] }}</span>
+                  <span class="rl">{{ $pick['role'] !== '' ? \App\Support\AssignmentRole::label($pick['role']) : '未定' }}</span>{{ $pick['name'] }}<span class="sc">{{ $pick['score'] }}</span>
                 </span>
               @empty
                 <span class="am-none">入れられる人がいません</span>
@@ -265,7 +280,11 @@
 <p class="am-note">
   ※ 名前の右の小さい数字は「おすすめ度」です。マウスを乗せると理由が出ます（本人が希望／今月まだ0件／このコンテンツ経験あり など）。<br>
   ※ 「候補」＝その案件に入れられる人の数です。<b>候補が少ない案件から先に</b>埋めています。<br>
-  ※ ⚠ <b>「残り」に数字が出ている案件は、自動では埋まりません。</b>手で名簿・社員・派遣から足してください。
+  ※ ⚠ <b>「残り」に数字が出ている案件は、自動では埋まりません。</b>手で名簿・社員・派遣から足してください。<br>
+  ※ 名前の前は<b>入る役割</b>です。<b>案件が必要としている枠にだけ</b>入れます（必要ポジションに無い役割は付けません）。<br>
+  ※ <b>「未定」</b>＝必要ポジションの合計より運営人数のほうが多いときの余りの枠です。担当はあとで決めてください。<br>
+  ※ ⚠ <b>役割の決まった枠には「その役割ができる人」だけ</b>入れます（名簿の「できるポジション」を見ています）。
+  できる人がいないと、その枠は空いたままになります（「残り」に数えます）。
 </p>
 
 <div class="am-sec">人ごと（入れたあとどうなるか）</div>

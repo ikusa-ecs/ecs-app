@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
+use App\Support\PositionTemplate;
 use App\Support\AssignmentStamp;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
@@ -260,34 +261,9 @@ class AssignmentController extends Controller
      */
     private function positionTemplate(Project $project): array
     {
-        $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
-        $scale = $project->scale;
-        if (empty($contentIds) || ! $scale) {
-            return [];
-        }
-
-        $rows = ContentRoleRequirement::whereIn('content_id', $contentIds)
-            ->where('scale', $scale)
-            ->where('count', '>', 0)
-            ->get(['position', 'count']);
-
-        $sum = [];
-        foreach ($rows as $r) {
-            if (! AssignmentRole::isValid($r->position)) {
-                continue; // 表記ゆれ・未知コードは無視（正本 AssignmentRole に寄せる）
-            }
-            $sum[$r->position] = ($sum[$r->position] ?? 0) + (int) $r->count;
-        }
-
-        // 表示順は AssignmentRole の定義順（D→SD→OP→…）にそろえる。
-        $ordered = [];
-        foreach (array_keys(AssignmentRole::LABELS) as $code) {
-            if (! empty($sum[$code])) {
-                $ordered[$code] = $sum[$code];
-            }
-        }
-
-        return $ordered;
+        // ⚠ 中身は App\Support\PositionTemplate が正本（2026-09-07 に外へ出した）。
+        //   月まとめ自動アサインでも同じ計算を使うので、ここに書き戻さないこと。
+        return PositionTemplate::of($project);
     }
 
     /**
