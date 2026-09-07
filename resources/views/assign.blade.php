@@ -478,6 +478,10 @@
   window.ECS_QUICK_URL = '/entries/assign';
   // 今この画面が見ている拠点（管理者が全拠点で見ているときは空）。公開のときに「違う拠点は触らない」保険として送る。
   window.ECS_OFFICE_SCOPE = @json($officeScope ?? null);
+  {{-- ボードに並べる日数（今日から何日先まで）。正本＝AssignBoardController::BOARD_DAYS。
+       ⚠ ここに数字を書かないこと。サーバーが案件・希望を集める範囲と食い違うと、
+          「案件は出るのにその日の希望者が出ない」になる。 --}}
+  window.ECS_BOARD_DAYS = @json($boardDays ?? 42);
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -486,8 +490,12 @@
   // off    … 今日から何日後に開催か／cat … 現場種別／need … 必要人数／filled … 割当済み
   // state  … todo(未着手) / adj(調整中) / fix(確定) / pub(公開済)
   // pos    … 主要ポジションの充足ランプ ／ mine … 自分(baba)担当か
-  // ※ボードは「近い日（今日〜3週間先）の本番・予備日」を日ごとに並べる。過去・下書き・
+  // ※ボードは「近い日（今日〜6週間先）の本番・予備日」を日ごとに並べる。過去・下書き・
   //   遠い月の案件は出さない（それらは案件一覧／スタッフ画面で見る）。同じ1つのデータから作る。
+  // ⚠ 日数はサーバーから受け取る（正本＝AssignBoardController::BOARD_DAYS）。
+  //   ここに数字を書き直すと、サーバーが案件・希望を集める範囲と食い違って
+  //   「案件は出るのにその日の希望者が出ない」状態になる（2026-09-07に21→42へ変更）。
+  const BOARD_DAYS = (typeof window.ECS_BOARD_DAYS === 'number') ? window.ECS_BOARD_DAYS : 42;
   // DBのボードデータ（割当メンバー込み）があればそれを使う。空なら見本cases.jsで動かす（フォールバック）。
   // ※ 旗（ECS_USINGDB）が立っていれば、DBの結果が0件でも見本には戻さない（拠点で絞った結果を正しく「0件」と見せる）。
   const USING_DB = (window.ECS_USINGDB !== undefined && window.ECS_USINGDB !== null)
@@ -495,7 +503,7 @@
     : !!(window.ECS_BOARD_CASES && window.ECS_BOARD_CASES.length);
   const ECS_BOARD = USING_DB ? (window.ECS_BOARD_CASES || []) : null;
   const cases = (ECS_BOARD || ECS_CASES)
-    .filter(c => !c.archived && !c.draft && c.off >= 0 && c.off <= 21)
+    .filter(c => !c.archived && !c.draft && c.off >= 0 && c.off <= BOARD_DAYS)
     .map(c => ({
       id:c.id, off:c.off, name:c.name, contentMissing:c.contentMissing, client:c.client, cat:c.cat,
       need:c.need, filled:c.filled, state:c.state, mine:c.mine,

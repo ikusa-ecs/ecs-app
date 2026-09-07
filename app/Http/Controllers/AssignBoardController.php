@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\DB;
  * スタッフ名の一覧（NAME_POOL の単一ソース）を DB（people のスタッフ）から渡す。
  *
  * さらに /assign（日別ボード）は、案件リストと「割当メンバー」を本物のデータにする：
- *   - 案件＝projects（今日〜21日先の本番・予備日）
+ *   - 案件＝projects（今日〜BOARD_DAYS日先の本番・予備日）
  *   - 割当メンバー＝assignments（/project-assign・/assign-director で保存した実データ）
  * Blade は window.ECS_BOARD_CASES があればそれを使い、空なら従来の見本(cases.js)合成にフォールバックする。
  *
@@ -36,6 +36,21 @@ use Illuminate\Support\Facades\DB;
  */
 class AssignBoardController extends Controller
 {
+    /**
+     * 日別ボードに並べる日数（今日から何日先まで）＝**6週間**（2026-09-07 baba指示）。
+     *
+     * ⚠ この数字の正本はここ1か所だけ。以前は4か所（案件を集める所・希望を読む所・
+     *   件数を数える所・画面の絞り込み）にバラバラに「21」と書いてあり、
+     *   1つ直し忘れると「案件は出るのに希望者が出ない日がある」といった食い違いになる。
+     *   画面（Blade）へも下の 'boardDays' で渡している＝画面にも数字を書かないこと。
+     *
+     * もともと21日（3週間）だったのは、この画面を「もうすぐ本番の日を詰める場所」と決めて
+     * 遠い先は案件一覧で見る、という役割分担にしていたため。業務上の根拠ではなかったので、
+     * 「もっと先まで見たい」という baba の指示で 42日 に広げた。
+     * ⚠ 増やすほど重くなる（1日ぶんの列に、その日の希望者・空き・割当が全部載るため）。
+     */
+    private const BOARD_DAYS = 42;
+
     /** カレンダー表示（📅 空いている人）で先まで見せる日数。3か月ぶん。 */
     private const WISH_CALENDAR_DAYS = 92;
 
@@ -49,7 +64,7 @@ class AssignBoardController extends Controller
     private const POS_PRIORITY = ['D', 'SD', 'MC', 'OP', 'SP', 'FC', 'RP', 'CK'];
 
     /** アサインボード（日別）/assign。案件＋割当メンバー＋希望者・稼働可・今月件数を DB から渡す。
-     *  ?from=YYYY-MM-DD が来たら、その日を基準（先頭）に 3週間分を表示する（既定＝今日）。 */
+     *  ?from=YYYY-MM-DD が来たら、その日を基準（先頭）に BOARD_DAYS 日分を表示する（既定＝今日）。 */
     /**
      * 稼働可/希望の一覧を作った結果の覚え書き（同じ問い合わせを2回しないため）。
      *
@@ -77,6 +92,9 @@ class AssignBoardController extends Controller
             'noteOptions' => $this->allNoteOptions(),          // 担当メモ入力の候補（軍師/サポ 等）
             'officeScope' => $office,                          // 今絞っている拠点（null＝全拠点）。注記に使う
             'usingDb' => Project::exists(),                    // DBに案件があるか（絞って0件でも見本に戻さない旗）
+            // ⚠ 画面の絞り込みにも同じ日数を使う。画面に数字を書くと、ここと食い違って
+            //   「案件は出るのに希望者が出ない」状態になる（2026-09-07）。
+            'boardDays' => self::BOARD_DAYS,
         ]);
     }
 
@@ -362,7 +380,7 @@ class AssignBoardController extends Controller
      */
     private function boardCases(Carbon $anchor, ?string $office = null): Collection
     {
-        // ボード対象＝完了/下書きでなく、開催日があり、基準日〜21日先の案件。
+        // ボード対象＝完了/下書きでなく、開催日があり、基準日〜BOARD_DAYS日先の案件。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」（案件一覧と同じ）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
             ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
@@ -370,7 +388,7 @@ class AssignBoardController extends Controller
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
             ->map(fn (Project $p) => [$p, $this->offDays($p->start_date, $anchor)])
-            ->filter(fn (array $pair) => $pair[1] >= 0 && $pair[1] <= 21)
+            ->filter(fn (array $pair) => $pair[1] >= 0 && $pair[1] <= self::BOARD_DAYS)
             ->values();
 
         if ($projects->isEmpty()) {
@@ -581,7 +599,7 @@ class AssignBoardController extends Controller
             return $this->availCache[$key];
         }
 
-        $end = $anchor->copy()->addDays(21);
+        $end = $anchor->copy()->addDays(self::BOARD_DAYS);
 
         $prefs = ShiftPreference::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
             ->whereIn('availability', ['稼働可', '希望'])
@@ -633,14 +651,14 @@ class AssignBoardController extends Controller
     }
 
     /**
-     * ボード期間（今日〜21日先）の「名前 → アサイン件数」を assignments から数える。
+     * ボード期間（今日〜BOARD_DAYS日先）の「名前 → アサイン件数」を assignments から数える。
      * 月20件上限バッジ（capBadge）の表示に使う。キャンセルは除く。
      *
      * @return array<string, int>
      */
     private function boardMonthCount(Carbon $anchor): array
     {
-        $end = $anchor->copy()->addDays(21);
+        $end = $anchor->copy()->addDays(self::BOARD_DAYS);
 
         $rows = Assignment::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
             ->where('status', '!=', 'キャンセル')
@@ -664,7 +682,7 @@ class AssignBoardController extends Controller
 
     /**
      * エントリー一覧用の案件データ（応募者込み）を DB から組み立てる。
-     * /assign（21日枠）と違い、募集対象を月ごとに広く出すため完了/下書きのみ除外する。
+     * /assign（日別ボードの期間）と違い、募集対象を月ごとに広く出すため完了/下書きのみ除外する。
      *
      * @return Collection<int, array<string, mixed>>
      */
