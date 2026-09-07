@@ -398,9 +398,11 @@ class AssignBoardController extends Controller
         $projectIds = $projects->map(fn (array $pair) => $pair[0]->id);
 
         // この案件群の割当（キャンセル以外）。
+        // ⚠ date も引く。アサインは「案件×人×日」で1行なので、2日以上の案件では
+        //   同じ人の行が日数ぶんある。下で人ごとに1行へまとめるのに使う（2026-09-07）。
         $assignments = Assignment::whereIn('project_id', $projectIds)
             ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'role', 'role2', 'status', 'note', 'patrol', 'remark']);
+            ->get(['project_id', 'staff_id', 'date', 'role', 'role2', 'status', 'note', 'patrol', 'remark']);
 
         // この案件群への応募（applications）＝希望者カラムの元。note＝本人が応募時に書いた一言。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id', 'note']);
@@ -431,7 +433,22 @@ class AssignBoardController extends Controller
             $contentMissing = empty($cids) || empty(array_intersect($cids, $validContentIds));
 
             // 割当メンバー（assignments → 表示用 {name, lv, pos, type}）。
+            //
+            // ⚠⚠ 人ごとに1行にまとめる（2026-09-07 baba報告「自動アサインを押すと重複する」）。
+            //   アサインは「案件×人×日」で1行なので、**2日以上の案件では同じ人の行が日数ぶん**ある。
+            //   まとめずに並べていたため、カードのメンバー欄に同じ人が2回・3回出て、
+            //   充足数（filled）も水増しされていた。
+            //   ⚠ 残す1行の決め方＝**その案件の開催日（カードの日）の行を優先**、次に「確定」を優先。
+            //     日によって役割が違うときは、開催日の役割が出る（カードはその日のものなので）。
+            //   ⚠ 希望者（applicants）側は前から unique('staff_id') 済み。ここだけ抜けていた。
+            $startDate = $p->start_date?->format('Y-m-d');
             $assigned = ($assignedByProject->get($p->id) ?? collect())
+                ->sortBy(fn ($a) => [
+                    (optional($a->date)->format('Y-m-d') === $startDate) ? 0 : 1,
+                    ($a->status === '確定') ? 0 : 1,
+                    optional($a->date)->format('Y-m-d') ?? '9999-12-31',
+                ])
+                ->unique('staff_id')
                 ->map(function ($a) use ($people) {
                     $person = $people->get($a->staff_id);
 
@@ -506,6 +523,14 @@ class AssignBoardController extends Controller
                 'cat' => $p->site_category ?: '通常',
                 'need' => $p->required_count ?? 0,
                 'filled' => count($assigned),
+                // お客様（参加者）の人数とチーム数（2026-09-07 baba要望）。
+                // ⚠ スタッフの運営人数（need）とは**別のもの**。取り違えると当日の規模を読み違える。
+                // ⚠ 「未定」は空欄で保存される（案件登録の「人数は未定」チェック）ので、
+                //    0 と 未入力 を区別して渡す（0名と未定は意味が違う）。
+                'guest' => $p->guest_count !== null ? (int) $p->guest_count : null,
+                'guestType' => (string) ($p->guest_count_type ?? ''),   // 確定／募集
+                'teams' => $p->team_count !== null ? (int) $p->team_count : null,
+                'teamsTbd' => (bool) $p->team_tentative,                 // チーム数は仮（未定）
                 'state' => $state,
                 // ⚠ ボタンの出し分けはこの2つで行う（state ではなく）。
                 //   stat＝案件の進み具合だけ／pubOn＝スタッフに公開して募集中かどうか。

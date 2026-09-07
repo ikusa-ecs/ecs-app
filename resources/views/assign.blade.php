@@ -514,6 +514,9 @@
       needStaff:c.needStaff,   // スタッフ画面で使っている必要人数（未入力なら既定）。締切の判定に使う。
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
+      // お客様（参加者）の人数・チーム数（2026-09-07 baba要望）。
+      // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
+      guest:c.guest, guestType:c.guestType, teams:c.teams, teamsTbd:c.teamsTbd,
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
       // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
       //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
@@ -1289,6 +1292,27 @@
   // ⚠ ここで実施形態を判定しない。色の振り分けはサーバーが済ませて fmtCls で渡している
   //   （正本＝App\Support\ProjectFormats::badgeCode）。画面ごとに書くと必ず食い違う。
   // ⚠ 未設定の案件には何も出さない（「リアル」と決めつけない）。
+  // お客様（参加者）の人数とチーム数（2026-09-07 baba要望）。
+  // ⚠ スタッフの運営人数（need）とは**別のもの**。取り違えないよう「お客様」と書く。
+  // ⚠ 空欄＝未定。0名と未定は意味が違うので、空欄のときは「未定」と出す
+  //   （何も出さないと「入れ忘れ」なのか「0名」なのか分からない）。
+  function guestTeamHtml(c){
+    const parts = [];
+    const guest = (c.guest === null || c.guest === undefined) ? null : c.guest;
+    const type  = (c.guestType || '').trim();
+    // 「募集」＝まだ集めている途中の見込み人数。確定と区別が付かないと当日の規模を読み違える。
+    parts.push('<span><span class="ic">👥</span> お客様 '
+      + (guest === null ? '未定' : (guest + '名'))
+      + (type === '募集' ? '<b style="color:#b45309;">（募集中）</b>' : '') + '</span>');
+    if (c.teams !== null && c.teams !== undefined) {
+      parts.push('<span><span class="ic">🚩</span> ' + c.teams + 'チーム'
+        + (c.teamsTbd ? '<b style="color:#b45309;">（仮）</b>' : '') + '</span>');
+    } else {
+      parts.push('<span><span class="ic">🚩</span> チーム数 未定</span>');
+    }
+    return parts.join('');
+  }
+
   function fmtBadgeHtml(c){
     const text = (c.format || '').trim();
     if (!text) return '';
@@ -2031,6 +2055,7 @@
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>
             <span><span class="ic">📍</span> <span class="venue" title="${c.place || ''}">${c.placeShort || c.place || '—'}</span></span>
             ${c.meetPlace ? `<span><span class="ic">🚩</span> 集合場所：${c.meetPlace}</span>` : ''}
+            ${guestTeamHtml(c)}
           </div>
         </div>
         <!-- ⚠ 案件の進み具合と「募集中（公開）」は別のことなので、印も分けて出す。

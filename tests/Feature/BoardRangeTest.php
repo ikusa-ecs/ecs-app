@@ -104,4 +104,47 @@ class BoardRangeTest extends TestCase
         $this->assertStringNotContainsString('c.off <= 21', $blade,
             '画面に日数が直書きされています。サーバー（BOARD_DAYS）から受け取ってください。');
     }
+
+    /**
+     * お客様（参加者）の人数とチーム数がカードに届くこと（2026-09-07 baba要望）。
+     *
+     * ⚠ スタッフの運営人数（need）とは**別のもの**。取り違えると当日の規模を読み違える。
+     * ⚠ 未入力は null で渡す。0名と未定は意味が違うので、0 に丸めないこと
+     *   （丸めると画面で「0名」と出て、入れ忘れに気づけなくなる）。
+     */
+    public function test_card_carries_guest_and_team_counts(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin']);
+        $day = Carbon::today()->addDays(10)->format('Y-m-d');
+
+        $filled = ProjectFactory::new()->create([
+            'start_date' => $day, 'guest_count' => 120, 'guest_count_type' => '募集',
+            'team_count' => 8, 'team_tentative' => true,
+        ]);
+        $empty = ProjectFactory::new()->create([
+            'start_date' => $day, 'guest_count' => null, 'team_count' => null,
+        ]);
+
+        $cards = collect(
+            $this->actingAsPerson($me)->get('/assign')->assertOk()->original->getData()['boardCases']
+        )->keyBy('id');
+
+        $this->assertSame(120, $cards[$filled->id]['guest']);
+        $this->assertSame('募集', $cards[$filled->id]['guestType']);
+        $this->assertSame(8, $cards[$filled->id]['teams']);
+        $this->assertTrue($cards[$filled->id]['teamsTbd']);
+
+        $this->assertNull($cards[$empty->id]['guest'], '未入力は0でなくnull');
+        $this->assertNull($cards[$empty->id]['teams'], '未入力は0でなくnull');
+    }
+
+    /** ⚠ 画面で詰め替えを忘れるとカードに出ない（この画面でよくある事故）。 */
+    public function test_the_view_passes_guest_and_team_through(): void
+    {
+        $blade = (string) file_get_contents(resource_path('views/assign.blade.php'));
+
+        $this->assertStringContainsString('guest:c.guest', $blade);
+        $this->assertStringContainsString('teams:c.teams', $blade);
+        $this->assertStringContainsString('guestTeamHtml(c)', $blade);
+    }
 }
