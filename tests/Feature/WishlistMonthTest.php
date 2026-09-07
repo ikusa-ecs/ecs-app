@@ -88,6 +88,6 @@ class WishlistMonthTest extends TestCase
 
         $this->actingAsPerson($me)->get('/assign-wishlist?period=2020-01')
             ->assertOk()
-            ->assertSee('まだ誰も稼働希望を出していません', false);
+            ->assertSee('まだ誰も稼働希望（〇）もエントリーも出していません', false);
     }
 }

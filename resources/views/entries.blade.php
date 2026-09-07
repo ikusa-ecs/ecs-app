@@ -51,6 +51,7 @@
     .day-chip.on.sun, .day-chip.on.sat { color:#fff; }
     .day-chip.nav { font-weight:700; padding:5px 9px; }
     .day-chip.clear { background:#f4ede3; color:#6e5b49; }
+    .day-chip.around { background:#eef2ff; border-color:#c7d2fe; color:#4338ca; font-weight:700; }
 
     /* サマリー（数値カード） */
     .ent-summary { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
@@ -234,7 +235,7 @@
 @verbatim
       <div class="mock-note">
         <b>どの案件に、誰がエントリー（希望）してくれているか</b>を確認する画面です（DBの本物データ）。<br>
-        上の「この日から」で表示開始日を、<b>「この日だけ」でその1日だけ</b>を見られます。<b>「案件ごと」</b>＝案件単位の候補者一覧／<b>「月ごと」</b>＝スタッフ（縦）×案件（横）の一覧表／<b>「空いている人」</b>＝カレンダーの日付に、その日<b>終日〇</b>を出しているスタッフの名前が並びます。<br>
+        上の「この日から」で表示開始日を選べます。<b>日付のボタンは、いくつでも選べます</b>（前後の日も一緒に見ながらアサインできます）。<b>「案件ごと」</b>＝案件単位の候補者一覧／<b>「月ごと」</b>＝スタッフ（縦）×案件（横）の一覧表／<b>「空いている人」</b>＝カレンダーの日付に、その日<b>終日〇</b>を出しているスタッフの名前が並びます。<br>
         ⚠ <b>「案件ごと」には2種類の人が並びます。</b><span class="e-src ent">🙋 エントリー</span>＝その案件に手を挙げてくれた人／<span class="e-src cal">📅 空いてる</span>＝その案件には応募していないが、<b>その日を「終日〇」にしている</b>人（声を掛ける候補）。
         <b>先に「エントリー」の人が並びます。</b>「出どころ」「スタッフ名」でも絞れます。
       </div>
@@ -254,8 +255,8 @@
         <!-- 日ごとに調べるための絞り込み（2026-09-07 baba要望）。
              「この日から」は開始日を決めるだけなので、1日だけを見たいときに使えなかった。 -->
         <span class="f-label" style="margin-left:6px;">この日だけ：</span>
-        <input type="date" id="fOnDate" onchange="render()">
-        <button type="button" class="f-today" onclick="clearOnDate()">解除</button>
+        <input type="date" id="fOnDate" onchange="onDateBoxChanged()">
+        <button type="button" class="f-today" onclick="pickDay('')">解除</button>
         <span class="f-label" style="margin-left:6px;">絞り込み：</span>
         <input type="text" id="fKeyword" placeholder="案件名・会社名で検索" oninput="render()">
         <input type="text" id="fStaff" placeholder="スタッフ名で検索" oninput="render()">
@@ -408,14 +409,14 @@
   // 絞り込みを通すか
   function passFilter(c){
     const from = document.getElementById('fFromDate').value;   // "YYYY-MM-DD"（空なら制限なし）
-    const on  = document.getElementById('fOnDate').value;      // "YYYY-MM-DD"（空なら制限なし）
+    const days = daysFilter();                                  // 見たい日（複数・空なら制限なし）
     const kw  = document.getElementById('fKeyword').value.trim();
     const rec = document.getElementById('fRecruit').value;
     const pos = document.getElementById('fPos').value;
     const iso = isoOf(caseDate(c.off));
-    // 「この日だけ」を選んでいるときは、そちらが優先（「この日から」は無視する）。
-    // ⚠ 2つとも効かせると「この日だけ」を選んでも何も出ない日が生まれて、壊れて見える。
-    if (on) { if (iso !== on) return false; }
+    // 日を選んでいるときは、そちらが優先（「この日から」は無視する）。
+    // ⚠ 2つとも効かせると、選んだ日なのに何も出ないことがあって壊れて見える。
+    if (days.size) { if (!days.has(iso)) return false; }
     else if (from && iso < from) return false;                  // 選んだ日より前は出さない
     if (kw && !((c.name || '').includes(kw) || (c.client || '').includes(kw))) return false;
     if (rec && recruitState(c) !== rec) return false;
@@ -427,18 +428,28 @@
   // 「今日から」ボタン：表示開始日を今日に戻す
   function resetFromToday(){
     document.getElementById('fFromDate').value = isoOf(caseDate(0));
-    document.getElementById('fOnDate').value = '';
-    render();
-  }
-  // 「この日だけ」を解除する
-  function clearOnDate(){
-    document.getElementById('fOnDate').value = '';
+    pickedDays.clear();
+    syncOnDateBox();
     render();
   }
 
   // ===== スタッフ名・出どころの絞り込み（2026-09-07 baba要望）=====
   // ⚠ 表に出す人だけを絞る。元のデータ（c.entrants）は減らさない
   //   （減らすと「エントリー◯名」の数まで変わって、実際の応募数が分からなくなる）。
+  // ===== 見たい日（複数）=====
+  // ⚠ 日付の絞り込みの**正本はこの1つ**。日付ボタンも「この日だけ」の欄も、ここに入れるだけにする。
+  //   2か所で別々に絞ると必ず食い違う。
+  // ⚠ 前後の日を見ながらアサインしたい（連勤・移動を見る）ので、**いくつでも選べる**
+  //   （2026-09-07 baba要望）。空＝すべての日。
+  const pickedDays = new Set();
+
+  function daysFilter(){ return pickedDays; }
+  // 「この日だけ」の欄には1日しか入らないので、1日だけ選んでいるときだけ表示をそろえる。
+  function syncOnDateBox(){
+    const el = document.getElementById('fOnDate');
+    el.value = (pickedDays.size === 1) ? Array.from(pickedDays)[0] : '';
+  }
+
   function staffFilter(){ return (document.getElementById('fStaff').value || '').trim(); }
   function srcFilter(){ return document.getElementById('fSrc').value || ''; }
   // 月ごとの表に出す人。⚠ エントリーした人だけでなく「その日 空いている人」も出す
@@ -498,39 +509,68 @@
     const box = document.getElementById('dayChips');
     if (!box) return;
     const list = dayChipsSource();
-    const now = document.getElementById('fOnDate').value;
     if (!list.length){ box.innerHTML = ''; return; }
-    box.innerHTML = '<span class="f-label">1日ずつ見る：</span>'
+    box.innerHTML = '<span class="f-label">見たい日（いくつでも選べます）：</span>'
       + '<button type="button" class="day-chip nav" onclick="stepDay(-1)" title="1つ前の（案件がある）日へ">◀</button>'
       + list.map(function (d) {
           const dt = new Date(d.iso.slice(0,4), Number(d.iso.slice(5,7)) - 1, Number(d.iso.slice(8,10)));
           const dow = DOW[dt.getDay()];
-          const cls = 'day-chip' + (d.iso === now ? ' on' : '')
+          const cls = 'day-chip' + (pickedDays.has(d.iso) ? ' on' : '')
             + (dt.getDay() === 0 ? ' sun' : (dt.getDay() === 6 ? ' sat' : ''));
           return '<button type="button" class="' + cls + '" onclick="pickDay(\'' + d.iso + '\')"'
-            + ' title="' + d.iso + ' の案件だけにします（もう一度押すと解除）">'
+            + ' title="' + d.iso + ' を見たい日に足します（もう一度押すと外します）。いくつでも選べます">'
             + (dt.getMonth()+1) + '/' + dt.getDate() + '<span class="dw">' + dow + '</span>'
             + '<span class="cn">' + d.count + '</span></button>';
         }).join('')
       + '<button type="button" class="day-chip nav" onclick="stepDay(1)" title="1つ次の（案件がある）日へ">▶</button>'
-      + (now ? '<button type="button" class="day-chip clear" onclick="pickDay(\'\')">すべての日に戻す</button>' : '');
+      + (pickedDays.size
+          ? '<button type="button" class="day-chip around" onclick="addAroundDays()" title="いま選んでいる日の前後（案件がある日）も一緒に出します。連勤や移動を見ながらアサインするときに使います">＋前後の日も見る</button>'
+            + '<button type="button" class="day-chip clear" onclick="pickDay(\'\')">すべての日に戻す（' + pickedDays.size + '日 選択中）</button>'
+          : '');
   }
 
-  // 同じ日をもう一度押したら解除（＝すべての日に戻る）。
+  // 日付を押す＝その日を「見たい日」に足す／もう一度押すと外す（いくつでも選べる）。
   function pickDay(iso){
-    const el = document.getElementById('fOnDate');
-    el.value = (el.value === iso) ? '' : iso;
+    if (iso === '') { pickedDays.clear(); }
+    else if (pickedDays.has(iso)) { pickedDays.delete(iso); }
+    else { pickedDays.add(iso); }
+    syncOnDateBox();
+    render();
+  }
+  // 「この日だけ」の欄で日付を選んだとき＝その1日だけにする。
+  function onDateBoxChanged(){
+    const v = document.getElementById('fOnDate').value;
+    pickedDays.clear();
+    if (v) pickedDays.add(v);
     render();
   }
   // ◀ ▶ ＝「案件がある日」だけを1つずつ動く（何も無い日を素通りする）。
+  // ⚠ 複数選んでいるときは、端の日を基準にして1日だけに戻す。
   function stepDay(n){
     const list = dayChipsSource().map(d => d.iso);
     if (!list.length) return;
-    const now = document.getElementById('fOnDate').value;
+    const sorted = Array.from(pickedDays).sort();
+    const now = sorted.length ? sorted[n > 0 ? sorted.length - 1 : 0] : '';
     let i = list.indexOf(now);
     if (i < 0) { i = (n > 0) ? -1 : list.length; }
     const next = list[Math.min(list.length - 1, Math.max(0, i + n))];
-    document.getElementById('fOnDate').value = next;
+    pickedDays.clear();
+    pickedDays.add(next);
+    syncOnDateBox();
+    render();
+  }
+  // 選んでいる日の「前後1日（案件がある日）」も一緒に出す。
+  // ⚠ 連勤・移動を見ながらアサインしたい、というご要望のためのもの（2026-09-07 baba）。
+  function addAroundDays(){
+    const list = dayChipsSource().map(d => d.iso);
+    if (!list.length || !pickedDays.size) { alert('先に日付を1つ選んでください。'); return; }
+    Array.from(pickedDays).forEach(function (iso) {
+      const i = list.indexOf(iso);
+      if (i < 0) return;
+      if (i > 0) pickedDays.add(list[i - 1]);
+      if (i < list.length - 1) pickedDays.add(list[i + 1]);
+    });
+    syncOnDateBox();
     render();
   }
 

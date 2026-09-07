@@ -111,12 +111,12 @@
         <a class="wl-mon-btn" href="?period={{ $nextPeriod }}" title="次の月へ">▶</a>
         <a class="wl-mon-btn wide {{ $isThisMonth ? 'on' : '' }}" href="?" title="今月に戻す">今月</a>
       </div>
-      <div class="sub">稼働希望を出してくれているスタッフの一覧です。希望日数・実アサイン数・その割合、できるポジションを確認できます。（数値はすべて本物の希望・アサインから計算しています。対象月＝<b>{{ $periodLabel }}</b>）<br>
-        ◀ ▶ で月を変えられます。<b>その月に希望を出していない人は出ません</b>（希望が0件の人はこの一覧の対象外です）。</div>
+      <div class="sub">稼働希望（〇）を出した人と、案件にエントリーしてくれた人の一覧です。希望数・実アサイン数・その割合、できるポジションを確認できます。（数値はすべて本物の希望・エントリー・アサインから計算しています。対象月＝<b>{{ $periodLabel }}</b>）<br>
+        ◀ ▶ で月を変えられます。<b>その月に〇もエントリーも出していない人は出ません。</b></div>
       @if (count($people) === 0)
         <div class="wl-empty">
-          <b>{{ $periodLabel }}は、まだ誰も稼働希望を出していません。</b><br>
-          月を間違えていないか、◀ ▶ で確かめてください。スタッフが「稼働希望」を保存すると、ここに並びます。
+          <b>{{ $periodLabel }}は、まだ誰も稼働希望（〇）もエントリーも出していません。</b><br>
+          月を間違えていないか、◀ ▶ で確かめてください。スタッフが「稼働希望」を保存するか、案件にエントリーすると、ここに並びます。
         </div>
       @endif
     </div>
@@ -124,12 +124,12 @@
     <!-- 上部の数値カード -->
     <div class="wl-cards">
       <div class="wl-card">
-        <div class="c-label">希望提出者</div>
+        <div class="c-label">希望・応募をくれた人</div>
         <div class="c-num" id="cTotal">0<small> 名</small></div>
       </div>
       <div class="wl-card">
-        <div class="c-label">希望日数の合計</div>
-        <div class="c-num" id="cWish">0<small> 日</small></div>
+        <div class="c-label">希望数の合計</div>
+        <div class="c-num" id="cWish">0<small> 枠</small></div>
       </div>
       <div class="wl-card">
         <div class="c-label">まだアサイン0の人</div>
@@ -164,7 +164,7 @@
       <div class="f-item">
         <label>並べ替え</label>
         <select id="fSort" onchange="render()">
-          <option value="wish">希望日数が多い順</option>
+          <option value="wish">希望数が多い順</option>
           <option value="rate">アサイン割合が低い順</option>
           <option value="assigned">アサイン数が少ない順</option>
         </select>
@@ -176,7 +176,7 @@
         <tr>
           <th>スタッフ</th>
           <th>区分</th>
-          <th class="center">希望日数</th>
+          <th class="center" title="その月に入れる枠の数。〇を出した日は「その日の案件数（案件が無ければ1）」、〇は無いがエントリーした日はその件数。同じ日は二重に数えません。">希望数</th>
           <th class="center">アサイン済</th>
           <th>アサイン割合</th>
           <th class="center">MCアサイン<br>回数</th>
@@ -187,7 +187,11 @@
     </table>
 
     <div class="note">
-      ※「アサイン割合」＝アサイン済 ÷ 希望日数。割合が低い人は、希望を出しているのにまだ入れていない人です（優先的に検討の目安）。<br>
+      ※「<b>希望数</b>」＝その月に<b>入れる枠の数</b>です（2026-09-07 に数え方を変えました）。<br>
+      　・<b>〇を出した日</b>＝その日の<b>案件数</b>（案件が無い日は 1）／・<b>〇は無いがエントリーした日</b>＝その<b>エントリー件数</b>。<br>
+      　⚠ <b>同じ日は二重に数えません</b>（〇の日のエントリーは「その日の案件数」に含まれます）。<br>
+      　⚠ 前は「〇を出した日数」だけで、<b>エントリーが入っていませんでした</b>（エントリーだけの人はこの一覧に出ていませんでした）。<br>
+      ※「アサイン割合」＝アサイン済 ÷ 希望数。割合が低い人は、入れる枠があるのにまだ入れていない人です（優先的に検討の目安）。<br>
       ※できるポジションの青タグ（D／OP／MC／軍師・サポーター）は経験者向けポジションです。
     </div>
   </div>
@@ -242,7 +246,7 @@
       tr.innerHTML = `
         <td><strong>${p.name}</strong> <span class="muted" style="font-size:11px;">${p.id}</span></td>
         <td><span class="lv ${p.lv}">${lvLabel[p.lv]}</span></td>
-        <td class="center">${p.wish}</td>
+        <td class="center"><b>${p.wish}</b><br><span class="muted" style="font-size:10.5px;">〇${p.okDays}日・応募${p.entries}件</span></td>
         <td class="center">${p.assigned}</td>
         <td><span class="rate"><span class="rbar"><i class="${rateClass(r)}" style="width:${r}%;"></i></span><span class="rtxt">${r}%</span></span></td>
         <td class="center">${p.pos.includes('MC') ? '<b>'+p.mc+'</b> 回' : '—'}</td>
@@ -252,7 +256,7 @@
 
     // 上部カード（全データ基準＝絞り込みに左右されない）
     document.getElementById('cTotal').innerHTML = people.length + '<small> 名</small>';
-    document.getElementById('cWish').innerHTML  = people.reduce((s,p)=>s+p.wish,0) + '<small> 日</small>';
+    document.getElementById('cWish').innerHTML  = people.reduce((s,p)=>s+p.wish,0) + '<small> 枠</small>';
     document.getElementById('cZero').innerHTML  = people.filter(p=>p.assigned===0).length + '<small> 名</small>';
   }
 

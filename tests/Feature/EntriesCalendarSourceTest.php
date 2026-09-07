@@ -208,7 +208,9 @@ class EntriesCalendarSourceTest extends TestCase
             ->assertSee('id="dayChips"', false)
             ->assertSee('function pickDay(iso){', false)
             ->assertSee('function stepDay(n){', false)
-            // 日付ボタンは fOnDate に値を入れるだけ（別の絞り込みを作らない）
-            ->assertSee("document.getElementById('fOnDate')", false);
+            // ⚠ 日付の絞り込みの正本は pickedDays 1つだけ（2か所で絞ると必ず食い違う）
+            ->assertSee('const pickedDays = new Set();', false)
+            // 前後の日も一緒に見られること（連勤・移動を見ながらアサインするため）
+            ->assertSee('function addAroundDays(){', false);
     }
 }

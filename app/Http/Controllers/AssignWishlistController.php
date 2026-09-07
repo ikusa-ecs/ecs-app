@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
@@ -54,14 +55,70 @@ class AssignWishlistController extends Controller
         // 案件ID → date_type（本番のみ数えるため）。
         $projectType = Project::pluck('date_type', 'id');
 
+        // ── 「希望数」の材料（2026-09-07 baba決定で数え方を変更）──────────────
+        // 【新しい数え方】その月の日ごとに、次を足す（**同じ日を二重に数えない**）：
+        //   ・その日に「〇（稼働可）」を出している    → **その日の案件数**（案件が無ければ 1）
+        //   ・〇は出していないがエントリーがある日     → **その日にエントリーした件数**
+        //   ・どちらも無い日                          → 0
+        // ⚠ 前は「〇を出した日数」だけで、**エントリーが一切入っていなかった**。
+        //   エントリーだけしてくれた人が、この一覧に1人も出てこなかった。
+        // ⚠ 〇の日を「案件数」で数えるのは、その日は**その日の案件どれにでも入れる**という意味だから
+        //   （案件が無い日は入りようがないので 1 で置く＝「その日は空けてくれている」という重みだけ残す）。
+        // ⚠ 同じ日にエントリーもある場合、その件は「その日の案件数」にすでに含まれているので足さない。
+
+        // その月の案件（下書き・キャンセルは数えない）。日ごとの件数と、案件ID→日 を作る。
+        $monthProjects = Project::whereNotNull('start_date')
+            ->whereBetween('start_date', [$monthStart->toDateString().' 00:00:00', $monthEnd->toDateString().' 23:59:59'])
+            ->notCancelled()
+            ->get(['id', 'start_date', 'status', 'is_archived'])
+            ->filter(fn (Project $p) => $p->status !== '下書き' && $p->is_archived !== true);
+
+        $projectsPerDay = [];   // 'Y-m-d' => その日の案件数
+        $dayOfProject = [];     // project_id => 'Y-m-d'
+        foreach ($monthProjects as $mp) {
+            $d = $mp->start_date->format('Y-m-d');
+            $projectsPerDay[$d] = ($projectsPerDay[$d] ?? 0) + 1;
+            $dayOfProject[$mp->id] = $d;
+        }
+
+        // その月のエントリー（応募）。staff_id => ['Y-m-d' => 件数]
+        $entriesByStaffDay = [];
+        $entryCount = [];       // staff_id => その月のエントリー件数（画面の内訳に出す）
+        if ($dayOfProject) {
+            foreach (Application::whereIn('project_id', array_keys($dayOfProject))->get(['project_id', 'staff_id']) as $a) {
+                $d = $dayOfProject[$a->project_id];
+                $entriesByStaffDay[$a->staff_id][$d] = ($entriesByStaffDay[$a->staff_id][$d] ?? 0) + 1;
+                $entryCount[$a->staff_id] = ($entryCount[$a->staff_id] ?? 0) + 1;
+            }
+        }
+
         // スタッフごとに一度だけ材料を引いておく（人数分のクエリを避ける）。
         $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
         $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
         $posByStaff = StaffRoleEligibility::all()->groupBy('staff_id');
 
-        $people = Person::staff()->get()->map(function (Person $p) use ($monthStart, $monthEnd, $projectType, $prefByStaff, $assignsByStaff, $posByStaff) {
-            // 希望日数（対象月）。0件の人は対象外なので後で除く。
-            $want = $prefByStaff->get($p->id, collect())->count();
+        $people = Person::staff()->get()->map(function (Person $p) use (
+            $monthStart, $monthEnd, $projectType, $prefByStaff, $assignsByStaff, $posByStaff,
+            $projectsPerDay, $entriesByStaffDay, $entryCount
+        ) {
+            // 〇を出した日（'Y-m-d' の集合）。
+            $okDays = $prefByStaff->get($p->id, collect())
+                ->map(fn (ShiftPreference $sp) => $sp->date?->format('Y-m-d'))
+                ->filter()->unique()->values()->all();
+            $myEntryDays = $entriesByStaffDay[$p->id] ?? [];
+
+            // 希望数＝〇の日は「その日の案件数（無ければ1）」／〇が無い日はエントリー件数。
+            $want = 0;
+            foreach ($okDays as $d) {
+                $want += max(1, (int) ($projectsPerDay[$d] ?? 0));
+            }
+            foreach ($myEntryDays as $d => $n) {
+                if (! in_array($d, $okDays, true)) {
+                    $want += (int) $n;   // 〇は出していないがエントリーした日
+                }
+            }
+
+            // 1つも無い人はこの一覧の対象外（エントリーも〇も無い＝まだ何も言ってくれていない）。
             if ($want === 0) {
                 return null;
             }
@@ -94,6 +151,10 @@ class AssignWishlistController extends Controller
                 'name'     => $p->name,
                 'lv'       => $total <= 10 ? 'new' : ($total < 30 ? 'mid' : 'vet'),
                 'wish'     => $want,
+                // 内訳（画面で「6（〇3日・応募1件）」と出すため）。
+                // ⚠ 数字だけだと何を数えたのか分からない＝聞かれるたびに説明することになる。
+                'okDays'   => count($okDays),
+                'entries'  => (int) ($entryCount[$p->id] ?? 0),
                 'assigned' => $assigned,
                 'mc'       => $mc,
                 'pos'      => $pos,
