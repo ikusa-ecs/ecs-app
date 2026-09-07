@@ -174,11 +174,15 @@
     table.mtx .m-tmp  { color:#b5824a; font-weight:700; font-size:11px; border:1px solid #e0cdb4; border-radius:4px; padding:0 4px; background:#fcefd6; }
     table.mtx .m-ent  { color:#b5824a; font-weight:700; }
     table.mtx .m-none { color:#d8cbb8; }
+    /* 「空」＝その日は終日〇だが、この案件には応募していない人（2026-09-07）。
+       ⚠ エントリー（〇）と同じ色にしないこと。応募してくれた人と見分けが付かなくなる。 */
+    table.mtx .m-cal  { color:#4338ca; font-weight:700; font-size:11px; border:1px solid #c7d2fe; border-radius:4px; padding:0 4px; background:#eef2ff; }
     /* クリックで 未→仮→確定→未 と切り替えできるセル */
     table.mtx td.assignable { cursor:pointer; }
     table.mtx td.assignable:hover { outline:2px solid var(--brand,#b5673a); outline-offset:-2px; background:#fff7ec; }
     table.mtx td.is-tmp { background:#fdf6e7; }         /* 仮アサイン */
     table.mtx td.is-fix { background:#eaf3ea; }         /* 確定 */
+    table.mtx td.is-cal { background:#f8f9ff; }         /* その日空いているだけ（未応募） */
     table.mtx td.is-pub { background:#dceee9; }         /* 確定＋公開済み＝解除に確認が要る */
     table.mtx .m-lock { font-size:10px; margin-left:1px; }
     /* 「×」＝このアサインを外すボタン（本体クリックでは解除されない） */
@@ -405,11 +409,11 @@
   //   （減らすと「エントリー◯名」の数まで変わって、実際の応募数が分からなくなる）。
   function staffFilter(){ return (document.getElementById('fStaff').value || '').trim(); }
   function srcFilter(){ return document.getElementById('fSrc').value || ''; }
-  // 月ごとの表に出す人＝エントリーした人だけ（スタッフ名の絞り込みは効かせる）。
-  function monthEntrants(c){
-    const nm = staffFilter();
-    return entrantsOf(c).filter(e => (e.src || 'entry') === 'entry' && (!nm || (e.name || '').includes(nm)));
-  }
+  // 月ごとの表に出す人。⚠ エントリーした人だけでなく「その日 空いている人」も出す
+  //   （2026-09-07 baba要望）。マスの印で見分けられるようにしてある：
+  //     〇＝エントリー中／空＝カレンダーで終日〇なだけ（まだ応募していない）／仮・✓＝アサイン済み。
+  //   絞り込み（スタッフ名・出どころ）は「案件ごと」と同じものを効かせる。
+  function monthEntrants(c){ return visibleEntrants(c); }
   function visibleEntrants(c){
     const nm = staffFilter(), src = srcFilter();
     return entrantsOf(c).filter(e =>
@@ -624,7 +628,7 @@
       + '　<span class="m-tmp">仮</span> 仮アサイン　<span class="m-asg">✓</span> 確定'
       + '　<span class="m-none">・</span> 応募なし　<span class="m-lock">🔒</span> 確定＋公開済み（解除に確認）'
       + '　｜　縦＝スタッフ／横＝案件　｜　<b>クリックで 未→仮→確定（前に進むだけ）／外すのは「×」</b>'
-      + '　｜　⚠ この表は<b>エントリーした人だけ</b>です（カレンダーで〇なだけの人は「案件ごと」で見てください）</div>';
+      + '　｜　<span class="m-cal">空</span> その日「終日〇」（この案件には応募していない）</div>';
 
     box.innerHTML = legend + groups.map(g => {
       const past = caseDate(g.off) < caseDate(0) && g.key !== todayKey;
@@ -636,8 +640,10 @@
       //   ほとんど空っぽの行が大量に増えて、誰が応募してくれたのか読めなくなる。
       //   〇だけの人は「案件ごと」と「📅 空いている人」で見る。
       cases.forEach(c => monthEntrants(c).forEach(e => {
-        if (!staffMap[e.name]){ staffMap[e.name] = { name:e.name, lv:e.lv, ent:0, asg:0 }; staffOrder.push(e.name); }
-        staffMap[e.name].ent++;
+        if (!staffMap[e.name]){ staffMap[e.name] = { name:e.name, lv:e.lv, ent:0, cal:0, asg:0 }; staffOrder.push(e.name); }
+        // ⚠ 「応募数」に数えるのはエントリーした人だけ。〇なだけの人まで数えると
+        //   「何件応募してくれたか」が読めなくなる（空きの日数は別の列に出す）。
+        if ((e.src || 'entry') === 'entry') staffMap[e.name].ent++; else staffMap[e.name].cal++;
         if (e.assigned) staffMap[e.name].asg++;
       }));
 
@@ -647,14 +653,17 @@
           + '<div class="empty-note" style="padding:16px;">この月はまだエントリーがありません。</div></div>';
       }
       // 応募数の多い順（同数はアサイン数の多い順）
-      staffOrder.sort((a,b) => staffMap[b].ent - staffMap[a].ent || staffMap[b].asg - staffMap[a].asg);
+      staffOrder.sort((a,b) => staffMap[b].ent - staffMap[a].ent || staffMap[b].asg - staffMap[a].asg || staffMap[b].cal - staffMap[a].cal);
 
       // 案件ごとに「名前→エントリー情報（状態・スタッフID・役割）」の対応表を作る
       // st： 'fix'=確定 / 'tmp'=仮 / 'ent'=エントリー中（未アサイン）
       const caseStatus = cases.map(c => {
         const m = {};
         monthEntrants(c).forEach(e => {
-          const st = (e.status === '確定') ? 'fix' : (e.status === '仮' ? 'tmp' : 'ent');
+          // ⚠ アサインが先。まだアサインされていない人だけ「〇（エントリー）／空（〇なだけ）」に分ける。
+          const st = (e.status === '確定') ? 'fix'
+                   : (e.status === '仮' ? 'tmp'
+                   : ((e.src === 'cal') ? 'cal' : 'ent'));
           m[e.name] = { st: st, id: e.id, role: e.roleCode || '' };
         });
         return m;
@@ -663,10 +672,12 @@
       // ヘッダー（案件を横に）
       let head = '<thead><tr><th class="staffcol">スタッフ</th><th class="entcol">応募<br>数</th>';
       cases.forEach(c => {
-        const cnt = entrantsOf(c).length;
+        const all = entrantsOf(c);
+        const entCnt = all.filter(e => (e.src || 'entry') === 'entry').length;
+        const calCnt = all.length - entCnt;
         head += `<th title="${esc(c.name)}"><span class="coldate">${dateLabel(c.off)}</span><br>`
           + `<span class="colname">${esc(c.name)}</span><br>`
-          + `<span class="colmeta">必${c.need}/応${cnt}</span></th>`;
+          + `<span class="colmeta">必${c.need}/応${entCnt}/空${calCnt}</span></th>`;
       });
       head += '</tr></thead>';
 
@@ -685,15 +696,17 @@
           // 状態ごとのマーク
           const mark = st === 'fix' ? '<span class="m-asg">✓</span>'
                      : st === 'tmp' ? '<span class="m-tmp">仮</span>'
+                     : st === 'cal' ? '<span class="m-cal">空</span>'
                      : '<span class="m-ent">〇</span>';
           const lock = (st === 'fix' && pub) ? '<span class="m-lock" title="確定＋公開済み">🔒</span>' : '';
-          const rmBtn = (st !== 'ent') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';
+          const rmBtn = (st === 'fix' || st === 'tmp') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';
           const tip = st === 'fix' ? (pub ? '確定＋公開済み（×で解除・確認あり）' : '確定（外すには×）')
                     : st === 'tmp' ? 'クリックで確定／×で外す'
+                    : st === 'cal' ? 'この案件には応募していませんが、その日は「終日〇」です。クリックで仮アサイン'
                     : 'クリックで仮アサイン';
           // スタッフID がある（DBの本物データ）ならクリックで保存できるようにする
           if (e.id){
-            const cls = st === 'fix' ? 'is-fix' : (st === 'tmp' ? 'is-tmp' : 'is-ent');
+            const cls = st === 'fix' ? 'is-fix' : (st === 'tmp' ? 'is-tmp' : (st === 'cal' ? 'is-cal' : 'is-ent'));
             body += `<td class="cell assignable ${cls}${(st==='fix'&&pub)?' is-pub':''}"`
               + ` data-pid="${esc(c.id)}" data-sid="${esc(e.id)}" data-role="${esc(e.role)}" data-state="${st}"`
               + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${esc(c.name)}"`
