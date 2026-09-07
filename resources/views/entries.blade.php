@@ -31,6 +31,8 @@
       padding:7px 10px; border:1px solid #d8c8b6; border-radius:7px; font-size:13px; color:#3a2d20;
     }
     .ent-filter .f-label { font-size:12px; color:#a08a73; }
+    .ent-filter .f-check { font-size:12.5px; color:#6e5b49; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+    .ent-filter .f-check input { width:15px; height:15px; accent-color:var(--brand,#b5673a); cursor:pointer; }
 
     /* サマリー（数値カード） */
     .ent-summary { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
@@ -177,12 +179,15 @@
     /* 「空」＝その日は終日〇だが、この案件には応募していない人（2026-09-07）。
        ⚠ エントリー（〇）と同じ色にしないこと。応募してくれた人と見分けが付かなくなる。 */
     table.mtx .m-cal  { color:#4338ca; font-weight:700; font-size:11px; border:1px solid #c7d2fe; border-radius:4px; padding:0 4px; background:#eef2ff; }
+    /* ✕＝エントリーはあるが、その日は本人がNG（希望休）。行き違いなので赤く出す（2026-09-07）。 */
+    table.mtx .m-ng   { color:#b91c1c; font-weight:800; }
     /* クリックで 未→仮→確定→未 と切り替えできるセル */
     table.mtx td.assignable { cursor:pointer; }
     table.mtx td.assignable:hover { outline:2px solid var(--brand,#b5673a); outline-offset:-2px; background:#fff7ec; }
     table.mtx td.is-tmp { background:#fdf6e7; }         /* 仮アサイン */
     table.mtx td.is-fix { background:#eaf3ea; }         /* 確定 */
     table.mtx td.is-cal { background:#f8f9ff; }         /* その日空いているだけ（未応募） */
+    table.mtx td.is-ng  { background:#fdf3f3; }         /* エントリーはあるがNG＝行き違いの注意 */
     table.mtx td.is-pub { background:#dceee9; }         /* 確定＋公開済み＝解除に確認が要る */
     table.mtx .m-lock { font-size:10px; margin-left:1px; }
     /* 「×」＝このアサインを外すボタン（本体クリックでは解除されない） */
@@ -241,6 +246,11 @@
           <option value="entry">エントリーした人だけ</option>
           <option value="cal">その日 空いている人だけ</option>
         </select>
+        <!-- 月ごとの表で、関係のない人の行をまとめて隠す（2026-09-07 baba要望）。
+             ⚠ 「この日だけ」と組み合わせると、その日に関係する人だけの表になる。 -->
+        <label class="f-check" title="月ごとの表で「・（何もなし）」と「✕（NG）」しかない人の行を隠します。「この日だけ」と一緒に使うと、その日の関係者だけになります。">
+          <input type="checkbox" id="fOnlyRelated" onchange="render()"> 関係者だけ（月ごと）
+        </label>
         <select id="fRecruit" onchange="render()">
           <option value="">募集状態：すべて</option>
           <option value="open">募集中のみ</option>
@@ -628,14 +638,15 @@
       + '　<span class="m-tmp">仮</span> 仮アサイン　<span class="m-asg">✓</span> 確定'
       + '　<span class="m-none">・</span> 応募なし　<span class="m-lock">🔒</span> 確定＋公開済み（解除に確認）'
       + '　｜　縦＝スタッフ／横＝案件　｜　<b>クリックで 未→仮→確定（前に進むだけ）／外すのは「×」</b>'
-      + '　｜　<span class="m-cal">空</span> その日「終日〇」（この案件には応募していない）</div>';
+      + '　｜　<span class="m-cal">空</span> その日「終日〇」（この案件には応募していない）'
+      + '　<span class="m-ng">✕</span> ⚠ エントリーはあるが、その日はNG（希望休）</div>';
 
     box.innerHTML = legend + groups.map(g => {
       const past = caseDate(g.off) < caseDate(0) && g.key !== todayKey;
       const cases = g.items.slice().sort((a,b) => a.off - b.off);
 
       // この月の案件に関わるスタッフ（応募＋アサイン）を縦に並べる。名前をキーに集約。
-      const staffMap = {}; const staffOrder = [];
+      const staffMap = {}; let staffOrder = [];
       // ⚠ この表は「エントリーした人」だけ（2026-09-07）。カレンダーで〇なだけの人まで並べると
       //   ほとんど空っぽの行が大量に増えて、誰が応募してくれたのか読めなくなる。
       //   〇だけの人は「案件ごと」と「📅 空いている人」で見る。
@@ -647,10 +658,26 @@
         if (e.assigned) staffMap[e.name].asg++;
       }));
 
+      // ⚠ 「関係者だけ」＝その月（この日だけを選んでいればその日）に、
+      //   〇・空・仮・✓ が1つも無い人の行を隠す。「・」と「✕（NG）」しかない人が対象。
+      //   ⚠ 隠すのは**行の表示だけ**。上の「応募数」などの数え方は変えない。
+      if (document.getElementById('fOnlyRelated').checked) {
+        const keep = {};
+        cases.forEach(c => monthEntrants(c).forEach(e => {
+          const live = (e.status === '確定') || (e.status === '仮') || (e.wish !== 'ng');
+          if (live) keep[e.name] = true;
+        }));
+        staffOrder = staffOrder.filter(n => keep[n]);
+      }
+
       if (!staffOrder.length){
         return `<div class="month-group"><div class="month-head ${past?'past':''}">${g.label}`
           + `<span class="cnt">（${cases.length}件）${past?' ・終了':''}</span></div>`
-          + '<div class="empty-note" style="padding:16px;">この月はまだエントリーがありません。</div></div>';
+          + '<div class="empty-note" style="padding:16px;">'
+          + (document.getElementById('fOnlyRelated').checked
+              ? 'この条件に当てはまる人がいません。（「関係者だけ」を外すと、NGの人や関係のない人も出ます）'
+              : 'この月はまだエントリーがありません。')
+          + '</div></div>';
       }
       // 応募数の多い順（同数はアサイン数の多い順）
       staffOrder.sort((a,b) => staffMap[b].ent - staffMap[a].ent || staffMap[b].asg - staffMap[a].asg || staffMap[b].cal - staffMap[a].cal);
@@ -660,11 +687,14 @@
       const caseStatus = cases.map(c => {
         const m = {};
         monthEntrants(c).forEach(e => {
-          // ⚠ アサインが先。まだアサインされていない人だけ「〇（エントリー）／空（〇なだけ）」に分ける。
+          // ⚠ アサインが先。まだアサインされていない人を「✕（NG）／〇（エントリー）／空（〇なだけ）」に分ける。
+          // ⚠ NG＝エントリーはくれたが、稼働希望カレンダーではその日を「NG・希望休」にしている人。
+          //   これまで〇（エントリー中）と同じ見た目だったので、**気づかずアサインしていた**（2026-09-07）。
           const st = (e.status === '確定') ? 'fix'
                    : (e.status === '仮' ? 'tmp'
-                   : ((e.src === 'cal') ? 'cal' : 'ent'));
-          m[e.name] = { st: st, id: e.id, role: e.roleCode || '' };
+                   : (e.wish === 'ng' ? 'ng'
+                   : ((e.src === 'cal') ? 'cal' : 'ent')));
+          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name };
         });
         return m;
       });
@@ -696,6 +726,7 @@
           // 状態ごとのマーク
           const mark = st === 'fix' ? '<span class="m-asg">✓</span>'
                      : st === 'tmp' ? '<span class="m-tmp">仮</span>'
+                     : st === 'ng'  ? '<span class="m-ng">✕</span>'
                      : st === 'cal' ? '<span class="m-cal">空</span>'
                      : '<span class="m-ent">〇</span>';
           const lock = (st === 'fix' && pub) ? '<span class="m-lock" title="確定＋公開済み">🔒</span>' : '';
@@ -703,10 +734,11 @@
           const tip = st === 'fix' ? (pub ? '確定＋公開済み（×で解除・確認あり）' : '確定（外すには×）')
                     : st === 'tmp' ? 'クリックで確定／×で外す'
                     : st === 'cal' ? 'この案件には応募していませんが、その日は「終日〇」です。クリックで仮アサイン'
+                    : st === 'ng' ? '⚠ エントリーはありますが、稼働希望カレンダーではこの日をNG（希望休）にしています。入れる前に本人に確かめてください'
                     : 'クリックで仮アサイン';
           // スタッフID がある（DBの本物データ）ならクリックで保存できるようにする
           if (e.id){
-            const cls = st === 'fix' ? 'is-fix' : (st === 'tmp' ? 'is-tmp' : (st === 'cal' ? 'is-cal' : 'is-ent'));
+            const cls = st === 'fix' ? 'is-fix' : (st === 'tmp' ? 'is-tmp' : (st === 'ng' ? 'is-ng' : (st === 'cal' ? 'is-cal' : 'is-ent')));
             body += `<td class="cell assignable ${cls}${(st==='fix'&&pub)?' is-pub':''}"`
               + ` data-pid="${esc(c.id)}" data-sid="${esc(e.id)}" data-role="${esc(e.role)}" data-state="${st}"`
               + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${esc(c.name)}"`
@@ -765,7 +797,19 @@
     let action, status = null;
     if (isRemove){
       action = 'unassign';
-    } else if (state === 'ent'){
+    } else if (state === 'ent' || state === 'cal'){
+      action = 'assign'; status = '仮';
+    } else if (state === 'ng'){
+      // ⚠ NG（希望休）の人を入れるときは必ず確認する。
+      //   エントリーはくれていても「その日は入れません」と言っている人なので、
+      //   黙って入れると当日になって断られる（2026-09-07）。
+      // ⚠ 改行は String.fromCharCode(10) で作る。「\」＋「n」と書くと、置換のときに
+      //   本物の改行に化けて、この画面のJavaScriptが丸ごと死ぬ（過去に何度も起きている）。
+      const NL = String.fromCharCode(10);
+      const sn = cell.dataset.sname || 'この人';
+      if (!confirm(sn + ' さんは、稼働希望カレンダーでこの日を「NG（希望休）」にしています。' + NL
+        + 'エントリーはいただいていますが、行き違いの可能性があります。' + NL + NL
+        + '本人に確かめたうえで、仮アサインしますか？')) return;
       action = 'assign'; status = '仮';
     } else if (state === 'tmp'){
       action = 'assign'; status = '確定';

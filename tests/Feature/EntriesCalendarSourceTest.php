@@ -159,4 +159,37 @@ class EntriesCalendarSourceTest extends TestCase
             ->assertSee('id="fStaff"', false)
             ->assertSee('function srcTag(e){', false);
     }
+
+    /**
+     * 月ごとの表の決まりを守る（2026-09-07 baba要望）。
+     *
+     * ⚠ ✕（NG）＝エントリーはあるが、その日は本人がNG（希望休）。
+     *   これまで〇（エントリー中）と同じ見た目だったので、**気づかずアサインしていた**。
+     * ⚠ 「関係者だけ」＝「・」と「✕」しかない人の行を隠す。隠すのは行の表示だけで、
+     *   応募数の数え方は変えない。
+     */
+    public function test_month_view_marks_and_filter_exist(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+
+        $this->actingAsPerson($me)->get('/entries')
+            ->assertOk()
+            ->assertSee('id="fOnlyRelated"', false)
+            // NG は 〇 と別の印にする
+            ->assertSee("e.wish === 'ng' ? 'ng'", false)
+            ->assertSee('m-ng', false)
+            // ⚠ 改行は String.fromCharCode(10)。「\」＋「n」と書くと置換で本物の改行に化けて
+            //   この画面の JavaScript が丸ごと死ぬ（過去に何度も起きている）。
+            ->assertSee('String.fromCharCode(10)', false);
+    }
+
+    /** ⚠ 「空」のマスもクリックで仮アサインできること（押せないと候補に出す意味がない）。 */
+    public function test_calendar_cells_are_clickable(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+
+        $this->actingAsPerson($me)->get('/entries')
+            ->assertOk()
+            ->assertSee("state === 'ent' || state === 'cal'", false);
+    }
 }
