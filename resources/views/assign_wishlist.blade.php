@@ -78,14 +78,47 @@
     table.tbl thead th { white-space: nowrap; position: sticky; top: 0; background: var(--panel); z-index: 1; }
     .ptag { margin: 0 2px 0 0; padding: 1px 6px; }   /* ポジションタグも詰める（折返し分の高さを抑える） */
     .rate .rbar { width: 60px; }
+
+    /* 月の切替（2026-09-07）。ほかの画面（社員・ディレクター集計）と同じ見た目にそろえる。 */
+    .wl-month { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; }
+    .wl-month .wl-mon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--line); background: #fff; border-radius: 8px;
+      width: 30px; height: 30px; font-size: 15px; text-decoration: none; color: var(--ink);
+    }
+    .wl-month .wl-mon-btn.wide { width: auto; padding: 0 10px; font-size: 12.5px; font-weight: 700; }
+    .wl-month .wl-mon-btn.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .wl-month .wl-mon-btn:hover { background: #f3ece0; }
+    .wl-month .wl-mon-btn.on:hover { background: var(--brand); }
+    .wl-month .wl-mon { font-size: 14px; font-weight: 700; min-width: 96px; text-align: center; }
+    /* その月の希望が1件も無いとき。空の表だけだと「壊れている」と誤解されるので理由を出す。 */
+    .wl-empty {
+      margin: 10px 0 0; padding: 12px 14px; border-radius: 10px;
+      background: #fdf6e8; border: 1px solid #e8d3ac; font-size: 13px; line-height: 1.7;
+    }
   </style>
   @endverbatim
 </head>
 <body>
   <div class="wl-wrap">
     <div class="wl-head">
-      <h1>👥 スタッフ一覧（{{ now()->format('Y年n月') }}）</h1>
-      <div class="sub">いま稼働希望を出してくれているスタッフの一覧です。希望日数・実アサイン数・その割合、できるポジションを確認できます。（数値はすべて本物の希望・アサインから計算しています。対象月＝{{ now()->format('Y年n月') }}）</div>
+      <h1>👥 スタッフ一覧（{{ $periodLabel }}）</h1>
+      {{-- 月の切替（2026-09-07 baba要望）。それまでは当月に固定で、
+           来月の希望をまとめて見ることができなかった。 --}}
+      <div class="wl-month">
+        <a class="wl-mon-btn" href="?period={{ $prevPeriod }}" title="前の月へ">◀</a>
+        <span class="wl-mon">{{ $periodLabel }}</span>
+        <a class="wl-mon-btn" href="?period={{ $nextPeriod }}" title="次の月へ">▶</a>
+        <a class="wl-mon-btn wide {{ $isThisMonth ? 'on' : '' }}" href="?" title="今月に戻す">今月</a>
+      </div>
+      <div class="sub">稼働希望を出してくれているスタッフの一覧です。希望日数・実アサイン数・その割合、できるポジションを確認できます。（数値はすべて本物の希望・アサインから計算しています。対象月＝<b>{{ $periodLabel }}</b>）<br>
+        ◀ ▶ で月を変えられます。<b>その月に希望を出していない人は出ません</b>（希望が0件の人はこの一覧の対象外です）。</div>
+      @if (count($people) === 0)
+        <div class="wl-empty">
+          <b>{{ $periodLabel }}は、まだ誰も稼働希望を出していません。</b><br>
+          月を間違えていないか、◀ ▶ で確かめてください。スタッフが「稼働希望」を保存すると、ここに並びます。
+        </div>
+      @endif
     </div>
 
     <!-- 上部の数値カード -->

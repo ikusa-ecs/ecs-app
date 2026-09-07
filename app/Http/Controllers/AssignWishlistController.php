@@ -7,12 +7,15 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
  * 希望まとめ（/assign-wishlist・別ウィンドウ）。
  *
- * いま稼働希望を出しているスタッフ（対象月＝今日の当月。例：7月に開けば2026-07）の一覧を DB から作る。
+ * 稼働希望を出しているスタッフの一覧を DB から作る。
+ * 対象月＝既定は今日の当月。?period=YYYY-MM で前後の月に切り替えられる（2026-09-07 baba要望）。
+ * ⚠ それまでは当月に固定で、来月の希望をまとめて見ることができなかった。
  * 画面の絞り込み・並べ替え・カード集計は元の JavaScript をそのまま使い、
  * その材料（people 配列）だけを本物のデータに差し替える。
  *
@@ -39,12 +42,14 @@ class AssignWishlistController extends Controller
         'RP'  => '受付',
     ];
 
-    public function index()
+    public function index(Request $request)
     {
-        // 対象月＝今日の当月（当月の1日〜末日）。period は '2026-07' の形の月キー。
-        $period = Carbon::today()->format('Y-m');
-        $monthStart = Carbon::today()->startOfMonth();
-        $monthEnd = Carbon::today()->endOfMonth();
+        // 対象月。既定＝今日の当月。?period=YYYY-MM が来ればその月（2026-09-07 baba要望）。
+        // period は '2026-07' の形の月キー＝shift_preferences.period と同じ形。
+        $month = $this->targetMonth($request);
+        $period = $month->format('Y-m');
+        $monthStart = $month->copy()->startOfMonth();
+        $monthEnd = $month->copy()->endOfMonth();
 
         // 案件ID → date_type（本番のみ数えるため）。
         $projectType = Project::pluck('date_type', 'id');
@@ -95,6 +100,30 @@ class AssignWishlistController extends Controller
             ];
         })->filter()->values();
 
-        return view('assign_wishlist', ['people' => $people]);
+        return view('assign_wishlist', [
+            'people' => $people,
+            // 月の切替（画面の見出し・前後の月へのリンクに使う）。
+            'period' => $period,
+            'periodLabel' => $month->format('Y年n月'),
+            'prevPeriod' => $month->copy()->subMonth()->format('Y-m'),
+            'nextPeriod' => $month->copy()->addMonth()->format('Y-m'),
+            'isThisMonth' => $period === Carbon::today()->format('Y-m'),
+        ]);
+    }
+
+    /**
+     * 見る月。?period=2026-10 が来ればその月、来なければ今月。
+     * ⚠ 読めない形は今月として扱う（去年の数字が黙って出るのを防ぐ）。
+     *   ここは /projects-agg の月切替と同じ考え方にそろえている。
+     */
+    private function targetMonth(Request $request): Carbon
+    {
+        $ym = (string) $request->query('period', '');
+        if (preg_match('/^(\d{4})-(\d{1,2})$/', $ym, $m)
+            && (int) $m[2] >= 1 && (int) $m[2] <= 12) {
+            return Carbon::create((int) $m[1], (int) $m[2], 1)->startOfDay();
+        }
+
+        return Carbon::today()->startOfMonth();
     }
 }
