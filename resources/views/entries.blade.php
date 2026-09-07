@@ -117,6 +117,13 @@
     .e-stat { font-size:11.5px; font-weight:600; }
     .e-stat.assigned { color:#3d7a45; }
     .e-stat.waiting  { color:#a08a73; }
+    /* 出どころの印（2026-09-07）。エントリー＝手を挙げてくれた人／空いてる＝その日〇なだけ。 */
+    .e-src { font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; white-space:nowrap; }
+    .e-src.ent { background:#e7f6ec; color:#15803d; }
+    .e-src.cal { background:#eef2ff; color:#4338ca; }
+    /* カレンダーの〇だけの人の行は、少し薄くして「まだ応募はしていない」と分かるようにする。 */
+    .ent-table tr.fromcal td { background:#fbfbfd; }
+    .ecase-counts .c.filtered { color:#b45309; font-weight:700; }
     .ent-note { font-size:12px; color:#6b5a48; max-width:180px; }
     .ent-remark { font-family:inherit; font-size:12px; padding:2px 6px; border:1px solid #d8c8b6; border-radius:6px; width:150px; background:#fff; }
     .ent-remark:focus { outline:2px solid var(--brand-soft); border-color:var(--brand); }
@@ -200,7 +207,9 @@
 @verbatim
       <div class="mock-note">
         <b>どの案件に、誰がエントリー（希望）してくれているか</b>を確認する画面です（DBの本物データ）。<br>
-        上の「この日から」で表示開始日を選べます。<b>「案件ごと」</b>＝案件単位の応募者一覧／<b>「月ごと」</b>＝スタッフ（縦）×案件（横）の一覧表／<b>「空いている人」</b>＝カレンダーの日付に、その日<b>終日〇</b>を出しているスタッフの名前が並びます。
+        上の「この日から」で表示開始日を、<b>「この日だけ」でその1日だけ</b>を見られます。<b>「案件ごと」</b>＝案件単位の候補者一覧／<b>「月ごと」</b>＝スタッフ（縦）×案件（横）の一覧表／<b>「空いている人」</b>＝カレンダーの日付に、その日<b>終日〇</b>を出しているスタッフの名前が並びます。<br>
+        ⚠ <b>「案件ごと」には2種類の人が並びます。</b><span class="e-src ent">🙋 エントリー</span>＝その案件に手を挙げてくれた人／<span class="e-src cal">📅 空いてる</span>＝その案件には応募していないが、<b>その日を「終日〇」にしている</b>人（声を掛ける候補）。
+        <b>先に「エントリー」の人が並びます。</b>「出どころ」「スタッフ名」でも絞れます。
       </div>
 
       <!-- 見方の切替タブ -->
@@ -215,8 +224,19 @@
         <span class="f-label">この日から：</span>
         <input type="date" id="fFromDate" onchange="render()">
         <button type="button" class="f-today" onclick="resetFromToday()">今日から</button>
+        <!-- 日ごとに調べるための絞り込み（2026-09-07 baba要望）。
+             「この日から」は開始日を決めるだけなので、1日だけを見たいときに使えなかった。 -->
+        <span class="f-label" style="margin-left:6px;">この日だけ：</span>
+        <input type="date" id="fOnDate" onchange="render()">
+        <button type="button" class="f-today" onclick="clearOnDate()">解除</button>
         <span class="f-label" style="margin-left:6px;">絞り込み：</span>
         <input type="text" id="fKeyword" placeholder="案件名・会社名で検索" oninput="render()">
+        <input type="text" id="fStaff" placeholder="スタッフ名で検索" oninput="render()">
+        <select id="fSrc" onchange="render()">
+          <option value="">出どころ：すべて</option>
+          <option value="entry">エントリーした人だけ</option>
+          <option value="cal">その日 空いている人だけ</option>
+        </select>
         <select id="fRecruit" onchange="render()">
           <option value="">募集状態：すべて</option>
           <option value="open">募集中のみ</option>
@@ -352,19 +372,56 @@
   // 絞り込みを通すか
   function passFilter(c){
     const from = document.getElementById('fFromDate').value;   // "YYYY-MM-DD"（空なら制限なし）
+    const on  = document.getElementById('fOnDate').value;      // "YYYY-MM-DD"（空なら制限なし）
     const kw  = document.getElementById('fKeyword').value.trim();
     const rec = document.getElementById('fRecruit').value;
     const pos = document.getElementById('fPos').value;
-    if (from && isoOf(caseDate(c.off)) < from) return false;    // 選んだ日より前は出さない
+    const iso = isoOf(caseDate(c.off));
+    // 「この日だけ」を選んでいるときは、そちらが優先（「この日から」は無視する）。
+    // ⚠ 2つとも効かせると「この日だけ」を選んでも何も出ない日が生まれて、壊れて見える。
+    if (on) { if (iso !== on) return false; }
+    else if (from && iso < from) return false;                  // 選んだ日より前は出さない
     if (kw && !((c.name || '').includes(kw) || (c.client || '').includes(kw))) return false;
     if (rec && recruitState(c) !== rec) return false;
     if (pos && !entrantsOf(c).some(e => e.pos === pos)) return false;
+    // スタッフ名・出どころの絞り込みは「その人が居る案件だけ出す」形で効かせる。
+    if (!visibleEntrants(c).length && (staffFilter() || srcFilter())) return false;
     return true;
   }
   // 「今日から」ボタン：表示開始日を今日に戻す
   function resetFromToday(){
     document.getElementById('fFromDate').value = isoOf(caseDate(0));
+    document.getElementById('fOnDate').value = '';
     render();
+  }
+  // 「この日だけ」を解除する
+  function clearOnDate(){
+    document.getElementById('fOnDate').value = '';
+    render();
+  }
+
+  // ===== スタッフ名・出どころの絞り込み（2026-09-07 baba要望）=====
+  // ⚠ 表に出す人だけを絞る。元のデータ（c.entrants）は減らさない
+  //   （減らすと「エントリー◯名」の数まで変わって、実際の応募数が分からなくなる）。
+  function staffFilter(){ return (document.getElementById('fStaff').value || '').trim(); }
+  function srcFilter(){ return document.getElementById('fSrc').value || ''; }
+  // 月ごとの表に出す人＝エントリーした人だけ（スタッフ名の絞り込みは効かせる）。
+  function monthEntrants(c){
+    const nm = staffFilter();
+    return entrantsOf(c).filter(e => (e.src || 'entry') === 'entry' && (!nm || (e.name || '').includes(nm)));
+  }
+  function visibleEntrants(c){
+    const nm = staffFilter(), src = srcFilter();
+    return entrantsOf(c).filter(e =>
+      (!nm  || (e.name || '').includes(nm)) &&
+      (!src || (e.src || 'entry') === src));
+  }
+  // 出どころの印。⚠ エントリー（案件に手を挙げた）と、カレンダーの〇（その日は働ける）は別の入力。
+  //   混ぜて出すと、声を掛ける優先度を取り違える。
+  function srcTag(e){
+    return (e.src === 'cal')
+      ? '<span class="e-src cal" title="この案件には応募していませんが、稼働希望カレンダーでその日を「終日〇」にしています">📅 空いてる</span>'
+      : '<span class="e-src ent" title="この案件に「エントリーする」を押してくれた人です">🙋 エントリー</span>';
   }
 
   // 状態バッジ
@@ -501,17 +558,24 @@
     const box = document.getElementById('view-bycase');
     if (!list.length){ box.innerHTML = '<div class="empty-note">条件に合う案件がありません。</div>'; return; }
     box.innerHTML = list.map(c => {
-      const ents = entrantsOf(c);
+      const all = entrantsOf(c);
+      const ents = visibleEntrants(c);            // 絞り込み後（表に出す人）
+      const entryCount = all.filter(e => (e.src || 'entry') === 'entry').length;
+      const calCount = all.length - entryCount;
       const dt = (c.dayType && c.dayType !== '本番') ? `<span class="e-badge dt-badge">${c.dayType}</span>` : '';
       const shortCls = c.filled < c.need ? ' short' : '';
-      const rows = ents.map(e => `
-        <tr class="${e.assigned?'assigned':''}">
-          <td>${e.no}</td>
+      const rows = ents.map((e, i) => `
+        <tr class="${e.assigned?'assigned':''}${(e.src === 'cal') ? ' fromcal' : ''}">
+          <td>${i + 1}</td>
           <td>${esc(e.name)}</td>
+          <td>${srcTag(e)}</td>
           <td>${wishTag(e.wish)}</td>
           <td><span class="e-lv ${e.lv}">${lvLabel[e.lv]}</span></td>
           <td>${posTag(e.pos)}</td>
-          <td><span class="e-stat ${e.assigned?'assigned':'waiting'}">${e.assigned?'✓ アサイン済み':'エントリー中'}</span></td>
+          <td><span class="e-stat ${e.assigned?'assigned':'waiting'}">${
+            e.assigned ? '✓ アサイン済み'
+                       : (e.src === 'cal' ? '未エントリー' : 'エントリー中')
+          }</span></td>
           <td class="ent-note">${e.entryNote ? esc(e.entryNote) : '<span class="muted">—</span>'}</td>
           <td>${e.assigned
             ? `<input class="ent-remark" value="${escAttr(e.remark||'')}" placeholder="担当メモ" title="アサインの備考と同じ（他のアサイン画面と同期します）" onchange="saveEntryMemo('${c.id}','${e.id}', this.value)">`
@@ -528,12 +592,14 @@
           </div>
           <div class="ecase-counts">
             <span class="c">必要 <b>${c.need}</b>名</span>
-            <span class="c">エントリー <b>${ents.length}</b>名</span>
+            <span class="c">🙋 エントリー <b>${entryCount}</b>名</span>
+            <span class="c">📅 その日空いている <b>${calCount}</b>名</span>
             <span class="c${shortCls}">アサイン済み <b>${Math.min(c.filled,c.need)}</b>名</span>
+            ${ents.length !== all.length ? `<span class="c filtered">絞り込み中：<b>${ents.length}</b>名を表示</span>` : ''}
           </div>
           <table class="ent-table">
-            <thead><tr><th>No</th><th>名前</th><th>その日の希望</th><th>区分</th><th>できるポジション</th><th>状態</th><th>本人メモ</th><th>担当メモ</th></tr></thead>
-            <tbody>${rows}</tbody>
+            <thead><tr><th>No</th><th>名前</th><th>出どころ</th><th>その日の希望</th><th>区分</th><th>できるポジション</th><th>状態</th><th>本人メモ</th><th>担当メモ</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="9" class="muted" style="text-align:center;padding:14px 0;">絞り込みに合う人がいません。</td></tr>'}</tbody>
           </table>
         </div>`;
     }).join('');
@@ -557,7 +623,8 @@
     const legend = '<div class="mtx-legend">見方：<span class="m-ent">〇</span> エントリー中'
       + '　<span class="m-tmp">仮</span> 仮アサイン　<span class="m-asg">✓</span> 確定'
       + '　<span class="m-none">・</span> 応募なし　<span class="m-lock">🔒</span> 確定＋公開済み（解除に確認）'
-      + '　｜　縦＝スタッフ／横＝案件　｜　<b>クリックで 未→仮→確定（前に進むだけ）／外すのは「×」</b></div>';
+      + '　｜　縦＝スタッフ／横＝案件　｜　<b>クリックで 未→仮→確定（前に進むだけ）／外すのは「×」</b>'
+      + '　｜　⚠ この表は<b>エントリーした人だけ</b>です（カレンダーで〇なだけの人は「案件ごと」で見てください）</div>';
 
     box.innerHTML = legend + groups.map(g => {
       const past = caseDate(g.off) < caseDate(0) && g.key !== todayKey;
@@ -565,7 +632,10 @@
 
       // この月の案件に関わるスタッフ（応募＋アサイン）を縦に並べる。名前をキーに集約。
       const staffMap = {}; const staffOrder = [];
-      cases.forEach(c => entrantsOf(c).forEach(e => {
+      // ⚠ この表は「エントリーした人」だけ（2026-09-07）。カレンダーで〇なだけの人まで並べると
+      //   ほとんど空っぽの行が大量に増えて、誰が応募してくれたのか読めなくなる。
+      //   〇だけの人は「案件ごと」と「📅 空いている人」で見る。
+      cases.forEach(c => monthEntrants(c).forEach(e => {
         if (!staffMap[e.name]){ staffMap[e.name] = { name:e.name, lv:e.lv, ent:0, asg:0 }; staffOrder.push(e.name); }
         staffMap[e.name].ent++;
         if (e.assigned) staffMap[e.name].asg++;
@@ -583,7 +653,7 @@
       // st： 'fix'=確定 / 'tmp'=仮 / 'ent'=エントリー中（未アサイン）
       const caseStatus = cases.map(c => {
         const m = {};
-        entrantsOf(c).forEach(e => {
+        monthEntrants(c).forEach(e => {
           const st = (e.status === '確定') ? 'fix' : (e.status === '仮' ? 'tmp' : 'ent');
           m[e.name] = { st: st, id: e.id, role: e.roleCode || '' };
         });

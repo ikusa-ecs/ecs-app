@@ -749,6 +749,33 @@ class AssignBoardController extends Controller
             $projects->pluck('start_date')->filter()->map(fn ($d) => $d->format('Y-m-d'))->all()
         );
 
+        // ── 「その日に終日〇を出しているだけの人」も候補として出す（2026-09-07 baba要望）──
+        // ⚠ エントリー（案件に手を挙げた）と、稼働希望カレンダーの〇（その日は働けます）は**別の入力**。
+        //   これまでは前者しか出していなかったので、「カレンダーで〇にしてくれている人」が
+        //   案件ごとの一覧に一切出てこず、声を掛ける相手を探せなかった。
+        // ⚠ どちらの入力から来た人かは必ず区別して渡す（src）。混ぜると
+        //   「エントリーしてくれた人」と「その日空いているだけの人」が見分けられなくなる。
+        //     src='entry' … その案件にエントリーした人
+        //     src='cal'   … その日に終日〇を出しているだけ（この案件には応募していない）
+        // ⚠ 出す人の決まりは「📅 空いている人」カレンダー（wishCalendar）と同じにそろえる。
+        //   ずれると同じ画面の中で言うことが違ってしまう。
+        $dates = $projects->pluck('start_date')->filter()
+            ->map(fn ($d) => $d->format('Y-m-d'))->unique()->values();
+        $okByDay = $dates->isEmpty()
+            ? []
+            : ShiftWish::okStaffByDay((string) $dates->min(), (string) $dates->max());
+
+        // その〇を出した人のうち、画面に出してよい人（スタッフ・在籍中・拠点）。
+        $calIds = collect($okByDay)->flatten()->unique()->values()->all();
+        $calPeople = $calIds
+            ? OfficeScope::applyToPeople(Person::staff(), $office)
+                ->whereIn('id', $calIds)
+                ->where(fn ($q) => $q->where('active', true)->orWhereNull('active'))
+                ->with('roleEligibilities:staff_id,position')
+                ->get()
+                ->keyBy('id')
+            : collect();
+
         $appsByProject = $apps->groupBy('project_id');
         // 案件×人 → 本人の応募メモ（applications.note）。
         $noteByProject = $apps->groupBy('project_id')->map(fn ($rows) => $rows->pluck('note', 'staff_id')->all());
@@ -777,7 +804,7 @@ class AssignBoardController extends Controller
             return $map;
         });
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
             $entryNotes = $noteByProject->get($p->id, []);         // [staff_id => 本人の応募メモ]
@@ -803,8 +830,43 @@ class AssignBoardController extends Controller
                         'status' => $assignedStatus[$sid] ?? null,   // '確定'/'仮'/null（未アサイン）
                         'entryNote' => $entryNotes[$sid] ?? '',      // 本人が応募時に書いた一言（読むだけ）
                         'remark' => $remarks[$sid] ?? '',            // 担当メモ＝アサインの備考(remark)と同期
+                        // どこから来た人か（2026-09-07 baba要望）。'entry'＝この案件にエントリーした人。
+                        'src' => 'entry',
                     ];
                 })->all();
+
+            // その日に「終日〇」を出しているだけの人を足す（この案件には応募していない人）。
+            // ⚠ 順番＝**エントリーした人が先、〇だけの人が後**。混ぜて並べると
+            //   「手を挙げてくれた人」が埋もれる。声を掛ける優先度が違う。
+            // ⚠ すでにこの案件のメンバーに入っている人も出す（誰が入っているか分かるように）。
+            //   ただし二重には出さない（entrants に居る人は飛ばす）。
+            $already = collect($entrants)->pluck('id')->flip();
+            $day = $p->start_date?->format('Y-m-d');
+            foreach (($day ? ($okByDay[$day] ?? []) : []) as $sid) {
+                if (isset($already[$sid])) {
+                    continue;
+                }
+                $person = $calPeople->get($sid);
+                if (! $person) {
+                    continue;   // 社員・退職者・他拠点（「📅 空いている人」と同じ決まり）
+                }
+                $already[$sid] = true;
+                $entrants[] = [
+                    'no' => count($entrants) + 1,
+                    'wish' => 'ok',                              // ここに来る人は必ず終日〇
+                    'id' => $sid,
+                    'name' => $person->name ?? $sid,
+                    'lv' => $this->lvCode($person->skill_level),
+                    'pos' => $this->primaryPos($person),
+                    'roleCode' => $this->primaryPosCode($person),
+                    'assigned' => in_array($sid, $assignedIds, true),
+                    'status' => $assignedStatus[$sid] ?? null,
+                    'entryNote' => '',                            // 応募していないので本人メモは無い
+                    'remark' => $remarks[$sid] ?? '',
+                    // 'cal'＝カレンダーで終日〇を出しているだけ（この案件には応募していない）。
+                    'src' => 'cal',
+                ];
+            }
 
             return [
                 'id' => $p->id,
