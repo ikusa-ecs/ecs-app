@@ -146,7 +146,7 @@ class RoleRequirementImportTest extends TestCase
         $preview->assertOk();
         $preview->assertSee('コンテンツ');
         $preview->assertSee('テスト合戦ミニ');
-        $preview->assertSee('新規');       // 台帳に無いものには印が付く
+        $preview->assertSee('新しく作る');   // 台帳に無いものには印が付く
         // ⚠ プレビューの時点ではまだ何も書き込まない。
         $this->assertSame(0, ContentRoleRequirement::count());
 
@@ -191,6 +191,100 @@ class RoleRequirementImportTest extends TestCase
         // もう一度取り込んでも増えない（消して入れ直しているため）。
         $this->importOnce($me);
         $this->assertSame(11, ContentRoleRequirement::where('content_id', 'CT-001')->count());
+    }
+
+    /**
+     * 名前の書き方だけが違う登録済みコンテンツは、**同じもの**として扱う（台帳を増やさない）。
+     * 2026-09-07 baba報告「案件名がちょっとちがうだけで、登録済みのやつも新規登録されちゃう」。
+     */
+    public function test_a_slightly_different_name_goes_into_the_existing_content(): void
+    {
+        Storage::fake('local');
+        $me = PersonFactory::new()->manager()->create();
+
+        // 台帳の名前は「テスト・合戦」（中黒あり）。CSVは「テスト合戦」。
+        Content::create(['id' => 'CT-001', 'content_name' => 'テスト・合戦', 'active' => true]);
+        // 全角英数・空白のゆれも同じものとして拾う。
+        Content::create(['id' => 'CT-002', 'content_name' => 'テスト合戦 ミニ', 'active' => true]);
+
+        $this->importOnce($me);
+
+        // 書き方が違うだけの2件は台帳を増やさない（増えるのは「テストチャンバラ」の1件だけ）。
+        $this->assertSame(3, Content::count());
+        $this->assertNull(Content::where('content_name', 'テスト合戦')->first());
+        $this->assertNull(Content::where('content_name', 'テスト合戦ミニ')->first());
+        $this->assertSame(11, ContentRoleRequirement::where('content_id', 'CT-001')->count());
+        $this->assertSame(11, ContentRoleRequirement::where('content_id', 'CT-002')->count());
+    }
+
+    /** 長音・数字は意味が変わるので、混ぜない（「謎パ」と「謎パ2」は別物）。 */
+    public function test_digits_and_long_vowels_are_not_merged(): void
+    {
+        $same = fn ($a, $b) => RoleRequirementCsv::normalizeName($a) === RoleRequirementCsv::normalizeName($b);
+
+        // 同じものとして拾ってよいゆれ
+        $this->assertTrue($same('水合戦', '水合戦 '));
+        $this->assertTrue($same('ヒラメキクエスト', 'ヒラメキ・クエスト'));
+        $this->assertTrue($same('ロケットPDCA', 'ロケットＰＤＣＡ'));
+
+        // ⚠ 混ぜてはいけないもの
+        $this->assertFalse($same('謎パ', '謎パ2'));
+        $this->assertFalse($same('ワールドリーダーズ', 'ワルドリダズ'));
+        $this->assertFalse($same('城攻め', '城攻め（大型）'));
+    }
+
+    /** 似ているだけ（片方が片方を含む）のときは勘で寄せず、人に選ばせる。 */
+    public function test_a_similar_name_is_asked_instead_of_guessed(): void
+    {
+        Storage::fake('local');
+        $me = PersonFactory::new()->manager()->create();
+
+        // 「テスト合戦（大型）」は「テスト合戦」を含むが、別物の可能性がある。
+        Content::create(['id' => 'CT-001', 'content_name' => 'テスト合戦（大型）', 'active' => true]);
+
+        $file = UploadedFile::fake()->createWithContent('必要アサイン人数.csv', $this->csv());
+        $preview = $this->actingAsPerson($me)
+            ->post('/role-requirement-import/preview', ['csv' => $file]);
+        $preview->assertOk();
+        $preview->assertSee('要確認');
+
+        $item = collect($preview->viewData('summary')['items'])->firstWhere('product', 'テスト合戦');
+        $this->assertSame('maybe', $item['matchType']);
+        // 既定は「新しく作る」＝黙って別のコンテンツへ入れない。
+        $this->assertNull($item['contentId']);
+        $this->assertSame('CT-001', $item['candidates'][0]['id']);
+
+        // 人が「これはCT-001のことです」と選んだら、そこへ入れる（新しくは作らない）。
+        $this->actingAsPerson($me)->post('/role-requirement-import', [
+            'token' => $preview->viewData('token'),
+            'map'   => [RoleRequirementCsv::key('テスト合戦') => 'CT-001'],
+        ])->assertRedirect('/role-requirement-import');
+
+        $this->assertSame(11, ContentRoleRequirement::where('content_id', 'CT-001')->count());
+        $this->assertNull(Content::where('content_name', 'テスト合戦')->first());
+    }
+
+    /** 2つの行が同じ台帳を指していたら取り込まない（あとの行だけ残る事故を防ぐ）。 */
+    public function test_it_refuses_when_two_rows_point_at_the_same_content(): void
+    {
+        Storage::fake('local');
+        $me = PersonFactory::new()->manager()->create();
+
+        Content::create(['id' => 'CT-001', 'content_name' => 'テスト合戦', 'active' => true]);
+
+        $file = UploadedFile::fake()->createWithContent('必要アサイン人数.csv', $this->csv());
+        $preview = $this->actingAsPerson($me)
+            ->post('/role-requirement-import/preview', ['csv' => $file]);
+
+        $res = $this->actingAsPerson($me)->post('/role-requirement-import', [
+            'token' => $preview->viewData('token'),
+            // 「テスト合戦ミニ」も CT-001 に入れる指定＝ぶつかる
+            'map'   => [RoleRequirementCsv::key('テスト合戦ミニ') => 'CT-001'],
+        ]);
+
+        $res->assertOk();               // 取り込まずに、同じ画面で知らせる
+        $res->assertSee('取り込めません');
+        $this->assertSame(0, ContentRoleRequirement::count());
     }
 
     /** 確認した内容が見つからないとき（時間が経った・開き直した）は、断って作り直させる。 */

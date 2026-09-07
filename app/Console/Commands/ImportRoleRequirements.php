@@ -42,7 +42,14 @@ class ImportRoleRequirements extends Command
 
         // ── プレビュー表示 ──
         foreach ($summary['items'] as $item) {
-            $tag = $item['isNew'] ? '★新規' : "既存({$item['contentId']})";
+            $tag = match ($item['matchType']) {
+                'exact'      => "既存({$item['contentId']})",
+                'normalized' => "≈既存({$item['contentId']}「{$item['matchedName']}」＝書き方ちがい)",
+                'ambiguous'  => "⚠要確認 既存({$item['contentId']}) ほか".(count($item['candidates']) - 1).'件の候補',
+                'maybe'      => '⚠要確認 ★新規（似た台帳あり：'
+                    .implode('・', array_map(fn ($c) => $c['id'].$c['name'], $item['candidates'])).'）',
+                default      => '★新規',
+            };
             $this->line("■ {$item['product']}  [{$tag}]");
             foreach ($item['scales'] as $scale => $info) {
                 $posSummary = [];
