@@ -89,4 +89,41 @@ class EmployeeAvailabilityOrderTest extends TestCase
             ->assertOk()
             ->assertSee("'<tr class=\"dep-'", false);
     }
+
+    /**
+     * 並べ替え（所属順／社歴順）に必要な材料が画面へ渡っていること（2026-09-07 baba要望）。
+     *
+     * ⚠ 並べ替えるのは画面側。EMP_LIST そのものを並べ替えないこと
+     *   （idx＝元の並びの番号で本人の入力を引いているので、崩すと他人の行に自分の入力が出る）。
+     * ⚠ 入社年月日が空の人は '' で渡し、社歴順ではいちばん下にまとめる
+     *   （空を「いちばん古い」と扱うと、新人が先輩より上に来て意味が逆になる）。
+     */
+    public function test_rows_carry_sort_keys(): void
+    {
+        $me = $this->emp('E-ME', '自分 太郎', 'わたし たろう', 'イベプラ');
+        \App\Models\Person::where('id', 'E-ME')->update(['hire_date' => '2020-04-01']);
+        $this->emp('E-N1', '入社日なし', 'にゅうしゃび なし', 'セールス');
+
+        $this->actingAsPerson($me)->get('/employee-availability')
+            ->assertOk()
+            ->assertViewHas('employees', function ($employees) {
+                $by = collect($employees)->keyBy('id');
+
+                return ($by['E-ME']['hire'] ?? null) === '2020-04-01'
+                    && ($by['E-N1']['hire'] ?? null) === ''
+                    && ($by['E-ME']['deptRank'] ?? null) === 0
+                    && ($by['E-N1']['deptRank'] ?? null) === 1;
+            });
+    }
+
+    /** 並べ替えの選択そのものが画面から消えていないこと（@ の区間の中なので気づけない）。 */
+    public function test_the_sort_selector_exists(): void
+    {
+        $me = $this->emp('E-ME', '自分 太郎', 'わたし たろう', 'イベプラ');
+
+        $this->actingAsPerson($me)->get('/employee-availability')
+            ->assertOk()
+            ->assertSee('id="ovSort"', false)
+            ->assertSee('社歴順（入社が古い人が上）', false);
+    }
 }

@@ -374,6 +374,15 @@
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 10px;">
             <select id="ovOffice" onchange="renderOverview()"
                     style="padding:7px 9px; border:1px solid #d1d5db; border-radius:8px; font-size:13px;"></select>
+            <!-- 並べ替え（2026-09-07 baba要望）。⚠ 自分の行は、どちらを選んでも必ずいちばん上。
+                 画面が「先頭の行＝自分」という決まりで動いているため（崩すと他人の行に自分の入力が出る）。
+                 ⚠ ここは @ の区間の中なので、Bladeのコメントを書くとそのまま画面に出る。 -->
+
+            <select id="ovSort" onchange="renderOverview()"
+                    style="padding:7px 9px; border:1px solid #d1d5db; border-radius:8px; font-size:13px;">
+              <option value="dept">並び：所属順（イベプラ→セールス→その他）</option>
+              <option value="hire">並び：社歴順（入社が古い人が上）</option>
+            </select>
             <span class="sub" id="ovOfficeHint" style="margin:0;"></span>
           </div>
           <div class="ov-wrap">
@@ -387,7 +396,9 @@
             ※ 本人が <b>✎ で書いたその日のメモ</b>（「午後だけ可」「前泊」など）も、その日のマスに小さく出ます。
             <b>平日など列になっていない日のメモは、右はしの「備考」に「◯日：〜」の形でまとめて出します。</b><br>
             ※ 上の<b>拠点</b>で絞れます（はじめは自分の拠点）。<b>「〇の人数」も、いま表に出ている人だけで数えます</b>
-            ＝その拠点で何人出られるかが分かります。他拠点の人も見たいときは「拠点：すべて」にしてください。
+            ＝その拠点で何人出られるかが分かります。他拠点の人も見たいときは「拠点：すべて」にしてください。<br>
+            ※ 上の<b>並び</b>で、<b>所属順</b>（イベプラ→セールス→その他）と<b>社歴順</b>（入社が古い人＝先輩が上）を切り替えられます。
+            <b>あなた自身の行は、どちらを選んでもいちばん上</b>です。社歴順のとき、<b>入社年月日を入れていない人はいちばん下</b>にまとまります。
           </p>
         </div>
       </div>
@@ -791,6 +802,29 @@
     const rows = [];
     EMPLOYEES.forEach(function(name, idx){
       if (want === '' || ovOfficeOf(idx) === want) rows.push({ name: name, idx: idx });
+    });
+
+    // ===== 並べ替え（2026-09-07 baba要望）=====
+    // ⚠ 並べ替えるのは rows（表に出す行）だけ。EMP_LIST そのものは絶対に並べ替えないこと。
+    //   idx（元の並びの番号）で本人の入力を引いているので、EMP_LIST を崩すと
+    //   他人の行に自分の入力が出る。
+    // ⚠ 自分（idx===0）は、どちらを選んでも必ずいちばん上。
+    // ⚠ 社歴順で入社日が空の人はいちばん下（空を「いちばん古い」と扱うと意味が逆になる）。
+    const sortSel = document.getElementById('ovSort');
+    const mode = sortSel ? sortSel.value : 'dept';
+    rows.sort(function(a, b){
+      if ((a.idx === 0) !== (b.idx === 0)) return a.idx === 0 ? -1 : 1;   // 自分が先頭
+      const ea = EMP_LIST[a.idx] || {}, eb = EMP_LIST[b.idx] || {};
+      if (mode === 'hire'){
+        const ha = ea.hire || '', hb = eb.hire || '';
+        if ((ha === '') !== (hb === '')) return ha === '' ? 1 : -1;       // 空はいちばん下
+        if (ha !== hb) return ha < hb ? -1 : 1;                            // 古い人が上
+      } else {
+        const ra = (ea.deptRank == null ? 9 : ea.deptRank);
+        const rb = (eb.deptRank == null ? 9 : eb.deptRank);
+        if (ra !== rb) return ra - rb;
+      }
+      return a.idx - b.idx;   // 同じときは元の並び（＝五十音順）のまま
     });
     return rows;
   }

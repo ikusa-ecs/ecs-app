@@ -79,7 +79,7 @@ class EmployeeAvailabilityController extends Controller
         $employees = Person::employees()
             ->inAssignPool($me ? [$me->id] : [])
             ->byKana()
-            ->get(['id', 'name', 'name_kana', 'office', 'department'])
+            ->get(['id', 'name', 'name_kana', 'office', 'department', 'hire_date'])
             // 拠点で絞って見られるように office も渡す（2026-08-26 baba要望）。
             // ⚠ 空の人は画面側で「東京」として扱う（名簿・案件と同じ決まり）。
             // dept＝所属の色分け用コード（plan/sales/other…）。色の正本＝App\Support\Departments。
@@ -89,6 +89,12 @@ class EmployeeAvailabilityController extends Controller
                 'office' => $p->office,
                 'dept' => Departments::code($p->department),
                 'deptLabel' => Departments::label($p->department),
+                // 並べ替え用の材料（2026-09-07 baba要望＝所属順／社歴順を選べるように）。
+                // ⚠ 画面で並べ替えるので、判断の材料はここで持たせる（画面に所属名や順番を書かない）。
+                'deptRank' => $deptRank(Departments::code($p->department)),
+                // 社歴＝入社年月日。空の人は '' にして、画面では**いちばん下**にまとめる
+                //   （空を「いちばん古い」と扱うと、新人が先輩より上に来て意味が逆になる）。
+                'hire' => $p->hire_date?->format('Y-m-d') ?? '',
             ])
             ->sortBy(fn (array $e) => [
                 ($me && $e['id'] === $me->id) ? 0 : 1,
