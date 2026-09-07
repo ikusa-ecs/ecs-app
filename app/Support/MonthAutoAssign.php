@@ -7,7 +7,6 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
-use App\Models\ShiftPreference;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -109,8 +108,10 @@ class MonthAutoAssign
 
         // 稼働希望（〇／NG）。⚠ 日付は時刻つきで入っているので ShiftWish に任せる。
         $wishByKey = ShiftWish::forDays($people->keys()->all(), $dates);
-        // 希望日数（分母）＝その月に「〇」を出した日数。充足率の計算に使う。
-        $wishDays = $this->wishDaysOfMonth($people->keys()->all());
+        // 希望数（充足率の分母）。⚠ 数え方の正本は [[WishCount]] 1か所だけ。
+        //   ここで独自に数えると「スタッフ一覧」と食い違う（実際に食い違っていた・2026-09-07 baba指摘）。
+        $wishInfo = WishCount::forMonth($this->period, $people->keys()->all());
+        $wishDays = array_map(fn ($v) => $v['wish'], $wishInfo);
 
         // ── ② 取り合いが厳しい案件から先に ─────────────────────────
         $rows = $projects->map(function (Project $p) use ($apps, $memberOf, $people, $wishByKey, $busyByDay, $monthCount) {
@@ -196,7 +197,7 @@ class MonthAutoAssign
 
         return [
             'projects' => $out,
-            'staff' => $this->staffSummary($addedByStaff, $monthCount, $wishDays, $people),
+            'staff' => $this->staffSummary($addedByStaff, $monthCount, $wishInfo, $people),
             'totals' => $this->totals(
                 count($out),
                 array_sum(array_map(fn ($r) => count($r['picks']), $out)),
@@ -400,34 +401,6 @@ class MonthAutoAssign
         return round((1 - $rate) * self::FAIRNESS_MAX, 2);
     }
 
-    /**
-     * その月に「〇」を出した日数（充足率の分母）。
-     *
-     * @return array<string, int>
-     */
-    private function wishDaysOfMonth(array $staffIds): array
-    {
-        if (! $staffIds) {
-            return [];
-        }
-        $rows = ShiftPreference::whereIn('staff_id', $staffIds)
-            ->whereBetween('date', [
-                $this->monthStart->format('Y-m-d').' 00:00:00',
-                $this->monthEnd->format('Y-m-d').' 23:59:59',
-            ])
-            ->get(['staff_id', 'date', 'availability']);
-
-        $out = [];
-        foreach ($rows as $r) {
-            if (! in_array((string) $r->availability, ['稼働可', '希望'], true)) {
-                continue;
-            }
-            $out[$r->staff_id] = ($out[$r->staff_id] ?? 0) + 1;
-        }
-
-        return $out;
-    }
-
     /** 主ポジション（保存する役割コード）。決められなければ空（あとで人が入れる）。 */
     private function roleOf(Person $p): string
     {
@@ -448,17 +421,22 @@ class MonthAutoAssign
      *
      * @return array<int, array<string, mixed>>
      */
-    private function staffSummary(array $addedByStaff, array $monthCountAfter, array $wishDays, Collection $people): array
+    private function staffSummary(array $addedByStaff, array $monthCountAfter, array $wishInfo, Collection $people): array
     {
         $out = [];
         foreach ($addedByStaff as $sid => $add) {
             $after = (int) ($monthCountAfter[$sid] ?? 0);
             $before = $after - $add;
-            $want = (int) ($wishDays[$sid] ?? 0);
+            $mine = $wishInfo[$sid] ?? ['wish' => 0, 'okDays' => 0, 'entries' => 0];
+            $want = (int) $mine['wish'];
             $out[] = [
                 'id' => $sid,
                 'name' => $people[$sid]->name ?? $sid,
                 'wishDays' => $want,
+                // 内訳（画面に「11（〇8日・応募10件）」と出すため）。
+                // ⚠ 数字だけだと何を数えたのか分からない＝聞かれるたびに説明することになる。
+                'okDays' => (int) $mine['okDays'],
+                'entries' => (int) $mine['entries'],
                 'before' => $before,
                 'add' => $add,
                 'after' => $after,

@@ -383,4 +383,51 @@ class MonthAutoAssignTest extends TestCase
             '見出しは日付の早い順'
         );
     }
+
+    /**
+     * ⚠ 希望数の数え方は「スタッフ一覧」と**同じ**であること（2026-09-07 baba指摘）。
+     *
+     * はじめ2か所で別々に数えていた（スタッフ一覧＝入れる枠の数／月まとめ＝〇の日数だけ）。
+     * 同じ「希望数」「充足率」という言葉なのに画面で数が違う＝どちらが正しいのか分からなくなる。
+     * 正本＝[[App\Support\WishCount]]。ここで数え直さないこと。
+     */
+    public function test_wish_count_matches_the_staff_list(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $month = Carbon::today()->startOfMonth();
+        $day = $month->copy()->addDays(10);
+
+        // 同じ日に案件を3件つくる＝〇1日ぶんが「3枠」と数えられる。
+        $ps = ProjectFactory::new()->count(3)->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['name' => '数え方さん', 'office' => '東京']);
+        $this->wish($s, $day);
+        \App\Models\Application::create([
+            'project_id' => $ps->first()->id, 'staff_id' => $s->id, 'intent' => '希望',
+        ]);
+
+        // 正本の数え方＝〇1日 × その日の案件3件 ＝ 3（エントリーは同じ日なので足さない）。
+        $expected = \App\Support\WishCount::forMonth($month->format('Y-m'))[$s->id];
+        $this->assertSame(3, $expected['wish']);
+        $this->assertSame(1, $expected['okDays']);
+        $this->assertSame(1, $expected['entries']);
+
+        // 月まとめの下見も同じ数を使っている。
+        $data = $this->actingAsPerson($me)
+            ->get('/auto-assign-month?period=' . $month->format('Y-m'))
+            ->assertOk()->original->getData();
+        $row = collect($data['plan']['staff'])->firstWhere('name', '数え方さん');
+        $this->assertSame(3, $row['wishDays']);
+        $this->assertSame(1, $row['okDays']);
+        $this->assertSame(1, $row['entries']);
+
+        // スタッフ一覧も同じ数。
+        $wl = $this->actingAsPerson($me)
+            ->get('/assign-wishlist?period=' . $month->format('Y-m'))
+            ->assertOk()->original->getData();
+        $wlRow = collect($wl['people'])->firstWhere('name', '数え方さん');
+        $this->assertSame(3, $wlRow['wish']);
+        $this->assertSame(1, $wlRow['entries']);
+    }
 }
