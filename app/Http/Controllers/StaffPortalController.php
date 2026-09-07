@@ -46,6 +46,13 @@ class StaffPortalController extends Controller
      */
     private const DEFAULT_NEED = RecruitStatus::DEFAULT_NEED;
 
+    /**
+     * 「終わった案件」をさかのぼって見せる日数（2026-09-07）。
+     * 400日＝13か月ぶん。月末に前年同月ぶんの請求を作り直すことがあるので、1年ちょうどでは足りない。
+     * ⚠ ここを無制限にすると、何年も続けたときに画面が重くなる。増やすならこの1か所だけ直す。
+     */
+    private const PAST_DAYS = 400;
+
     public function index()
     {
         $today = Carbon::today();
@@ -71,7 +78,11 @@ class StaffPortalController extends Controller
             : Project::whereIn('id', $mine->pluck('project_id')->unique()->all())
                 ->where('staff_published', true)
                 ->notCancelled()   // キャンセルになった案件は本人にも見せない（2026-08-26）
-                ->whereNotIn('status', ['下書き', '完了'])
+                // ⚠ ここで除くのは「下書き」だけ。以前は「完了」もここで除いていたが、
+                //   終わった案件はたいてい「完了」になるため、**終わった案件が1件も出せなかった**
+                //   （2026-09-04 まーみさん「請求書を作るとき過去の案件を見返したい」）。
+                //   これからの分から「完了」を外すのは、下の $published の絞り込みで行う。
+                ->whereNotIn('status', ['下書き'])
                 ->get()
                 ->keyBy('id');
 
@@ -87,16 +98,11 @@ class StaffPortalController extends Controller
                 ->all()
             : [];
 
-        $published = $mine
+        $allMine = $mine
             ->map(function (Assignment $a) use ($today, $projects, $myEntryNotes) {
                 $p = $projects->get($a->project_id);
                 if (! $p) {
-                    return null;   // 未公開／下書き／完了の案件は出さない
-                }
-
-                // 手動アーカイブされた案件は出さない（案件一覧と同じ扱い）。
-                if ($p->is_archived === true) {
-                    return null;
+                    return null;   // 未公開／下書きの案件は出さない
                 }
 
                 // 表示する日＝そのアサインの日（無ければ案件の開催日）。
@@ -118,6 +124,10 @@ class StaffPortalController extends Controller
                     'meet' => $p->staff_meet_time ?? $p->start_time ?? '—',
                     'leave' => $p->staff_leave_time ?? $p->end_time ?? '—',
                     'off' => $off,
+                    // 「これからの分」に出すかどうかの判定材料。⚠ ここで捨てず、下でふるい分ける
+                    //   （終わった案件は done / archived でも見返せるようにするため）。
+                    'done' => ($p->status === '完了'),
+                    'archived' => ($p->is_archived === true),
                     // 本人の担当ポジション（表示名）。役割コード→表示名は必ず AssignmentRole::label() を使う
                     // （日本語直書き禁止＝表記ゆれ防止）。role2 は兼任。
                     'mine' => true,
@@ -143,9 +153,20 @@ class StaffPortalController extends Controller
                 ];
             })
             ->filter()
-            // 過去の日は出さない（募集タブと同じ扱い＝当日は出す）。
-            ->filter(fn ($c) => $c['off'] >= 0)
+            ->values();
+
+        // これからの分（当日を含む）。⚠ 片付け済み（アーカイブ）と「完了」は出さない＝今までどおり。
+        $published = $allMine
+            ->filter(fn ($c) => $c['off'] >= 0 && ! $c['done'] && ! $c['archived'])
             ->sortBy('off')
+            ->values();
+
+        // 終わった分（昨日まで）。新しい順に、直近 PAST_DAYS 日ぶんだけ。
+        // ⚠ こちらは「完了」も片付け済みも**出す**。見返すことが目的なので、
+        //   担当が片付けたかどうかで本人の履歴が消えてはいけない（2026-09-07）。
+        $pastJobs = $allMine
+            ->filter(fn ($c) => $c['off'] < 0 && $c['off'] >= -self::PAST_DAYS)
+            ->sortByDesc('off')
             ->values();
 
         // 稼働希望カレンダーの対象月。既定＝今日基準の当月（?period= があればそれを優先）。
@@ -153,6 +174,9 @@ class StaffPortalController extends Controller
 
         return view('staff_portal', [
             'published' => $published,
+            // 終わった案件（新しい順）。⚠ カレンダーの「イベント」印には使わない
+            //   （使うと過去の月まで印が付いて、希望の入力と紛らわしくなる）。
+            'pastJobs' => $pastJobs,
             'recruitJobs' => $this->recruitJobs($today, $me),
             // お知らせ文＝本人の拠点のもの（2026-08-25 baba要望：拠点ごとに出し分ける）。
             'notice' => OfficeSettings::get(OfficeSettings::NOTICE, OfficeScope::filter(request())),

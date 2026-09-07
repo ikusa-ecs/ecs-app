@@ -239,6 +239,15 @@
     .apply-btn-sm:active { background: var(--brand-dark); }
     .apply-btn-sm.cancel { background: #fff; color: var(--brand-dark); border: 1px solid #bbe3c6; }
     .apply-btn-sm.disabled { background: #ece3d4; color: #8a7a66; cursor: default; }
+    /* 誤タップ防止の「もう一度押すと…」（2026-09-07）。
+       赤くして点滅させる＝ふだんのボタンと明らかに違う見た目にする。 */
+    .apply-btn-sm.confirm { background: var(--danger); color: #fff; border: none; animation: applyPulse 1s ease-in-out infinite; }
+    @keyframes applyPulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+    /* エントリー済みの案件を、一覧に残したまま見分けられるようにする（2026-09-07）。
+       ⚠ 消さずに残す＝どれに応募したか見返しながら選べるようにするため。 */
+    .job-row.applied { box-shadow: inset 4px 0 0 #15803d; }
+    .applied-mark { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+                    background: #15803d; color: #fff; font-size: 11px; font-weight: 700; }
 
     /* ===== 稼働希望カレンダー（既存スマホ画面から移植） ===== */
     .pref-wrap { max-width: 460px; margin: 0 auto; }
@@ -291,6 +300,9 @@
     .jc-job.applied { background: var(--job-applied-bg); color: var(--job-applied-fg); border-color: var(--job-applied-bd); font-weight: 700; }
     .jc-job.closed  { background: var(--job-closed-bg);  color: var(--job-closed-fg); border-color: var(--job-closed-bg); }
     .jc-job.extra   { box-shadow: inset 3px 0 0 var(--danger); }
+    /* 確定アサイン（2026-09-07）。カレンダーで「その日はもう入っている」が分かるようにする。
+       ⚠ 募集の3色（募集中＝薄橙／エントリー中＝薄緑／締切＝灰）と混ざらないよう青にする。 */
+    .jc-job.confirmed { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; font-weight: 700; }
     .jc-hint { font-size: 11.5px; color: var(--muted); margin: 8px 2px 0; }
     /* PCでは列の見出しに曜日が出ているので、マスの中の曜日は隠す。 */
     .jc-dow { display: none; }
@@ -418,6 +430,15 @@
 
     .empty-note { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
 
+    /* 終わった案件（2026-09-07）。これからの予定と見分けが付くよう、日付の色を落として灰色にする。 */
+    .pastToggle { width: 100%; padding: 10px; border: 1px solid var(--line); background: #f8f8f6; color: var(--ink);
+                  border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .pastToggle:hover { background: #f1efe9; }
+    .assign-item.past .assign-date { background: #9ca3af; }
+    .assign-item.past .assign-info .t { color: #4b5563; }
+    .pastMonth { margin: 14px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted);
+                 border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+
     /* ===== 設定タブ ===== */
     .settings-wrap { max-width: 560px; margin: 0 auto; }
     /* 便利リンク集（Notion・アンケートフォーム等）。1行まるごとタップできる大きさにする。 */
@@ -529,7 +550,7 @@
              （2026-08-24＝案件を登録する前に開くと嘘になるため）。 --}}
         <div class="notice" id="staffNotice">
           📣 @if(!empty($notice)){{ $notice }}
-          @elseif (!empty($recruitJobs) && count($recruitJobs))募集が出ています。気になる案件は「エントリーする」を押してください。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）
+          @elseif (!empty($recruitJobs) && count($recruitJobs))募集が出ています。気になる案件は「エントリーする」を押してください。<b>押し間違い防止のため、2回押すと決まります</b>（1回目は赤い「⚠ もう一度押すとエントリー」に変わるだけです）。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）
           @else いまは募集中の案件はありません。募集が始まると、ここに案件が並びます。@endif
         </div>
 
@@ -584,9 +605,11 @@
             <span class="jc-job applied">エントリー中</span>
             <span class="jc-job closed">締切・満員</span>
             <span class="jc-job open extra">追加案件</span>
+            <span class="jc-job confirmed">確定（あなたの担当）</span>
           </div>
           <p class="jc-hint">
             案件をタップすると、<b>すぐ下に一覧が開いて、その案件のところまで動きます</b>。ほかの案件もそのまま見られて、エントリーもできます。<br>
+            青い<b>「確定」</b>は、あなたの担当が決まっている日です。タップすると「確定アサイン」タブが開いて、持ち物や集合場所が見られます。<br>
             <span class="jc-only-sp">スマホでは幅が足りないので、マスの中には<b>案件名だけ</b>を出しています。<b>集合〜解散と場所は、押すと下の一覧に出ます</b>（日付のマスのどこを押しても開きます）。</span>
           </p>
           <div class="empty-note" id="jobCalEmpty" style="display:none;">この月には、条件に合う案件がありません。「‹ ›」で前後の月を見てください。</div>
@@ -676,6 +699,16 @@
             <div id="confirmList"></div>
           </div>
           <p class="empty-note">これ以降のアサインはまだ確定していません。</p>
+
+          {{-- 終わった案件（2026-09-07）。
+               請求書を作るときに、自分がいつどこに入ったかを見返せるようにするためのもの
+               （2026-09-04 まーみさんのご意見）。ふだんは閉じておく＝これからの予定の邪魔をしない。 --}}
+          <div class="m-card" id="pastCard" style="display:none;">
+            <h3>終わった案件</h3>
+            <p class="sub">昨日までに終わった、あなたの確定アサインです（新しい順・約13か月ぶん）。<b>請求書を作るときの確認にお使いください。</b>タップすると当日の内容が見られます。</p>
+            <button type="button" class="pastToggle" id="pastToggle" onclick="togglePastList()">▼ 終わった案件を見る</button>
+            <div id="pastList" style="display:none;"></div>
+          </div>
         </div>
       </div>
 
@@ -869,6 +902,8 @@
   </script>
   <!-- DBから渡された「公開ON（staff_published=true）」の案件。確定アサイン表示の元データ。 -->
   <script>window.ECS_PUBLISHED = @json($published);</script>
+  {{-- 終わった案件（新しい順・約13か月ぶん）。請求書を作るときに見返すためのもの。 --}}
+  <script>window.ECS_PAST_JOBS = @json($pastJobs ?? []);</script>
   <!-- 募集中タブの案件リスト（DB）。 -->
   <script>window.ECS_RECRUIT_JOBS = @json($recruitJobs ?? []);</script>
   <!-- 設定タブの初期値（本人のDB値）＋保存用のCSRFトークン。test/未ログインは null。 -->
@@ -960,6 +995,44 @@
     //   絞り込みを選び直したときは消す＝ふつうの絞り込みに戻す。
     const keepVisible = new Set();
 
+    // ===== エントリーの誤タップ防止（2026-09-07）=====
+    // 「一回タップしただけでエントリー済みになってしまう。気づいたらエントリーしてた、に
+    //   なりそう」というご意見（2026-09-02 佐賀熙さん）を受けて、2回押しに変えた。
+    // 1回目＝ボタンが赤い「⚠ もう一度押すと…」に変わるだけ（保存しない）。
+    // 2回目＝本当に保存する（toggleApply を呼ぶ）。
+    // ⚠ 5秒で自動的に元に戻す。戻さないと、赤いボタンを押したつもりが無いのに
+    //   ずっと赤いままになり、次に触ったときに1回で保存されてしまう。
+    let applyArmed = null;        // いま「もう一度押すと…」になっている案件のID（1件だけ）
+    let applyArmedTimer = null;
+
+    function disarmApply() {
+      applyArmed = null;
+      if (applyArmedTimer) { clearTimeout(applyArmedTimer); applyArmedTimer = null; }
+    }
+
+    function armApply(i) {
+      const j = jobs[i];
+      if (!j) return;
+      if (applyArmed === j.id) {   // 2回目＝本当に実行
+        disarmApply();
+        toggleApply(i);
+        return;
+      }
+      disarmApply();
+      applyArmed = j.id;
+      // ⚠ 押した案件は絞り込みから外れても一覧に残す（赤いボタンごと消えると押しようがない）。
+      keepVisible.add(j.id);
+      applyArmedTimer = setTimeout(function () { applyArmed = null; applyArmedTimer = null; renderJobs(); }, 5000);
+      renderJobs();
+    }
+
+    // カレンダーの青い「確定」を押したとき＝「確定アサイン」タブへ移る（2026-09-07）。
+    // ⚠ 中身をここで作らない。持ち物・集合場所は確定アサインタブが正なので、そこへ送るだけ。
+    function goToAssignTab() {
+      const btn = document.querySelector('.s-tabs button[data-tab="tab-assign"]');
+      if (btn) switchTab(btn);
+    }
+
     function syncToggleButtons() {
       document.getElementById('jfOpen').classList.toggle('on', jobStateFilter === 'open');
       document.getElementById('jfApplied').classList.toggle('on', jobStateFilter === 'applied');
@@ -969,6 +1042,7 @@
     function setJobState(v) {
       jobStateFilter = (jobStateFilter === v) ? '' : v;
       keepVisible.clear();   // 絞り込みを選び直したら、ふつうの絞り込みに戻す
+      disarmApply();         // 「もう一度押すと…」も解除（別の案件を押すつもりの取り違えを防ぐ）
       syncToggleButtons();
       renderJobs();
     }
@@ -1015,18 +1089,25 @@
         const cmt = commentState[j.id] || { text: '', open: false };
 
         // エントリーボタン（状態で見た目が変わる）
+        // ⚠ 押すのは armApply（2段階）。いきなり toggleApply を呼ばないこと
+        //   ＝1回のタップで決まってしまい、誤タップでエントリーされる（2026-09-02 佐賀熙さん）。
         let btn;
         if (j.state === 'closed') {
           btn = `<button class="apply-btn-sm disabled" disabled>締切・満員</button>`;
+        } else if (applyArmed === j.id) {
+          // 1回目を押したあと（5秒だけこの状態）。もう一度押すと本当に保存する。
+          btn = j.state === 'applied'
+            ? `<button class="apply-btn-sm confirm" onclick="armApply(${j._i})">⚠ もう一度押すと取り消し</button>`
+            : `<button class="apply-btn-sm confirm" onclick="armApply(${j._i})">⚠ もう一度押すとエントリー</button>`;
         } else if (j.state === 'applied') {
-          btn = `<button class="apply-btn-sm cancel" onclick="toggleApply(${j._i})">エントリーを取り消す</button>`;
+          btn = `<button class="apply-btn-sm cancel" onclick="armApply(${j._i})">エントリーを取り消す</button>`;
         } else if (window.ECS_MOCK_ONLY) {
           // ⚠ 体験用（見本）アカウントはエントリーが保存されない。押したあとに注意を出すだけだと
           //   「エントリーしたのに担当の一覧に無い」に見えるので、押す前にボタンで分かるようにする
           //   （2026-08-28 baba報告）。上の赤い注意と合わせて二重に知らせる。
-          btn = `<button class="apply-btn-sm" onclick="toggleApply(${j._i})" title="体験用アカウントのため保存されません。実際に応募するときは、発行されたスタッフのアカウントでログインしてください。">エントリーする（体験用・保存されません）</button>`;
+          btn = `<button class="apply-btn-sm" onclick="armApply(${j._i})" title="体験用アカウントのため保存されません。実際に応募するときは、発行されたスタッフのアカウントでログインしてください。">エントリーする（体験用・保存されません）</button>`;
         } else {
-          btn = `<button class="apply-btn-sm" onclick="toggleApply(${j._i})">エントリーする</button>`;
+          btn = `<button class="apply-btn-sm" onclick="armApply(${j._i})">エントリーする</button>`;
         }
 
         const row = document.createElement('div');
@@ -1038,7 +1119,7 @@
         row.innerHTML = `
           <div class="jr-head">
             <span class="jr-date">${dateStr}</span>
-            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span></span>
+            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.state === 'applied' ? '<span class="applied-mark">✅ エントリー済み</span>' : ''}</span>
             <span class="j-badge ${sb.c}">${sb.t}</span>
           </div>
           <div class="jr-tags">${tags}</div>
@@ -1191,6 +1272,20 @@
         monthCount++;
       });
 
+      // 確定アサインも同じカレンダーに出す（2026-09-07）。
+      // 「カレンダーの画面で、日付を押すとエントリーや確定済みの案件が出てほしい」というご意見
+      // （2026-09-02 スタッフのフォーム回答）。募集の案件だけだと、自分がもう入っている日が分からない。
+      // ⚠ 中身は「確定アサイン」タブが正。ここでは日付に印を出して、押したらそのタブへ送るだけにする
+      //   （同じ中身を2か所で作ると、片方だけ直して食い違う）。
+      const confirmedByDay = {};
+      let confirmedCount = 0;
+      (window.ECS_PUBLISHED || []).forEach(c => {
+        const cd = addDays(today, c.off);
+        if (cd.getFullYear() !== y || cd.getMonth() !== m) return;
+        (confirmedByDay[cd.getDate()] = confirmedByDay[cd.getDate()] || []).push(c);
+        confirmedCount++;
+      });
+
       const first = new Date(y, m, 1);
       const days = new Date(y, m + 1, 0).getDate();
       // 1日までの空きマス（日曜始まり＝稼働希望のカレンダーと同じ並び）。
@@ -1248,10 +1343,24 @@
           cell.appendChild(more);
         }
 
+        // その日の確定アサイン（青い帯）。押すと「確定アサイン」タブへ移る。
+        (confirmedByDay[d] || []).forEach(c => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'jc-job confirmed';
+          b.innerHTML = '<span class="jc-nm">✅ ' + escAttr(c.content) + '</span>'
+            + '<span class="jc-sub">確定</span>';
+          b.title = '確定アサイン：' + c.content + '／' + c.client
+            + '（押すと「確定アサイン」タブが開いて、持ち物や集合場所が見られます）';
+          b.onclick = function (ev) { ev.stopPropagation(); goToAssignTab(); };
+          cell.appendChild(b);
+        });
+
         grid.appendChild(cell);
       }
 
-      document.getElementById('jobCalEmpty').style.display = monthCount === 0 ? '' : 'none';
+      // ⚠ 確定アサインだけがある月に「案件がありません」と出さない（confirmedCount も数える）。
+      document.getElementById('jobCalEmpty').style.display = (monthCount + confirmedCount) === 0 ? '' : 'none';
 
       // 開いている日が、いま見ている月・絞り込みから外れたら閉じる（中身だけ残らないように）。
       if (openDayKey && !list.some(j => jobDayKey(j) === openDayKey)) {
@@ -1590,7 +1699,58 @@
         + '<div class="ad-note">当日の連絡・集合の合図は、これまでどおり LINE・チャットワークで行います。'
         + '内容に変更があると、この画面の表示も自動で新しくなります。</div></div>';
     }
+    // 終わった案件（2026-09-07）。請求書を作るときに見返すためのもの。
+    // ⚠ 中身の作り方は確定アサインと同じ assignDetailHtml を使う。
+    //   ここに別の詳細を書くと、片方だけ直して食い違う。
+    function renderPast(){
+      const card = document.getElementById('pastCard');
+      const wrap = document.getElementById('pastList');
+      if (!card || !wrap) return;
+      // 新しい順（off はマイナス。-1＝昨日）。サーバーで並べてあるが、念のためここでも並べる。
+      const past = (window.ECS_PAST_JOBS || []).slice().sort((a, b) => b.off - a.off);
+      if (!past.length){
+        card.style.display = 'none';   // 1件も無いときはカードごと出さない
+        return;
+      }
+      card.style.display = '';
+      document.getElementById('pastToggle').textContent = '▼ 終わった案件を見る（' + past.length + '件）';
+
+      let lastMonth = '';
+      wrap.innerHTML = past.map((j, i) => {
+        const d = addDays(today, j.off);
+        const key = 'pd-' + i;
+        const monthLabel = d.getFullYear() + '年' + (d.getMonth() + 1) + '月';
+        // 月が変わったら見出しを差し込む＝請求書は月ごとに作るので区切りがあると数えやすい。
+        const head = (monthLabel !== lastMonth) ? '<div class="pastMonth">' + monthLabel + '</div>' : '';
+        lastMonth = monthLabel;
+        const roleText = j.myRole ? escAttr(j.myRole) + (j.myRole2 ? '（兼任：' + escAttr(j.myRole2) + '）' : '') : '';
+        return head + `<div class="assign-item past" onclick="toggleAssignDetail('${key}')">
+          <div class="assign-date"><div class="d">${(d.getMonth()+1)}/${d.getDate()}</div><div class="dow">${DOW_CIRCLE[d.getDay()]}</div></div>
+          <div class="assign-info">
+            <div class="t">${escAttr(j.content)} ${escAttr(j.client)}${roleText ? ' ／ <span style="color:#6b7280;font-weight:700;">担当：'+roleText+'</span>' : ''}</div>
+            <div class="meta">集合 ${escAttr(j.meet)}〜${escAttr(j.leave)}　／　${escAttr(j.place)}</div>
+          </div>
+          <div class="assign-arrow">›</div>
+        </div>
+        <div class="assign-detail" id="${key}" style="display:none;">
+          ${assignDetailHtml(j, d)}
+        </div>`;
+      }).join('');
+    }
+
+    // 終わった案件の開閉。ふだんは閉じておく（これからの予定を先に見せたいため）。
+    function togglePastList(){
+      const wrap = document.getElementById('pastList');
+      const btn = document.getElementById('pastToggle');
+      if (!wrap || !btn) return;
+      const willOpen = (wrap.style.display === 'none' || !wrap.style.display);
+      wrap.style.display = willOpen ? '' : 'none';
+      const n = (window.ECS_PAST_JOBS || []).length;
+      btn.textContent = (willOpen ? '▲ 終わった案件を閉じる（' : '▼ 終わった案件を見る（') + n + '件）';
+    }
+
     renderConfirmed();
+    renderPast();
     // 公開や集合時間を切り替えたら、この画面に戻ったとき／別タブ更新時に反映
     window.addEventListener('focus', renderConfirmed);
     window.addEventListener('storage', renderConfirmed);
