@@ -48,6 +48,7 @@
         <a class="{{ ($active ?? '') === 'assign_director' ? 'active' : '' }}" href="/assign-director"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
         <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>
         <a class="{{ ($active ?? '') === 'entry_feed' ? 'active' : '' }}" href="/entry-feed"><span class="nav-icon">🆕</span> エントリー新着（来た順）</a>
+        <a class="{{ ($active ?? '') === 'auto_assign_month' ? 'active' : '' }}" href="/auto-assign-month"><span class="nav-icon">⚡</span> 月まとめ自動アサイン</a>
         {{-- 派遣一覧＝どの案件にどこへ何名頼んだかのシート（2026-09-03 baba要望）。
              ⚠ 入れる場所は日別ボードの「＋派遣」。それまでDBに何も残っていなかった。 --}}
         <a class="{{ ($active ?? '') === 'dispatch_list' ? 'active' : '' }}" href="/dispatch-list"><span class="nav-icon">🤝</span> 派遣一覧</a>

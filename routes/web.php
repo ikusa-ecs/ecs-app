@@ -23,6 +23,7 @@ use App\Http\Controllers\FinanceListController;
 use App\Http\Controllers\FinanceReminderController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\MasterImportController;
+use App\Http\Controllers\MonthAutoAssignController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\MyPageFinanceController;
 use App\Http\Controllers\OnboardingController;
@@ -208,6 +209,13 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/paper-stock/receipts', [PaperStockController::class, 'updateReceipts']);
     // 希望まとめ（別ウィンドウ）。対象月の希望者一覧を DB（希望＋アサイン＋ポジション可否）から作る。
     Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
+
+    // 月まとめの自動アサイン（2026-09-07 baba要望）。
+    // ⚠ 1か月ぶんをまとめて入れる操作なので、プレビュー（見るだけ）と実行を必ず分ける。
+    //   実行と取り消しは管理者以上（まとめて動く操作＝一般社員には出さない）。
+    Route::get('/auto-assign-month', [MonthAutoAssignController::class, 'index']);
+    Route::post('/auto-assign-month/run', [MonthAutoAssignController::class, 'run'])->middleware('tier:manager');
+    Route::post('/auto-assign-month/undo', [MonthAutoAssignController::class, 'undo'])->middleware('tier:manager');
 
     // アサイン関連の画面（Blade化済み）
     // アサイン表（東京アサイン表そっくりの縦カード）。案件情報＋割り当てメンバーを1画面で見る。月を選んで表示。
