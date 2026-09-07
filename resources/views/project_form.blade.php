@@ -374,7 +374,12 @@
             <label>開催日<span class="req-mark red">必須</span></label>
             <!-- 曜日は日付の右に出す。土日かどうかで動き方が変わるため、選んだ瞬間に分かるように（2026-08-21 baba）。 -->
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <input type="date" id="startDate" name="start_date" data-need="req">
+              <!-- ⚠ 欄のどこを押してもカレンダーが開くようにする（2026-07-24 八重さんのご要望
+                   「開催日ボタン上、全て反応するようにしてほしい（現状📅マークのみ）」）。
+                   ブラウザの既定では、日付の欄は右はしの📅マークを押したときしか開かない。
+                   showPicker が無い古いブラウザでは、これまでどおり📅マークで開く（何も壊れない）。 -->
+              <input type="date" id="startDate" name="start_date" data-need="req"
+                     onclick="if (this.showPicker) { try { this.showPicker(); } catch (e) {} }">
               <span id="startDateDow" class="dow-badge" style="display:none;"></span>
             </div>
             <div class="tbd-row">
