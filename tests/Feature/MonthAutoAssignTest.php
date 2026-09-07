@@ -296,4 +296,91 @@ class MonthAutoAssignTest extends TestCase
 
         $this->assertSame(0, Assignment::count());
     }
+
+    /**
+     * ⚠「この案件は入れない」で外した案件は、計画に出さない（2026-09-07 baba要望）。
+     * 実行のときも同じものを外す。
+     */
+    public function test_skipped_project_is_excluded(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $skip = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'project_name' => '外す案件', 'office' => '東京',
+        ]);
+        $keep = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'project_name' => '残す案件', 'office' => '東京',
+        ]);
+        PersonFactory::new()->staff()->count(2)->create(['office' => '東京'])
+            ->each(fn ($s) => $this->wish($s, $day));
+
+        $plan = (new MonthAutoAssign($day->format('Y-m'), null, [], [$skip->id]))->plan();
+        $names = collect($plan['projects'])->pluck('name')->all();
+        $this->assertNotContains('外す案件', $names);
+        $this->assertContains('残す案件', $names);
+
+        // 実行でも外れる。
+        $this->actingAsPerson($me)->post('/auto-assign-month/run', [
+            'period' => $day->format('Y-m'),
+            'skipProject' => [$skip->id],
+        ])->assertRedirect();
+
+        $this->assertSame(0, Assignment::where('project_id', $skip->id)->count());
+        $this->assertSame(1, Assignment::where('project_id', $keep->id)->count());
+    }
+
+    /** ⚠ 外した案件も一覧には返す（返さないとチェックを戻せなくなる）。 */
+    public function test_candidate_projects_include_skipped_ones(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $p = ProjectFactory::new()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+        ]);
+
+        $engine = new MonthAutoAssign($day->format('Y-m'), null, [], [$p->id]);
+
+        $this->assertContains($p->id, collect($engine->candidateProjects())->pluck('id')->all());
+        $this->assertSame(0, $engine->plan()['totals']['projects']);
+    }
+
+    /**
+     * ⚠ 表示は日ごとにしたが、**埋める順は変えていない**。
+     * その証拠として、各行に「何番目に埋めたか」（order）が入っていること。
+     */
+    public function test_each_row_keeps_the_fill_order(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $month = Carbon::today()->startOfMonth();
+        $day1 = $month->copy()->addDays(20);   // 候補が多い日（あとで埋まる）
+        $day2 = $month->copy()->addDays(10);   // 候補が1人だけの日（先に埋まる）
+
+        ProjectFactory::new()->create([
+            'start_date' => $day1->format('Y-m-d'), 'required_count' => 1,
+            'project_name' => 'ゆとり', 'office' => '東京',
+        ]);
+        ProjectFactory::new()->create([
+            'start_date' => $day2->format('Y-m-d'), 'required_count' => 1,
+            'project_name' => 'きびしい', 'office' => '東京',
+        ]);
+        PersonFactory::new()->staff()->count(3)->create(['office' => '東京'])
+            ->each(fn ($s) => $this->wish($s, $day1));
+        $this->wish(PersonFactory::new()->staff()->create(['office' => '東京']), $day2);
+
+        $data = $this->actingAsPerson($me)
+            ->get('/auto-assign-month?period=' . $month->format('Y-m'))
+            ->assertOk()->original->getData();
+
+        $byName = collect($data['plan']['projects'])->keyBy('name');
+        $this->assertSame(1, $byName['きびしい']['order'], '候補が少ない案件が1番目');
+        $this->assertSame(2, $byName['ゆとり']['order']);
+
+        // 表示は日ごと（日付をキーにまとまっている・日付順）。
+        $this->assertSame(
+            [$day2->format('Y-m-d'), $day1->format('Y-m-d')],
+            array_keys($data['byDay']),
+            '見出しは日付の早い順'
+        );
+    }
 }

@@ -55,6 +55,21 @@
   .am-skip .s-day .cn { font-size:10.5px; font-weight:700; background:#f0e6d8; color:#6e5b49; border-radius:999px; padding:0 5px; }
   .am-skip .s-clear { display:inline-block; margin-top:8px; font-size:12px; color:var(--brand-dark); }
 
+  .am-skip .s-day.s-proj { max-width:280px; }
+  .am-skip .s-day.s-proj .dt { font-size:11px; color:var(--muted); margin-right:3px; }
+
+  /* 日ごとのまとまり（2026-09-07 baba要望＝並べ方だけ日ごとにする） */
+  .am-day { margin:0 0 16px; }
+  .am-day-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    font-size:14px; font-weight:700; color:var(--ink);
+    border-left:4px solid var(--brand); padding:3px 0 3px 9px; margin:0 0 6px; }
+  .am-day-head .dw { font-size:12px; color:var(--muted); font-weight:600; }
+  .am-day-sum { font-size:12px; color:var(--muted); font-weight:600; }
+  /* 何番目に埋めたか。⚠ 並べ方を日ごとにしても「厳しい案件から埋めた」ことが分かるように残す。 */
+  .am-ord { display:inline-block; margin-left:6px; min-width:18px; text-align:center;
+    background:#eee3d4; color:#6e5b49; border-radius:999px; padding:0 6px;
+    font-size:10.5px; font-weight:700; }
+
   .am-sec { font-size:15px; font-weight:700; margin:18px 0 8px; }
   .am-note { font-size:12px; color:var(--muted); line-height:1.7; margin:6px 0 0; }
 
@@ -100,7 +115,7 @@
   ・⚠ <b>確定・公開ずみの案件、「🔒 この人数で足りている」で締めた案件には触りません。</b><br>
   ・⚠ <b>その日がNGの人・同じ日に別案件へ入っている人・今月{{ $monthCap }}件に達している人は入れません。</b><br>
   ・⚠ <b>運営人数が未入力（0）の案件は対象外</b>です（何人必要か決まっていないため）。<br>
-  ・<b>「この日はアサインしない」</b>にチェックを入れた日は、自動では入れません（自分で決めたい日に使ってください）。
+  ・<b>「この日はアサインしない」「この案件は入れない」</b>にチェックを入れたものは、自動では入れません（自分で決めたい日・案件に使ってください）。
 </div>
 
 {{-- 「この日はアサインしない」（2026-09-07 baba要望）。
@@ -123,8 +138,22 @@
       </label>
     @endforeach
   </div>
-  @if (count($skipDays) > 0)
-    <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => $officeScope])) }}">チェックを全部外す（{{ count($skipDays) }}日 除外中）</a>
+  {{-- ⚠ 案件のチェックも同じフォームで送る。別々のフォームにすると、
+       日を変えたときに案件のチェックが消えてしまう。 --}}
+  <span class="s-label" style="margin-top:12px;">この案件は入れない（チェックした案件は自動で入れません）：</span>
+  <div class="s-days">
+    @foreach ($candidateProjects as $cp)
+      @php($cd = \Illuminate\Support\Carbon::parse($cp['date']))
+      @php($poff = in_array((string) $cp['id'], $skipProjects, true))
+      <label class="s-day s-proj {{ $poff ? 'off' : '' }}">
+        <input type="checkbox" name="skipProject[]" value="{{ $cp['id'] }}" {{ $poff ? 'checked' : '' }}
+               onchange="document.getElementById('skipForm').submit();">
+        <span class="dt">{{ $cd->format('n/j') }}</span>{{ $cp['name'] }}<span class="cn">必{{ $cp['need'] }}</span>
+      </label>
+    @endforeach
+  </div>
+  @if (count($skipDays) > 0 || count($skipProjects) > 0)
+    <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => $officeScope])) }}">チェックを全部外す（日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} 除外中）</a>
   @endif
 </form>
 @endif
@@ -155,6 +184,9 @@
     @foreach ($skipDays as $d)
       <input type="hidden" name="skip[]" value="{{ $d }}">
     @endforeach
+    @foreach ($skipProjects as $pid)
+      <input type="hidden" name="skipProject[]" value="{{ $pid }}">
+    @endforeach
     <button type="submit" class="am-btn go" {{ $plan['totals']['added'] === 0 ? 'disabled' : '' }}>
       ⚡ この計画で {{ $plan['totals']['added'] }}名を入れる（すべて「仮」）
     </button>
@@ -177,41 +209,59 @@
   </div>
 @else
 
-<div class="am-sec">案件ごと（埋める順）</div>
-<table class="am-tbl">
-  <thead>
-    <tr>
-      <th>順</th><th>開催日</th><th>案件</th>
-      <th class="num" title="運営人数（案件登録の必要人数）">必要</th>
-      <th class="num" title="すでに入っている人数">現在</th>
-      <th class="num" title="入れられる候補が何人いるか">候補</th>
-      <th>入れる人（おすすめ順）</th>
-      <th class="num" title="入れてもまだ足りない人数">残り</th>
-    </tr>
-  </thead>
-  <tbody>
-    @foreach ($plan['projects'] as $i => $row)
-      <tr class="{{ $row['stillShort'] > 0 ? 'short' : '' }}">
-        <td class="num">{{ $i + 1 }}</td>
-        <td>{{ \Illuminate\Support\Carbon::parse($row['date'])->format('n/j') }}</td>
-        <td><b>{{ $row['name'] }}</b><br><span class="am-none">{{ $row['client'] }}</span></td>
-        <td class="num">{{ $row['need'] }}</td>
-        <td class="num">{{ $row['filled'] }}</td>
-        <td class="num">{{ $row['candCount'] }}</td>
-        <td>
-          @forelse ($row['picks'] as $pick)
-            <span class="am-pick" title="{{ implode('／', $pick['reasons']) }}{{ $pick['warnings'] ? '　⚠ '.implode('／', $pick['warnings']) : '' }}">
-              {{ $pick['name'] }}<span class="sc">{{ $pick['score'] }}</span>
-            </span>
-          @empty
-            <span class="am-none">入れられる人がいません</span>
-          @endforelse
-        </td>
-        <td class="num">{{ $row['stillShort'] > 0 ? $row['stillShort'] : '—' }}</td>
-      </tr>
-    @endforeach
-  </tbody>
-</table>
+<div class="am-sec">日ごと（この計画で誰が入るか）</div>
+<p class="am-note" style="margin:0 0 10px;">
+  ⚠ <b>埋める順は今までどおり「取り合いが厳しい案件から」</b>です（考え方は変えていません）。
+  見やすいように<b>並べ方だけ日ごと</b>にしました。案件名の右の <span class="am-ord">①</span> が<b>何番目に埋めたか</b>です。
+</p>
+@foreach ($byDay as $day => $rows)
+  @php($d = \Illuminate\Support\Carbon::parse($day))
+  <div class="am-day">
+    <div class="am-day-head">
+      {{ $d->format('n月j日') }}<span class="dw">（{{ ['日','月','火','水','木','金','土'][$d->dayOfWeek] }}）</span>
+      <span class="am-day-sum">{{ count($rows) }}件 ／ 入れる {{ collect($rows)->sum(fn ($r) => count($r['picks'])) }}名
+        @if (collect($rows)->sum('stillShort') > 0)
+          <b class="am-warn">／ まだ足りない {{ collect($rows)->sum('stillShort') }}名</b>
+        @endif
+      </span>
+    </div>
+    <table class="am-tbl">
+      <thead>
+        <tr>
+          <th style="width:150px;">案件</th>
+          <th class="num" title="運営人数（案件登録の必要人数）">必要</th>
+          <th class="num" title="すでに入っている人数">現在</th>
+          <th class="num" title="入れられる候補が何人いるか">候補</th>
+          <th>入れる人（おすすめ順）</th>
+          <th class="num" title="入れてもまだ足りない人数">残り</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach ($rows as $row)
+          <tr class="{{ $row['stillShort'] > 0 ? 'short' : '' }}">
+            <td>
+              <b>{{ $row['name'] }}</b><span class="am-ord" title="この計画で{{ $row['order'] }}番目に埋めました">{{ $row['order'] }}</span><br>
+              <span class="am-none">{{ $row['client'] }}</span>
+            </td>
+            <td class="num">{{ $row['need'] }}</td>
+            <td class="num">{{ $row['filled'] }}</td>
+            <td class="num">{{ $row['candCount'] }}</td>
+            <td>
+              @forelse ($row['picks'] as $pick)
+                <span class="am-pick" title="{{ implode('／', $pick['reasons']) }}{{ $pick['warnings'] ? '　⚠ '.implode('／', $pick['warnings']) : '' }}">
+                  {{ $pick['name'] }}<span class="sc">{{ $pick['score'] }}</span>
+                </span>
+              @empty
+                <span class="am-none">入れられる人がいません</span>
+              @endforelse
+            </td>
+            <td class="num">{{ $row['stillShort'] > 0 ? $row['stillShort'] : '—' }}</td>
+          </tr>
+        @endforeach
+      </tbody>
+    </table>
+  </div>
+@endforeach
 <p class="am-note">
   ※ 名前の右の小さい数字は「おすすめ度」です。マウスを乗せると理由が出ます（本人が希望／今月まだ0件／このコンテンツ経験あり など）。<br>
   ※ 「候補」＝その案件に入れられる人の数です。<b>候補が少ない案件から先に</b>埋めています。<br>

@@ -50,14 +50,16 @@ class MonthAutoAssign
     private Carbon $monthEnd;
 
     /**
-     * @param  array<int, string>  $skipDays  自動アサインしない日（'Y-m-d' の並び・2026-09-07 baba要望）
-     *   ⚠ 「この日は自分で決めたい」「大事な案件だから機械に任せない」ときのため。
-     *     除いた日の案件は**計画にも出さない**（下見に出ると、入るものだと勘違いする）。
+     * @param  array<int, string>  $skipDays      自動アサインしない日（'Y-m-d' の並び・2026-09-07 baba要望）
+     * @param  array<int, string>  $skipProjects  自動アサインしない案件（案件IDの並び・2026-09-07 baba要望）
+     *   ⚠ 「この日は自分で決めたい」「この案件だけは機械に任せない」ときのため。
+     *     除いたものは**計画にも出さない**（下見に出ると、入るものだと勘違いする）。
      */
     public function __construct(
         private string $period,          // 'YYYY-MM'
         private ?string $office = null,  // null＝全拠点
         private array $skipDays = [],
+        private array $skipProjects = [],
     ) {
         [$y, $m] = array_map('intval', explode('-', $period));
         $this->monthStart = Carbon::create($y, $m, 1)->startOfDay();
@@ -175,6 +177,9 @@ class MonthAutoAssign
             }
 
             $out[] = [
+                // ⚠ 埋めた順番。表示は日ごとに並べ替えるが、
+                //   「取り合いが厳しい案件から先に埋めた」ことは画面に残す（2026-09-07）。
+                'order' => count($out) + 1,
                 'id' => $p->id,
                 'name' => $p->project_name,
                 'client' => $p->client ?? '',
@@ -220,7 +225,30 @@ class MonthAutoAssign
         return $out;
     }
 
-    /** その月の「まだ足りない案件」。$applySkip=false なら「この日はアサインしない」を無視する。 */
+    /**
+     * その月の「自動アサインの対象になりうる案件」。**外したものも含めて**返す。
+     * 画面の案件ごとのチェックボックスを並べるために使う。
+     *
+     * ⚠ 外した案件も出さないと、チェックを外して戻すことができなくなる。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function candidateProjects(): array
+    {
+        return $this->targetProjects(false)
+            ->map(fn (Project $p) => [
+                'id' => $p->id,
+                'name' => $p->project_name,
+                'client' => $p->client ?? '',
+                'date' => $p->start_date->format('Y-m-d'),
+                'need' => $this->needOf($p),
+            ])
+            ->sortBy('date')
+            ->values()
+            ->all();
+    }
+
+    /** その月の「まだ足りない案件」。$applySkip=false なら外した日・案件を無視する。 */
     private function targetProjects(bool $applySkip = true): Collection
     {
         return OfficeScope::applyToProjects(Project::query(), $this->office)
@@ -233,8 +261,11 @@ class MonthAutoAssign
             ->orderBy('start_date')
             ->get()
             ->filter(function (Project $p) use ($applySkip) {
-                // ⚠ 「この日はアサインしない」で外した日（2026-09-07 baba要望）。
-                if ($applySkip && in_array($p->start_date->format('Y-m-d'), $this->skipDays, true)) {
+                // ⚠ 「この日はアサインしない」「この案件は入れない」で外したもの（2026-09-07 baba要望）。
+                if ($applySkip && (
+                    in_array($p->start_date->format('Y-m-d'), $this->skipDays, true)
+                    || in_array((string) $p->id, $this->skipProjects, true)
+                )) {
                     return false;
                 }
                 if (in_array($p->status, ['下書き', '完了'], true) || $p->is_archived === true) {

@@ -39,20 +39,27 @@ class MonthAutoAssignController extends Controller
         $period = $this->targetPeriod($request);
 
         $skipDays = $this->skipDays($request);
+        $skipProjects = $this->skipProjects($request);
 
-        $engine = new MonthAutoAssign($period, $office, $skipDays);
+        $engine = new MonthAutoAssign($period, $office, $skipDays, $skipProjects);
         $plan = $engine->plan();
 
         return view('auto_assign_month', [
-            // 「この日はアサインしない」のチェックを並べるための日の一覧（外した日も含む）。
+            // チェックボックスを並べるための一覧（外したものも含む）。
             'candidateDays' => $engine->candidateDays(),
+            'candidateProjects' => $engine->candidateProjects(),
             'skipDays' => $skipDays,
+            'skipProjects' => $skipProjects,
             'period' => $period,
             'periodLabel' => Carbon::createFromFormat('Y-m-d', $period.'-01')->format('Y年n月'),
             'prevPeriod' => Carbon::createFromFormat('Y-m-d', $period.'-01')->subMonth()->format('Y-m'),
             'nextPeriod' => Carbon::createFromFormat('Y-m-d', $period.'-01')->addMonth()->format('Y-m'),
             'isThisMonth' => $period === Carbon::today()->format('Y-m'),
             'plan' => $plan,
+            // ⚠ 表示だけ日ごとにまとめる（2026-09-07 baba要望）。
+            //   埋める順（＝取り合いが厳しい案件から）は変えていない。
+            //   その順番は各行の 'order' に残してあるので、画面に番号として出す。
+            'byDay' => collect($plan['projects'])->groupBy('date')->sortKeys()->all(),
             'officeScope' => $office,
             'monthCap' => MonthAutoAssign::MONTH_CAP,
             // 取り消せる直近の実行（まだ取り消していないもの）。
@@ -70,7 +77,7 @@ class MonthAutoAssignController extends Controller
 
         // ⚠ プレビューのあとに誰かが手で入れているかもしれないので、**作り直してから**保存する
         //   （画面が持っている古い計画をそのまま保存すると、二重に入る）。
-        $plan = (new MonthAutoAssign($period, $office, $this->skipDays($request)))->plan();
+        $plan = (new MonthAutoAssign($period, $office, $this->skipDays($request), $this->skipProjects($request)))->plan();
 
         $projects = Project::whereIn('id', collect($plan['projects'])->pluck('id'))
             ->get(['id', 'start_date'])->keyBy('id');
@@ -164,6 +171,22 @@ class MonthAutoAssignController extends Controller
             array_map(fn ($d) => (string) $d, $raw),
             fn ($d) => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)
         ));
+    }
+
+    /**
+     * 「この案件は入れない」で外した案件（2026-09-07 baba要望）。
+     * ⚠ 実行のときも同じものを受け取る。プレビューで外したのに実行では入る、では意味がない。
+     *
+     * @return array<int, string>
+     */
+    private function skipProjects(Request $request): array
+    {
+        $raw = $request->input('skipProject', []);
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(fn ($v) => (string) $v, $raw), fn ($v) => $v !== ''));
     }
 
     /**
