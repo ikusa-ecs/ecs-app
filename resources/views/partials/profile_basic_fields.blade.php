@@ -41,7 +41,7 @@
      2026-09-01 まで画面に直書きだったので、マスタ管理で拠点を足しても
      ここに出てこなかった（拠点ごとの選択肢で何度も踏んでいる形）。
      マスタが空のときだけ、これまでの並びで代用する（選べる物がゼロになるのを防ぐ）。 --}}
-@php($officeOptions = \App\Support\OfficeScope::options() ?: ['東京', '大阪', '名古屋', '福岡', '東北', '北海道'])
+@php($officeOptions = \App\Support\OfficeScope::options() ?: ['東京', '大阪', '名古屋', '福岡', '東北', '札幌'])
 <div class="form-row">
   <label>事務所</label>
   <select name="office">

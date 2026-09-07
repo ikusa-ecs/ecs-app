@@ -42,7 +42,7 @@ class ProjectFormRenderTest extends TestCase
     /** 運営場所の選択肢が画面に届いていること（拠点マスタから作った「○○依頼」を含む）。 */
     public function test_operation_place_options_are_passed_to_the_page(): void
     {
-        \App\Models\Office::firstOrCreate(['name' => '北海道'], ['sort_order' => 60, 'active' => true]);
+        \App\Models\Office::firstOrCreate(['name' => '札幌'], ['sort_order' => 60, 'active' => true]);
 
         $html = $this->open()->assertOk()->getContent();
 
@@ -55,7 +55,7 @@ class ProjectFormRenderTest extends TestCase
         };
 
         $this->assertTrue($contains('現地'), '「現地」が選択肢にあること');
-        $this->assertTrue($contains('北海道依頼'), '拠点マスタの拠点が「○○依頼」として選べること');
+        $this->assertTrue($contains('札幌依頼'), '拠点マスタの拠点が「○○依頼」として選べること');
     }
 
     /**

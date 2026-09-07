@@ -519,7 +519,7 @@
                   <label><input type="checkbox" name="baseLocation[]" value="大阪"> 大阪</label>
                   <label><input type="checkbox" name="baseLocation[]" value="名古屋"> 名古屋</label>
                   <label><input type="checkbox" name="baseLocation[]" value="福岡"> 福岡</label>
-                  <label><input type="checkbox" name="baseLocation[]" value="北海道"> 北海道</label>
+                  <label><input type="checkbox" name="baseLocation[]" value="札幌"> 札幌</label>
                 </div>
                 <div class="hint">「他拠点」がからむ案件で、どの拠点が対象かを選びます。</div>
               </div>

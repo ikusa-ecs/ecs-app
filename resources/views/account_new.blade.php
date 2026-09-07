@@ -134,7 +134,7 @@
             <label>事務所</label>
             <select name="office">
               <option value="">選択してください</option>
-              @foreach (['東京','大阪','名古屋','福岡','東北','北海道'] as $opt)
+              @foreach (['東京','大阪','名古屋','福岡','東北','札幌'] as $opt)
                 <option value="{{ $opt }}" @selected(old('office') === $opt)>{{ $opt }}</option>
               @endforeach
             </select>

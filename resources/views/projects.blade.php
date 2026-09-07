@@ -369,7 +369,7 @@
     .cal-ev.of-nagoya   { background: #c2410c; }
     .cal-ev.of-fukuoka  { background: #7c5aa6; }
     .cal-ev.of-tohoku   { background: #5f8079; }
-    .cal-ev.of-hokkaido { background: #3f6fa3; }
+    .cal-ev.of-sapporo { background: #3f6fa3; }
     .cal-ev.of-etc      { background: #6b7280; }
     .cal-ev.draft       { background: #6b5544; }
     .cal-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
@@ -442,7 +442,7 @@
   .of-badge.of-nagoya   { background: #c2410c; }
   .of-badge.of-fukuoka  { background: #7c5aa6; }
   .of-badge.of-tohoku   { background: #5f8079; }
-  .of-badge.of-hokkaido { background: #3f6fa3; }
+  .of-badge.of-sapporo { background: #3f6fa3; }
   .of-badge.of-etc      { background: #6b7280; }
   .of-share { font-size: 10.5px; font-weight: 700; color: var(--brand-dark, #6d4526); background: var(--brand-soft, #f6e9dd); border: 1px solid var(--line, #e6d8c8); border-radius: 6px; padding: 2px 8px; }
   .of-mine { font-size: 10.5px; font-weight: 800; color: #166534; background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 6px; padding: 2px 8px; }
@@ -791,7 +791,7 @@
     return a.length === 3 ? (Number(a[1]) + '/' + Number(a[2])) : s;
   }
   // 拠点 → 札の色クラス（拠点ごとに色を変えて、一覧をスクロールしただけで分かるように）
-  const OFFICE_CLASS = { '東京':'of-tokyo', '大阪':'of-osaka', '名古屋':'of-nagoya', '福岡':'of-fukuoka', '東北':'of-tohoku', '北海道':'of-hokkaido' };
+  const OFFICE_CLASS = { '東京':'of-tokyo', '大阪':'of-osaka', '名古屋':'of-nagoya', '福岡':'of-fukuoka', '東北':'of-tohoku', '札幌':'of-sapporo' };
   function officeClass(name) { return OFFICE_CLASS[name] || 'of-etc'; }
   // 絞り込みの「拠点」の値（プルダウンを出していないときは常に空＝絞らない）
   function officeFilterValue() {

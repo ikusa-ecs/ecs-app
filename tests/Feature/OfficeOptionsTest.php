@@ -44,11 +44,11 @@ class OfficeOptionsTest extends TestCase
     /** 運営場所には、ほかの拠点への「○○依頼」が自動で足される。 */
     public function test_operation_places_add_other_offices(): void
     {
-        $list = OfficeOptions::operationPlaces('東京', ['東京', '名古屋', '北海道']);
+        $list = OfficeOptions::operationPlaces('東京', ['東京', '名古屋', '札幌']);
 
         $this->assertContains('現地', $list);
         $this->assertContains('名古屋依頼', $list);
-        $this->assertContains('北海道依頼', $list);
+        $this->assertContains('札幌依頼', $list);
         $this->assertNotContains('東京依頼', $list, '自分の拠点への依頼は出さない');
     }
 
