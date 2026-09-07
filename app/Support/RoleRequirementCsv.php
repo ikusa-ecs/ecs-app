@@ -227,7 +227,7 @@ class RoleRequirementCsv
      *
      * @param  list<string>  $products
      * @param  array<string, string>  $overrides  商品名のキー(key())→ コンテンツID（''＝新規で作る）
-     * @return array<string, array{contentId: ?string, matchType: string, candidates: list<array{id: string, name: string}>, forcedNew: bool}>
+     * @return array<string, array{contentId: ?string, contentName: ?string, matchType: string, candidates: list<array{id: string, name: string}>, forcedNew: bool}>
      */
     public static function matchProducts(array $products, array $overrides = []): array
     {
@@ -235,12 +235,14 @@ class RoleRequirementCsv
 
         $exact = [];      // 名前 => id（同名が複数なら古い方）
         $byNorm = [];     // 整えた名前 => [['id'=>, 'name'=>], ...]
+        $nameById = [];   // id => 名前（選ばれた先の名前を画面に出すため）
         foreach ($contents as $c) {
             $name = (string) $c->content_name;
             if (! isset($exact[$name])) {
                 $exact[$name] = (string) $c->id;
             }
             $byNorm[self::normalizeName($name)][] = ['id' => (string) $c->id, 'name' => $name];
+            $nameById[(string) $c->id] = $name;
         }
 
         $result = [];
@@ -322,7 +324,22 @@ class RoleRequirementCsv
             ];
         }
 
+        // 入れる先の台帳の名前を添える（画面で「どこに入るのか」を必ず見せるため）。
+        foreach ($result as $prod => $r) {
+            $result[$prod]['contentName'] = $r['contentId'] !== null
+                ? ($nameById[$r['contentId']] ?? null)
+                : null;
+        }
+
         return $result;
+    }
+
+    /** 台帳のコンテンツ一覧（画面の「入れる先」の選択肢に出す）。 */
+    public static function contentList(): array
+    {
+        return Content::orderBy('id')->get(['id', 'content_name'])
+            ->map(fn ($c) => ['id' => (string) $c->id, 'name' => (string) $c->content_name])
+            ->all();
     }
 
     /** 商品名 → 画面の入力欄で使う短いキー（日本語をそのまま name 属性にしないため）。 */
@@ -380,16 +397,8 @@ class RoleRequirementCsv
                 ];
             }
 
-            // 入れる先の台帳の名前（書き方だけ違う一致のとき、画面に出して見てもらう）。
-            $matchedName = null;
-            if ($contentId !== null) {
-                foreach ($m['candidates'] as $c) {
-                    if ($c['id'] === $contentId) {
-                        $matchedName = $c['name'];
-                        break;
-                    }
-                }
-            }
+            // 入れる先の台帳の名前（どこに入るのかを必ず画面に出す）。
+            $matchedName = $m['contentName'];
 
             $items[] = [
                 'product'     => $prod,
@@ -410,6 +419,8 @@ class RoleRequirementCsv
             'slotTotal'        => $slotTotal,
             'matchedCount'     => $matchedCount,
             'needsChoiceCount' => $needsChoiceCount,
+            // 「入れる先」を自分で選べるようにするための台帳の一覧（2026-09-07 baba要望）。
+            'contents'         => self::contentList(),
         ];
     }
 

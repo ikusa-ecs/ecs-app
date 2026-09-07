@@ -61,7 +61,9 @@
       ⚠ ExcelでCSVを開いて上書き保存したもの（Shift_JIS）でも、そのまま読めます。<br>
       ✅ <b>名前の書き方が少し違うだけのものは、同じコンテンツとして扱います</b>（全角と半角・空白の有無・「・」の有無・大文字小文字）。
       台帳に<b>似た名前が2つできてしまうのを防ぐため</b>です。決められないものは<b>確認画面で選んでいただきます</b>
-      （勘で寄せません）。
+      （勘で寄せません）。<br>
+      ✅ <b>「入れる先」はどの行でもご自分で選べます</b>＝「★ 新しく作る」か、<b>コンテンツ台帳のどれに入れるか</b>を
+      選べます（名前がまったく同じ行だけは、迷う余地がないので選択欄を出しません）。
     </p>
 
     <form method="POST" action="/role-requirement-import/preview" enctype="multipart/form-data">
@@ -141,22 +143,36 @@
                     @endif
                   </td>
                   <td>
+                    {{-- どの行でも「新しく作る」か「台帳のどれに入れるか」を自分で選べる（2026-09-07 baba要望）。
+                         完全一致の行だけは選ばせない＝名前がそのまま同じなので迷う余地がない。 --}}
                     @if ($item['matchType'] === 'exact')
                       <span class="rr-pos">{{ $item['contentId'] }}</span> 登録済み（同じ名前）
-                    @elseif ($item['candidates'] === [])
-                      <span class="rr-new">★ 新しく作る</span>
-                      <input type="hidden" name="map[{{ $item['key'] }}]" value="">
                     @else
+                      @php($candidateIds = array_column($item['candidates'], 'id'))
                       <select name="map[{{ $item['key'] }}]">
                         <option value="" @selected($item['contentId'] === null)>★ 新しく作る</option>
-                        @foreach ($item['candidates'] as $c)
-                          <option value="{{ $c['id'] }}" @selected($item['contentId'] === $c['id'])>
-                            {{ $c['id'] }}　{{ $c['name'] }}　に入れる
-                          </option>
-                        @endforeach
+                        @if ($item['candidates'] !== [])
+                          <optgroup label="こちらが見つけた候補">
+                            @foreach ($item['candidates'] as $c)
+                              <option value="{{ $c['id'] }}" @selected($item['contentId'] === $c['id'])>
+                                {{ $c['id'] }}　{{ $c['name'] }}
+                              </option>
+                            @endforeach
+                          </optgroup>
+                        @endif
+                        <optgroup label="コンテンツ台帳から選ぶ（すべて）">
+                          @foreach ($summary['contents'] as $c)
+                            @continue (in_array($c['id'], $candidateIds, true))
+                            <option value="{{ $c['id'] }}" @selected($item['contentId'] === $c['id'])>
+                              {{ $c['id'] }}　{{ $c['name'] }}
+                            </option>
+                          @endforeach
+                        </optgroup>
                       </select>
-                      @if ($item['matchedName'] !== null && $item['matchType'] === 'normalized')
-                        <br><span class="rr-pos">＝台帳の「{{ $item['matchedName'] }}」と同じものとして入れます</span>
+                      @if ($item['matchedName'] !== null)
+                        <br><span class="rr-pos">＝台帳の「{{ $item['matchedName'] }}」に入れます</span>
+                      @else
+                        <br><span class="rr-pos">＝台帳に「{{ $item['product'] }}」を新しく作ります</span>
                       @endif
                     @endif
                   </td>
@@ -181,8 +197,13 @@
 
         <div style="margin-top:16px;">
           <button type="submit" class="btn primary">この内容で取り込む</button>
+          <button type="submit" name="recheck" value="1" class="btn" style="margin-left:8px;">選び直した内容を見直す</button>
           <a class="btn" href="/imports" style="margin-left:8px;">やめる</a>
         </div>
+        <p class="rr-note" style="margin:8px 0 0;">
+          ※ 「入れる先」を選び直したときは、<b>「選び直した内容を見直す」</b>を押すと、
+          どこに入るのかの説明が新しくなります（まだ取り込みません）。
+        </p>
       </form>
     </div>
   @endisset

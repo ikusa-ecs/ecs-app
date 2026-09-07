@@ -77,9 +77,10 @@ class RoleRequirementImportController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'token' => ['required', 'string', 'regex:/^[A-Za-z0-9]{32}$/'],
-            'map'   => ['nullable', 'array'],
-            'map.*' => ['nullable', 'string', 'max:50'],
+            'token'   => ['required', 'string', 'regex:/^[A-Za-z0-9]{32}$/'],
+            'map'     => ['nullable', 'array'],
+            'map.*'   => ['nullable', 'string', 'max:50'],
+            'recheck' => ['nullable', 'string', 'max:10'],
         ]);
 
         $path = self::TEMP_DIR.'/'.$request->input('token').'.csv';
@@ -95,9 +96,23 @@ class RoleRequirementImportController extends Controller
         $parsed = RoleRequirementCsv::parse(RoleRequirementCsv::rows((string) Storage::get($path)));
         $summary = RoleRequirementCsv::summary($parsed, $overrides);
 
+        $collisions = $this->collisions($summary);
+
+        // 「選び直した内容を見直す」＝取り込まずに、選んだ内容で確認画面を出し直す。
+        // ⚠ これが無いと、選び直しても行の説明文（「台帳の○○に入れます」）が古いまま見える。
+        //   説明文はサーバー側で作っているため（画面のJSに頼らない作りにしている）。
+        if ($request->filled('recheck')) {
+            return view('role_requirement_import', [
+                'summary'    => $summary,
+                'token'      => $request->input('token'),
+                'fileName'   => '選び直した内容',
+                'collisions' => $collisions,
+                'chosen'     => $overrides,
+            ]);
+        }
+
         // ⚠ 同じ台帳のコンテンツを2つの行が指していたら、取り込まずに直してもらう。
         //   そのまま入れると、あとの行の人数だけが残って前の行が消えたように見える。
-        $collisions = $this->collisions($summary);
         if ($collisions !== []) {
             return view('role_requirement_import', [
                 'summary'    => $summary,

@@ -264,6 +264,64 @@ class RoleRequirementImportTest extends TestCase
         $this->assertNull(Content::where('content_name', 'テスト合戦')->first());
     }
 
+    /**
+     * 似た名前が1つも無い行でも、「新しく作る」か「台帳のどれに入れるか」を**自分で選べる**
+     * （2026-09-07 baba要望「新しく作るは、新しく作るか選択できるかを自分で選べるようにしてほしい」）。
+     */
+    public function test_every_row_can_be_pointed_at_any_existing_content(): void
+    {
+        Storage::fake('local');
+        $me = PersonFactory::new()->manager()->create();
+
+        // 名前がまったく似ていないコンテンツ（＝こちらの候補には出てこない）。
+        Content::create(['id' => 'CT-050', 'content_name' => 'まったく別の催し', 'active' => true]);
+
+        $file = UploadedFile::fake()->createWithContent('必要アサイン人数.csv', $this->csv());
+        $preview = $this->actingAsPerson($me)
+            ->post('/role-requirement-import/preview', ['csv' => $file]);
+        $preview->assertOk();
+        // 台帳のすべてが選択肢に出ている（候補が無い行でも選べる）。
+        $preview->assertSee('コンテンツ台帳から選ぶ');
+        $preview->assertSee('まったく別の催し');
+
+        $item = collect($preview->viewData('summary')['items'])->firstWhere('product', 'テストチャンバラ');
+        $this->assertSame('new', $item['matchType']);
+        $this->assertSame([], $item['candidates']);
+
+        // 候補に出ていないコンテンツを自分で指定できる。
+        $this->actingAsPerson($me)->post('/role-requirement-import', [
+            'token' => $preview->viewData('token'),
+            'map'   => [RoleRequirementCsv::key('テストチャンバラ') => 'CT-050'],
+        ])->assertRedirect('/role-requirement-import');
+
+        $this->assertSame(2, ContentRoleRequirement::where('content_id', 'CT-050')->count());
+        $this->assertNull(Content::where('content_name', 'テストチャンバラ')->first());
+    }
+
+    /** 「選び直した内容を見直す」は、まだ取り込まない（説明文だけ新しくする）。 */
+    public function test_recheck_shows_the_new_choice_without_importing(): void
+    {
+        Storage::fake('local');
+        $me = PersonFactory::new()->manager()->create();
+        Content::create(['id' => 'CT-050', 'content_name' => 'まったく別の催し', 'active' => true]);
+
+        $file = UploadedFile::fake()->createWithContent('必要アサイン人数.csv', $this->csv());
+        $preview = $this->actingAsPerson($me)
+            ->post('/role-requirement-import/preview', ['csv' => $file]);
+
+        $res = $this->actingAsPerson($me)->post('/role-requirement-import', [
+            'token'   => $preview->viewData('token'),
+            'map'     => [RoleRequirementCsv::key('テストチャンバラ') => 'CT-050'],
+            'recheck' => '1',
+        ]);
+
+        $res->assertOk();
+        $res->assertSee('台帳の「まったく別の催し」に入れます', false);
+        // まだ何も入っていない。
+        $this->assertSame(0, ContentRoleRequirement::count());
+        $this->assertSame(1, Content::count());
+    }
+
     /** 2つの行が同じ台帳を指していたら取り込まない（あとの行だけ残る事故を防ぐ）。 */
     public function test_it_refuses_when_two_rows_point_at_the_same_content(): void
     {
