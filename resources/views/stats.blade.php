@@ -107,6 +107,7 @@
   .st-dept.plan     { border-top: 3px solid #d97706; }
   .st-dept.sales    { border-top: 3px solid #3b5ba5; }
   .st-dept.creative { border-top: 3px solid #2e9e6b; }
+  .st-dept.other    { border-top: 3px solid #6e5b49; }
   .st-dept .d-name { font-size: 12.5px; font-weight: 800; color: var(--ink); }
   .st-dept .d-num { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.15; margin-top: 2px; }
   .st-dept .d-sub { font-size: 11px; color: #a89680; }
@@ -131,17 +132,20 @@
 
 @section('content')
 
-{{-- 期間の粒度をタブ（シート）で選ぶ。案件一覧の下書き/アーカイブと同じ切替方式。拠点(office)は引き継ぐ。 --}}
+{{-- 期間の粒度をタブ（シート）で選ぶ。案件一覧の下書き/アーカイブと同じ切替方式。
+     リンクは全部コントローラで作っている（拠点・所属・並び順を付け忘れないため）。 --}}
 <div class="st-tabs">
-  <a class="st-tab {{ $span === 'month' ? 'active' : '' }}" href="/stats?span=month&office={{ urlencode($scopeOffice) }}">月単位</a>
-  <a class="st-tab {{ $span === 'quarter' ? 'active' : '' }}" href="/stats?span=quarter&office={{ urlencode($scopeOffice) }}">四半期</a>
-  <a class="st-tab {{ $span === 'year' ? 'active' : '' }}" href="/stats?span=year&office={{ urlencode($scopeOffice) }}">年単位</a>
+  <a class="st-tab {{ $span === 'month' ? 'active' : '' }}" href="{{ $links['span']['month'] }}">月単位</a>
+  <a class="st-tab {{ $span === 'quarter' ? 'active' : '' }}" href="{{ $links['span']['quarter'] }}">四半期</a>
+  <a class="st-tab {{ $span === 'year' ? 'active' : '' }}" href="{{ $links['span']['year'] }}">年単位</a>
 </div>
 
-{{-- 選んだ粒度の中で、どの期間かを選ぶ。選ぶとGETで開き直す（拠点も引き継ぐ）。 --}}
+{{-- 選んだ粒度の中で、どの期間かを選ぶ。選ぶとGETで開き直す（拠点・所属・並び順も引き継ぐ）。 --}}
 <form method="GET" action="/stats" class="st-controls" id="stForm">
   <input type="hidden" name="span" value="{{ $span }}">
   <input type="hidden" name="office" value="{{ $scopeOffice }}">
+  <input type="hidden" name="dept" value="{{ $deptCode }}">
+  <input type="hidden" name="sort" value="{{ $sort }}">
   <span class="lbl">
     @switch($span) @case('quarter') 四半期 @break @case('year') 年 @break @default 月 @endswitch
     を選ぶ
@@ -155,18 +159,47 @@
   </select>
 
   <span class="spacer"></span>
-  <span class="now">{{ $selectedLabel !== '' ? $selectedLabel : '—' }}・{{ $scopeOffice !== '' ? $scopeOffice : '全拠点' }} の集計</span>
-  <a class="st-csv" href="/stats/export.csv?span={{ $span }}&period={{ urlencode($selected) }}&office={{ urlencode($scopeOffice) }}">⬇ CSVで出力</a>
+  <span class="now">{{ $selectedLabel !== '' ? $selectedLabel : '—' }}・{{ $scopeOffice !== '' ? $scopeOffice : '全拠点' }}@if ($scopeDept !== '')・{{ $scopeDept }}@endif の集計</span>
+  <a class="st-csv" href="{{ $links['csv'] }}">⬇ CSVで出力</a>
 </form>
 
 {{-- 表示範囲＝全拠点／各拠点。選ぶと下の集計すべてがその拠点に切り替わる（baba 2026-07-27）。 --}}
 <div class="st-scope">
   <span class="sc-label">表示範囲</span>
-  <a class="all {{ $scopeOffice === '' ? 'active' : '' }}" href="/stats?span={{ $span }}&period={{ urlencode($selected) }}&office=">全拠点</a>
+  <a class="all {{ $scopeOffice === '' ? 'active' : '' }}" href="{{ $links['office'][''] }}">全拠点</a>
   @foreach ($offices as $o)
-    <a class="{{ $scopeOffice === $o ? 'active' : '' }}" href="/stats?span={{ $span }}&period={{ urlencode($selected) }}&office={{ urlencode($o) }}">{{ $o }}</a>
+    <a class="{{ $scopeOffice === $o ? 'active' : '' }}" href="{{ $links['office'][$o] }}">{{ $o }}</a>
   @endforeach
 </div>
+
+{{-- 所属（イベプラ／セールス／…）で絞る（FB No.10・baba 2026-09-03）。
+     所属の一覧は画面に書かず App\Support\Departments から受け取る（増えてもここは直さない）。 --}}
+<div class="st-scope">
+  <span class="sc-label">所属</span>
+  <a class="all {{ $deptCode === '' ? 'active' : '' }}" href="{{ $links['dept'][''] }}">すべて</a>
+  @foreach ($deptOptions as $code => $name)
+    <a class="{{ $deptCode === $code ? 'active' : '' }}" href="{{ $links['dept'][$code] }}">{{ $name }}</a>
+  @endforeach
+</div>
+
+{{-- 並び順＝社歴順（既定）／出勤数の多い順（FB No.11）。社員別・スタッフ別の両方に効く。 --}}
+<div class="st-scope">
+  <span class="sc-label">並び替え</span>
+  <a class="{{ $sort === 'hire' ? 'active' : '' }}" href="{{ $links['sort']['hire'] }}">社歴順</a>
+  <a class="{{ $sort === 'count' ? 'active' : '' }}" href="{{ $links['sort']['count'] }}">出勤数が多い順</a>
+  <span class="st-note" style="margin:0;">
+    社歴順＝入社が古い人（先輩）が上。入社年月日を入れていない人はいちばん下にまとめます。
+  </span>
+</div>
+
+{{-- 所属で絞っているときの注意書き。イベント数まで変わったように見える誤解を防ぐ（大事）。 --}}
+@if ($scopeDept !== '')
+  <p class="st-excluded">
+    いまは所属「<b>{{ $scopeDept }}</b>」の人だけを表示しています。<br>
+    ※ <b>イベント数は案件ごとの集計なので、所属では変わりません</b>（イベント数・規模別・他拠点依頼は、案件を数えているため所属という考えがありません）。<br>
+    所属で変わるのは「のべ出勤数」「部署別」「社員別」です。スタッフ（アルバイト）には所属が無いので、絞っている間はスタッフ別の欄を出しません。
+  </p>
+@endif
 
 {{-- KPI：イベント数（合計・リアル・オンライン）と のべ出勤数 --}}
 <div class="st-kpis">
@@ -183,7 +216,7 @@
     <div class="k-num">{{ $onlineEvents }}<small>件</small></div>
   </div>
   <div class="st-kpi accent-att">
-    <div class="k-label">のべ出勤数（全員）</div>
+    <div class="k-label">のべ出勤数（{{ $scopeDept !== '' ? $scopeDept : '全員' }}）</div>
     <div class="k-num">{{ $totalAttendance }}<small>回</small></div>
   </div>
 </div>
@@ -252,7 +285,8 @@
     <h3>部署別 出勤・ディレクター</h3>
     <div class="st-depts">
       @foreach ($byDept as $d)
-        @php $cls = ['イベプラ' => 'plan', 'セールス' => 'sales', 'クリエイティブ' => 'creative'][$d['dept']] ?? ''; @endphp
+        {{-- 所属→色のコードは Departments が正本。画面に所属名を書き足さない。 --}}
+        @php $cls = \App\Support\Departments::code($d['dept']); @endphp
         <div class="st-dept {{ $cls }}">
           <div class="d-name">{{ $d['dept'] }}</div>
           <div class="d-num">{{ $d['count'] }}</div>
@@ -270,13 +304,14 @@
   // 集計の主役は社員（スタッフは出さない）。
   // 全拠点モード＝拠点ごとにカード分け／特定の拠点を選んだとき＝部署ごとにカード分け（baba 2026-07-27）。
   $emp = $members->where('kind', '社員')->values();
-  if ($scopeOffice !== '') {
+  if ($scopeOffice !== '' || $scopeDept !== '') {
     $groupBy = '部署';
-    $groupOrder = ['イベプラ', 'セールス', 'クリエイティブ'];
-    $empGrouped = $emp->groupBy(fn ($m) => ($m['dept'] ?? '') !== '' ? $m['dept'] : '（部署未設定）');
+    // 所属の一覧・拠点の一覧はここに書かない（コントローラ＝正本から受け取る）。
+    $groupOrder = $deptGroups;
+    $empGrouped = $emp->groupBy(fn ($m) => ($m['deptGroup'] ?? '') !== '' ? $m['deptGroup'] : '（部署未設定）');
   } else {
     $groupBy = '拠点';
-    $groupOrder = ['東京', '名古屋', '大阪', '福岡', '北海道', '東北'];
+    $groupOrder = $offices;
     $empGrouped = $emp->groupBy(fn ($m) => ($m['office'] ?? '') !== '' ? $m['office'] : '（拠点未設定）');
   }
   // 表示順＝定番の順→それ以外（未設定など）は後ろ。
@@ -284,7 +319,8 @@
       ->merge($empGrouped->keys()->diff($groupOrder))->values();
 @endphp
 
-{{-- 社員別 出勤数＋ディレクター内訳（全拠点=拠点ごと／拠点別=部署ごと・各グループ内は出勤の多い順）。
+{{-- 社員別 出勤数＋ディレクター内訳（全拠点=拠点ごと／拠点や所属で絞ると部署ごと・
+     各グループ内の並びは上の「並び替え」で決める＝既定は社歴順）。
      列は「社員・ディレクター集計」と同じ：出勤／D＋SD合計／D／リアルD／大型D／大型SD／オンラインD。 --}}
 <div class="st-office-title">社員別 イベント出勤・ディレクター内訳（{{ $groupBy }}ごと・{{ $emp->count() }}名）</div>
 @forelse ($groupKeys as $gk)
@@ -307,7 +343,9 @@
         <tbody>
           @foreach ($empGrouped[$gk] as $m)
             <tr>
-              <td class="l">{{ $m['name'] }}@if ($scopeOffice !== '' && $m['office'] !== '')<span class="sub">{{ $m['office'] }}</span>@endif</td>
+              <td class="l">{{ $m['name'] }}@if ($scopeOffice !== '' && $m['office'] !== '')<span class="sub">{{ $m['office'] }}</span>@endif
+                {{-- ⚠ 上の @endif とこの下の行をくっつけて書かないこと。Bladeが命令として読まず、画面が500になる。 --}}
+                @if ($sort === 'hire')<span class="sub">{{ $m['hireLabel'] }}</span>@endif</td>
               <td>{{ $m['count'] }}</td>
               <td>{{ $m['dTotal'] }}</td>
               <td>{{ $m['d'] }}</td>
@@ -324,10 +362,13 @@
 @empty
   <div class="st-panel"><div class="empty">この期間に出勤した社員がいません。</div></div>
 @endforelse
-<p class="st-note">全拠点＝拠点ごと／拠点を選ぶと部署ごとに表示。出勤＝出勤日数。D＋SD合計〜オンラインDは「社員・ディレクター集計」と同じ数え方（同じ案件は1回）。</p>
+<p class="st-note">全拠点＝拠点ごと／拠点や所属を選ぶと部署ごとに表示。並びは「{{ $sort === 'count' ? '出勤数が多い順' : '社歴順' }}」。出勤＝出勤日数。D＋SD合計〜オンラインDは「社員・ディレクター集計」と同じ数え方（同じ案件は1回）。</p>
 
-{{-- スタッフ別 出勤数（上長要望で追加・baba 2026-07-27） --}}
-@php $stf = $members->where('kind', 'スタッフ')->sortByDesc('count')->values(); @endphp
+{{-- スタッフ別 出勤数（上長要望で追加・baba 2026-07-27）。
+     ⚠ 所属で絞っているときは出さない。スタッフ（アルバイト）に所属は無いので、
+        絞ると全員消えて「この期間は誰も出勤していない」と読めてしまうため。 --}}
+@if ($scopeDept === '')
+@php $stf = $members->where('kind', 'スタッフ')->values(); @endphp
 <div class="st-panel" style="margin-top:16px;">
   <h3>スタッフ別 イベント出勤数（{{ $stf->count() }}名）</h3>
   <div class="st-members">
@@ -340,7 +381,8 @@
       <div class="empty">この期間に出勤したスタッフがいません。</div>
     @endforelse
   </div>
-  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。</p>
+  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。並びは「{{ $sort === 'count' ? '出勤数が多い順' : '社歴順（IKUSAで働き始めた年月が古い人が上・未入力は下）' }}」。</p>
 </div>
+@endif
 
 @endsection

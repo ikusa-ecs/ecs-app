@@ -8,6 +8,7 @@ use App\Support\Departments;
 use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\EventCount;
+use App\Support\HireDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -28,7 +29,7 @@ use Illuminate\Support\Collection;
 class StatsController extends Controller
 {
     /** 拠点（事務所）の表示順。実データが無くても常にこの順で全拠点を出す。 */
-    private const OFFICE_ORDER = ['東京', '名古屋', '大阪', '福岡', '北海道', '東北'];
+    private const OFFICE_ORDER = ['東京', '名古屋', '大阪', '福岡', '札幌', '東北'];
 
     public function index(Request $request)
     {
@@ -47,9 +48,9 @@ class StatsController extends Controller
 
         // 社員別のグループ分け（画面と同じ）。全拠点＝拠点ごと／特定の拠点＝部署ごと。
         $emp = $data['members']->where('kind', '社員');
-        if ($data['scopeOffice'] !== '') {
+        if ($data['scopeOffice'] !== '' || $data['scopeDept'] !== '') {
             $groupCol = '部署';
-            $groupKey = 'dept';
+            $groupKey = 'deptGroup';
             $order = Departments::GROUPS;   // イベプラ／セールス／クリエイティブ／その他
         } else {
             $groupCol = '拠点';
@@ -65,6 +66,12 @@ class StatsController extends Controller
         $rows[] = ['ECS集計ダッシュボード'];
         $rows[] = ['期間', $data['selectedLabel']];
         $rows[] = ['表示範囲', $scopeLabel];
+        // 画面と同じ条件で出していることが、CSVだけ見ても分かるようにしておく。
+        $rows[] = ['所属', $data['scopeDept'] !== '' ? $data['scopeDept'] : 'すべて'];
+        $rows[] = ['並び順', $data['sort'] === 'count' ? '出勤数が多い順' : '社歴順（入社が古い人が上）'];
+        if ($data['scopeDept'] !== '') {
+            $rows[] = ['※ イベント数は案件ごとの集計なので、所属では変わりません'];
+        }
         $rows[] = [];
         $rows[] = ['■ イベント数'];
         $rows[] = ['合計', $data['totalEvents']];
@@ -110,10 +117,13 @@ class StatsController extends Controller
             }
             $rows[] = [];
         }
-        $rows[] = ['■ スタッフ別 イベント出勤'];
-        $rows[] = ['氏名', 'イベント出勤', 'うち大型'];
-        foreach ($data['members']->where('kind', 'スタッフ')->sortByDesc('count') as $m) {
-            $rows[] = [$m['name'], $m['count'], $m['big']];
+        // スタッフに所属は無いので、所属で絞っているときは出さない（0名と誤解されるため・画面と同じ）。
+        if ($data['scopeDept'] === '') {
+            $rows[] = ['■ スタッフ別 イベント出勤'];
+            $rows[] = ['氏名', 'イベント出勤', 'うち大型'];
+            foreach ($data['members']->where('kind', 'スタッフ') as $m) {
+                $rows[] = [$m['name'], $m['count'], $m['big']];
+            }
         }
 
         // BOM＋各行を書き出す（$escape='' でPHP8.4のfputcsv非推奨警告を回避）。
@@ -126,7 +136,9 @@ class StatsController extends Controller
         $csv = stream_get_contents($handle);
         fclose($handle);
 
-        $filename = 'ecs-stats_' . ($data['selected'] ?: 'all') . ($data['scopeOffice'] !== '' ? '_office' : '') . '.csv';
+        $filename = 'ecs-stats_' . ($data['selected'] ?: 'all')
+            . ($data['scopeOffice'] !== '' ? '_office' : '')
+            . ($data['deptCode'] !== '' ? '_' . $data['deptCode'] : '') . '.csv';
 
         return response($csv, 200, [
             'Content-Type'        => 'text/csv; charset=UTF-8',
@@ -182,6 +194,23 @@ class StatsController extends Controller
         $scopeOffice = (string) $request->query('office', '');
         if (! in_array($scopeOffice, self::OFFICE_ORDER, true)) {
             $scopeOffice = '';   // 全拠点
+        }
+
+        // 所属（イベプラ／セールス／クリエイティブ／その他）で絞る（FB No.10・baba 2026-09-03）。
+        // ⚠ 拠点と違い、絞れるのは「人」の集計だけ（部署別・社員別・のべ出勤数）。
+        //   イベント数・規模別・他拠点依頼は案件を数えているので、所属という考えが無い＝変わらない。
+        //   所属の一覧はここに書かず App\Support\Departments が正本（増えてもこの画面は直さなくてよい）。
+        $deptOptions = Departments::groupOptions();   // [コード => 所属名]
+        $deptCode = (string) $request->query('dept', '');
+        if (! isset($deptOptions[$deptCode])) {
+            $deptCode = '';   // すべての所属
+        }
+        $scopeDept = $deptCode !== '' ? $deptOptions[$deptCode] : '';
+
+        // 並び順＝社歴順（既定）／出勤数の多い順（FB No.11・baba 2026-09-03「基本的に社歴順だと分かりやすい」）。
+        $sort = (string) $request->query('sort', 'hire');
+        if (! in_array($sort, ['hire', 'count'], true)) {
+            $sort = 'hire';
         }
         // 拠点で絞る前の「その期間の全拠点ぶん」を控える（他拠点依頼数＝拠点をまたぐ共有の集計に使う）。
         $periodAll = $inPeriod;
@@ -318,18 +347,29 @@ class StatsController extends Controller
         $neededIds = Person::where('role', 'employee')->pluck('id')
             ->merge($countByStaff->keys())->unique()->values();
         $people = Person::whereIn('id', $neededIds->all())
-            ->get(['id', 'name', 'role', 'department', 'office'])
+            ->get(['id', 'name', 'role', 'department', 'office', 'hire_date'])
             ->keyBy('id');
 
-        // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。出勤の多い順。
+        // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。
+        // 並び順は下の sortMembers（社歴順が既定）。
         $members = $people
             ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats) {
                 $id = $person->id;
                 $ds = $dirStats[$id] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
+                $hire = $person->hire_date?->format('Y-m-d') ?? '';
+                // 社歴順で並べたとき「なぜこの順なのか」が名前の横で分かるようにする。
+                $hireLabel = preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $hire, $hm) === 1 && $hire !== HireDate::INCOMPLETE
+                    ? $hm[1] . '年' . (int) $hm[2] . '月入社'
+                    : '入社日未入力';
 
                 return [
                     'name'     => $person->name ?? $id,
                     'dept'     => $person->department ?? '',
+                    // 色分け・絞り込み・集計の単位（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
+                    'deptGroup' => Departments::group($person->department),
+                    // 社歴の並び替えに使う入社年月日（'Y-m-d'／未入力は空）と、画面に出す言い方。
+                    'hire'      => $hire,
+                    'hireLabel' => $hireLabel,
                     'office'   => $person->office ?? '',
                     'kind'     => $person->role === 'employee' ? '社員' : 'スタッフ',
                     'count'    => (int) ($countByStaff[$id] ?? 0),
@@ -344,7 +384,16 @@ class StatsController extends Controller
                     'director' => $ds['d'],               // 部署別の平均で使う（D数）
                 ];
             })
-            ->filter(function (array $m) use ($scopeOffice) {
+            ->filter(function (array $m) use ($scopeOffice, $scopeDept) {
+                // 所属で絞っているときは社員だけを出す。
+                // ⚠ スタッフ（アルバイト）に所属は無いので、絞ると全員消えてしまい「0名」と誤解される。
+                //   画面・CSVでは、そのときスタッフ別の欄そのものを出さない。
+                if ($scopeDept !== '') {
+                    return $m['kind'] === '社員'
+                        && $m['deptGroup'] === $scopeDept
+                        && ($scopeOffice === '' || $m['office'] === $scopeOffice);
+                }
+
                 if ($m['kind'] === '社員') {
                     // 全拠点＝全社員／拠点を選んだときは、その拠点の社員だけ（他拠点の社員は隠す）。
                     return $scopeOffice === '' || $m['office'] === $scopeOffice;
@@ -352,23 +401,28 @@ class StatsController extends Controller
 
                 return $m['count'] > 0;   // スタッフは出勤がある人だけ
             })
-            ->sortByDesc('count')
             ->values();
+        $members = $this->sortMembers($members, $sort);
 
-        $totalAttendance = $countByStaff->sum();
+        // のべ出勤数。所属で絞っているときは、その所属の人ぶんだけを足す
+        //（絞ったのに数字が全社のままだと、どこの数字か分からなくなるため）。
+        $totalAttendance = $scopeDept !== '' ? $members->sum('count') : $countByStaff->sum();
 
         // 部署ごとの社員数（＝平均の分母。所属が設定された社員だけ）。
         // 集計の単位は4グループ（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
-        $deptDefs = Departments::GROUPS;
+        // 所属で絞っているときは、その所属のカードだけ出す（他は0名0件になり、絞ったのか0なのか分からないため）。
+        $deptDefs = $scopeDept !== '' ? [$scopeDept] : Departments::GROUPS;
         $headByDept = Person::where('role', 'employee')
-            ->whereIn('department', $deptDefs)
             ->get(['id', 'department'])
-            ->groupBy('department')
+            // ⚠ 「経営管理」など、まとめ先が「その他」になる所属の人も数に入れる（Departments::group が正本）。
+            //   ここで department をそのまま突き合わせていたころは、その人たちの出勤が
+            //   どの部署にも入らず、静かに消えていた。
+            ->groupBy(fn (Person $p) => Departments::group($p->department))
             ->map(fn (Collection $g) => $g->count());
 
         // 部署別＝合計出勤・合計ディレクター＋1人あたり平均（分母＝部署の社員数）。
         $byDept = collect($deptDefs)->map(function ($dept) use ($members, $headByDept) {
-            $m = $members->where('dept', $dept);
+            $m = $members->where('deptGroup', $dept);
             $head = (int) ($headByDept[$dept] ?? 0);
             $sumEvents = $m->sum('count');
             $sumDirector = $m->sum('director');
@@ -384,12 +438,38 @@ class StatsController extends Controller
             ];
         });
 
+        // いまの条件ひとそろい（画面のリンクとCSVで同じものを使う）。
+        $query = ['span' => $span, 'period' => $selected, 'office' => $scopeOffice,
+            'dept' => $deptCode, 'sort' => $sort];
+
         return [
             'span'            => $span,
             'spanOptions'     => $options,
             'selected'        => $selected,
             'scopeOffice'     => $scopeOffice,
             'offices'         => self::OFFICE_ORDER,
+            // 所属の絞り込み（FB No.10）
+            'scopeDept'       => $scopeDept,     // 絞っている所属名（空＝すべて）
+            'deptCode'        => $deptCode,      // URLに載せる短い名前（plan/sales/creative/other）
+            'deptOptions'     => $deptOptions,   // [コード => 所属名]。正本＝Departments
+            'deptGroups'      => Departments::GROUPS,
+            // 並び順（FB No.11）
+            'sort'            => $sort,
+            // 画面のリンクで「いまの条件」をそのまま持ち回すための一式。
+            'query'           => $query,
+            // 画面に置くリンク（1つだけ条件を変えて、他は今のまま）。
+            // ⚠ Bladeでリンクを組み立てると、条件が増えたとき付け忘れる場所が必ず出るので、ここで作って渡す。
+            'links'           => [
+                'span'   => collect(['month', 'quarter', 'year'])
+                    ->mapWithKeys(fn ($s) => [$s => $this->statsLink($query, ['span' => $s, 'period' => ''])])->all(),
+                'office' => collect([''])->merge(self::OFFICE_ORDER)
+                    ->mapWithKeys(fn ($o) => [$o => $this->statsLink($query, ['office' => $o])])->all(),
+                'dept'   => collect([''])->merge(array_keys($deptOptions))
+                    ->mapWithKeys(fn ($d) => [$d => $this->statsLink($query, ['dept' => $d])])->all(),
+                'sort'   => collect(['hire', 'count'])
+                    ->mapWithKeys(fn ($s) => [$s => $this->statsLink($query, ['sort' => $s])])->all(),
+                'csv'    => '/stats/export.csv?' . http_build_query($query),
+            ],
             'selectedLabel'   => collect($options)->firstWhere('value', $selected)['label'] ?? '',
             'totalEvents'     => $totalEvents,
             // 数えなかった案件（体験会・EXPO など）＝画面の注記用
@@ -410,6 +490,39 @@ class StatsController extends Controller
             'byDept'          => $byDept,
             'members'         => $members,
         ];
+    }
+
+    /** いまの条件のうち1つだけ差し替えた /stats のリンクを作る（他の条件は今のまま持ち回す）。 */
+    private function statsLink(array $query, array $change): string
+    {
+        return '/stats?' . http_build_query(array_merge($query, $change));
+    }
+
+    /**
+     * メンバーの並び順（画面もCSVもここ1か所で決める）。
+     *
+     * 'hire'（既定）＝社歴順。入社が古い人＝先輩が上（baba 2026-09-03「基本的に社歴順だと分かりやすい」）。
+     *   ⚠ 入社年月日が空の人は**いちばん下**にまとめる。
+     *     空を「いちばん古い」と扱うと、入れていない新人が先頭に並んで意味が逆になる。
+     * 'count' ＝出勤数の多い順（これまでの並び）。
+     *
+     * 同じ値のときは「出勤の多い順→氏名順」で決める＝開き直しても並びが入れ替わらない。
+     */
+    private function sortMembers(Collection $members, string $sort): Collection
+    {
+        return $members->sortBy(function (array $m) use ($sort) {
+            // 出勤数は「多い順」にしたいので、大きいほど小さい文字列になるように引き算しておく。
+            $byCount = sprintf('%04d', 9999 - min(9999, (int) $m['count'])) . '|' . $m['name'];
+            if ($sort === 'count') {
+                return $byCount;
+            }
+
+            $hire = (string) $m['hire'];
+            $filled = $hire !== '' && $hire !== HireDate::INCOMPLETE && preg_match('/^\d{4}-\d{2}-\d{2}$/', $hire) === 1;
+
+            // '0'＋日付 … 入社日あり（古い順）／'1' … 入社日なし＝必ず後ろ。
+            return ($filled ? '0' . $hire : '1') . '|' . $byCount;
+        })->values();
     }
 
     /**
