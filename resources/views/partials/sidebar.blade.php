@@ -4,6 +4,11 @@
 <aside class="sidebar">
   <div class="logo">ECS<small>スタッフアサイン管理</small></div>
   <nav>
+    {{-- ⚠ ここから下（社員向けのメニュー一覧）は「社員以上」にだけ出す。
+         理由：マイプロフィール(/profile)・パスワード変更(/password)はスタッフも入れる画面で、
+              この土台(layouts.app)を使うため、囲まないとスタッフに社員用メニューが丸ごと見えていた。
+              中身は EnsureTier が守っているので押しても入れないが、メニュー名だけ読めていた（2026-09-07 指摘）。 --}}
+    @if (in_array(optional(Auth::user())->permission, ['employee', 'manager', 'admin'], true))
     <a class="{{ ($active ?? '') === 'dashboard' ? 'active' : '' }}" href="/dashboard"><span class="nav-icon">▣</span> ダッシュボード</a>
     <a class="{{ ($active ?? '') === 'stats' ? 'active' : '' }}" href="/stats"><span class="nav-icon">📈</span> 集計ダッシュボード</a>
     <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">🙍</span> マイページ</a>
@@ -77,6 +82,11 @@
         @endif
       </div>
     </div>
+    @else
+    {{-- スタッフはこちら（/profile・/password を開いたとき）。自分の画面へ戻る道だけ出す。 --}}
+    <a href="/staff-portal"><span class="nav-icon">🏠</span> スタッフ画面へ戻る</a>
+    <a href="/guide-staff" target="_blank" rel="noopener"><span class="nav-icon">📋</span> 使い方ガイド</a>
+    @endif
   </nav>
   <div class="userbox">
     @auth
