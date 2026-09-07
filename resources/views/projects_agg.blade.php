@@ -27,6 +27,19 @@
     .live.off { background: #ece3d4;        color: #7a6a58; }
     .live .dot { width: 9px; height: 9px; border-radius: 999px; background: currentColor; }
     .note { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
+    /* 所属の切替（2026-09-07）。拠点の切替スイッチと同じ見た目にそろえる。 */
+    .dept-switch {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin: 0 0 14px; padding: 10px 12px;
+      background: #fbf6ef; border: 1px solid var(--line); border-radius: 10px;
+    }
+    .dept-switch .ds-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: 2px; }
+    .dept-switch .ds-chip {
+      text-decoration: none; font-size: 13px; font-weight: 600; color: var(--ink); background: #fff;
+      border: 1px solid var(--line-strong, #d8c4ae); border-radius: 999px; padding: 5px 13px;
+    }
+    .dept-switch .ds-chip:hover { border-color: var(--brand); }
+    .dept-switch .ds-chip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
     table.tbl th.num, table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
     table.tbl td.nm { font-weight: 600; }
     /* 名前の文字色＝所属（D決め画面と同じ配色） */
@@ -45,10 +58,11 @@
     {{-- 月の切替（2026-09-02 baba要望）。それまでは全期間の合計で、
          「今月は誰が多いか」が読めなかった（D決めの担当バランスは月単位なので数も合わなかった）。 --}}
     <div class="month-nav">
-      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $prevPeriod, 'office' => $officeScope])) }}" title="前の月へ">◀</a>
+      {{-- ⚠ 月を動かしても、選んでいる拠点と所属を落とさないこと（落とすと全社に戻って驚く）。 --}}
+      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $prevPeriod, 'office' => $officeScope, 'dept' => $deptCode])) }}" title="前の月へ">◀</a>
       <span class="mon" id="monLabel">{{ $periodLabel }}</span>
-      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $nextPeriod, 'office' => $officeScope])) }}" title="次の月へ">▶</a>
-      <a class="mon-btn wide" href="?{{ http_build_query(array_filter(['office' => $officeScope])) }}" title="今月に戻す">今月</a>
+      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $nextPeriod, 'office' => $officeScope, 'dept' => $deptCode])) }}" title="次の月へ">▶</a>
+      <a class="mon-btn wide" href="?{{ http_build_query(array_filter(['office' => $officeScope, 'dept' => $deptCode])) }}" title="今月に戻す">今月</a>
     </div>
     <div class="spacer"></div>
     <span class="live off" id="live"><span class="dot"></span><span id="liveText">案件一覧と未接続</span></span>
@@ -57,12 +71,30 @@
   {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
   @include('partials.office_switch')
 
+  {{-- 所属（イベプラ／セールス／…）で絞る（2026-09-07 baba要望）。
+       所属の一覧は画面に書かず App\Support\Departments から受け取る（増えてもここは直さない）。
+       ⚠ リンクは fullUrlWithQuery＝いま見ている月（ym）と拠点（office）を落とさない。 --}}
+  <div class="dept-switch">
+    <span class="ds-label">所属</span>
+    <a class="ds-chip {{ $deptCode === '' ? 'active' : '' }}"
+       href="{{ request()->fullUrlWithQuery(['dept' => '']) }}">すべて</a>
+    @foreach ($deptOptions as $code => $name)
+      <a class="ds-chip {{ $deptCode === $code ? 'active' : '' }}"
+         href="{{ request()->fullUrlWithQuery(['dept' => $code]) }}">{{ $name }}</a>
+    @endforeach
+  </div>
+
   <p class="note">
     <b>D決め画面（/assign-director）</b>で保存したD／SD担当の実績を、社員ごとに数えた本物の集計です。<br>
     下書きの案件は数えません。<b>数えているのは「{{ $periodLabel }}に開催する案件」だけ</b>です（2026-09-02 から月ごとになりました）。
     ◀ ▶ で月を変えられます。
     @if ($officeScope)
       <br><b>{{ $officeScope }}所属の社員</b>だけを並べています。件数は<b>その社員が担当した案件すべて</b>（他拠点への応援も含む）です。
+    @endif
+    @if ($scopeDept !== '')
+      <br>所属「<b>{{ $scopeDept }}</b>」の社員だけを並べています。
+      「その他」は、イベプラ・セールス・クリエイティブ<b>以外</b>の所属をまとめたものです。
+      <b>所属を入れていない社員は、どの所属を選んでも出ません</b>（名簿の「所属」を埋めてください）。
     @endif
   </p>
 
@@ -98,12 +130,19 @@
   <!-- 本物の集計（ControllerがD決めの保存先＝assignmentsから作成）をJSへ渡す。下のロジックはそのまま温存。 -->
   <script>
     window.ECS_AGG = @json($rows);
+    // ⚠ 本物の集計を出している、という印。所属で絞って0人になっても、
+    //   見本データ（/ecs/data/cases.js）に戻らないようにするため（2026-09-07）。
+    //   戻ってしまうと、架空の社員の数字が「絞り込みの結果」として出てしまう。
+    window.ECS_HAS_DB_AGG = @json($hasDbAgg ?? false);
   </script>
   @verbatim
   <script>
     // ===== 親ウィンドウ（案件一覧）から送られてくる集計データを受け取って表示 =====
     // 本物の集計データがあるか（Controllerが渡す。空なら従来の案件データ集計にフォールバック）。
-    const HAS_DB_AGG = Array.isArray(window.ECS_AGG) && window.ECS_AGG.length > 0;
+    // ⚠ 件数が0でも、サーバーが「本物を出している」と言っていれば本物あつかいにする。
+    //   （所属で絞って0人になったときに見本データへ落ちるのを防ぐ）
+    const HAS_DB_AGG = window.ECS_HAS_DB_AGG === true
+      || (Array.isArray(window.ECS_AGG) && window.ECS_AGG.length > 0);
 
     function setLive(on) {
       document.getElementById('live').className = 'live ' + (on ? 'on' : 'off');

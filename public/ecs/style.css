@@ -281,6 +281,10 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .form-row input[type="date"],
 .form-row input[type="time"],
 .form-row input[type="email"],
+/* ⚠ password が抜けていて、ログイン・パスワード変更・パスワード再設定の3画面で
+   パスワード欄だけがブラウザ既定の小さい幅になっていた（2026-07-07 から・2026-09-07に修正）。
+   入力欄の種類を増やしたら、必ずこの一覧にも足すこと。 */
+.form-row input[type="password"],
 .form-row select,
 .form-row textarea {
   width: 100%;
@@ -441,6 +445,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .form-row input[type="date"],
   .form-row input[type="time"],
   .form-row input[type="email"],
+  .form-row input[type="password"],
   .form-row select,
   .form-row textarea { font-size: 16px; padding: 10px 11px; }
 

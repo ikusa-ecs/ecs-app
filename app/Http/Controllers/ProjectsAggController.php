@@ -35,9 +35,31 @@ class ProjectsAggController extends Controller
         // ⚠ここで絞るのは「社員の所属拠点」だけ。数える案件は絞らない＝他拠点への応援も数える
         //   （その社員がどれだけ担当したかを見る表なので、働いた先の拠点は関係ない）。
         $office = OfficeScope::filter($request);
-        $officeEmployeeIds = OfficeScope::applyToPeople(Person::employees(), $office)
-            ->pluck('id')
-            ->all();
+
+        // 所属（イベプラ／セールス／…）で絞る（2026-09-07 baba要望・集計ダッシュボードと同じ作り）。
+        // ⚠ 所属の一覧はここに書かない。正本＝App\Support\Departments（増えてもこの画面は直さない）。
+        // ⚠ 名簿には本当の所属名（「経営管理」など）が入っているが、絞り込みの単位は4グループなので
+        //   Departments::group を通してから比べる（DBのwhereでは絞れない＝下で collection を絞る）。
+        $deptOptions = Departments::groupOptions();          // [コード => 所属名]
+        $deptCode = (string) $request->query('dept', '');
+        if (! isset($deptOptions[$deptCode])) {
+            $deptCode = '';   // すべての所属
+        }
+        $scopeDept = $deptCode !== '' ? $deptOptions[$deptCode] : '';
+
+        // 表に並べる社員（拠点＋所属で絞ったあと）。数える案件のほうは絞らない
+        // ＝他拠点への応援も、その社員の実績として数える。
+        $employees = OfficeScope::applyToPeople(Person::employees(), $office)
+            ->get(['id', 'name', 'department']);
+        if ($scopeDept !== '') {
+            $employees = $employees
+                ->filter(fn (Person $p) => Departments::group($p->department) === $scopeDept)
+                ->values();
+        }
+        $officeEmployeeIds = $employees->pluck('id')->all();
+
+        // 絞り込みが1つでも掛かっていれば、担当の一覧もその人たちだけにする。
+        $limitToEmployees = ($office !== null && $office !== '') || $scopeDept !== '';
 
         // 数える月（2026-09-02 baba要望）。既定＝今月。?ym=2026-10 で切り替える。
         // ⚠ それまでは**全期間の合計**だったので、「今月は誰が多いか」が読めなかった
@@ -56,7 +78,7 @@ class ProjectsAggController extends Controller
         $rows = Assignment::whereIn('role', ['D', 'SD'])
             ->where('status', '!=', 'キャンセル')
             ->whereIn('project_id', $monthProjectIds)
-            ->when($office, fn ($q) => $q->whereIn('staff_id', $officeEmployeeIds))
+            ->when($limitToEmployees, fn ($q) => $q->whereIn('staff_id', $officeEmployeeIds))
             ->get(['project_id', 'staff_id', 'role']);
 
         // 関係する案件の実施形態・規模・状態。
@@ -130,10 +152,8 @@ class ProjectsAggController extends Controller
         }
 
         // 登録している社員は全員出す＝D/SD実績が無くても0で並べる（アサイン有無に関係なく・baba 2026-07-28）。
-        // 拠点で絞るときは、その拠点の社員だけを並べる。
-        $allEmployees = OfficeScope::applyToPeople(Person::where('role', 'employee'), $office)
-            ->get(['id', 'name', 'department']);
-        foreach ($allEmployees as $e) {
+        // 拠点・所属で絞るときは、その人たちだけを並べる（上で作った $employees をそのまま使う）。
+        foreach ($employees as $e) {
             if (! isset($agg[$e->id])) {
                 $dept = (string) ($e->department ?? '');
                 $agg[$e->id] = [
@@ -169,6 +189,12 @@ class ProjectsAggController extends Controller
             'rows' => $list,
             'summary' => $summary,
             'officeScope' => $office,   // 今絞っている拠点（null＝全拠点）。注記と切替スイッチに使う
+            'deptCode' => $deptCode,        // URLに載せる短い名前（plan/sales/creative/other・空＝すべて）
+            'deptOptions' => $deptOptions,  // [コード => 所属名]。正本＝Departments
+            'scopeDept' => $scopeDept,      // 今絞っている所属名（空＝すべて）
+            // ⚠ 絞り込みで0人になっても、見本データ（cases.js）に戻らないようにするための印。
+            //   これが true のときは「本物の集計を出している」＝空でも空のまま見せる。
+            'hasDbAgg' => true,
             // 数えている月（2026-09-02 baba要望）。見出しと前後の月へのリンクに使う。
             'period' => $period->format('Y-m'),
             'periodLabel' => $period->format('Y年n月'),
