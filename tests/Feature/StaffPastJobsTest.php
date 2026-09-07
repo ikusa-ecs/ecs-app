@@ -132,6 +132,22 @@ class StaffPastJobsTest extends TestCase
         );
     }
 
+    /**
+     * ⚠「📋 募集中のみ」でしぼっているときに、エントリーした案件が一覧から消えないこと
+     * （2026-09-07 baba指示）。エントリーすると状態が open → applied に変わるので、
+     * 素直にしぼると押した瞬間に消える。どれに応募したか見返しながら選びたいので残す。
+     */
+    public function test_open_filter_keeps_applied_jobs(): void
+    {
+        $blade = file_get_contents(resource_path('views/staff_portal.blade.php'));
+
+        $this->assertStringContainsString(
+            "(state === 'open' && j.state === 'applied')",
+            $blade,
+            '「募集中のみ」にエントリー済みを残す条件が消えていないこと'
+        );
+    }
+
     /** 「仮」のままのアサインは、終わった案件にも出さない（確定したものだけが本人の記録）。 */
     public function test_tentative_assignment_is_not_listed(): void
     {

@@ -573,8 +573,10 @@
              「募集中」「エントリー中」はどちらか片方だけ（もう一度押すと解除）。
              「追加案件」はそれとは別に、重ねて絞り込める。 --}}
         <div class="job-toggles">
-          <button type="button" class="jf-tg" id="jfOpen" onclick="setJobState('open')">📋 募集中のみ</button>
-          <button type="button" class="jf-tg" id="jfApplied" onclick="setJobState('applied')">★ エントリー中のみ</button>
+          <button type="button" class="jf-tg" id="jfOpen" onclick="setJobState('open')"
+                  title="まだ入れる案件だけにしぼります。エントリー済みの案件も残るので、どれに応募したか見返しながら選べます（締切・満員は出ません）。">📋 募集中のみ</button>
+          <button type="button" class="jf-tg" id="jfApplied" onclick="setJobState('applied')"
+                  title="自分がエントリーした案件だけにしぼります。">★ エントリー中のみ</button>
           <button type="button" class="jf-tg extra" id="jfExtra" onclick="toggleExtraOnly()">🔥 追加案件のみ</button>
         </div>
 
@@ -987,6 +989,8 @@
 
     // 絞り込みボタンの状態。
     // jobStateFilter … ''＝すべて / 'open'＝募集中のみ / 'applied'＝エントリー中のみ（どちらか片方）
+    // ⚠ 'open'（募集中のみ）は【エントリー済みも残す】＝まだ入れる案件と、自分が応募済みの案件。
+    //   絞り込みの本体は renderJobs の中。詳しい理由はそこに書いてある。
     // extraOnly      … 追加案件だけに絞るか（上とは別に重ねられる）
     let jobStateFilter = '';
     let extraOnly = false;
@@ -1165,12 +1169,16 @@
       const list = jobs
         .filter(j => !kw    || (j.content + j.client + j.place).includes(kw))
         .filter(j => !area  || j.area === area)
-        // ⚠ いま押した案件は、絞り込みから外れても一覧に残す（2026-09-01 baba指摘）。
-        //   「📋 募集中のみ」で絞っているときにエントリーすると「エントリー中」に変わり、
-        //   絞り込みから外れて**押した瞬間に一覧から消えて**いた。
-        //   押したものが消えると、エントリーできたのかどうか分からない。
-        //   絞り込みを選び直すか、画面を開き直せば、ふつうの絞り込みに戻る。
-        .filter(j => !state || j.state === state || keepVisible.has(j.id))
+        // ⚠⚠ 「📋 募集中のみ」は【エントリー済みも残す】（2026-09-07 baba指示）。
+        //   エントリーすると状態が「エントリー中」に変わるので、素直に絞ると
+        //   **押した案件が一覧から消えて**しまい、応募できたのか分からない。
+        //   どれに応募したか見返しながら次を選びたいので、消さずに残す
+        //   （残った案件には緑の「✅ エントリー済み」が付くので見分けられる）。
+        //   ⚠ 「押した直後だけ残す」やり方（keepVisible）では画面を開き直すと消えるので、
+        //     絞り込みの意味そのものを「募集中＋自分がエントリー済み」に変えている。
+        //   ※ 締切・満員はこれまでどおり出さない。「★ エントリー中のみ」も今までどおり。
+        .filter(j => !state || j.state === state || keepVisible.has(j.id)
+                  || (state === 'open' && j.state === 'applied'))
         .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
         // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
         .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
