@@ -34,6 +34,24 @@
     .ent-filter .f-check { font-size:12.5px; color:#6e5b49; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
     .ent-filter .f-check input { width:15px; height:15px; accent-color:var(--brand,#b5673a); cursor:pointer; }
 
+    /* 日付を押すだけで1日ずつ絞る並び（2026-09-07）。案件がある日だけを出す。 */
+    .day-chips { display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:0 0 12px; }
+    .day-chip {
+      font-family:inherit; font-size:12.5px; line-height:1.2; cursor:pointer;
+      background:#fff; border:1px solid #d8c8b6; border-radius:8px; padding:5px 8px; color:#3a2d20;
+      display:inline-flex; align-items:center; gap:4px;
+    }
+    .day-chip:hover { background:#f7f1e8; border-color:var(--brand,#b5673a); }
+    .day-chip.on { background:var(--brand,#b5673a); border-color:var(--brand,#b5673a); color:#fff; }
+    .day-chip .dw { font-size:10.5px; opacity:.8; }
+    .day-chip .cn { font-size:10.5px; font-weight:700; background:#f0e6d8; color:#6e5b49; border-radius:999px; padding:0 5px; }
+    .day-chip.on .cn { background:rgba(255,255,255,.28); color:#fff; }
+    .day-chip.sun { color:#c05a5a; }
+    .day-chip.sat { color:#4a6ea8; }
+    .day-chip.on.sun, .day-chip.on.sat { color:#fff; }
+    .day-chip.nav { font-weight:700; padding:5px 9px; }
+    .day-chip.clear { background:#f4ede3; color:#6e5b49; }
+
     /* サマリー（数値カード） */
     .ent-summary { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
     .sum-card {
@@ -268,6 +286,10 @@
         </select>
       </div>
 
+      <!-- 日付を押すだけで1日ずつ絞れる並び（2026-09-07 baba要望）。
+           「この日だけ」に日付を打ち込むのは手間なので、案件がある日をボタンで出す。 -->
+      <div class="day-chips" id="dayChips"></div>
+
       <!-- サマリー -->
       <div class="ent-summary" id="summary"></div>
 
@@ -455,7 +477,65 @@
   }
 
   // ===== 描画 =====
+  // ===== 日付を押すだけで1日ずつ絞る（2026-09-07 baba要望）=====
+  // ⚠ ここに出すのは「案件がある日」だけ。案件が無い日を並べても押す意味がない。
+  // ⚠ 日付の絞り込みそのものは「この日だけ」（fOnDate）が正本。このボタンはその値を入れるだけ
+  //   ＝2か所で別々に絞ると必ず食い違う。
+  function dayChipsSource(){
+    const from = document.getElementById('fFromDate').value;
+    const days = {};
+    targetCases().forEach(c => {
+      if (c.archived) return;
+      const iso = isoOf(caseDate(c.off));
+      if (from && iso < from) return;          // 「この日から」より前は出さない
+      days[iso] = (days[iso] || 0) + 1;
+    });
+    // ⚠ 多すぎると押しにくいので、近い日から60日ぶんまで。
+    return Object.keys(days).sort().slice(0, 60).map(iso => ({ iso: iso, count: days[iso] }));
+  }
+
+  function renderDayChips(){
+    const box = document.getElementById('dayChips');
+    if (!box) return;
+    const list = dayChipsSource();
+    const now = document.getElementById('fOnDate').value;
+    if (!list.length){ box.innerHTML = ''; return; }
+    box.innerHTML = '<span class="f-label">1日ずつ見る：</span>'
+      + '<button type="button" class="day-chip nav" onclick="stepDay(-1)" title="1つ前の（案件がある）日へ">◀</button>'
+      + list.map(function (d) {
+          const dt = new Date(d.iso.slice(0,4), Number(d.iso.slice(5,7)) - 1, Number(d.iso.slice(8,10)));
+          const dow = DOW[dt.getDay()];
+          const cls = 'day-chip' + (d.iso === now ? ' on' : '')
+            + (dt.getDay() === 0 ? ' sun' : (dt.getDay() === 6 ? ' sat' : ''));
+          return '<button type="button" class="' + cls + '" onclick="pickDay(\'' + d.iso + '\')"'
+            + ' title="' + d.iso + ' の案件だけにします（もう一度押すと解除）">'
+            + (dt.getMonth()+1) + '/' + dt.getDate() + '<span class="dw">' + dow + '</span>'
+            + '<span class="cn">' + d.count + '</span></button>';
+        }).join('')
+      + '<button type="button" class="day-chip nav" onclick="stepDay(1)" title="1つ次の（案件がある）日へ">▶</button>'
+      + (now ? '<button type="button" class="day-chip clear" onclick="pickDay(\'\')">すべての日に戻す</button>' : '');
+  }
+
+  // 同じ日をもう一度押したら解除（＝すべての日に戻る）。
+  function pickDay(iso){
+    const el = document.getElementById('fOnDate');
+    el.value = (el.value === iso) ? '' : iso;
+    render();
+  }
+  // ◀ ▶ ＝「案件がある日」だけを1つずつ動く（何も無い日を素通りする）。
+  function stepDay(n){
+    const list = dayChipsSource().map(d => d.iso);
+    if (!list.length) return;
+    const now = document.getElementById('fOnDate').value;
+    let i = list.indexOf(now);
+    if (i < 0) { i = (n > 0) ? -1 : list.length; }
+    const next = list[Math.min(list.length - 1, Math.max(0, i + n))];
+    document.getElementById('fOnDate').value = next;
+    render();
+  }
+
   function render(){
+    renderDayChips();
     const list = targetCases().filter(passFilter);
     renderSummary(list);
     if (currentView === 'bycase') renderByCase(list);

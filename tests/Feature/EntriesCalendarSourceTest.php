@@ -192,4 +192,23 @@ class EntriesCalendarSourceTest extends TestCase
             ->assertOk()
             ->assertSee("state === 'ent' || state === 'cal'", false);
     }
+
+    /**
+     * 日付を押すだけで1日ずつ絞れること（2026-09-07 baba要望）。
+     *
+     * ⚠ 絞り込みの正本は「この日だけ」（fOnDate）。日付ボタンはその値を入れるだけにする。
+     *   2か所で別々に絞ると必ず食い違う。
+     */
+    public function test_day_chips_exist(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+
+        $this->actingAsPerson($me)->get('/entries')
+            ->assertOk()
+            ->assertSee('id="dayChips"', false)
+            ->assertSee('function pickDay(iso){', false)
+            ->assertSee('function stepDay(n){', false)
+            // 日付ボタンは fOnDate に値を入れるだけ（別の絞り込みを作らない）
+            ->assertSee("document.getElementById('fOnDate')", false);
+    }
 }
