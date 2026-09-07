@@ -59,6 +59,14 @@
       <p><b>月別の出勤可能日シート</b>（〇×が並んだ表）を、そのまま流し込みます。本人が入れてくれるのを待たずに登録できます。<b>本人がすでに入れた日は残します。</b></p>
       <a class="btn primary" href="/availability-import">開く</a>
     </div>
+
+    {{-- 必要アサイン人数の取込（2026-09-07 baba要望）。それまでコマンドしか入口が無かった。 --}}
+    <div class="im-card">
+      <div class="im-icon">🧮</div>
+      <h2>必要アサイン人数</h2>
+      <p><b>「必要アサイン人数リスト」</b>を、そのまま流し込みます。コンテンツごと・規模ごと（小型／中型／大型）に、どのポジションが何人必要かが入り、<b>アサイン画面のポジション枠</b>に出てきます。<b>CSVに無いコンテンツは変わりません。</b></p>
+      <a class="btn primary" href="/role-requirement-import">開く</a>
+    </div>
   </div>
 
   <p class="im-lead" style="margin-top:18px;">

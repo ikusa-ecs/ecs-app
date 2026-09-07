@@ -37,6 +37,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectHistoryController;
 use App\Http\Controllers\ProjectsAggController;
+use App\Http\Controllers\RoleRequirementImportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StatsController;
@@ -166,6 +167,12 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/availability-import', [AvailabilityImportController::class, 'show'])->middleware('tier:manager');
     Route::post('/availability-import/preview', [AvailabilityImportController::class, 'preview'])->middleware('tier:manager');
     Route::post('/availability-import', [AvailabilityImportController::class, 'import'])->middleware('tier:manager');
+    // 必要アサイン人数リストの取込（2026-09-07 baba要望）。それまで artisan コマンドしか入口が無く、
+    // リストが更新されても小沼さんご自身では反映できなかった。
+    // ⚠ 必ずプレビューを見せてから保存する（どのコンテンツの必要人数が入れ替わるかを見てから確定）。
+    Route::get('/role-requirement-import', [RoleRequirementImportController::class, 'show'])->middleware('tier:manager');
+    Route::post('/role-requirement-import/preview', [RoleRequirementImportController::class, 'preview'])->middleware('tier:manager');
+    Route::post('/role-requirement-import', [RoleRequirementImportController::class, 'import'])->middleware('tier:manager');
     // アカウント発行（1人ずつ）。最初はCSV一括、以降はここで発行。作成＝管理者以上。
     Route::get('/account-new', [AccountController::class, 'create'])->middleware('tier:manager');
     Route::post('/account-new', [AccountController::class, 'store'])->middleware('tier:manager');
