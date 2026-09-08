@@ -21,6 +21,9 @@
        ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
   window.ECS_OFFICES = @json($offices ?? []);
   window.ECS_MY_OFFICE = @json($myOffice ?? '');
+  {{-- スキルの絞り込みの選択肢（2026-09-08 baba要望）。
+       ⚠ 項目名・判定をここに書かない。正本は App\Support\SkillFilter（社員名簿と共通）。 --}}
+  window.ECS_SKILL_OPTIONS = @json($skillOptions ?? []);
   window.ECS_LV_LABEL = { new: '新人', mid: '中堅', vet: 'ベテラン' };
   window.ECS_yearsSince = function (joinDate) {
     if (!joinDate) return 0;
@@ -67,6 +70,9 @@
     .postags { display: flex; flex-wrap: wrap; gap: 4px; }
     .ptag { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: #f1e9dc; color: #7a6a58; border: 1px solid var(--line); white-space: nowrap; }
     .ptag.key { background: #e0f2fe; color: #0369a1; border-color: #c3e3f5; } /* D/MC/OP/軍師＝経験者向け */
+    /* スキルのバッジ（英語・運転・着ぐるみなど）。ポジションと見分けが付くよう別の色にする。 */
+    .skilltags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .stag { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: #f3f0ff; color: #5b4bab; border: 1px solid #ddd6fe; white-space: nowrap; }
 
     .rel { font-size: 12px; }
     .rel .ng { color: var(--danger); }
@@ -141,6 +147,9 @@
             <option value="MC">MC（司会進行）</option>
             <option value="SP">軍師・サポーター</option>
           </select>
+          <!-- スキルで絞る（例＝英語ができる人を見たい）。2026-09-08 baba要望。 -->
+          <!-- 選択肢はサーバーから受け取る（ここに項目名を書かない。正本＝App\Support\SkillFilter）。 -->
+          <select id="fSkill" onchange="rosterFilter()"></select>
           <!-- メールをもらった順に案内を送る運用のため、「まだの人」だけ出せるようにする。 -->
           <!-- 拠点で絞る。選択肢は拠点マスタから（ここに拠点名を書かない）。既定は自分の拠点。 -->
           <select id="fOffice" onchange="rosterFilter()"></select>
@@ -178,6 +187,7 @@
               <th>専属</th>
               <th class="num">通算</th>
               <th>できるポジション</th>
+              <th>スキル</th>
               <th>相性</th>
               <th class="right"></th>
             </tr>
@@ -346,6 +356,16 @@
     return '<span class="muted" style="font-size:12px;">—</span>';
   }
 
+  // スキルのバッジ（英語・運転・着ぐるみなど）。2026-09-08 baba要望。
+  // ⚠ 何をバッジに出すか・誰が持っているかの判定は**サーバーが決めている**
+  //   （p.skillBadges / p.skills。正本＝App\Support\SkillFilter）。ここに条件を書かない
+  //   ＝同じ絞り込みを社員名簿にも付けるため、書き写すと片方だけ直って食い違う。
+  function skillTagsHtml(p){
+    const tags = (p.skillBadges || []).map(t => `<span class="stag">${t}</span>`);
+    if (!tags.length) return '<span class="muted" style="font-size:12px;">—</span>';
+    return `<div class="skilltags">${tags.join('')}</div>`;
+  }
+
   // 拠点（事務所）の編集欄。2026-08-27 baba要望＝これまで画面から直せなかった。
   // ⚠ 直せるのは管理者以上（拠点を間違えると別の拠点のデータが見えるため）。それ未満は表示だけ。
   // ⚠ 拠点名は拠点マスタ（window.ECS_OFFICES）から作る＝画面に拠点名を直書きしない。
@@ -436,6 +456,7 @@
         <td>${p.exclusive ? '<span class="badge green">専属</span>' : '<span class="muted" style="font-size:12px;">—</span>'}</td>
         <td class="num">${p.total}</td>
         <td>${posTagsHtml(p)}</td>
+        <td>${skillTagsHtml(p)}</td>
         <td>${relHtml(p)}</td>
         <td class="right"><span class="row-toggle" onclick="rosterToggle(${idx}, this)">詳細 ▾</span></td>`;
       tbody.appendChild(tr);
@@ -445,7 +466,7 @@
       dr.className = 'detail-row';
       dr.dataset.for = idx;
       dr.style.display = 'none';
-      dr.innerHTML = `<td colspan="8">${detailHtml(p, idx)}</td>`;
+      dr.innerHTML = `<td colspan="9">${detailHtml(p, idx)}</td>`;
       tbody.appendChild(dr);
     });
     applyFilter();
@@ -743,10 +764,25 @@
       : '（すべての拠点を表示中）';
   }
 
+  // ===== スキルの絞り込み（2026-09-08 baba要望）=====
+  // ⚠ 項目はサーバーが渡すものだけを並べる（window.ECS_SKILL_OPTIONS）。
+  //   画面に項目名を書き足すと、社員名簿と食い違う／持っていない印で絞って0名になる。
+  function buildSkillFilter(selId){
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    var html = '<option value="">スキル：すべて</option>';
+    (window.ECS_SKILL_OPTIONS || []).forEach(function(o){
+      html += '<option value="' + o.key + '">' + o.label + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
   function applyFilter(){
     const kw  = document.getElementById('kw').value.trim();
     const fLv = document.getElementById('fLv').value;
     const fPos= document.getElementById('fPos').value;
+    const fSkillEl = document.getElementById('fSkill');
+    const fSkill = fSkillEl ? fSkillEl.value : '';
     const fOfficeEl = document.getElementById('fOffice');
     const fOffice = fOfficeEl ? fOfficeEl.value : '';
     const fLoginEl = document.getElementById('fLogin');
@@ -758,6 +794,8 @@
       const okKw  = !kw  || p.name.includes(kw) || p.id.includes(kw) || (p.kana || '').includes(kw);
       const okLv  = !fLv || lvOf(p) === fLv;
       const okPos = !fPos|| p.pos[fPos];
+      // スキル＝サーバーが付けた印（p.skills）に、選んだ印が入っているか。判定はここでしない。
+      const okSkill = !fSkill || (p.skills || []).indexOf(fSkill) >= 0;
       // ログインの状態で絞る。「まだログインできない人」＝本人がパスワードを決めていない人ぜんぶ。
       const okLogin = !fLogin
         || (fLogin === 'spot' ? !!p.spot
@@ -765,7 +803,7 @@
           : fLogin === 'notready' ? (p.login !== 'ready' && !p.spot)
           : (p.login === fLogin && !p.spot));
       const okOffice = !fOffice || officeOf(p) === fOffice;
-      const visible = okKw && okLv && okPos && okLogin && okOffice;
+      const visible = okKw && okLv && okPos && okSkill && okLogin && okOffice;
       mr.style.display = visible ? '' : 'none';
       if (!visible && dr) { dr.style.display = 'none';
         const t = mr.querySelector('.row-toggle'); if (t) t.innerHTML = '詳細 ▾'; }
@@ -828,7 +866,9 @@
         const tds = mr.querySelectorAll('td');
         if (tds[3]) tds[3].innerHTML = p.exclusive ? '<span class="badge green">専属</span>' : '<span class="muted" style="font-size:12px;">—</span>';
         if (tds[5]) tds[5].innerHTML = posTagsHtml(p);
-        if (tds[6]) tds[6].innerHTML = relHtml(p);
+        // ⚠ 6列目は「スキル」（2026-09-08 に追加）。相性は7列目にずれている＝
+        //   列を足すときは、ここの番号も一緒に直す（ずれると別の欄が書き換わる）。
+        if (tds[7]) tds[7].innerHTML = relHtml(p);
       }
       if (statusEl) { statusEl.textContent = '✓ 保存しました'; statusEl.style.color = '#15803d'; }
       if (btn) btn.disabled = false;
@@ -878,6 +918,7 @@
   window.rosterSave = saveStaff;
 
   buildOfficeFilter('fOffice');
+  buildSkillFilter('fSkill');
   render();
   })();
 </script>

@@ -12,6 +12,7 @@ use App\Support\ExperienceCount;
 use App\Support\PersonAccess;
 use App\Support\LoginInvite;
 use App\Support\OfficeScope;
+use App\Support\SkillFilter;
 use App\Support\SpotStaff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -92,6 +93,11 @@ class PersonController extends Controller
                         'toolsOther' => $p->online_tools_other ?? '',
                         'note' => $p->profile_note ?? '',
                     ],
+                    // スキルで絞り込むための印と、一覧に出すバッジ（2026-09-08 baba要望）。
+                    // ⚠ 判定は画面に書かない＝正本は App\Support\SkillFilter
+                    //   （同じ絞り込みを社員名簿とスタッフ名簿の2画面に付けるため）。
+                    'skills' => SkillFilter::keysFor($p),
+                    'skillBadges' => SkillFilter::badgesFor($p),
                 ];
             })
             ->values();
@@ -111,6 +117,9 @@ class PersonController extends Controller
             // 拠点で絞って見るための選択肢（2026-08-25 baba要望）。既定は自分の拠点。
             'offices' => OfficeScope::options(),
             'myOffice' => OfficeScope::filterSingle(request()),
+            // スキルの絞り込みの選択肢（2026-09-08 baba要望）。⚠ 画面に項目名を書かない。
+            //   社員には「着ぐるみ・前泊・MC審査」を入力する画面が無いので出さない（必ず0名になるため）。
+            'skillOptions' => SkillFilter::options(false),
             // 「アサイン表に出す／出さない」を切り替えられるか＝管理者以上（アサイン担当）。
             'canManageAssignPool' => in_array(optional(Auth::user())->permission, ['manager', 'admin'], true),
             'employees' => $employees,
@@ -433,6 +442,10 @@ class PersonController extends Controller
                         'toolsOther' => $p->online_tools_other ?? '',
                         'note' => $p->profile_note ?? '',
                     ],
+                    // スキルで絞り込むための印と、一覧に出すバッジ（2026-09-08 baba要望）。
+                    // ⚠ 判定は画面に書かない＝正本は App\Support\SkillFilter（社員名簿と共通）。
+                    'skills' => SkillFilter::keysFor($p),
+                    'skillBadges' => SkillFilter::badgesFor($p),
                 ];
             })
             ->values();
@@ -452,6 +465,9 @@ class PersonController extends Controller
             // （他拠点へヘルプに行く／来てもらう運用があるため）。
             'offices' => OfficeScope::options(),
             'myOffice' => OfficeScope::filterSingle(request()),
+            // スキルの絞り込みの選択肢（2026-09-08 baba要望）。⚠ 画面に項目名を書かない。
+            //   スタッフは着ぐるみ・前泊・MC審査も自分で入れているので、そこまで並べる。
+            'skillOptions' => SkillFilter::options(true),
             // 「退職にする」「削除」を出すか＝Administrator だけ（権限4段階の決まり）。
             'canManagePeople' => optional(Auth::user())->permission === 'admin',
             // 拠点（事務所）を直せるか＝管理者以上（2026-08-27 baba選択）。

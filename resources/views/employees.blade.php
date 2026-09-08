@@ -28,6 +28,9 @@
   window.ECS_MY_OFFICE = @json($myOffice ?? '');
   {{-- 入社年月日で選べる年（新しい順）。正本は App\Support\HireDate＝JSに年を書き足さない。 --}}
   window.ECS_HIRE_YEARS = @json(\App\Support\HireDate::years());
+  {{-- スキルの絞り込みの選択肢（2026-09-08 baba要望）。
+       ⚠ 項目名・判定をここに書かない。正本は App\Support\SkillFilter（スタッフ名簿と共通）。 --}}
+  window.ECS_SKILL_OPTIONS = @json($skillOptions ?? []);
 </script>
 {{-- 入社年月日の「勤続◯年◯か月」の案内。他の4画面と同じものを使う（正本は1か所）。 --}}
 @include('partials.hire_date_script')
@@ -54,6 +57,10 @@
 
     /* 所属バッジ。色は上の <style> で正本（App\Support\Departments）から作っている。 */
     .dept { font-size: 11.5px; padding: 1px 9px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+
+    /* スキルのバッジ（英語・運転）。所属バッジと見分けが付くよう別の色にする。 */
+    .skilltags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .stag { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: #f3f0ff; color: #5b4bab; border: 1px solid #ddd6fe; white-space: nowrap; }
 
     /* 経験コンテンツのタグ（詳細パネル内のみ） */
     .contags { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -102,6 +109,9 @@
             <option value="">新人：すべて</option>
             <option value="fresh">新人（入社半年以内）のみ</option>
           </select>
+          <!-- スキルで絞る（例＝英語ができる人を見たい）。2026-09-08 baba要望。 -->
+          <!-- 選択肢はサーバーから受け取る（ここに項目名を書かない。正本＝App\Support\SkillFilter）。 -->
+          <select id="fSkill" onchange="applyFilter()"></select>
           <!-- 拠点で絞る。選択肢は拠点マスタから（ここに拠点名を書かない）。既定は自分の拠点。 -->
           <select id="fOffice" onchange="applyFilter()"></select>
           <div class="spacer"></div>
@@ -119,6 +129,7 @@
               <th>所属</th>
               <th>事務所</th>
               <th>服 / 靴</th>
+              <th>スキル</th>
               <th class="right"></th>
             </tr>
           </thead>
@@ -195,6 +206,7 @@
         <td>${deptBadges(p)}</td>
         <td><span class="muted" style="font-size:12.5px;">${p.office || '—'}</span></td>
         <td><span class="muted" style="font-size:12.5px;">${p.wear || '—'} / ${p.shoe || '—'}</span></td>
+        <td>${skillTagsHtml(p)}</td>
         <td class="right"><span class="row-toggle" onclick="toggleDetail(${idx}, this)">詳細 ▾</span></td>`;
       tbody.appendChild(tr);
 
@@ -203,10 +215,20 @@
       dr.className = 'detail-row';
       dr.dataset.for = idx;
       dr.style.display = 'none';
-      dr.innerHTML = `<td colspan="5">${detailHtml(p, idx)}</td>`;
+      dr.innerHTML = `<td colspan="6">${detailHtml(p, idx)}</td>`;
       tbody.appendChild(dr);
     });
     applyFilter();
+  }
+
+  // スキルのバッジ（英語・運転）。2026-09-08 baba要望。
+  // ⚠ 何をバッジに出すか・誰が持っているかの判定は**サーバーが決めている**
+  //   （p.skillBadges / p.skills。正本＝App\Support\SkillFilter）。ここに条件を書かない
+  //   ＝同じ絞り込みをスタッフ名簿にも付けているため、書き写すと片方だけ直って食い違う。
+  function skillTagsHtml(p){
+    const tags = (p.skillBadges || []).map(t => `<span class="stag">${t}</span>`);
+    if (!tags.length) return '<span class="muted" style="font-size:12px;">—</span>';
+    return `<div class="skilltags">${tags.join('')}</div>`;
   }
 
   // 本人がマイプロフィールで入れた申告（2026-08-31 baba要望）。ここは見るだけ＝直せない。
@@ -845,10 +867,26 @@
       : '（すべての拠点を表示中）';
   }
 
+  // ===== スキルの絞り込み（2026-09-08 baba要望）=====
+  // ⚠ 項目はサーバーが渡すものだけを並べる（window.ECS_SKILL_OPTIONS）。
+  //   社員には入力する画面が無い項目（着ぐるみ・前泊・MC審査）は、サーバー側で外している
+  //   ＝ここに書き足すと、必ず0名になる項目が並んで「壊れている」と誤解される。
+  function buildSkillFilter(selId){
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    var html = '<option value="">スキル：すべて</option>';
+    (window.ECS_SKILL_OPTIONS || []).forEach(function(o){
+      html += '<option value="' + o.key + '">' + o.label + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
   function applyFilter(){
     const kw     = document.getElementById('kw').value.trim();
     const fDept  = document.getElementById('fDept').value;
     const fFresh = document.getElementById('fFresh').value;
+    const fSkillEl = document.getElementById('fSkill');
+    const fSkill = fSkillEl ? fSkillEl.value : '';
     const fOfficeEl = document.getElementById('fOffice');
     const fOffice = fOfficeEl ? fOfficeEl.value : '';
     let shown = 0;
@@ -863,7 +901,9 @@
         || (Array.isArray(p.depts) && p.depts.some(function(d){ return d.code === fDept; }));
       const okFresh = !fFresh|| fresh;
       const okOffice = !fOffice || officeOf(p) === fOffice;
-      const visible = okKw && okDept && okFresh && okOffice;
+      // スキル＝サーバーが付けた印（p.skills）に、選んだ印が入っているか。判定はここでしない。
+      const okSkill = !fSkill || (p.skills || []).indexOf(fSkill) >= 0;
+      const visible = okKw && okDept && okFresh && okSkill && okOffice;
       mr.style.display = visible ? '' : 'none';
       if (!visible && dr) { dr.style.display = 'none';
         const t = mr.querySelector('.row-toggle'); if (t) t.innerHTML = '詳細 ▾'; }
@@ -874,6 +914,7 @@
   }
 
   buildOfficeFilter('fOffice');
+  buildSkillFilter('fSkill');
   render();
 </script>
 @endverbatim
