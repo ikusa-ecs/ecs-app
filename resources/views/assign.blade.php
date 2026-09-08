@@ -167,6 +167,8 @@
     .cc-fill .fbar > i.low  { background: var(--warn); }
     .cc-fill .fnum { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .cc-fill .fnum .need { color: var(--muted); font-weight: 400; }
+    /* 運営人数を直すボタン（2026-09-08）。人数の右にそっと置く＝バーを押し縮めない。 */
+    .cc-fill .need-edit { padding: 2px 7px; font-size: 11px; white-space: nowrap; flex: none; }
 
     /* ポジション充足ランプ */
     .cc-pos { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -479,6 +481,10 @@
   // 担当メモ（軍師・サポ等）の入力候補。datalist に流し込む。
   window.ECS_NOTE_OPTIONS = @json($noteOptions ?? []);
   window.ECS_QUICK_URL = '/entries/assign';
+  {{-- 運営人数（必要人数）の保存先（2026-09-08 baba要望「日別ボードで運営人数を変更できるように」）。
+       ⚠ 公開ボード・アサイン表と**同じ入口**を使う＝保存先は projects.required_count の1か所。
+          新しい入口を作ると、画面によって違う数が入る。 --}}
+  window.ECS_COUNT_URL = '/assign-publish/count';
   // 今この画面が見ている拠点（管理者が全拠点で見ているときは空）。公開のときに「違う拠点は触らない」保険として送る。
   window.ECS_OFFICE_SCOPE = @json($officeScope ?? null);
   {{-- ボードに並べる日数（今日から何日先まで）。正本＝AssignBoardController::BOARD_DAYS。
@@ -745,6 +751,48 @@
   // 「⛔ 別案件」の見せ方（希望者カラムと追加パネルで同じ文言にする）。
   function busyTitle(name, where){
     return name + ' さんは、この日すでに「' + where.join('」「') + '」に入っています。';
+  }
+
+  // ===== 運営人数（必要人数）をこの画面から直す（2026-09-08 baba要望）=====
+  // 【なぜ日別ボードから直せるようにしたか】
+  //   人数はお客様と話して当日近くまで動く。ボードを見ながら「あと◯名」を判断する場所なので、
+  //   ここで直せないと、公開ボードや案件登録まで行って戻ってくることになる。
+  // ⚠ 保存先は projects.required_count＝**案件登録・アサイン表・公開ボードと同じ欄**。
+  //   ここで別の場所に書くと、画面によって違う人数が出る。
+  // ⚠ 「未定」に戻したいときは空のままOKを押す（スタッフ画面では既定5名で見せる）。
+  //   その既定の数はサーバー（RecruitStatus）が持っているので、ここには書かない。
+  function editNeed(id){
+    const c = cases.find(x => x.id === id);
+    if (!c) return;
+    const now = (c.need > 0) ? String(c.need) : '';
+    const answer = prompt(
+      '「' + c.name + '」の運営人数（必要人数）を入れてください。' + String.fromCharCode(10)
+      + '※ 空のままOKを押すと「未定」に戻ります。',
+      now
+    );
+    if (answer === null) return;   // キャンセル
+
+    const trimmed = String(answer).trim();
+    // 数字だけ受ける。「6〜8」のような範囲はこの欄では受けない（範囲は案件登録・アサイン表から）。
+    if (trimmed !== '' && !/^[0-9]+$/.test(trimmed)) {
+      alert('数字で入れてください（例 12）。' + String.fromCharCode(10)
+        + '「6〜8」のような範囲は、案件登録またはアサイン表から入れてください。');
+      return;
+    }
+
+    fetch(window.ECS_COUNT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ id: id, count: trimmed === '' ? null : Number(trimmed) })
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok || !(j && j.ok)) { alert((j && j.message) || '運営人数を保存できませんでした。'); return; }
+        // ⚠ 画面のあちこち（その日の「必要◯名／あと◯名」・募集の残り・バーの色）が
+        //   この数を見ているので、読み込み直してそろえる＝一部だけ古いまま残るのを防ぐ。
+        location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
   }
 
   // ===== 必要ポジションの枠（2026-09-07 baba指摘で追加）=====
@@ -2182,6 +2230,8 @@
         <span class="fnum">${filled}${settled
           ? `<span class="need">名（この人数で確定・予定${c.need}名）</span>`
           : `<span class="need"> / ${c.need}名</span>`}</span>
+        <button class="edit-btn need-edit" onclick="editNeed('${c.id}')"
+                title="運営人数（必要人数）を直します。案件登録・アサイン表・公開ボードと同じ欄に保存されます">✎ 人数</button>
       </div>
       <div class="cc-cols">
         ${memCol}

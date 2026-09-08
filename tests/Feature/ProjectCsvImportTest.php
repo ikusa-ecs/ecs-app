@@ -63,12 +63,18 @@ class ProjectCsvImportTest extends TestCase
         $this->assertStringStartsWith('2026-08-15', $p2->start_date->format('Y-m-d'));
     }
 
-    /** IT-CSV-02：必須項目が欠けた行はスキップされ、正常行だけ登録される。 */
+    /**
+     * IT-CSV-02：必須項目が欠けた行はスキップされ、正常行だけ登録される。
+     *
+     * ⚠ 2026-09-08 baba要望で**運営人数は必須をやめた**（空欄なら参加人数とコンテンツから
+     *   「仮」の人数を入れる）。必須は「案件名」と「開催日」の2つ。
+     *   仮の人数の中身は tests/Feature/RequiredCountEstimateTest.php で見張っている。
+     */
     public function test_rows_missing_required_fields_are_skipped(): void
     {
         $user = PersonFactory::new()->create();
 
-        // 1件目=正常 / 2件目=開催日なし / 3件目=運営人数なし
+        // 1件目=正常 / 2件目=開催日なし / 3件目=運営人数なし（＝仮で入る）
         $csv = $this->makeCsv(
             ['案件名', '開催日', '運営人数'],
             [
@@ -83,11 +89,16 @@ class ProjectCsvImportTest extends TestCase
             ->post('/project-import', ['csv' => $file]);
 
         $response->assertRedirect('/projects');
-        // 登録されるのは正常な1件だけ。
-        $this->assertSame(1, Project::count());
+        // 登録されるのは「正常案件」と「人数欠け」の2件（開催日が無い行だけ落ちる）。
+        $this->assertSame(2, Project::count());
         $this->assertNotNull(Project::where('project_name', '正常案件')->first());
         $this->assertNull(Project::where('project_name', '開催日欠け')->first());
-        $this->assertNull(Project::where('project_name', '人数欠け')->first());
+
+        // 人数が空の行は入る＝運営人数は「仮」で最少の5名。
+        $noCount = Project::where('project_name', '人数欠け')->first();
+        $this->assertNotNull($noCount, '運営人数が空だと取り込めていない');
+        $this->assertSame(5, (int) $noCount->required_count);
+        $this->assertTrue((bool) $noCount->count_tentative);
     }
 
     /** IT-CSV-03：コンテンツ名（案件名）から contents が発番/紐づけされ content_ids に入る。 */

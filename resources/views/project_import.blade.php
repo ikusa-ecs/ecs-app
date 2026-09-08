@@ -129,7 +129,7 @@
           <strong>列の説明（1件＝1行。1件ずつ入力フォームと同じ項目です）：</strong><br>
           <u>基本情報</u>　<code>区分</code>（通常案件/追加案件）　<code>toC</code>（一般のお客様向けなら「toC」、企業向けは空欄）　<code>確度</code>（確定/Aヨミ/Bヨミ/Cヨミ）　<code>開催日</code>（必須・2026-07-20 の形式）　<code>宿泊</code>（無/前泊有 等）　<code>案件名</code>（必須・コンテンツ名）　<code>案件規模</code>（大型/中型/小型/該当なし）　<code>営業担当</code><br>
           <u>形態・取引先</u>　<code>実施形態</code>（イベント東(リアル) 等）　<code>配信種別</code>（なし/配信/中継）　<code>クライアント</code>　<code>代理店名</code>（任意）　<code>複数案件</code>（あり/なし）　<code>日程種別</code>（本番/予備日/リハ日）　<code>紐づく本番案件</code>　<code>運営場所</code>（現地/配信室 等）<br>
-          <u>当日・手配</u>　<code>担当体制</code>　<code>集合時間</code>（08:00）　<code>解散時間</code>　<code>イベント入場</code>　<code>イベント開始</code>　<code>イベント終了</code>　<code>運営人数</code>（必須・数字／<code>6〜8</code>のような幅もOK）　<code>お客様人数</code>　<code>チーム数</code>　<code>リピート</code>（あり/なし）　<code>音響機材</code><br>
+          <u>当日・手配</u>　<code>担当体制</code>　<code>集合時間</code>（08:00）　<code>解散時間</code>　<code>イベント入場</code>　<code>イベント開始</code>　<code>イベント終了</code>　<code>運営人数</code>（数字／<code>6〜8</code>のような幅もOK。<b>空でもOK＝参加人数とコンテンツから「仮」で入ります・最少5名</b>）　<code>お客様人数</code>　<code>チーム数</code>　<code>リピート</code>（あり/なし）　<code>音響機材</code><br>
           <u>備品・会場</u>　<code>ロゴ</code> <code>カメラ</code> <code>事例記事</code> <code>動画</code>（不要/ほしい/OK/NG/-）　<code>会場住所</code>　<code>屋内外</code>（屋内/屋外）　<code>集合形式</code>（会場現地 等）　<code>お酒</code>（あり/なし）　<code>ケータリング</code>　<code>移動車両</code>　<code>スタッフ募集</code>（募集する/募集しない）<br>
           <u>運営（アサイン後に記入。空欄でOK）</u>　<code>ディレクター</code>（現場のD担当）　<code>物品担当</code>（備品準備）　<code>運営シートURL</code>（スプレッドシートのリンク）　<code>準備:LINE概要送付</code> <code>準備:引き継ぎ</code> <code>準備:台本</code>（済/未）　<code>備考</code><br>
           <span class="muted">※ 「運営」グループ（ディレクター・物品担当・運営シート・準備チェック）は登録後にアサイン画面/案件一覧で入力する項目です。CSVでは空欄のままでかまいません。<br>
@@ -410,8 +410,19 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errs.push('開催日の形式が不正です（例 2026-07-20）');
     else { const d = new Date(r.date); if (isNaN(d.getTime())) errs.push('開催日が存在しない日付です'); }
     // 「6〜8」のような範囲も通す。⚠ サーバー側（ProjectController）と同じ基準にすること。
-    if (impMaxCount(r.count) < 1) errs.push('運営人数が空または不正です（例 16 ／ 6〜8）');
+    // ⚠ 2026-09-08 baba要望：**空欄はエラーにしない**＝参加人数とコンテンツから「仮」で入る。
+    //   書いてあるのに読めないときだけエラー（勘で埋めないため）。
+    if (String(r.count == null ? '' : r.count).trim() !== '' && impMaxCount(r.count) < 1) {
+      errs.push('運営人数が読めません（例 16 ／ 6〜8）');
+    }
     return errs;
+  }
+
+  // 運営人数が空の行か（＝取り込むと「仮」の人数が入る）。
+  // ⚠ 何名になるかはサーバーが決める（コンテンツの必要人数を見るため、画面では分からない）。
+  //   正本＝App\Support\RequiredCountEstimate。ここに人数の計算を書かない。
+  function isCountBlank(r) {
+    return String(r.count == null ? '' : r.count).trim() === '';
   }
 
   // プレビュー描画（サンプルと実ファイルで共用）。isReal=true のときだけ「取り込む」を有効化。
@@ -439,6 +450,9 @@
         <td>${r.kbn}</td>
         <td>${isOk
           ? '<span class="res-ok">✓ OK</span>'
+            + (isCountBlank(r)
+              ? '<br><span class="err-detail">運営人数は「仮」で入ります（参加人数とコンテンツから算出・最少5名）。あとで直してください</span>'
+              : '')
           : '<span class="res-err">✕ エラー</span><br><span class="err-detail">' + errs.join('／') + '</span>'
             + (canFix ? '<br><span class="fix-hint">✎ クリックで直して登録</span>' : '')}</td>`;
       if (canFix) {

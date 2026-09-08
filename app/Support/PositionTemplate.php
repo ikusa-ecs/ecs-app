@@ -27,8 +27,24 @@ final class PositionTemplate
      */
     public static function of(Project $project): array
     {
-        $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
-        $scale = $project->scale;
+        return self::forContents(
+            is_array($project->content_ids) ? array_filter($project->content_ids) : [],
+            $project->scale
+        );
+    }
+
+    /**
+     * 案件になる前（CSV取込の途中など）でも使える形。
+     *
+     * ⚠ 中身は of() と同じ＝**計算はここ1か所**。案件の形になっていない段階でも
+     *   同じ答えになるように分けただけ（写して2つにしない）。
+     *
+     * @param  array<int, string>  $contentIds
+     * @return array<string, int>
+     */
+    public static function forContents(array $contentIds, ?string $scale): array
+    {
+        $contentIds = array_values(array_filter($contentIds));
         if (empty($contentIds) || ! $scale) {
             return [];
         }

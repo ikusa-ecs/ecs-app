@@ -20,6 +20,7 @@ use App\Support\ProjectAccess;
 use App\Support\ProjectFormats;
 use App\Support\ProjectHistoryRecorder;
 use App\Support\ProjectImportColumns;
+use App\Support\RequiredCountEstimate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -1065,6 +1066,9 @@ class ProjectController extends Controller
 
         $okCount = 0;
         $errors = [];   // 「2行目：開催日の形式が…」のような説明を貯める
+        // 運営人数が空欄で「仮」を入れた行の説明（2026-09-08）。
+        // ⚠ 黙って数字を入れない＝何名をどう出したかを必ず知らせる。
+        $estimated = [];
         $lineNo = 1;    // 見出しを除いた人間向けの行番号（1始まり）
 
         foreach ($lines as $line) {
@@ -1093,8 +1097,11 @@ class ProjectController extends Controller
             }
             // 「6〜8」のような範囲も受ける（2026-08-25 baba）。読み方は Headcount が正本。
             // ⚠ ctype_digit だと「6〜8」を弾いてしまう。
-            if (($count === '') || (Headcount::parse($count)['max'] ?? 0) < 1) {
-                $rowErrors[] = '運営人数が空または不正です（例 16 ／ 6〜8）';
+            // ⚠ 2026-09-08 baba要望：**空欄はエラーにしない**＝参加人数とコンテンツから
+            //   「仮」の人数を出して入れる（0のままだと「必要0名」になり、人が足りないことに
+            //   気づけない）。書いてあるのに読めないときは、今までどおりエラーにする。
+            if ($count !== '' && (Headcount::parse($count)['max'] ?? 0) < 1) {
+                $rowErrors[] = '運営人数が読めません（例 16 ／ 6〜8）';
             }
             if ($rowErrors) {
                 $errors[] = "{$lineNo}行目（{$name}）：".implode('／', $rowErrors);
@@ -1106,6 +1113,23 @@ class ProjectController extends Controller
             $contentName = collect([$name])->filter()->unique()->values();
             $contentIds = $this->resolveContentIds($contentName);
 
+            $guest = ctype_digit($get($row, 'お客様人数')) ? (int) $get($row, 'お客様人数') : null;
+            $scale = $get($row, '案件規模') ?: null;
+
+            // ⚠ 運営人数が空のときは「仮」で置く（2026-09-08 baba要望）。
+            //   出し方の正本＝App\Support\RequiredCountEstimate（画面に書き写さない）。
+            //   仮で入れたことが分かるように count_tentative（運営人数は仮）を立てる。
+            $countMax = Headcount::parse((string) $count)['max'];
+            $countMin = Headcount::parse((string) $count)['min'];
+            $tentative = false;
+            if ($countMax === null) {
+                $est = RequiredCountEstimate::for($contentIds, $scale, $guest);
+                $countMax = $est['count'];
+                $countMin = null;
+                $tentative = true;
+                $estimated[] = "{$lineNo}行目（{$name}）：{$est['count']}名 ← {$est['reason']}";
+            }
+
             Project::create([
                 'id' => $this->nextProjectId($date),
                 'project_name' => $name,
@@ -1114,7 +1138,7 @@ class ProjectController extends Controller
                 // toC列に「toC/toc/あり/○/はい/1」があれば一般消費者向け＝true。空欄はtoB扱い。
                 'is_toc' => in_array($get($row, 'toC'), ['toC', 'toc', 'あり', '○', '◯', 'はい', '1'], true),
                 'yomi' => $get($row, '確度') ?: null,
-                'scale' => $get($row, '案件規模') ?: null,
+                'scale' => $scale,
                 'is_recruiting' => $get($row, 'スタッフ募集') !== '募集しない',
                 'is_multi' => $get($row, '複数案件') === 'あり',
                 'date_type' => $get($row, '日程種別') ?: '本番',
@@ -1136,9 +1160,11 @@ class ProjectController extends Controller
                 'is_outdoor' => $get($row, '屋内外') ? ($get($row, '屋内外') === '屋外') : null,
                 'lodging' => $get($row, '宿泊') ?: null,
                 'assembly_type' => $get($row, '集合形式') ?: null,
-                'required_count' => Headcount::parse((string) $count)['max'],
-                'required_count_min' => Headcount::parse((string) $count)['min'],
-                'guest_count' => ctype_digit($get($row, 'お客様人数')) ? (int) $get($row, 'お客様人数') : null,
+                'required_count' => $countMax,
+                'required_count_min' => $countMin,
+                // 空欄から出した仮の人数か（画面に「仮」と出る／あとで人が本当の数を入れる）。
+                'count_tentative' => $tentative,
+                'guest_count' => $guest,
                 'team_count' => ctype_digit($get($row, 'チーム数')) ? (int) $get($row, 'チーム数') : null,
                 'is_repeat' => $get($row, 'リピート') === 'あり',
                 'alcohol' => $get($row, 'お酒') ? ($get($row, 'お酒') === 'あり') : null,
@@ -1165,6 +1191,11 @@ class ProjectController extends Controller
         }
 
         $msg = "CSVから{$okCount}件の案件を取り込みました。";
+        // ⚠ 仮で入れた人数は必ず知らせる（黙って入れると「セールスが入れた数」と区別が付かない）。
+        if ($estimated) {
+            $msg .= ' ⚠ 運営人数が空欄だった'.count($estimated).'件は「仮」で入れました'
+                .'（案件一覧に「仮」と出ます。決まったら直してください）：'.implode(' / ', $estimated).'。';
+        }
         if ($errors) {
             $msg .= ' エラー'.count($errors).'件は取り込みませんでした：'.implode(' / ', $errors);
         }

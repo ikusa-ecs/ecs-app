@@ -7,6 +7,7 @@ use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectAccess;
+use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -227,6 +228,11 @@ class AssignPublishController extends Controller
      * 募集をかける直前に人数を直したい場面が多いので、公開ボードからも変えられるようにした。
      * 保存先は projects.required_count＝案件登録・アサイン表と同じ列（食い違いが起きない）。
      * 空で送れば「未定」に戻る（スタッフ画面では既定5名として見せる）。
+     *
+     * ⚠ 2026-09-08 追加：**日別ボードからもここを呼ぶ**（baba要望「日別ボードで運営人数を
+     *   変更できるようにしてほしい」）。保存の入口を増やさない＝食い違いが起きないため。
+     * ⚠ 人がここで数字を入れたら「仮（count_tentative）」の印は外す。
+     *   CSV取込が空欄から入れた仮の数と、人が決めた数を見分けられなくなるため。
      */
     public function setCount(Request $request)
     {
@@ -243,9 +249,17 @@ class AssignPublishController extends Controller
         $project->required_count = $data['count'] !== null && $data['count'] !== ''
             ? (int) $data['count']
             : null;
+        // ⚠ 人が入れた数＝もう「仮」ではない（CSV取込が空欄から置いた仮の数と区別する）。
+        $project->count_tentative = false;
         $project->save();
 
-        return response()->json(['ok' => true, 'count' => $project->required_count]);
+        return response()->json([
+            'ok' => true,
+            'count' => $project->required_count,
+            // 日別ボード・スタッフ画面が「未定なら5名」で見せている数（正本＝RecruitStatus）。
+            // ⚠ この既定の数をJSに書かないため、サーバーから返す。
+            'needStaff' => RecruitStatus::need($project->required_count),
+        ]);
     }
 
     /**
