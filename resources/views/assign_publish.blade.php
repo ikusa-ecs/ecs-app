@@ -183,6 +183,24 @@
     .badge.extra { background: #fde8e8; color: #b91c1c; border: 1px solid var(--danger); font-weight: 700; }
     tr.extra-row td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 
+    /* 日付を押してその日へ飛ぶ並び（2026-09-08 baba要望）。
+       ⚠ 見た目はエントリー一覧の日付チップと同じにそろえる（別の画面で違う見え方にしない）。 */
+    .day-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0 0 12px; }
+    .day-chips .dc-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+    .day-chip {
+      font-family: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer;
+      background: #fff; border: 1px solid #d8c8b6; border-radius: 8px; padding: 5px 8px; color: #3a2d20;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .day-chip:hover { background: #f7f1e8; border-color: var(--brand); }
+    .day-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .day-chip .dw { font-size: 10.5px; opacity: .8; }
+    .day-chip .cn { font-size: 10.5px; font-weight: 700; background: #f0e6d8; color: #6e5b49; border-radius: 999px; padding: 0 5px; }
+    .day-chip.on .cn { background: rgba(255,255,255,.28); color: #fff; }
+    .day-chip.sun { color: #c05a5a; }
+    .day-chip.sat { color: #4a6ea8; }
+    .day-chip.today { box-shadow: 0 0 0 2px var(--brand-soft); }
+
     /* 月見出しジャンプの点滅 */
     @keyframes pubFlash { 0% { background: var(--warn-soft); } 100% { background: var(--brand-soft); } }
     tr.group-row.flash td { animation: pubFlash 1.4s ease-out; }
@@ -276,6 +294,12 @@
         <button class="view-tab active" id="tab-active"  onclick="setView('active')">スタッフ公開ボード<span class="vt-count" id="cntActive"></span></button>
         <button class="view-tab"        id="tab-archive" onclick="setView('archive')">🗄 アーカイブ（過去）<span class="vt-count" id="cntArchive"></span></button>
       </div>
+
+      <!-- 日付を押すとその日の案件へ飛ぶ（2026-09-08 baba要望「公開ボードも日付で飛べるように」）。
+           ⚠ 左メニューの年月フォルダは「月」までしか飛べず、月に案件が多いと探し直しになる。
+           ⚠ 出すのは「いま表示しているぶん」の日だけ（タブ・絞り込みに合わせる）。
+              押しても案件が無い日が並ぶと、押して何も起きない＝壊れて見えるため。 -->
+      <div class="day-chips" id="dayChips"></div>
 
       <!-- 表 -->
       <div class="panel panel-table">
@@ -514,6 +538,12 @@
   const today = (function(){ const x = new Date(); x.setHours(0,0,0,0); return x; })();
   const todayY = today.getFullYear(), todayM = today.getMonth() + 1;
   function dateOf(off){ const x = new Date(today); x.setDate(x.getDate() + off); return x; }
+  // 日付の印（'2026-09-20'）。⚠ toISOString は時差でズレるので使わない（前日になることがある）。
+  function dayKey(d){
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
 
   CASES.forEach(c => {
     c.date = dateOf(c.off);
@@ -620,6 +650,8 @@
     // ⚠ 日別ボードの「公開ボード →」は、前はただ公開ボードを開くだけで、
     //   どの案件だったか探し直す必要があった。
     tr.id = 'case-' + c.id;
+    // 日付で飛ぶための印（2026-09-08）。⚠ これが無いと日付チップから行を見つけられない。
+    tr.dataset.date = dayKey(c.date);
     if (extra) tr.className = 'extra-row';
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
@@ -744,6 +776,8 @@
     empty.style.display = shownTotal === 0 ? '' : 'none';
     document.getElementById('checkCount').textContent = checkedIds.size;
     syncSelAll();
+    // ⚠ 日付チップは表を描いたあとに作る（表に出ている行から日を拾うため＝表と必ず一致する）。
+    buildDayChips();
   }
 
   function escapeHtml(s){ return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -857,6 +891,64 @@
     const collapsed = box.classList.toggle('collapsed');
     if (car) car.textContent = collapsed ? '▸' : '▾';
   }
+  // ===== 日付を押してその日の案件へ飛ぶ（2026-09-08 baba要望）=====
+  // 【なぜ要るか】左メニューの年月フォルダは「月」までしか飛べない。
+  //   月に案件が20件も並ぶと、そこから目で探し直すことになる。
+  // ⚠ 並べるのは「いま表示しているぶん」の日だけ（タブ＝公開ボード/アーカイブ、
+  //   絞り込み＝公開中/非公開 に合わせる）。案件の無い日を押して何も起きないと壊れて見える。
+  // ⚠ 日の判定・件数はこの1か所で作る（表と別に数えると食い違う）。
+  let pickedDay = '';   // いま光らせている日（チップの色を付けるためだけに持つ）
+  function buildDayChips(){
+    const box = document.getElementById('dayChips');
+    if (!box) return;
+
+    // 表に出ている行の日付を、そのまま拾う＝表と必ず同じ日になる。
+    const counts = new Map();
+    tbody.querySelectorAll('tr[data-date]').forEach(tr => {
+      const k = tr.dataset.date;
+      counts.set(k, (counts.get(k) || 0) + 1);
+    });
+
+    if (counts.size === 0) { box.innerHTML = ''; return; }
+
+    const todayKey = dayKey(today);
+    let html = '<span class="dc-label">日付で飛ぶ：</span>';
+    Array.from(counts.keys()).sort().forEach(k => {
+      const [y, m, d] = k.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const dw = dt.getDay();
+      const cls = 'day-chip'
+        + (k === pickedDay ? ' on' : '')
+        + (dw === 0 ? ' sun' : (dw === 6 ? ' sat' : ''))
+        + (k === todayKey ? ' today' : '');
+      html += '<button class="' + cls + '" onclick="jumpToDay(\'' + k + '\')"'
+        + ' title="' + y + '年' + m + '月' + d + '日の案件へ移動します">'
+        + m + '/' + d + '<span class="dw">（' + DOW[dw] + '）</span>'
+        + '<span class="cn">' + counts.get(k) + '</span></button>';
+    });
+    box.innerHTML = html;
+  }
+
+  // その日の最初の案件まで移動して光らせる。
+  // ⚠ 畳んである月にある日を押しても届くように、見つからなければ全部開いて描き直す
+  //   （押して何も起きないのが、いちばん困るため）。
+  function jumpToDay(key){
+    pickedDay = key;
+    let row = tbody.querySelector('tr[data-date="' + key + '"]');
+    if (!row){
+      collapsedMonths.clear();
+      render();
+      row = tbody.querySelector('tr[data-date="' + key + '"]');
+    } else {
+      buildDayChips();   // 押した日に色を付け直す
+    }
+    if (!row) return;
+
+    row.scrollIntoView({ behavior:'smooth', block:'center' });
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+    setTimeout(() => row.classList.remove('flash'), 1600);
+  }
+
   let flashTimer = null;
   function jumpToMonth(key){
     document.querySelectorAll('.ym-month-btn').forEach(b => b.classList.remove('active'));
