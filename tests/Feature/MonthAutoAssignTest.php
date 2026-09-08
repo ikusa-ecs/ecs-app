@@ -507,7 +507,15 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame('MC', $picks[0]['role']);
     }
 
-    /** ⚠ すでに入っている人の役割も数える（MCがもう1人いるのに、また入れない）。 */
+    /**
+     * ⚠ すでに入っている人の役割も数える（MCがもう1人いるのに、また入れない）。
+     *
+     * ⚠ 2026-09-08 の baba選択で「**手でスタッフを入れた案件はまるごと触らない**」に変えたので、
+     *   この案件は既定では対象外になる。ここで確かめたいのは
+     *   「**対象に戻したとき**に、すでに入っている役割を数えるか」なので、
+     *   第5引数（この案件も自動で埋める）にこの案件を渡している。
+     *   ＝人が「埋めていいよ」と言ったときだけ働く、という形。
+     */
     public function test_counts_roles_already_filled(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
@@ -531,7 +539,7 @@ class MonthAutoAssignTest extends TestCase
         $this->wish($mc, $day);
         $this->wish($op, $day);
 
-        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $plan = (new MonthAutoAssign($day->format('Y-m'), null, [], [], [$p->id]))->plan();
         $picks = collect($plan['projects'])->firstWhere('id', $p->id)['picks'];
 
         $this->assertCount(1, $picks, 'あと1人だけ');

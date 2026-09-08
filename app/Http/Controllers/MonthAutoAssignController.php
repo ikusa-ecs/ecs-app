@@ -40,8 +40,9 @@ class MonthAutoAssignController extends Controller
 
         $skipDays = $this->skipDays($request);
         $skipProjects = $this->skipProjects($request);
+        $includeHandMade = $this->includeHandMade($request);
 
-        $engine = new MonthAutoAssign($period, $office, $skipDays, $skipProjects);
+        $engine = new MonthAutoAssign($period, $office, $skipDays, $skipProjects, $includeHandMade);
         $plan = $engine->plan();
 
         return view('auto_assign_month', [
@@ -50,6 +51,10 @@ class MonthAutoAssignController extends Controller
             'candidateProjects' => $engine->candidateProjects(),
             'skipDays' => $skipDays,
             'skipProjects' => $skipProjects,
+            // ⚠ 手でスタッフを入れた案件＝機械は触らない（2026-09-08 baba指摘）。
+            //   黙って外すと「なぜ下見に出ないのか」が分からないので、必ず画面に出して戻せるようにする。
+            'handMade' => $engine->handMadeProjects(),
+            'includeHandMade' => $includeHandMade,
             'period' => $period,
             'periodLabel' => Carbon::createFromFormat('Y-m-d', $period.'-01')->format('Y年n月'),
             'prevPeriod' => Carbon::createFromFormat('Y-m-d', $period.'-01')->subMonth()->format('Y-m'),
@@ -77,7 +82,14 @@ class MonthAutoAssignController extends Controller
 
         // ⚠ プレビューのあとに誰かが手で入れているかもしれないので、**作り直してから**保存する
         //   （画面が持っている古い計画をそのまま保存すると、二重に入る）。
-        $plan = (new MonthAutoAssign($period, $office, $this->skipDays($request), $this->skipProjects($request)))->plan();
+        $plan = (new MonthAutoAssign(
+            $period, $office,
+            $this->skipDays($request),
+            $this->skipProjects($request),
+            // ⚠ 下見と同じものを受け取る。ここを渡し忘れると
+            //   「下見では触らないと出ていたのに、実行したら入る」になる。
+            $this->includeHandMade($request),
+        ))->plan();
 
         $projects = Project::whereIn('id', collect($plan['projects'])->pluck('id'))
             ->get(['id', 'start_date'])->keyBy('id');
@@ -137,14 +149,30 @@ class MonthAutoAssignController extends Controller
             return back()->with('status', 'その取り消しはすでに済んでいます。');
         }
 
-        // ⚠ 「仮」のままのものだけ消す。人が「確定」に上げたもの・手で直したものは残す。
-        $removed = Assignment::where('auto_run_id', $run->id)->where('status', '仮')->delete();
-        $kept = Assignment::where('auto_run_id', $run->id)->count();
+        // ⚠ 消すのは「機械が入れて、そのあと**誰も触っていない**仮」だけ。
+        //   ・人が「確定」に上げたもの … 残す（人の判断を機械が消さない）
+        //   ・人があとから手で直したもの … **残す**
+        //     （役割を替えた・備考を書いた・担当メモを入れた行。2026-09-08 baba指摘
+        //      「置いた人がいなくなっていた」＝ここが消えていた可能性がある）
+        //   見分け方＝作った時刻より更新の時刻が後なら「あとから誰かが触った」。
+        $removed = Assignment::where('auto_run_id', $run->id)
+            ->where('status', '仮')
+            ->whereColumn('updated_at', '<=', 'created_at')
+            ->delete();
+
+        $keptConfirmed = Assignment::where('auto_run_id', $run->id)->where('status', '確定')->count();
+        $keptEdited = Assignment::where('auto_run_id', $run->id)
+            ->where('status', '仮')
+            ->whereColumn('updated_at', '>', 'created_at')
+            ->count();
         $run->update(['undone' => $removed]);
 
         $msg = "自動アサインを取り消しました（{$removed}名）。";
-        if ($kept > 0) {
-            $msg .= "⚠ {$kept}名は「確定」になっていたので残しています（手で外してください）。";
+        if ($keptConfirmed > 0) {
+            $msg .= "⚠ {$keptConfirmed}名は「確定」になっていたので残しています（手で外してください）。";
+        }
+        if ($keptEdited > 0) {
+            $msg .= "⚠ {$keptEdited}名は、そのあと手で直してあったので残しています（消したいときは日別ボードで外してください）。";
         }
 
         return redirect('/auto-assign-month?'.http_build_query(array_filter([
@@ -182,6 +210,24 @@ class MonthAutoAssignController extends Controller
     private function skipProjects(Request $request): array
     {
         $raw = $request->input('skipProject', []);
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(fn ($v) => (string) $v, $raw), fn ($v) => $v !== ''));
+    }
+
+    /**
+     * 「手で入っているけれど、この案件も自動で埋めてよい」と選んだ案件（2026-09-08 baba指摘）。
+     *
+     * ⚠ 既定は空＝**手で入っている案件には触らない**。
+     *   実行のときも下見と同じものを受け取る（食い違うと「下見と違う結果」になる）。
+     *
+     * @return array<int, string>
+     */
+    private function includeHandMade(Request $request): array
+    {
+        $raw = $request->input('includeHand', []);
         if (! is_array($raw)) {
             return [];
         }

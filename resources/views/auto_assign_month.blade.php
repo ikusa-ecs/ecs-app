@@ -57,6 +57,9 @@
 
   .am-skip .s-day.s-proj { max-width:280px; }
   .am-skip .s-day.s-proj .dt { font-size:11px; color:var(--muted); margin-right:3px; }
+  /* 手で入っている案件＝機械が触らない印（他のチェックと見分けが付くように色を変える）。 */
+  .am-skip .s-day.s-hand { border-color:#f0c98a; background:#fff8ec; }
+  .am-skip .s-day.s-hand.off { border-color:#e6d6bd; background:#faf6ee; }
 
   /* 日ごとのまとまり（2026-09-07 baba要望＝並べ方だけ日ごとにする） */
   .am-day { margin:0 0 16px; }
@@ -158,7 +161,28 @@
       </label>
     @endforeach
   </div>
-  @if (count($skipDays) > 0 || count($skipProjects) > 0)
+  {{-- ⚠ 手で入っている案件は既定で対象外（2026-09-08 baba指摘
+       「日別ボードで仮埋めしてたのに変わった」「触らないでほしい」）。
+       黙って外すと「なぜ下見に出ないのか」が分からないので、ここに理由つきで出す。
+       ⚠ 同じフォームで送る（別フォームにすると、日のチェックを変えたときに消える）。 --}}
+  @if (count($handMade) > 0)
+    <span class="s-label" style="margin-top:12px;">
+      🖐 <b>手で入っている案件（機械は触りません）</b>
+      … 日別ボードなどで、すでに人が入れてある案件です。<b>チェックを付けた案件だけ</b>、足りないぶんを自動で埋めます。
+    </span>
+    <div class="s-days">
+      @foreach ($handMade as $hm)
+        @php($hd = \Illuminate\Support\Carbon::parse($hm['date']))
+        <label class="s-day s-proj s-hand {{ $hm['included'] ? '' : 'off' }}"
+               title="手で入っている人：{{ implode('、', $hm['people']) }}">
+          <input type="checkbox" name="includeHand[]" value="{{ $hm['id'] }}" {{ $hm['included'] ? 'checked' : '' }}
+                 onchange="document.getElementById('skipForm').submit();">
+          <span class="dt">{{ $hd->format('n/j') }}</span>{{ $hm['name'] }}<span class="cn">手{{ count($hm['people']) }}名</span>
+        </label>
+      @endforeach
+    </div>
+  @endif
+  @if (count($skipDays) > 0 || count($skipProjects) > 0 || count($includeHandMade) > 0)
     <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => $officeScope])) }}">チェックを全部外す（日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} 除外中）</a>
   @endif
 </form>
@@ -192,6 +216,11 @@
     @endforeach
     @foreach ($skipProjects as $pid)
       <input type="hidden" name="skipProject[]" value="{{ $pid }}">
+    @endforeach
+    {{-- ⚠ 「手で入っているけれど埋めてよい」も実行に持っていく。忘れると
+         下見では入るはずの案件が、実行では入らない（逆に、触らないはずの案件が動くこともない）。 --}}
+    @foreach ($includeHandMade as $pid)
+      <input type="hidden" name="includeHand[]" value="{{ $pid }}">
     @endforeach
     <button type="submit" class="am-btn go" {{ $plan['totals']['added'] === 0 ? 'disabled' : '' }}>
       ⚡ この計画で {{ $plan['totals']['added'] }}名を入れる（すべて「仮」）

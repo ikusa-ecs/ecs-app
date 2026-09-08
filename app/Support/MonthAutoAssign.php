@@ -60,12 +60,16 @@ class MonthAutoAssign
      * @param  array<int, string>  $skipProjects  自動アサインしない案件（案件IDの並び・2026-09-07 baba要望）
      *   ⚠ 「この日は自分で決めたい」「この案件だけは機械に任せない」ときのため。
      *     除いたものは**計画にも出さない**（下見に出ると、入るものだと勘違いする）。
+     * @param  array<int, string>  $includeHandMade  「手で入っているけれど、それでも自動で埋めてよい」案件
+     *   （2026-09-08 baba指摘「日別ボードで仮で埋めてるものは触らないでほしい」）。
+     *   ⚠ 既定は**手で入っている案件には触らない**。ここに案件IDを入れたときだけ対象に戻す。
      */
     public function __construct(
         private string $period,          // 'YYYY-MM'
         private ?string $office = null,  // null＝全拠点
         private array $skipDays = [],
         private array $skipProjects = [],
+        private array $includeHandMade = [],
     ) {
         [$y, $m] = array_map('intval', explode('-', $period));
         $this->monthStart = Carbon::create($y, $m, 1)->startOfDay();
@@ -286,9 +290,88 @@ class MonthAutoAssign
             ->all();
     }
 
+    /**
+     * ⚠ **人が手でスタッフを入れた案件**（2026-09-08 baba指摘
+     * 「日別ボードで仮埋めしてたのに変わった」「触らないでほしい」）。
+     *
+     * 【なぜ案件まるごと外すのか】
+     * 人が一度その案件を組み始めているなら、そこには「この人とこの人を組ませたい」という
+     * **人の判断**が入っている。機械が残り枠を埋めると、あとから見て
+     * **どこまでが自分の判断だったのか分からなくなる**。だから触らない。
+     *
+     * 【手で入れた、の見分け方】
+     *  ・`auto_run_id` が空＝この機械が入れた行ではない（＝人が入れた）
+     *  ・その人が**スタッフ**（people.role='staff'）
+     *    ⚠ 社員の行（D決めで決めたD・SD）は数えない。
+     *      Dはたいてい先に決まるので、それで外すと**ほとんどの案件が対象外**になり、
+     *      この機能そのものが使えなくなる。
+     *  ・キャンセル以外
+     *
+     * @return array<string, array<int, string>> 案件ID => 手で入っている人の名前
+     */
+    public function handMadeStaff(): array
+    {
+        $rows = Assignment::whereBetween('date', [
+            $this->monthStart->format('Y-m-d').' 00:00:00',
+            $this->monthEnd->format('Y-m-d').' 23:59:59',
+        ])
+            ->whereNull('auto_run_id')
+            ->where('status', '!=', 'キャンセル')
+            ->whereIn('staff_id', Person::staff()->select('id'))
+            ->get(['project_id', 'staff_id']);
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $names = Person::whereIn('id', $rows->pluck('staff_id')->unique())->pluck('name', 'id');
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[$r->project_id][] = (string) ($names[$r->staff_id] ?? $r->staff_id);
+        }
+
+        return array_map(fn (array $v) => array_values(array_unique($v)), $out);
+    }
+
+    /**
+     * 手で入っているので外した案件（画面に出して、戻せるようにするためのもの）。
+     *
+     * ⚠ 黙って外すと「なぜこの案件が下見に出てこないのか」が分からなくなる。
+     *   必ず画面に理由つきで出す。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function handMadeProjects(): array
+    {
+        $hand = $this->handMadeStaff();
+        if ($hand === []) {
+            return [];
+        }
+
+        return $this->targetProjects(false)
+            ->filter(fn (Project $p) => isset($hand[$p->id]))
+            ->map(fn (Project $p) => [
+                'id' => $p->id,
+                'name' => $p->project_name,
+                'client' => $p->client ?? '',
+                'date' => $p->start_date->format('Y-m-d'),
+                'need' => $this->needOf($p),
+                'people' => $hand[$p->id],
+                // いま対象に戻してあるか（チェックを付けた案件）。
+                'included' => in_array((string) $p->id, $this->includeHandMade, true),
+            ])
+            ->sortBy('date')
+            ->values()
+            ->all();
+    }
+
     /** その月の「まだ足りない案件」。$applySkip=false なら外した日・案件を無視する。 */
     private function targetProjects(bool $applySkip = true): Collection
     {
+        // ⚠ 手で入っている案件（人が組み始めた案件）は外す。1回だけ引いて使い回す。
+        $hand = $applySkip ? $this->handMadeStaff() : [];
+
         return OfficeScope::applyToProjects(Project::query(), $this->office)
             ->notCancelled()
             ->whereNotNull('start_date')
@@ -298,12 +381,19 @@ class MonthAutoAssign
             ])
             ->orderBy('start_date')
             ->get()
-            ->filter(function (Project $p) use ($applySkip) {
+            ->filter(function (Project $p) use ($applySkip, $hand) {
                 // ⚠ 「この日はアサインしない」「この案件は入れない」で外したもの（2026-09-07 baba要望）。
                 if ($applySkip && (
                     in_array($p->start_date->format('Y-m-d'), $this->skipDays, true)
                     || in_array((string) $p->id, $this->skipProjects, true)
                 )) {
+                    return false;
+                }
+                // ⚠ 人が手でスタッフを入れた案件には触らない（2026-09-08 baba指摘）。
+                //    「この案件も自動で埋める」にチェックを付けたときだけ対象に戻す。
+                if ($applySkip
+                    && isset($hand[$p->id])
+                    && ! in_array((string) $p->id, $this->includeHandMade, true)) {
                     return false;
                 }
                 if (in_array($p->status, ['下書き', '完了'], true) || $p->is_archived === true) {
