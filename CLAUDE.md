@@ -2,7 +2,12 @@
 
 このフォルダ（`C:\Users\onuma\ecs_dev\ecs_laravel`）は ECS の本番コード（Laravel/Blade）。
 画面編集はここの `resources/views/*.blade.php` で行う。
-**モックは見本として凍結・触らない**：`G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_モック\*.html`、および本フォルダ内の `public/ecs/*.html`・`public/ecs/data/*.js`（実体はBladeが動く＝本実装の参照元ではない）。
+**モックは見本として凍結・触らない**：`G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発\ECS_モック\*.html`、および本フォルダ内の `resources/mock/*.html`・`public/ecs/data/*.js`（実体はBladeが動く＝本実装の参照元ではない）。
+- ⚠ モックのHTMLは **2026-09-08に `public/ecs/` から `resources/mock/` へ移した**（23枚）。**`public` へ戻さない。**
+  理由：`public` の中のファイルは **Laravel を通らない**（Webサーバーが直接返す）ので、ログインの門も権限の門も効かず、
+  `/ecs/staff.html` のように**ログインしなくても誰でもURLで開けていた**（2026-09-07 デバッグ担当の指摘で発覚）。
+- ⚠ ただし `public/ecs/style.css`・`public/ecs/csv-read.js`・`public/ecs/data/cases.js` は**今も本番の画面が読んでいる**
+  （`cases.js` は9画面）。**この3つは消さない・動かさない。** `public/ecs/` を丸ごと消すと画面が壊れる。
 
 ## 作業を始める前に、必ず下記を読むこと（設計の「正」はすべて共有Googleドライブ `ECS再開発2026_Claude開発` にある。コピーは作らない＝唯一の正。※2026-06-30にOneDriveからここへ移行）
 > 共有ドライブの実体パス＝`G:\.shortcut-targets-by-id\1wtRKd0z73TyKcNSAd4TEDbrM_27KXL5H\ECS再開発2026_Claude開発`
