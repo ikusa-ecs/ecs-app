@@ -58,7 +58,7 @@
 
     .pk-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0 4px; }
     .pk-selcount { font-size:13px; color:#6e5b49; }
-    .pk-selcount b { color:var(--brand,#b5673a); font-size:15px; }
+    .pk-selcount b { color: var(--brand-ink); font-size:15px; }
 
     /* バッジ類 */
     .e-badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }

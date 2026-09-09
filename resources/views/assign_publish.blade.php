@@ -81,7 +81,7 @@
 
     td.date-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
     td.date-cell .dow { font-size: 11.5px; color: var(--muted); margin-left: 2px; }
-    td.date-cell .dow.sun { color: var(--danger); } td.date-cell .dow.sat { color: var(--brand); }
+    td.date-cell .dow.sun { color: var(--danger); } td.date-cell .dow.sat { color: var(--brand-ink); }
 
     td.proj-cell { min-width: 0; word-break: break-all; }
     td.proj-cell strong { font-size: 14px; }
@@ -132,7 +132,7 @@
     td.ops-cell .note-btn:hover { background: #f3ece0; }
     /* 記載があるボタンはひと目で分かるようにする（2026-08-21 baba。案件一覧の📝と同じ考え方） */
     td.ops-cell .note-btn.has { background: var(--warn-soft, #fdf3e2); border-color: #e6c98f; font-weight: 700; }
-    td.ops-cell .note-btn .dot-mark { color: var(--brand); margin-left: 3px; font-size: 10px; vertical-align: 1px; }
+    td.ops-cell .note-btn .dot-mark { color: var(--brand-ink); margin-left: 3px; font-size: 10px; vertical-align: 1px; }
     td.ops-cell .cat-toggle { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 5px 7px; font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink); }
     td.ops-cell .cat-toggle:hover { background: #f3ece0; }
     td.ops-cell .cat-toggle.is-extra { background: #fde8e8; color: #b91c1c; border-color: var(--danger); font-weight: 700; }

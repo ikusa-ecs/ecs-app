@@ -55,13 +55,13 @@
 
   nav.toc{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:24px; }
   nav.toc b{ font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
-  nav.toc a{ color:var(--brand); text-decoration:none; font-size:14px; }
+  nav.toc a{ color: var(--brand-ink); text-decoration:none; font-size:14px; }
   nav.toc a:hover{ text-decoration:underline; }
   nav.toc ol{ margin:0; padding-left:20px; }
   nav.toc li{ margin:3px 0; }
 
   section{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:18px; }
-  h2{ font-size:17px; margin:0 0 10px; padding-bottom:8px; border-bottom:2px solid var(--brand-soft); color:var(--brand); }
+  h2{ font-size:17px; margin:0 0 10px; padding-bottom:8px; border-bottom:2px solid var(--brand-soft); color: var(--brand-ink); }
   h3{ font-size:14.5px; margin:16px 0 6px; }
   p{ margin:8px 0; }
   ul,ol{ margin:8px 0; padding-left:22px; }
@@ -77,16 +77,16 @@
     width:26px; height:26px; border-radius:50%; background:var(--brand-fill); color:#fff;
     text-align:center; line-height:26px; font-weight:700; font-size:13px;
   }
-  .steps b{ color:var(--brand); }
+  .steps b{ color: var(--brand-ink); }
 
   .note{ background:var(--warn-soft); border:1px solid #ecd9b6; border-radius:10px; padding:11px 13px; font-size:13px; }
   .tip{ background:var(--ok-soft); border:1px solid #b7e0c2; border-radius:10px; padding:11px 13px; font-size:13px; }
-  .pill{ display:inline-block; background:var(--brand-soft); color:var(--brand); border-radius:20px; padding:1px 10px; font-size:12px; font-weight:700; }
-  .key{ display:inline-block; background:var(--brand-soft); color:var(--brand); border:1px solid var(--line); border-radius:6px; padding:0 7px; font-weight:700; font-size:13px; }
+  .pill{ display:inline-block; background:var(--brand-soft); color: var(--brand-ink); border-radius:20px; padding:1px 10px; font-size:12px; font-weight:700; }
+  .key{ display:inline-block; background:var(--brand-soft); color: var(--brand-ink); border:1px solid var(--line); border-radius:6px; padding:0 7px; font-weight:700; font-size:13px; }
 
   table{ border-collapse:collapse; width:100%; margin:10px 0; font-size:13px; }
   th,td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
-  th{ background:var(--brand-soft); color:var(--brand); font-weight:700; }
+  th{ background:var(--brand-soft); color: var(--brand-ink); font-weight:700; }
 
   footer{ color:var(--muted); font-size:12px; text-align:center; margin-top:8px; }
 </style>

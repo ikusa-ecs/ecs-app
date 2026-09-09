@@ -109,7 +109,7 @@
       font-size: 10.5px; font-weight: 700; color: #15803d;
       background: var(--ok-soft); border-radius: 999px; padding: 1px 8px;
     }
-    .news-what { color: var(--brand); font-weight: 700; }
+    .news-what { color: var(--brand-ink); font-weight: 700; }
     .news-diff { color: var(--muted); }
     .news-diff b { color: var(--ink); }
     /* 企業名（お客様）。同じ日に同じコンテンツが2件あっても見分けられるように必ず出す。 */
@@ -172,7 +172,7 @@
     .jr-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .jr-date { font-weight: 700; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .jr-date .sun { color: var(--danger); }
-    .jr-date .sat { color: var(--brand); }
+    .jr-date .sat { color: var(--brand-ink); }
     .jr-title { font-weight: 700; font-size: 14px; }
     .jr-client { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 4px; }
     .jr-head .j-badge { margin-left: auto; }
@@ -311,7 +311,7 @@
     .jc-cell.empty { border: none; background: none; }
     .jc-cell .dnum { font-size: 11px; color: var(--muted); font-weight: 700; }
     .jc-cell.sun .dnum { color: var(--danger); }
-    .jc-cell.sat .dnum { color: var(--brand); }
+    .jc-cell.sat .dnum { color: var(--brand-ink); }
     .jc-cell.today { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
     .jc-job {
       border: 1px solid var(--line); border-radius: 6px; background: #fff;
@@ -401,7 +401,7 @@
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
     .cal-grid .dow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 2px; }
     .cal-grid .dow.sun { color: var(--danger); }
-    .cal-grid .dow.sat { color: var(--brand); }
+    .cal-grid .dow.sat { color: var(--brand-ink); }
     .cell {
       aspect-ratio: 1/1; border-radius: 9px; border: 1px solid var(--line);
       display: flex; flex-direction: column; align-items: center; justify-content: center;

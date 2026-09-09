@@ -8,7 +8,7 @@
 <style>
     .mp-wrap { max-width: 1000px; }
     .back-link { font-size: 13px; color: var(--brand-dark); font-weight: 700; }
-    .back-link:hover { color: var(--brand); }
+    .back-link:hover { color: var(--brand-ink); }
 
     /* 案件選択バー */
     .pick-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

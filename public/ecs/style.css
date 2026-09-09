@@ -43,11 +43,37 @@ html[data-theme="orange"] {
   --ink: #1f2328;       /* ほぼ黒＝コントラストを立ててシャープに見せる */
   --muted: #6b7280;     /* ニュートラルグレー */
   --line: #e5e7eb;      /* うすいグレーの罫線 */
-  --brand: #f07800;     /* コーポレートの鮮やかなオレンジ */
-  --brand-dark: #cc6000;
+  /* ⚠ オレンジは**3つの役目に分ける**（2026-09-09 デザイナー点検）。
+     鮮やかな #f07800 は白地で**文字にすると 2.84:1 ＝読めない**。線とアイコンにだけ使う。
+       --brand      … 線・アイコン・枠（鮮やかなまま。ブランドの印象はここで出す）
+       --brand-ink  … 文字・リンク（白地で読める濃さ 4.98:1）
+       --brand-fill … 面に敷く（白文字が読める濃さ）。ホバーはさらに濃く。 */
+  --brand: #f07800;
+  --brand-ink: #b35500;
+  --brand-fill: #b35500;
+  --brand-fill-hover: #8f4400;
+  --brand-dark: #b35500; /* 「濃いブランド色」＝文字にも使うので読める濃さにそろえる */
   --brand-soft: #fff3e6;/* オレンジのごく淡い面（帯・選択中の背景） */
+  /* ⚠ 意味の色の淡い面は**茶色みを抜く**（既定のクリームのままだと24画面の注記帯がベージュに見える）。 */
+  --ok-soft: #ecfdf5;
+  --warn-soft: #fffbeb;
+  --danger-soft: #fef2f2;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
 }
+/* 会社カラーのときだけ、共通部品のベージュをニュートラルグレーに置き換える。
+   ⚠ ここは**面積が大きいものだけ**（表の見出し・行のホバー・ボタンのホバー・灰バッジ・バーの下地・
+     上のバー）。ここを直すだけで「白地のテーマ」に見えるようになる（2026-09-09 デザイナー点検）。
+   ⚠ 既定（ベージュ）の見た目は変えない＝この節の中だけで上書きする。 */
+html[data-theme="orange"] table.tbl th { background: #f7f8f9; color: #4b5563; }
+html[data-theme="orange"] table.tbl tbody tr:hover { background: #f7f8f9; }
+html[data-theme="orange"] .btn:hover { background: #f3f4f6; }
+html[data-theme="orange"] .badge.gray { background: #f3f4f6; color: #4b5563; }
+html[data-theme="orange"] .cat-通常 { background: #f3f4f6; color: #4b5563; }
+html[data-theme="orange"] .bar { background: #e5e7eb; }
+html[data-theme="orange"] .nav-toggle { color: var(--muted); }
+html[data-theme="orange"] .nav-toggle:hover { background: #f3f4f6; color: var(--ink); }
+html[data-theme="orange"] .topbar .role-pill { color: #9a4a00; }
+html[data-theme="orange"] .mock-note { border-color: #fde68a; color: #92400e; }
 /* 左メニューも会社カラーにする（2026-09-09 baba「左側のメニューのところは会社カラーにはできない？」）。
    ⚠ 背景は **濃いめのオレンジ** にしている。鮮やかなオレンジ（--brand）のままだと
      白い文字とのコントラストが足りず、13px のメニュー文字が読みにくい。
@@ -138,7 +164,10 @@ html[data-theme="dark"] {
 }
 /* ⚠ 面に敷くオレンジは --brand-fill を使う（--brand は文字用）。
    ここで既定・会社カラーにも同じ名前を用意しておくことで、画面側は var(--brand-fill) だけ書けばよい。 */
-:root { --brand-fill: var(--brand); --brand-fill-hover: var(--brand-dark); }
+/* ⚠ 面に敷くオレンジ（--brand-fill）と文字に使うオレンジ（--brand-ink）は役目が違う。
+   既定と黒は「いままでと同じ色」を入れておく＝見た目を変えずに、画面側は var() だけ書ける。 */
+:root { --brand-fill: var(--brand); --brand-fill-hover: var(--brand-dark); --brand-ink: var(--brand); }
+html[data-theme="dark"] { --brand-ink: var(--brand); }
 html[data-theme="orange"] { --brand-fill: #d96b00; --brand-fill-hover: #b35500; }
 /* 左メニュー */
 html[data-theme="dark"] .sidebar { background: #1a1d23; color: var(--ink); }
@@ -278,7 +307,7 @@ body {
   line-height: 1.6;
 }
 
-a { color: var(--brand); text-decoration: none; }
+a { color: var(--brand-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ===== アプリ全体レイアウト（サイドバー＋本文） ===== */

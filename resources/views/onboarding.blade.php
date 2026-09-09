@@ -15,7 +15,7 @@
       background: #fff; width: 560px; max-width: 94vw; border-radius: 16px;
       padding: 30px 34px 34px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
     }
-    .ob-card .brand { font-size: 26px; font-weight: 800; letter-spacing: 2px; color: var(--brand); text-align: center; }
+    .ob-card .brand { font-size: 26px; font-weight: 800; letter-spacing: 2px; color: var(--brand-ink); text-align: center; }
     .ob-card .brand small { display:block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
     .ob-hello { text-align:center; font-size: 18px; font-weight: 700; margin: 18px 0 2px; }
     .ob-lead { text-align:center; color: var(--muted); font-size: 13px; margin: 0 0 8px; line-height:1.7; }

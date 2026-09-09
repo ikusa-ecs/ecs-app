@@ -11,7 +11,7 @@
       background: #fff; width: 380px; max-width: 92vw; border-radius: 16px;
       padding: 36px 34px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
     }
-    .login-card .brand { font-size: 30px; font-weight: 800; letter-spacing: 2px; color: var(--brand); text-align: center; }
+    .login-card .brand { font-size: 30px; font-weight: 800; letter-spacing: 2px; color: var(--brand-ink); text-align: center; }
     .login-card .brand small { display:block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
     .login-card h1 { font-size: 17px; text-align: center; margin: 22px 0 6px; }
     .login-card p.lead { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }

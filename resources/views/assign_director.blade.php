@@ -70,7 +70,7 @@
     .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
     .cal-dow > div { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 2px 0; }
     .cal-dow > div.sun { color: var(--danger); }
-    .cal-dow > div.sat { color: var(--brand); }
+    .cal-dow > div.sat { color: var(--brand-ink); }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 
     .cal-cell {
@@ -82,7 +82,7 @@
     .cal-cell .c-date { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
     .cal-cell.other .c-date { color: var(--muted); }
     .cal-cell .c-date .sun { color: var(--danger); }
-    .cal-cell .c-date .sat { color: var(--brand); }
+    .cal-cell .c-date .sat { color: var(--brand-ink); }
     /* その日の希望休（ディレクター） */
     /* その日の希望休（ディレクター）。⚠ 名前も出すので、折り返せるようにする
        （nowrap のままだとマスからはみ出して、カレンダーの並びが崩れる）。 */
@@ -286,7 +286,7 @@
     .dpick-pop .dp-empty { color: var(--muted); padding: 6px 0; }
     .dpick-pop .dp-warn { font-size: 10.5px; color: #b91c1c; font-weight: 700; margin-top: 7px; }
     .dpick-pop .dp-close { margin-top: 9px; text-align: right; }
-    .dpick-pop .dp-close button { border: none; background: none; color: var(--brand); cursor: pointer; font-size: 12px; font-family: inherit; }
+    .dpick-pop .dp-close button { border: none; background: none; color: var(--brand-ink); cursor: pointer; font-size: 12px; font-family: inherit; }
     /* ===== 黒ベース（2026-09-09）=====
        白い面と茶色の文字を、黒地でも読める色に置き換える。
        ⚠ 色の意味（緑＝D/SD担当／青＝FC等／赤＝注意／金＝大型）は変えない。

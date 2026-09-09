@@ -129,7 +129,7 @@
     .suggest.open { display: block; }
     .suggest .item { padding: 8px 12px; cursor: pointer; font-size: 13.5px; }
     .suggest .item:hover { background: var(--brand-soft); }
-    .suggest .add-new { color: var(--brand); font-weight: 600; }
+    .suggest .add-new { color: var(--brand-ink); font-weight: 600; }
     .suggest .add-new-note { display: block; color: #6b7280; font-weight: 400; font-size: 11.5px; margin-top: 2px; }
     /* 「この案件だけで使う」を選んだコンテンツ＝タグに小さく印を付けて区別する */
     .tag .oneoff-mark {

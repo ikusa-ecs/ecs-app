@@ -89,7 +89,7 @@
     .mp-cal.show { display: block; }
     .mp-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
     .mp-cal-grid .dow { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 4px; font-weight: 600; }
-    .mp-cal-grid .dow.sat { color: var(--brand); }
+    .mp-cal-grid .dow.sat { color: var(--brand-ink); }
     .mp-cal-grid .dow.sun { color: var(--danger); }
     .mp-cell {
       min-height: 74px; border-radius: 10px; border: 1px solid var(--line);
@@ -98,7 +98,7 @@
     .mp-cell.empty { border: none; background: none; }
     .mp-cell.has { background: var(--brand-soft); border-color: #e3d3b6; }
     .mp-cell .dnum { font-size: 12px; color: #8a7a66; font-weight: 600; }
-    .mp-cell.sat .dnum { color: var(--brand); }
+    .mp-cell.sat .dnum { color: var(--brand-ink); }
     .mp-cell.sun .dnum { color: var(--danger); }
     .mp-ev {
       background: #fff; border: 1px solid var(--line); border-radius: 6px;
@@ -131,7 +131,7 @@
       margin-top: 16px; background: none; border: none; cursor: pointer; font-family: inherit;
       font-size: 13px; font-weight: 700; color: var(--brand-dark); padding: 4px 0;
     }
-    .arch-toggle:hover { color: var(--brand); }
+    .arch-toggle:hover { color: var(--brand-ink); }
     .arch-body { display: none; margin-top: 8px; }
     .arch-body.open { display: block; }
     .arch-body tr td { color: var(--muted); }

@@ -81,7 +81,7 @@
     .rel .ng { color: var(--danger); }
     .rel .good { color: var(--ok); }
 
-    .row-toggle { cursor: pointer; color: var(--brand); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+    .row-toggle { cursor: pointer; color: var(--brand-ink); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
     tr.detail-row > td { background: #faf6ee; padding: 0; }
     .detail-box { padding: 16px 18px; }
     .detail-box .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }

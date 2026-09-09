@@ -43,7 +43,7 @@
   .pill.day { background: #f0ece3; color: #7a6a58; }
 
   .fl-edit { font-size: 12px; font-weight: 700; color: var(--brand-dark); text-decoration: none; }
-  .fl-edit:hover { color: var(--brand); text-decoration: underline; }
+  .fl-edit:hover { color: var(--brand-ink); text-decoration: underline; }
   .fl-noedit { font-size: 11.5px; color: var(--muted); }
   .fl-empty { color: var(--muted); font-size: 13px; padding: 20px 4px; }
   .fl-note { font-size: 11.5px; color: var(--muted); line-height: 1.8; margin-top: 12px; }

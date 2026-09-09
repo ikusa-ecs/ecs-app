@@ -58,7 +58,7 @@
       .day-head { top: 52px; }
     }
     .day-head .d-date { font-size: 15px; font-variant-numeric: tabular-nums; }
-    .day-head .d-date .sun { color: var(--danger); } .day-head .d-date .sat { color: var(--brand); }
+    .day-head .d-date .sun { color: var(--danger); } .day-head .d-date .sat { color: var(--brand-ink); }
     .day-head .d-pool { font-size: 12.5px; font-weight: 600; color: var(--ink); display: flex; gap: 12px; flex-wrap: wrap; }
     .day-head .d-pool b { font-variant-numeric: tabular-nums; }
     .day-head .d-pool .remain.ok  { color: #15803d; }
@@ -294,7 +294,7 @@
     .m-name.dup { color: var(--danger); font-weight: 700; }
     .m-x   { color: var(--danger); font-weight: 700; cursor: pointer; padding: 0 4px; }
     .m-x:hover { background: var(--danger-soft); border-radius: 6px; }
-    .c-add { color: var(--brand);  font-weight: 700; cursor: pointer; padding: 0 4px; white-space: nowrap; }
+    .c-add { color: var(--brand-ink);  font-weight: 700; cursor: pointer; padding: 0 4px; white-space: nowrap; }
     .c-add:hover { text-decoration: underline; }
 
     /* 希望者の色分け（複数案件希望／カレンダー〇／複数〇） */

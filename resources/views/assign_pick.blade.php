@@ -49,7 +49,7 @@
   .fill.none .bar > i { background: #d98b8b; }
   .fill .num { font-weight: 600; color: var(--ink); }
 
-  .pcard .go { margin-top: 4px; align-self: flex-start; font-size: 12px; color: var(--brand); font-weight: 600; }
+  .pcard .go { margin-top: 4px; align-self: flex-start; font-size: 12px; color: var(--brand-ink); font-weight: 600; }
   .badge-cat { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--brand-soft, #f0e9e0); color: #7a5a3a; }
 
   .pick-empty { padding: 40px; text-align: center; color: var(--muted); }

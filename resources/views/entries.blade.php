@@ -16,7 +16,7 @@
       margin-bottom:-2px;
     }
     .ent-tab:hover { color:#3a2d20; }
-    .ent-tab.active { color:var(--brand,#b5673a); border-bottom-color:var(--brand,#b5673a); }
+    .ent-tab.active { color: var(--brand-ink); border-bottom-color:var(--brand,#b5673a); }
 
     /* 絞り込みバー */
     .ent-filter {
@@ -167,7 +167,7 @@
     .mrow-spacer { flex:1; }
     .mrow-mini { font-size:12px; color:#6e5b49; }
     .mrow-mini b { color:#3a2d20; }
-    .mrow-toggle { font-size:12px; color:var(--brand,#b5673a); user-select:none; }
+    .mrow-toggle { font-size:12px; color: var(--brand-ink); user-select:none; }
     .mrow-ent { display:none; margin-top:8px; padding-top:8px; border-top:1px dashed #e6dccf; }
     .mrow-ent.open { display:block; }
     .ent-chip {

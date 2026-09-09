@@ -36,7 +36,7 @@
        列そのものが横に広がり、マスの大きさがバラバラになる（2026-08-28 修正）。 */
     .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; max-width: 640px; margin: 0 auto; }
     .cal-grid .dow { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 4px; font-weight: 600; }
-    .cal-grid .dow.sat { color: var(--brand); }
+    .cal-grid .dow.sat { color: var(--brand-ink); }
     .cal-grid .dow.sun { color: var(--danger); }
     /* ⚠ 高さは min-height ではなく height で固定する。min-height だと
        案件名・メモが入ったマスだけ縦に伸びて、カレンダーがガタガタになる（2026-08-28 修正）。
@@ -173,7 +173,7 @@
     /* 自分の行は今までどおり目立たせる（所属の色より優先）。 */
     table.ov-tbl tr.me td.namecol { background: #fff7ec; }
     table.ov-tbl tr.me td { background: #fffaf2; }
-    table.ov-tbl .vh th.we { color: var(--brand); }
+    table.ov-tbl .vh th.we { color: var(--brand-ink); }
     table.ov-tbl .vh th.holi { color: #b45309; }
     .ov-mark.ok    { color: #15803d; font-weight: 700; }
     .ov-mark.ng    { color: #b91c1c; }

@@ -58,12 +58,12 @@
     padding:14px 18px; margin-bottom:28px;
   }
   nav.toc b{ font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
-  nav.toc a{ color:var(--brand); text-decoration:none; font-size:14px; }
+  nav.toc a{ color: var(--brand-ink); text-decoration:none; font-size:14px; }
   nav.toc ol{ margin:0; padding-left:20px; }
   nav.toc li{ margin:3px 0; }
 
   section{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 24px; margin-bottom:20px; }
-  h2{ font-size:18px; margin:0 0 12px; padding-bottom:8px; border-bottom:2px solid var(--brand-soft); color:var(--brand); }
+  h2{ font-size:18px; margin:0 0 12px; padding-bottom:8px; border-bottom:2px solid var(--brand-soft); color: var(--brand-ink); }
   h3{ font-size:15px; margin:18px 0 6px; }
   p{ margin:8px 0; }
   ul,ol{ margin:8px 0; padding-left:22px; }
@@ -73,7 +73,7 @@
 
   table{ border-collapse:collapse; width:100%; margin:10px 0; font-size:13.5px; }
   th,td{ border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
-  th{ background:var(--brand-soft); color:var(--brand); font-weight:700; }
+  th{ background:var(--brand-soft); color: var(--brand-ink); font-weight:700; }
 
   .steps{ counter-reset:s; list-style:none; padding-left:0; }
   .steps>li{ counter-increment:s; position:relative; padding:8px 0 8px 42px; border-bottom:1px dashed var(--line); }
@@ -83,11 +83,11 @@
     width:28px; height:28px; border-radius:50%; background:var(--brand-fill); color:#fff;
     text-align:center; line-height:28px; font-weight:700; font-size:14px;
   }
-  .steps b{ color:var(--brand); }
+  .steps b{ color: var(--brand-ink); }
 
   .note{ background:var(--warn-soft); border:1px solid #ecd9b6; border-radius:10px; padding:12px 14px; font-size:13.5px; }
   .tip{ background:var(--ok-soft); border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13.5px; }
-  .pill{ display:inline-block; background:var(--brand-soft); color:var(--brand); border-radius:20px; padding:1px 10px; font-size:12px; font-weight:700; }
+  .pill{ display:inline-block; background:var(--brand-soft); color: var(--brand-ink); border-radius:20px; padding:1px 10px; font-size:12px; font-weight:700; }
   .menu{ display:inline-block; background:#f3ece4; border:1px solid var(--line); border-radius:6px; padding:0 7px; font-size:13.5px; font-weight:700; }
 
   .fb-btn{

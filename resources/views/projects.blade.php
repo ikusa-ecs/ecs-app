@@ -67,7 +67,7 @@
     td.date-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
     td.date-cell .dow { font-size: 11.5px; color: var(--muted); margin-left: 3px; }
     td.date-cell .dow.sun { color: var(--danger); }
-    td.date-cell .dow.sat { color: var(--brand); }
+    td.date-cell .dow.sat { color: var(--brand-ink); }
 
     /* 確度（ヨミ）の小マーク（日程の横）。確定は表示しない */
     .ymk { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
