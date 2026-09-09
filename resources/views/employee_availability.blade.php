@@ -283,7 +283,7 @@
        ========================================================================= */
     /* タブ・月切替 */
     html[data-theme="dark"] .ea-tab { background: var(--panel); color: var(--ink); }
-    html[data-theme="dark"] .ea-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .ea-tab.active { color: #ffffff; }
     html[data-theme="dark"] .ea-monthbar button { background: var(--panel); color: var(--ink); }
     html[data-theme="dark"] .ea-monthbar button:hover { background: #262b33; }
 

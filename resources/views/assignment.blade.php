@@ -167,7 +167,7 @@
     html[data-theme="dark"] .wish.未定 { background: #2b313a; color: #8b929c; }
 
     /* おすすめ度 */
-    html[data-theme="dark"] .score-pill.hi { color: #1a1206; }
+    html[data-theme="dark"] .score-pill.hi { color: #ffffff; }
     html[data-theme="dark"] .score-pill.lo { background: #2b313a; color: #8b929c; }
     html[data-theme="dark"] .score-warn { color: #f5c26b; }
     html[data-theme="dark"] .block-note { color: #f59a9a; }

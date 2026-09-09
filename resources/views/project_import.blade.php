@@ -85,7 +85,7 @@
        行の色の意味（赤＝エラー／緑＝登録済み）は変えない。 */
     html[data-theme="dark"] .mode-tabs a { background: var(--panel); }
     html[data-theme="dark"] .mode-tabs a:hover { background: #262b33; }
-    html[data-theme="dark"] .mode-tabs a.active { color: #1a1206; }
+    html[data-theme="dark"] .mode-tabs a.active { color: #ffffff; }
     html[data-theme="dark"] .step .arrow { color: #98a0aa; }
     html[data-theme="dark"] .cols-help code { background: #2b313a; color: #b7bec8; }
     html[data-theme="dark"] .dropzone { background: #23272f; border-color: #3a414c; }

@@ -89,7 +89,7 @@
     html[data-theme="dark"] .m-row input[type=text],
     html[data-theme="dark"] .m-row input[type=number] { background: #23272f; color: var(--ink); border-color: #3a414c; }
     html[data-theme="dark"] .m-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .m-btn.primary { background: var(--brand); border-color: var(--brand); color: #1a1206; }
+    html[data-theme="dark"] .m-btn.primary { background: var(--brand); border-color: var(--brand); color: #ffffff; }
     html[data-theme="dark"] .m-btn.danger { color: #f59a9a; border-color: #6b2f2f; background: #262b33; }
 </style>
 @endpush

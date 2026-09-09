@@ -78,7 +78,7 @@
   html[data-theme="dark"] .client-head .cmeta { color: var(--muted); }
   html[data-theme="dark"] .regulars { background: #23272f; }
   html[data-theme="dark"] .reg-chip { background: #262b33; border-color: #3a414c; }
-  html[data-theme="dark"] .reg-chip .rcount { color: #1a1206; }
+  html[data-theme="dark"] .reg-chip .rcount { color: #ffffff; }
   html[data-theme="dark"] .proj-item { border-bottom-color: var(--line); }
   html[data-theme="dark"] .mem-chip { background: #262b33; border-color: #3a414c; }
   html[data-theme="dark"] .mem-chip .mrole { color: #7cc4f0; }

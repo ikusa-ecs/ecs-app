@@ -248,10 +248,10 @@
     html[data-theme="dark"] .day-chip.sat { color:#7cc4f0; }
     html[data-theme="dark"] .day-chip.clear { background:#262b33; color:var(--ink); }
     html[data-theme="dark"] .day-chip.around { background:#14293a; border-color:#2c5070; color:#7cc4f0; }
-    html[data-theme="dark"] .day-chip.on { color:#1a1206; }
+    html[data-theme="dark"] .day-chip.on { color:#ffffff; }
     html[data-theme="dark"] .day-chip.on.sun,
-    html[data-theme="dark"] .day-chip.on.sat { color:#1a1206; }
-    html[data-theme="dark"] .day-chip.on .cn { background:rgba(0,0,0,.25); color:#1a1206; }
+    html[data-theme="dark"] .day-chip.on.sat { color:#ffffff; }
+    html[data-theme="dark"] .day-chip.on .cn { background:rgba(0,0,0,.25); color:#ffffff; }
     /* 数値カード */
     html[data-theme="dark"] .sum-card { background:var(--panel); border-color:var(--line); }
     html[data-theme="dark"] .sum-card .num { color:var(--ink); }

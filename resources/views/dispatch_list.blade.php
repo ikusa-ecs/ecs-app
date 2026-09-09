@@ -54,7 +54,7 @@
      状態の色（橙＝打診中／緑＝確定／灰＝中止）は変えない。 */
   html[data-theme="dark"] .dl-bar select,
   html[data-theme="dark"] .dl-bar input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-  html[data-theme="dark"] .dl-btn { color: #1a1206; }
+  html[data-theme="dark"] .dl-btn { color: #ffffff; }
   html[data-theme="dark"] .dl-btn.ghost { background: var(--panel); color: var(--brand-dark); }
   html[data-theme="dark"] .dl-sum .card { background: var(--panel); }
   html[data-theme="dark"] table.dl { background: var(--panel); }

@@ -120,7 +120,7 @@
       font-size: 12px; font-weight: 800; color: #fff; background: var(--brand);
       border-radius: 999px; padding: 2px 10px;
     }
-    html[data-theme="dark"] .news-new { color: #1a1206; }
+    html[data-theme="dark"] .news-new { color: #ffffff; }
 
     .sec-title { font-size: 14px; font-weight: 700; margin: 4px 2px 8px; }
 
@@ -551,7 +551,7 @@
           白ではなく濃い色にする（共通CSSの .btn.primary と同じ考え方）。 */
     /* タブ */
     html[data-theme="dark"] .s-tabs button { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .s-tabs button.active { color: #1a1206; }
+    html[data-theme="dark"] .s-tabs button.active { color: #ffffff; }
     /* 稼働希望の月切り替え */
     html[data-theme="dark"] .pref-month-nav .pm-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
     html[data-theme="dark"] .pref-month-nav .pm-btn:hover { background: #2f353f; }
@@ -568,7 +568,7 @@
     html[data-theme="dark"] .job-filter select { background: #23272f; color: var(--ink); }
     html[data-theme="dark"] .job-filter .jf-today { background: #262b33; }
     html[data-theme="dark"] .job-toggles .jf-tg { background: #262b33; }
-    html[data-theme="dark"] .job-toggles .jf-tg.on { color: #1a1206; }
+    html[data-theme="dark"] .job-toggles .jf-tg.on { color: #ffffff; }
     /* 募集案件の行 */
     html[data-theme="dark"] .job-row { background: var(--panel); }
     html[data-theme="dark"] .job-row.applied { background: #1b2a20; border-color: #2a5a38; }
@@ -605,14 +605,14 @@
     html[data-theme="dark"] .jr-cmt-ok { color: #7ee2a8; }
     html[data-theme="dark"] .jr-cmt-hint { color: var(--muted); }
     html[data-theme="dark"] .jr-comment { background: #23272f; color: var(--ink); }
-    html[data-theme="dark"] .apply-btn-sm { color: #1a1206; }
+    html[data-theme="dark"] .apply-btn-sm { color: #ffffff; }
     html[data-theme="dark"] .apply-btn-sm.cancel { background: #262b33; color: var(--brand-dark); border-color: #3a414c; }
     html[data-theme="dark"] .apply-btn-sm.disabled { background: #2b313a; color: #98a0aa; }
     html[data-theme="dark"] .apply-btn-sm.confirm { color: #fff; }
     /* 稼働希望・募集カレンダー */
     html[data-theme="dark"] .m-card { background: var(--panel); }
     html[data-theme="dark"] .jv-tab { background: #262b33; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .jv-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .jv-tab.active { color: #ffffff; }
     html[data-theme="dark"] .jc-nav { background: #262b33; border-color: #3a414c; }
     html[data-theme="dark"] .jc-nav:hover { background: #2f353f; }
     html[data-theme="dark"] .jc-cell { background: var(--panel); }
@@ -626,18 +626,18 @@
     html[data-theme="dark"] .cell.empty { background: none; }
     html[data-theme="dark"] .cell.s-ok { border-color: #2a5a38; color: #7ee2a8; }
     html[data-theme="dark"] .cell.s-ng { border-color: #6b2f2f; color: #f59a9a; }
-    html[data-theme="dark"] .cell.s-event { color: #1a1206; }
+    html[data-theme="dark"] .cell.s-event { color: #ffffff; }
     html[data-theme="dark"] .dot.ok { border-color: #2a5a38; }
     html[data-theme="dark"] .dot.ng { border-color: #6b2f2f; }
     /* 入力欄・保存ボタン */
     html[data-theme="dark"] .field input,
     html[data-theme="dark"] .field textarea,
     html[data-theme="dark"] .field select { background: #23272f; color: var(--ink); }
-    html[data-theme="dark"] .submit-btn { color: #1a1206; }
+    html[data-theme="dark"] .submit-btn { color: #ffffff; }
     html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
     /* 確定アサイン */
     html[data-theme="dark"] .assign-item:hover { background: #262b33; }
-    html[data-theme="dark"] .assign-date { color: #1a1206; }
+    html[data-theme="dark"] .assign-date { color: #ffffff; }
     html[data-theme="dark"] .ad-box { background: #23272f; }
     html[data-theme="dark"] .pastToggle { background: #262b33; }
     html[data-theme="dark"] .pastToggle:hover { background: #2f353f; }

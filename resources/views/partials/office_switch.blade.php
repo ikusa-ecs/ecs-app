@@ -31,7 +31,7 @@
   html[data-theme="dark"] .office-switch { background: #23272f; }
   html[data-theme="dark"] .office-switch .os-chip { background: var(--panel); color: var(--ink); border-color: #3a414c; }
   html[data-theme="dark"] .office-switch .os-chip:hover { background: #262b33; }
-  html[data-theme="dark"] .office-switch .os-chip.active { color: #1a1206; }
+  html[data-theme="dark"] .office-switch .os-chip.active { color: #ffffff; }
 </style>
 <div class="office-switch">
   <span class="os-label">表示する拠点</span>

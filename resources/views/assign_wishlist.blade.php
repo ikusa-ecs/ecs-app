@@ -113,7 +113,7 @@
     html[data-theme="dark"] .wl-month .wl-mon-btn { background: #262b33; border-color: #3a414c; }
     html[data-theme="dark"] .wl-month .wl-mon-btn:hover { background: #2f353f; }
     html[data-theme="dark"] .wl-month .wl-mon-btn.on,
-    html[data-theme="dark"] .wl-month .wl-mon-btn.on:hover { background: var(--brand); color: #1a1206; border-color: var(--brand); }
+    html[data-theme="dark"] .wl-month .wl-mon-btn.on:hover { background: var(--brand); color: #ffffff; border-color: var(--brand); }
     html[data-theme="dark"] .wl-empty { background: #33280f; border-color: #5c4a20; color: #f5c26b; }
   </style>
   @endverbatim

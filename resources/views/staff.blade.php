@@ -124,7 +124,7 @@
        白い面・茶色の文字・淡い色のバッジを、暗い面＋明るい文字に置き換える。
        バッジの色の意味（緑＝よく出ている／赤＝ご無沙汰 など）は変えない。 */
     html[data-theme="dark"] .staff-tab { background: var(--panel); color: var(--ink); }
-    html[data-theme="dark"] .staff-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .staff-tab.active { color: #ffffff; }
     html[data-theme="dark"] .filterbar input[type="text"],
     html[data-theme="dark"] .filterbar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
     html[data-theme="dark"] .lv.mid { background: #2b313a; color: #b7bec8; }

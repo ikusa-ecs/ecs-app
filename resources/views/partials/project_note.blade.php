@@ -45,7 +45,7 @@
       html[data-theme="dark"] .pnote .pn-body.empty { color: var(--muted); }
       html[data-theme="dark"] .pnote .pn-btn { background: var(--panel); color: #f5c26b; border-color: #5c4718; }
       html[data-theme="dark"] .pnote .pn-btn:hover { background: #3a2f14; }
-      html[data-theme="dark"] .pnote .pn-btn.save { background: #a87c22; border-color: #a87c22; color: #1a1206; }
+      html[data-theme="dark"] .pnote .pn-btn.save { background: #a87c22; border-color: #a87c22; color: #ffffff; }
       html[data-theme="dark"] .pnote .pn-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
       html[data-theme="dark"] .pnote .pn-msg { color: #f5c26b; }
       html[data-theme="dark"] .pnote .pn-msg.ok { color: #7ee2a8; }

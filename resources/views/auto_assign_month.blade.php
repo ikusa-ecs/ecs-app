@@ -100,12 +100,12 @@
      白い面・茶色の文字・淡い色の帯を、暗い面＋明るい文字に置き換える。意味の色（緑＝増えた／赤＝戻す）は変えない。 */
   html[data-theme="dark"] .am-month a { background:var(--panel); }
   html[data-theme="dark"] .am-month a:hover { background:#262b33; }
-  html[data-theme="dark"] .am-month a.on { background:var(--brand); color:#1a1206; }
+  html[data-theme="dark"] .am-month a.on { background:var(--brand); color:#ffffff; }
   html[data-theme="dark"] .am-flash { background:#16301f; color:#7ee2a8; border-color:#245c37; }
   html[data-theme="dark"] .am-lead { background:var(--panel); }
   html[data-theme="dark"] .am-warn { color:#f5c26b; }
   html[data-theme="dark"] .am-kpi { background:var(--panel); }
-  html[data-theme="dark"] .am-btn.go { color:#1a1206; }
+  html[data-theme="dark"] .am-btn.go { color:#ffffff; }
   html[data-theme="dark"] .am-btn.go:disabled { background:#2b313a; color:#98a0aa; }
   html[data-theme="dark"] .am-btn.undo { background:var(--panel); color:#f59a9a; border-color:#5a2a2a; }
   html[data-theme="dark"] .am-btn.undo:hover { background:#3a1c1c; }

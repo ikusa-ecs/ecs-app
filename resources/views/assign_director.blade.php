@@ -309,7 +309,7 @@
     html[data-theme="dark"] .help-note { color: #f5c26b; border-color: #5a4718; }
     html[data-theme="dark"] .month-nav button { background: #262b33; border-color: #3a414c; }
     html[data-theme="dark"] .month-nav button:hover { background: #2f353f; }
-    html[data-theme="dark"] .btn-save-dir { color: #1a1206; }
+    html[data-theme="dark"] .btn-save-dir { color: #ffffff; }
     html[data-theme="dark"] .btn-fix-month { background: #14293a; color: #7cc4f0; border-color: #2c5070; }
     /* 保存の状態表示（⚠ 失敗の赤い点滅は消さない） */
     html[data-theme="dark"] .save-state.ok     { background: #16301f; border-color: #2a5a38; color: #7ee2a8; }
@@ -335,7 +335,7 @@
     html[data-theme="dark"] .plamp.short { color: #f59a9a; }
     html[data-theme="dark"] .plamp.none  { background: #2b313a; color: #b7bec8; }
     /* D・SD のプルダウン */
-    html[data-theme="dark"] .dc-pick .pk.d-row .lbl { color: #1a1206; }
+    html[data-theme="dark"] .dc-pick .pk.d-row .lbl { color: #ffffff; }
     html[data-theme="dark"] .dc-pick .pk.d-row select { background: #23272f; }
     html[data-theme="dark"] .dc-pick .pk.d-row select.undef { background: #2d2716; color: #f5c26b; }
     html[data-theme="dark"] .dc-pick .pk.sd-row .lbl { background: #2b313a; }
@@ -356,7 +356,7 @@
     html[data-theme="dark"] table.agg-tbl tr.most td.dcnt { color: #f59a9a; }
     html[data-theme="dark"] .agg-bar { background: #2b313a; }
     /* 件数バッジとふきだし */
-    html[data-theme="dark"] .c-count { color: #1a1206; }
+    html[data-theme="dark"] .c-count { color: #ffffff; }
     html[data-theme="dark"] .day-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
     /* 社員チップ */
     html[data-theme="dark"] .emp-chip { background: #262b33; }
@@ -378,11 +378,11 @@
     html[data-theme="dark"] .dir-legend .lg-tag.newb  { background: #241f3a; color: #b8a6f5; }
     html[data-theme="dark"] .dir-legend .lg-tag.multi { background: #2b313a; color: #b7bec8; }
     html[data-theme="dark"] .dir-legend .lg-tag.role  { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .dir-legend .lg-cnt { color: #1a1206; }
+    html[data-theme="dark"] .dir-legend .lg-cnt { color: #ffffff; }
     /* 担当ピッカー（社員名を押すと開く小窓） */
     html[data-theme="dark"] .dpick-pop { background: var(--panel); box-shadow: 0 12px 34px rgba(0, 0, 0, .6); }
     html[data-theme="dark"] .dpick-pop .dp-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .dpick-pop .dp-btn.d.on { color: #1a1206; }
+    html[data-theme="dark"] .dpick-pop .dp-btn.d.on { color: #ffffff; }
     html[data-theme="dark"] .dpick-pop .dp-warn { color: #f59a9a; }
 </style>
 @endverbatim

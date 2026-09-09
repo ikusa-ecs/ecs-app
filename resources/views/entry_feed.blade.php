@@ -54,7 +54,7 @@
        色の意味（緑＝OK／赤＝NG など）は変えない。 */
     html[data-theme="dark"] .ef-filter { background: var(--panel); }
     html[data-theme="dark"] .ef-filter a.chip { background: var(--panel); color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .ef-filter a.chip.on { background: var(--brand); color: #1a1206; border-color: var(--brand); }
+    html[data-theme="dark"] .ef-filter a.chip.on { background: var(--brand); color: #ffffff; border-color: var(--brand); }
     html[data-theme="dark"] .ef-sum .card { background: var(--panel); }
     html[data-theme="dark"] table.ef { background: var(--panel); }
     html[data-theme="dark"] table.ef th { background: #23272f; }

@@ -72,7 +72,7 @@
        白い面・生成りの見出し・茶色の文字を、暗い面＋明るい文字に置き換える。
        青いチップ（コンテンツ）は色の意味を残したまま暗い青にする。 */
     html[data-theme="dark"] .ex-tab { background: var(--panel); color: var(--ink); }
-    html[data-theme="dark"] .ex-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .ex-tab.active { color: #ffffff; }
     html[data-theme="dark"] .ex-card { background: var(--panel); }
     html[data-theme="dark"] .ex-filters select,
     html[data-theme="dark"] .ex-filters input[type=search] { background: #23272f; color: var(--ink); border-color: #3a414c; }

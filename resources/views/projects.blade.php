@@ -441,11 +441,11 @@
     /* 確度・大型・小タグ */
     html[data-theme="dark"] .ymk.b { color: #f5c26b; }
     html[data-theme="dark"] .ymk.c { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .big-mark { color: #1a1206; }
+    html[data-theme="dark"] .big-mark { color: #ffffff; }
     html[data-theme="dark"] .tag-mini.add    { color: #f59a9a; }
     html[data-theme="dark"] .tag-mini.yobi   { color: #f5c26b; }
     html[data-theme="dark"] .tag-mini.reha   { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .tag-mini.repeat { color: #1a1206; }
+    html[data-theme="dark"] .tag-mini.repeat { color: #ffffff; }
     /* 実施形態のバッジ */
     html[data-theme="dark"] .fbadge.fmt-real   { background: #16301f; color: #7ee2a8; }
     html[data-theme="dark"] .fbadge.fmt-long   { background: #33280f; color: #f5c26b; }
@@ -476,7 +476,7 @@
     /* 一覧 / 下書き のタブ */
     html[data-theme="dark"] .list-tab { background: #262b33; }
     html[data-theme="dark"] .list-tab:hover { background: #2f353f; }
-    html[data-theme="dark"] .list-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .list-tab.active { color: #ffffff; }
     /* 集計・書き出しのモーダル */
     html[data-theme="dark"] .agg-modal { background: var(--panel); }
     html[data-theme="dark"] .agg-head .month-nav button { background: #262b33; border-color: #3a414c; }
@@ -487,12 +487,12 @@
     html[data-theme="dark"] .exp-steps { background: #23272f; }
     html[data-theme="dark"] .copied-msg { color: #7ee2a8; }
     /* サイドバーの年月フォルダ（ふだんの色は共通CSS側で黒に切り替わる） */
-    html[data-theme="dark"] .ym-month-btn.active { color: #1a1206; }
+    html[data-theme="dark"] .ym-month-btn.active { color: #ffffff; }
     html[data-theme="dark"] .ym-month-btn.active .ym-mcount { color: rgba(26, 18, 6, .75); }
     /* 表示の切替とカレンダー */
     html[data-theme="dark"] .view-tab { background: #262b33; }
     html[data-theme="dark"] .view-tab:hover { background: #2f353f; }
-    html[data-theme="dark"] .view-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .view-tab.active { color: #ffffff; }
     html[data-theme="dark"] .cal-nav { background: #262b33; border-color: #3a414c; }
     html[data-theme="dark"] .cal-dow.sat { color: #7cc4f0; }
     html[data-theme="dark"] .cal-cell { background: var(--panel); }

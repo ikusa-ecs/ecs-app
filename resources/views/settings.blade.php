@@ -118,7 +118,7 @@
     html[data-theme="dark"] .switch .track::before { background: #e6e8ea; }
     html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
     html[data-theme="dark"] .mtg-chip { background: #2b313a; border-color: #3a414c; }
-    html[data-theme="dark"] .mtg-chip.is-current { background: var(--brand); color: #1a1206; }
+    html[data-theme="dark"] .mtg-chip.is-current { background: var(--brand); color: #ffffff; }
     html[data-theme="dark"] .mtg-chip.danger { background: #3a1c1c; border-color: #5a2a2a; color: #f59a9a; }
     html[data-theme="dark"] .big-list { background: #23272f; }
     html[data-theme="dark"] .big-row .bclient { color: var(--muted); }

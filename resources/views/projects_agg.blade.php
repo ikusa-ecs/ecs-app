@@ -63,7 +63,7 @@
     html[data-theme="dark"] .live.off { background: #2b313a; color: #b7bec8; }
     html[data-theme="dark"] .dept-switch { background: #23272f; }
     html[data-theme="dark"] .dept-switch .ds-chip { background: #262b33; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .dept-switch .ds-chip.active { background: var(--brand); color: #1a1206; border-color: var(--brand); }
+    html[data-theme="dark"] .dept-switch .ds-chip.active { background: var(--brand); color: #ffffff; border-color: var(--brand); }
     html[data-theme="dark"] table.tbl td.nm.dep-plan     { color: #f59a5a; }
     html[data-theme="dark"] table.tbl td.nm.dep-sales    { color: #a5b4fc; }
     html[data-theme="dark"] table.tbl td.nm.dep-creative { color: #7ee2a8; }

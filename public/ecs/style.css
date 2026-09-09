@@ -86,7 +86,9 @@ html[data-theme="orange"] .sidebar .ym-month-btn.active .ym-mcount { color: rgba
      画面ごとの色は、その画面のファイルの <style> 末尾に html[data-theme="dark"] で書いてある。
    ⚠ 変数だけでは足りない＝上の枠の色は :root ではなく各ルールに直接書かれているので、
      ここで同じルールを上書きしている。
-   ⚠ 灰色の文字は #98a0aa より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。 */
+   ⚠ 灰色の文字は #98a0aa より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。
+   ⚠ **オレンジの面（選択中・押せるボタン）の文字は白**。濃い文字にすると
+     「黒くて見えにくい」（2026-09-09 baba指摘。マイページのリスト/カレンダー切替で発覚）。 */
 /* ねらい＝**シンプル**（baba のイメージ：黒＝シンプル／会社カラー＝スタイリッシュ／いまの色＝やわらかい）。
    飾りの色を増やさず、黒・グレー・白＋アクセント1色だけで組み立てる。 */
 html[data-theme="dark"] {
@@ -95,7 +97,12 @@ html[data-theme="dark"] {
   --ink: #e6e8ea;       /* 文字（真っ白は避ける＝まぶしさを抑える） */
   --muted: #9aa2ad;
   --line: #2f343d;      /* 罫線 */
-  --brand: #f07800;     /* アクセントは会社カラーのオレンジのまま */
+  /* アクセントのオレンジ。⚠ **少し濃くしている**（2026-09-09 baba指摘）。
+     鮮やかな #f07800 のままだと、オレンジ地に白文字が読みにくく、
+     濃い文字にすると「黒くて見えにくい」と言われた。⇒ **濃いオレンジ＋白文字**にそろえた。
+     ⚠ これは「面（背景）に敷く色」と「文字にも使う色」の兼用なので、
+       これ以上濃くすると黒地の上の文字（色だけで使う場所）が沈む。 */
+  --brand: #d96f0a;
   --brand-dark: #ff9a3c;
   --brand-soft: #3a2a16;/* オレンジの淡い面（黒の上なので暗い茶にする） */
   --ok-soft: #16301f;
@@ -134,7 +141,7 @@ html[data-theme="dark"] table.tbl tbody tr:hover { background: #23272f; }
 /* ボタン */
 html[data-theme="dark"] .btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
 html[data-theme="dark"] .btn:hover { background: #2f353f; }
-html[data-theme="dark"] .btn.primary { background: var(--brand); border-color: var(--brand); color: #1a1206; }
+html[data-theme="dark"] .btn.primary { background: var(--brand); border-color: var(--brand); color: #ffffff; }
 /* パネル・カード（背景が #fff で直書きされているもの） */
 html[data-theme="dark"] .panel,
 html[data-theme="dark"] .card { background: var(--panel); }

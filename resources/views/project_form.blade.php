@@ -261,7 +261,7 @@
     html[data-theme="dark"] .btn-same-time:hover { background: #2f353f; }
     html[data-theme="dark"] .mode-tabs a { background: var(--panel); }
     html[data-theme="dark"] .mode-tabs a:hover { background: #262b33; }
-    html[data-theme="dark"] .mode-tabs a.active { color: #1a1206; }
+    html[data-theme="dark"] .mode-tabs a.active { color: #ffffff; }
 
     /* コンテンツのタグ入力と候補リスト */
     html[data-theme="dark"] .tag-input { background: #23272f; }

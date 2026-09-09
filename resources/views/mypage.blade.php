@@ -324,7 +324,7 @@
 
     /* リスト／カレンダー 切替 */
     html[data-theme="dark"] .view-tab { background: var(--panel); color: var(--ink); }
-    html[data-theme="dark"] .view-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .view-tab.active { color: #ffffff; }
 
     /* カレンダー */
     html[data-theme="dark"] .mp-cell { background: var(--panel); }

@@ -42,7 +42,7 @@
     html[data-theme="dark"] .flash { border-color: #2f5c40; color: #7ee2a8; }
     html[data-theme="dark"] .r-grid thead th { background: #23272f; color: var(--muted); }
     html[data-theme="dark"] .r-grid td .cnt { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .r-btn { background: var(--brand); border-color: var(--brand); color: #1a1206; }
+    html[data-theme="dark"] .r-btn { background: var(--brand); border-color: var(--brand); color: #ffffff; }
 </style>
 @endpush
 

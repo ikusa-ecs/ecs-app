@@ -142,11 +142,11 @@
      増＝緑／減＝赤 の意味は変えない。 */
   html[data-theme="dark"] .st-tab { background: var(--panel); }
   html[data-theme="dark"] .st-tab:hover { background: #262b33; }
-  html[data-theme="dark"] .st-tab.active { color: #1a1206; }
+  html[data-theme="dark"] .st-tab.active { color: #ffffff; }
   html[data-theme="dark"] .st-scope .sc-label { color: var(--muted); }
   html[data-theme="dark"] .st-scope a { background: var(--panel); }
   html[data-theme="dark"] .st-scope a:hover { background: #262b33; }
-  html[data-theme="dark"] .st-scope a.active { color: #1a1206; }
+  html[data-theme="dark"] .st-scope a.active { color: #ffffff; }
   html[data-theme="dark"] .st-controls select { background: #23272f; border-color: #3a414c; }
   html[data-theme="dark"] .st-controls .lbl { color: var(--muted); }
   html[data-theme="dark"] .st-kpi .k-label { color: var(--muted); }
@@ -168,7 +168,7 @@
   html[data-theme="dark"] .st-note { color: var(--muted); }
   html[data-theme="dark"] .st-excluded,
   html[data-theme="dark"] .st-excluded-list { background: #23272f; }
-  html[data-theme="dark"] .st-csv { color: #1a1206; }
+  html[data-theme="dark"] .st-csv { color: #ffffff; }
 </style>
 @endpush
 

@@ -237,7 +237,7 @@
     html[data-theme="dark"] .pub-badge.off { color: #f5c26b; }
 
     /* 操作ボタン */
-    html[data-theme="dark"] .pub-toggle.go { color: #1a1206; }
+    html[data-theme="dark"] .pub-toggle.go { color: #ffffff; }
     html[data-theme="dark"] .pub-toggle.undo { background: #262b33; color: #7ee2a8; border-color: #2c5c3c; }
     html[data-theme="dark"] td.ops-cell .note-btn,
     html[data-theme="dark"] td.ops-cell .cat-toggle { background: #262b33; border-color: #3a414c; }
@@ -254,7 +254,7 @@
     /* 公開ボード / アーカイブ タブ */
     html[data-theme="dark"] .view-tab { background: var(--panel); }
     html[data-theme="dark"] .view-tab:hover { background: #262b33; }
-    html[data-theme="dark"] .view-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .view-tab.active { color: #ffffff; }
 
     /* 追加案件のバッジ */
     html[data-theme="dark"] .badge.extra { background: #3a1c1c; color: #f59a9a; }
@@ -262,9 +262,9 @@
     /* 日付を押してその日へ飛ぶ並び */
     html[data-theme="dark"] .day-chip { background: #262b33; border-color: #3a414c; color: var(--ink); }
     html[data-theme="dark"] .day-chip:hover { background: #2f353f; }
-    html[data-theme="dark"] .day-chip.on { color: #1a1206; }
+    html[data-theme="dark"] .day-chip.on { color: #ffffff; }
     html[data-theme="dark"] .day-chip .cn { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .day-chip.on .cn { background: rgba(0,0,0,.28); color: #1a1206; }
+    html[data-theme="dark"] .day-chip.on .cn { background: rgba(0,0,0,.28); color: #ffffff; }
     html[data-theme="dark"] .day-chip.sun { color: #f59a9a; }
     html[data-theme="dark"] .day-chip.sat { color: #7cc4f0; }
 

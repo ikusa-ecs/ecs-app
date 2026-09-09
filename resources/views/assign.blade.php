@@ -380,7 +380,7 @@
     html[data-theme="dark"] .month-nav button:hover { background: #2f353f; }
     html[data-theme="dark"] .board-controls select { background: #23272f; color: var(--ink); border-color: #3a414c; }
     html[data-theme="dark"] .lh-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .lh-btn.active { color: #1a1206; }
+    html[data-theme="dark"] .lh-btn.active { color: #ffffff; }
     /* 日付の帯 */
     html[data-theme="dark"] .day-head { box-shadow: 0 2px 6px rgba(0, 0, 0, .5); }
     html[data-theme="dark"] .day-head .d-pool .remain.ok { color: #7ee2a8; }
@@ -414,7 +414,7 @@
     html[data-theme="dark"] .ctag.setup  { background: #2b313a; color: #b7bec8; }
     html[data-theme="dark"] .ctag.renkin { color: #f59a9a; }
     html[data-theme="dark"] .ctag.stay   { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .open-btn { color: #1a1206; }
+    html[data-theme="dark"] .open-btn { color: #ffffff; }
     /* メンバー行 */
     html[data-theme="dark"] .m-st.kari { background: #33280f; color: #f5c26b; border-color: #5a4718; }
     html[data-theme="dark"] .m-st.fix  { color: #7ee2a8; border-color: #2a5a38; }
@@ -459,7 +459,7 @@
     html[data-theme="dark"] .cstat.busy { color: #f59a9a; }
     /* 手動編集の操作・メンバー追加パネル */
     html[data-theme="dark"] .edit-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .edit-btn.on { color: #1a1206; }
+    html[data-theme="dark"] .edit-btn.on { color: #ffffff; }
     html[data-theme="dark"] .add-row .mini { background: #262b33; }
     html[data-theme="dark"] .pick-box { background: var(--panel); }
     html[data-theme="dark"] .pick-box .pk-q { background: #23272f; color: var(--ink); }
