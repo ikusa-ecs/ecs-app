@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
+use App\Support\CrossOfficeHelp;
 use App\Support\PositionTemplate;
 use App\Support\AssignmentStamp;
 use App\Support\Headcount;
@@ -548,8 +549,15 @@ class AssignmentController extends Controller
                 ] + AssignmentStamp::forCreate($status));
             }
 
+            // ⚠ 他拠点の人を入れたら「ヘルプ」として記録する（2026-09-09 baba要望）。
+            //   記録しないと、拠点別の集計から「手伝ってもらった事実」が抜ける。
+            //   決まりの正本＝App\Support\CrossOfficeHelp（すでにある記録は上書きしない）。
+            $helped = CrossOfficeHelp::record($project, Person::find($sid));
+
             return response()->json([
                 'ok' => true, 'assigned' => true, 'status' => $status,
+                // 画面でお知らせを出すため（新しくヘルプとして記録したときだけ true）。
+                'help_recorded' => $helped,
                 'note' => $existing ? $existing->fresh()->note : $note,
                 'patrol' => $existing ? $existing->fresh()->patrol : $patrol,
                 'remark' => $existing ? $existing->fresh()->remark : $remark,
