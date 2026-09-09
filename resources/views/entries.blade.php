@@ -357,7 +357,124 @@
     html[data-theme="dark"] .empty-note { color:var(--muted); }
     /* 「見本です」の帯（背景はHTMLに直書きなので、文字色だけ黒地向けに戻す） */
     html[data-theme="dark"] .mock-note { color:var(--ink); border-color:var(--line); }
-  </style>
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う（選択中・ポジション・ヨミ等の橙は灰へ）。
+       ⚠ 緑＝確定／赤＝注意 の意味は変えない。⚠ 既定（ベージュ）の見た目は変えない。 */
+    /* タブ */
+    html[data-theme="orange"] .ent-tabs { border-bottom-color:#e5e7eb; }
+    html[data-theme="orange"] .ent-tab { color:#4b5563; }
+    html[data-theme="orange"] .ent-tab:hover { color:#1f2328; }
+    /* 絞り込みバー */
+    html[data-theme="orange"] .ent-filter { border-color:#e5e7eb; }
+    html[data-theme="orange"] .ent-filter input[type=date],
+    html[data-theme="orange"] .ent-filter input[type=text],
+    html[data-theme="orange"] .ent-filter select { border-color:#e5e7eb; color:#1f2328; }
+    html[data-theme="orange"] .ent-filter .f-today { background:#f3f4f6; border-color:#e5e7eb; color:#4b5563; }
+    html[data-theme="orange"] .ent-filter .f-today:hover { background:#e5e7eb; }
+    html[data-theme="orange"] .ent-filter .f-label { color:#6b7280; }
+    html[data-theme="orange"] .ent-filter .f-check { color:#4b5563; }
+    /* 日付チップ。押している日は「灰のべた塗り」＝橙は「仮」に取っておく */
+    html[data-theme="orange"] .day-chip { border-color:#e5e7eb; color:#1f2328; }
+    html[data-theme="orange"] .day-chip:hover { background:#f3f4f6; }
+    html[data-theme="orange"] .day-chip .cn { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] .day-chip.clear { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] .day-chip.on { background:#6b7280; border-color:#6b7280; }
+    /* 数値カード */
+    html[data-theme="orange"] .sum-card { border-color:#e5e7eb; }
+    html[data-theme="orange"] .sum-card .num { color:#1f2328; }
+    html[data-theme="orange"] .sum-card .num.warn { color:#b91c1c; }
+    html[data-theme="orange"] .sum-card .lbl { color:#6b7280; }
+    /* 案件カード */
+    html[data-theme="orange"] .ecase { border-color:#e5e7eb; }
+    html[data-theme="orange"] .ecase-date { color:#4b5563; }
+    html[data-theme="orange"] .ecase-name { color:#1f2328; }
+    html[data-theme="orange"] .ecase-client { color:#6b7280; }
+    html[data-theme="orange"] .ecase-counts .c { color:#4b5563; }
+    html[data-theme="orange"] .ecase-counts .c b { color:#1f2328; }
+    html[data-theme="orange"] .ecase-counts .c.short b { color:#b91c1c; }
+    /* バッジ類。緑＝確定・赤＝注意はそのまま。茶色は灰へ／調整中＝まだ決まっていない＝橙 */
+    html[data-theme="orange"] .cat-体力 { background:#e5e7eb; color:#4b5563; }
+    html[data-theme="orange"] .dt-badge { background:#f3f4f6; color:#4b5563; border-color:#e5e7eb; }
+    html[data-theme="orange"] .st-badge.todo { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] .st-badge.adj { background:#fff3e6; color:#b45309; }
+    html[data-theme="orange"] .rec-badge.close { background:#f3f4f6; color:#4b5563; }
+    /* エントリー者テーブル */
+    html[data-theme="orange"] .ent-table th,
+    html[data-theme="orange"] .ent-table td { border-bottom-color:#e5e7eb; }
+    html[data-theme="orange"] .ent-table th { color:#6b7280; }
+    html[data-theme="orange"] .ent-table tr.assigned { background:#f9fafb; }
+    html[data-theme="orange"] .ent-table tr.fromcal td { background:#f9fafb; }
+    /* 空いている人カレンダー */
+    html[data-theme="orange"] .wc-dow { color:#6b7280; }
+    html[data-theme="orange"] .wc-cell { border-color:#e5e7eb; }
+    html[data-theme="orange"] .wc-d { color:#4b5563; }
+    html[data-theme="orange"] .wc-cases a { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] .wc-p { color:#1f2328; }
+    /* エントリー済み＝藍（下の表の「空」と同じ藍にそろえる） */
+    html[data-theme="orange"] .wc-p.ent { color:#4338ca; }
+    html[data-theme="orange"] .wc-p.asg { color:#6b7280; }
+    html[data-theme="orange"] .wc-none { color:#6b7280; }
+    /* レベル・ポジション・状態（意味のない橙・茶は灰へ） */
+    html[data-theme="orange"] .e-lv.mid { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] .e-lv.vet { background:#e5e7eb; color:#4b5563; }
+    html[data-theme="orange"] .e-pos { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] .e-stat.waiting { color:#6b7280; }
+    html[data-theme="orange"] .ent-note { color:#4b5563; }
+    html[data-theme="orange"] .ent-remark { border-color:#e5e7eb; }
+    /* 月ごと */
+    html[data-theme="orange"] .month-head { color:#1f2328; }
+    html[data-theme="orange"] .month-head .cnt { color:#6b7280; }
+    html[data-theme="orange"] .month-head.past { border-left-color:#d1d5db; color:#6b7280; }
+    html[data-theme="orange"] .mrow { border-color:#e5e7eb; }
+    html[data-theme="orange"] .mrow-date { color:#4b5563; }
+    html[data-theme="orange"] .mrow-name { color:#1f2328; }
+    html[data-theme="orange"] .mrow-mini { color:#4b5563; }
+    html[data-theme="orange"] .mrow-mini b { color:#1f2328; }
+    html[data-theme="orange"] .mrow-ent { border-top-color:#e5e7eb; }
+    html[data-theme="orange"] .ent-chip { background:#f3f4f6; color:#4b5563; }
+    /* 月ごとの一覧表（スタッフ×案件）。見出し・貼り付く列・集計列・合計行 */
+    html[data-theme="orange"] .mtx-legend { color:#4b5563; }
+    html[data-theme="orange"] .mtx-wrap { border-color:#e5e7eb; }
+    html[data-theme="orange"] table.mtx th,
+    html[data-theme="orange"] table.mtx td { border-bottom-color:#e5e7eb; border-right-color:#e5e7eb; }
+    html[data-theme="orange"] table.mtx thead th { background:#f3f4f6; color:#4b5563; }
+    html[data-theme="orange"] table.mtx thead th.staffcol { background:#f3f4f6; }
+    html[data-theme="orange"] table.mtx th.entcol,
+    html[data-theme="orange"] table.mtx td.entcol { background:#f9fafb; }
+    html[data-theme="orange"] table.mtx td.totcol,
+    html[data-theme="orange"] table.mtx th.totcol { background:#f9fafb; }
+    html[data-theme="orange"] table.mtx .coldate { color:#4b5563; }
+    html[data-theme="orange"] table.mtx .colclient { color:#1f2328; }
+    html[data-theme="orange"] table.mtx .colmeta { color:#6b7280; }
+    /* 仮＝橙／エントリー中＝藍。同じ色だと「もう置いた人」か「応募してくれた人」か読み取れない */
+    html[data-theme="orange"] table.mtx .m-tmp { background:#fff3e6; color:#b45309; border-color:#f0c98a; }
+    html[data-theme="orange"] table.mtx .m-ent { color:#4338ca; }
+    html[data-theme="orange"] table.mtx .m-none { color:#6b7280; }
+    html[data-theme="orange"] table.mtx td.is-tmp { background:#fff3e6; }
+    /* マウスを乗せただけの印は「面」ではなく「枠」で出す（面だと仮を置いたように見える）。
+       枠だけにすると、そのマスがいま何色か（仮・確定・空・NG・公開済み）が消えるので、下で戻す。 */
+    html[data-theme="orange"] table.mtx td.assignable:hover { background:transparent; outline:2px solid #f07800; }
+    html[data-theme="orange"] table.mtx td.assignable.is-tmp:hover { background:#fff3e6; }
+    html[data-theme="orange"] table.mtx td.assignable.is-fix:hover { background:#eaf3ea; }
+    html[data-theme="orange"] table.mtx td.assignable.is-cal:hover { background:#f8f9ff; }
+    html[data-theme="orange"] table.mtx td.assignable.is-ng:hover  { background:#fdf3f3; }
+    html[data-theme="orange"] table.mtx td.assignable.is-pub:hover { background:#dceee9; }
+    html[data-theme="orange"] table.mtx .m-x { color:#6b7280; }
+    html[data-theme="orange"] table.mtx .m-x:hover { color:#b91c1c; }
+    html[data-theme="orange"] table.mtx tbody tr:hover td { background:#f9fafb; }
+    html[data-theme="orange"] table.mtx tbody tr:hover td.staffcol { background:#f3f4f6; }
+    html[data-theme="orange"] table.mtx tfoot td { background:#f9fafb; color:#1f2328; }
+    html[data-theme="orange"] .empty-note { color:#6b7280; }
+  
+  /* ⚠ 左に貼り付く氏名列が、会社カラーでは面と同色になって境目が消える。
+     面を一段変え、右に境界線を足す（2026-09-09 エンジニア点検）。 */
+  html[data-theme="orange"] table.mtx th.staffcol,
+  html[data-theme="orange"] table.mtx td.staffcol { background: var(--panel); border-right: 1px solid var(--line); }
+  html[data-theme="orange"] table.mtx thead th.staffcol { background: var(--surface-2); }
+  html[data-theme="orange"] table.mtx tbody tr:hover td.staffcol { background: var(--surface-hover); }
+</style>
 @endverbatim
 @endpush
 

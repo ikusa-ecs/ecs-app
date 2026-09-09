@@ -499,6 +499,81 @@
     html[data-theme="dark"] .cal-cell.sat .dnum { color: var(--info-ink); }
     /* 拠点まわり（下の2つ目の <style> にある指定を、黒地向けに上書きする） */
     html[data-theme="dark"] .of-mine { color: var(--ok-ink); background: var(--ok-soft); border-color: var(--ok-line); }
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+       ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+    /* カレンダーの「案件あり」＝薄い青（茶系の面をやめる）。凡例の見本も同じ入れ物を見ている。 */
+    html[data-theme="orange"] { --pj-has-bg: #eff6ff; }
+
+    /* 行の面（見出し・ホバー・下書き・開いた行） */
+    html[data-theme="orange"] tr.group-row.past td { background: #f3f4f6; }
+    html[data-theme="orange"] tr.main-row:hover { background: #f3f4f6; }
+    html[data-theme="orange"] tr.main-row.draft { background: #f9fafb; }
+    html[data-theme="orange"] tr.main-row.draft:hover { background: #f3f4f6; }
+    html[data-theme="orange"] tr.detail-row > td { background: #f9fafb; }
+
+    /* 下書き＝「準備中」。色（茶）ではなく濃いグレーで伝える。 */
+    html[data-theme="orange"] tr.main-row.draft td.caret-cell { box-shadow: inset 3px 0 0 #4b5563; }
+    html[data-theme="orange"] .tag-mini.draft { background: #4b5563; color: #fff; }
+    html[data-theme="orange"] .recruit-badge.draft { background: #4b5563; color: #fff; }
+    html[data-theme="orange"] .tab-badge { background: #4b5563; }
+    html[data-theme="orange"] .cal-ev.draft { background: #4b5563; }
+
+    /* 確度（ヨミ）Cと小タグ＝意味の薄い茶バッジは灰へ */
+    html[data-theme="orange"] .ymk.c { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .tag-mini.reha { background: #f3f4f6; color: #4b5563; }
+
+    /* 実施形態バッジ＝面はグレーにそろえ、意味は文字色で出す（淡い面＋中間色の文字は白地で読みにくい）。
+       ⚠ キャンセル（赤）はそのまま＝注意の色を弱めない。 */
+    html[data-theme="orange"] .fbadge.fmt-real   { background: #f3f4f6; color: #166534; }
+    html[data-theme="orange"] .fbadge.fmt-long   { background: #f3f4f6; color: #92400e; }
+    html[data-theme="orange"] .fbadge.fmt-online { background: #f3f4f6; color: #1d4ed8; }
+    html[data-theme="orange"] .fbadge.fmt-arena  { background: #f3f4f6; color: #6d28d9; }
+    html[data-theme="orange"] .fbadge.fmt-other  { background: #f3f4f6; color: #0f766e; }
+    html[data-theme="orange"] .fbadge.fmt-etc    { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .fmt-was { color: #6b7280; }
+    html[data-theme="orange"] tr.main-row.row-cancelled .proj-cell strong { color: #6b7280; }
+
+    /* 募集状態。⚠ 未公開＝スタッフにまだ見えていない＝放置に気づけるように赤にする。 */
+    html[data-theme="orange"] .recruit-badge.closed { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .recruit-badge.unpub  { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+    /* 時間が未定＝まだ決まっていない（仮）なので橙のまま。白地で読める濃さにする。 */
+    html[data-theme="orange"] td.time-cell .ev.tbd { color: #b45309; }
+
+    /* ホバー・押せる面 */
+    html[data-theme="orange"] .sheet-link:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .list-tab:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .view-tab:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .pick-pop > summary:hover { background: #f3f4f6; }
+
+    /* 書き出しモーダル（貼り付け用の文章・手順） */
+    html[data-theme="orange"] .exp-ta { background: #f9fafb; }
+    html[data-theme="orange"] .exp-steps { background: #f9fafb; }
+
+    /* 左メニューの年月フォルダ（この画面から出している指定） */
+    html[data-theme="orange"] .ym-year-btn,
+    html[data-theme="orange"] .ym-month-btn { color: #4b5563; }
+    html[data-theme="orange"] .ym-year-btn:hover,
+    html[data-theme="orange"] .ym-month-btn:hover { background: #f3f4f6; color: #1f2328; }
+    html[data-theme="orange"] .ym-caret { color: #6b7280; }
+    html[data-theme="orange"] .ym-year-btn .ym-ycount,
+    html[data-theme="orange"] .ym-month-btn .ym-mcount { color: #6b7280; }
+
+    /* 土曜＝青（橙にする意味がないため。日曜の赤はそのまま） */
+    html[data-theme="orange"] td.date-cell .dow.sat { color: #1d4ed8; }
+
+    /* 拠点の色。東京は茶色なので濃いグレーへ、名古屋は橙と混ざるので紫へ。
+       ⚠ 拠点名は文字でも出ているので、色を変えても情報は消えない。 */
+    html[data-theme="orange"] .cal-ev.of-tokyo   { background: #374151; }
+    html[data-theme="orange"] .cal-ev.of-nagoya  { background: #7c3aed; }
+    html[data-theme="orange"] .of-badge.of-tokyo  { background: #374151; }
+    html[data-theme="orange"] .of-badge.of-nagoya { background: #7c3aed; }
+    /* 凡例の見本だけは HTML の style="" に茶色が直書きされているので、ここで上から塗る。 */
+    html[data-theme="orange"] .cal-legend .lg:nth-of-type(2) .sw { background: #374151 !important; border-color: #374151 !important; }
 </style>
 @endverbatim
 @endpush
@@ -525,6 +600,10 @@
   .of-mine { font-size: 10.5px; font-weight: 800; color: #166534; background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 6px; padding: 2px 8px; }
   .ops .copy-ctl { display: inline-flex; align-items: center; gap: 4px; }
   .ops .copy-ctl select { font-size: 11px; padding: 1px 4px; }
+
+  /* ⚠ 前泊のべた塗り橙は「仮」と紛れる（橙は仮だけに使う決まり）。
+     移動・宿泊の情報は藍にそろえる（他画面の宿泊タグと同じ考え方）。 */
+  html[data-theme="orange"] .tag-mini.stay { background: #4338ca; color: #fff; }
 </style>
 @verbatim
       <div class="mock-note">ここに出ている案件は<b>登録された本物のデータ</b>です。<b>各行をクリックすると下に開き</b>、内容を確認できます。案件の中身を直すときは各行の「編集」からどうぞ。<b>リピート（常連）のクライアントは、クライアント名を押すと過去のアサインをさかのぼれます。</b><br><b>開催日が過ぎた案件は自動で「🗄 アーカイブ」タブに移ります。</b>各行の「🗄 アーカイブ」で手動でも隠せ、アーカイブタブの「↩ 戻す」で元に戻せます。<br>※ 詳細を開いたときのプルダウン（ディレクター・SD・物品担当・移動・音響）と、手動での「🗄 アーカイブ／↩ 戻す」は、<b>その場で保存されます</b>（読み込み直しても残ります）。<b>準備チェック（LINE作成・LINE概要送付・LINEダブチェ・引き継ぎ・台本）も、その場で保存されます。</b></div>

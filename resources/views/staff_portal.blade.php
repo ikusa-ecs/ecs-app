@@ -662,7 +662,81 @@
     html[data-theme="dark"] .line-btn:active { background: var(--surface-hover); }
     html[data-theme="dark"] .line-btn.danger { border-color: var(--danger-line); }
     html[data-theme="dark"] .switch .track { background: var(--field-line); }
-  </style>
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+       ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+    /* 募集の状態の色（リストのバッジとカレンダーのチップが同じ入れ物を見ている）。
+       募集中＝探す対象なので面のまま濃い緑＋白文字（白地で 5.0:1）。
+       エントリー中＝まだ決まっていない＝藍。締切・満員＝薄茶をやめて灰。 */
+    html[data-theme="orange"] {
+      --job-open-bg: #15803d;    --job-open-fg: #ffffff;
+      --job-applied-bg: #eef2ff; --job-applied-fg: #4338ca; --job-applied-bd: #c7d2fe;
+      --job-closed-bg: #f3f4f6;  --job-closed-fg: #4b5563;
+    }
+    /* エントリー済みのカード・印も藍にそろえる（緑＝確定と取り違えないようにする）。 */
+    html[data-theme="orange"] .job-row.applied { border-color: #c7d2fe; background: #f7f8ff; box-shadow: inset 4px 0 0 #4338ca; }
+    html[data-theme="orange"] .applied-mark { background: #4338ca; }
+    html[data-theme="orange"] .apply-btn-sm.cancel { color: #4338ca; border-color: #c7d2fe; }
+    html[data-theme="orange"] .apply-btn-sm.disabled { background: #f3f4f6; color: #6b7280; }
+    /* 確定アサインは「面をべた塗りの青」にする＝薄い藍（エントリー中）と見間違えないようにする。 */
+    html[data-theme="orange"] .jc-job.confirmed { background: #1d4ed8; color: #ffffff; border-color: #1d4ed8; }
+
+    /* 実施形態バッジ＝面はグレーにそろえ、意味は文字色で出す
+       （淡い面＋中間色の文字は白地で 3.7〜4.3:1 しかなく読みにくい）。 */
+    html[data-theme="orange"] .fbadge.fmt-real   { background: #f3f4f6; color: #166534; }
+    html[data-theme="orange"] .fbadge.fmt-long   { background: #f3f4f6; color: #92400e; }
+    html[data-theme="orange"] .fbadge.fmt-online { background: #f3f4f6; color: #1d4ed8; }
+    html[data-theme="orange"] .fbadge.fmt-arena  { background: #f3f4f6; color: #6d28d9; }
+    html[data-theme="orange"] .fbadge.fmt-other  { background: #f3f4f6; color: #0f766e; }
+    html[data-theme="orange"] .fbadge.fmt-etc    { background: #f3f4f6; color: #4b5563; }
+
+    /* 参考情報の小タグ・チップ＝薄茶をやめて灰 */
+    html[data-theme="orange"] .tag-mini.reha { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .tag-mini.size { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .tag-mini.rep  { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .chip.full     { background: #f3f4f6; color: #4b5563; }
+
+    /* 押せる面・ホバー */
+    html[data-theme="orange"] .cmt-toggle:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .jc-nav:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .jc-detail-close { color: #4b5563; }
+    html[data-theme="orange"] .jc-detail-close:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .jv-tab { color: #4b5563; }
+    html[data-theme="orange"] .line-btn:active { background: #f3f4f6; }
+    html[data-theme="orange"] .pastToggle { background: #f9fafb; }
+    html[data-theme="orange"] .pastToggle:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .jc-job.picked { box-shadow: 0 0 0 3px rgba(31, 35, 40, .14); }
+
+    /* 稼働希望の月切り替え（茶の枠・茶の文字をやめる） */
+    html[data-theme="orange"] .pref-month-nav .pm-btn { color: #4b5563; border-color: #e5e7eb; }
+    html[data-theme="orange"] .pref-month-nav .pm-btn:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .pref-month-nav .pm-btn.off { color: #6b7280; background: #f9fafb; border-color: #e5e7eb; }
+    html[data-theme="orange"] .pref-month-nav .pm-sel { color: #1f2328; border-color: #e5e7eb; }
+
+    /* 稼働希望カレンダー。⚠ ○（緑）×（赤）はそのまま＝白地で読めている。
+       確定アサインの日は橙のべた塗りをやめて青（確定＝青。橙は「仮」だけに使う）。
+       エントリー中の日は薄い藍＝まだ決まっていない、を面の濃さで区別する。 */
+    html[data-theme="orange"] .cell.s-event { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+    html[data-theme="orange"] .dot.event { background: #1d4ed8; border-color: #1d4ed8; }
+    html[data-theme="orange"] .cell.s-entry { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+    html[data-theme="orange"] .dot.entry { background: #eef2ff; border-color: #c7d2fe; }
+
+    /* 確定アサインの一覧・詳細 */
+    html[data-theme="orange"] .assign-item:hover { background: #f9fafb; }
+    html[data-theme="orange"] .ad-box { background: #f9fafb; }
+
+    /* 土曜＝青（橙にする意味がないため。日曜の赤はそのまま） */
+    html[data-theme="orange"] .jr-date .sat { color: #1d4ed8; }
+    html[data-theme="orange"] .jc-cell.sat .dnum { color: #1d4ed8; }
+    html[data-theme="orange"] .cal-grid .dow.sat { color: #1d4ed8; }
+  
+  /* ⚠ 前泊のべた塗り橙は「仮」と紛れる（橙は仮だけに使う決まり）。
+     移動・宿泊の情報は藍にそろえる（他画面の宿泊タグと同じ考え方）。 */
+  html[data-theme="orange"] .tag-mini.stay { background: #4338ca; color: #fff; }
+</style>
   @endverbatim
 </head>
 <body>

@@ -477,6 +477,63 @@
     html[data-theme="dark"] .legend .sw.only { background: var(--chip-bg); }
     /* 「見本です」の帯（背景はHTMLに直書きなので、文字色だけ黒地向けに戻す） */
     html[data-theme="dark"] .mock-note { color: var(--ink); border-color: var(--line); }
+
+      /* 日付の帯＝この画面でいちばん面積の大きい橙。会社カラーでは「仮」と同じ面色になるので灰にする
+     （橙は「仮」だけに使う、の決まりに合わせる。日のリズムは太字と罫線で出す）。 */
+  html[data-theme="orange"] .day-head { background: #f3f4f6; color: #1f2328; }
+  html[data-theme="orange"] .day-head .d-date .sat { color: #1d4ed8; }   /* 土曜＝他画面と同じ青にそろえる */
+
+  /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う（選択中・ポジション・ヨミ等の橙は灰へ）。
+       ⚠ 緑＝確定／赤＝注意 の意味は変えない。⚠ 既定（ベージュ）の見た目は変えない。 */
+    /* 日付の帯のボタン */
+    html[data-theme="orange"] .day-head .day-bulk { color: #4b5563; }
+    html[data-theme="orange"] .day-head .day-bulk:hover { background: #f3f4f6; }
+    /* まとめて自動アサインは「仮」を置く操作なので、仮と同じ橙にそろえる */
+    html[data-theme="orange"] .day-head .day-bulk.auto { background: #fff3e6; border-color: #f0c98a; color: #b45309; }
+    html[data-theme="orange"] .day-head .day-bulk.auto:hover { background: #ffe8cc; }
+    /* 実施形態のバッジ（茶色の「その他」だけ灰へ） */
+    html[data-theme="orange"] .fbadge.fmt-etc { background: #f3f4f6; color: #4b5563; }
+    /* 連勤まとめバッジ */
+    html[data-theme="orange"] .renkin-badge { background: #f3f4f6; color: #4b5563; }
+    /* 締切・満員＝べた塗りの茶をやめて、灰のべた塗りに */
+    html[data-theme="orange"] .sb.full { background: #6b7280; color: #fff; }
+    /* 人数バー。途中＝灰／足りない＝赤（いまは両方とも橙で見分けられない） */
+    html[data-theme="orange"] .cc-fill .fbar { background: #e5e7eb; }
+    html[data-theme="orange"] .cc-fill .fbar > i.mid { background: #9ca3af; }
+    html[data-theme="orange"] .cc-fill .fbar > i.low { background: #dc2626; }
+    /* ポジションランプ・案件タグ（宿泊は藍、日帰りは灰＝意味のない橙をやめる） */
+    html[data-theme="orange"] .plamp.none { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .ctag.setup { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .ctag.stay  { background: #eef2ff; color: #4338ca; }
+    html[data-theme="orange"] .ctag.day   { background: #f3f4f6; color: #4b5563; }
+    /* 仮＝橙。この画面で橙を使うのはここだけ */
+    html[data-theme="orange"] .m-st.kari { background: #fff3e6; color: #b45309; border-color: #f0c98a; }
+    html[data-theme="orange"] .kari-warn { background: #fff3e6; color: #b45309; }
+    /* メンバー行のポジション・レベル */
+    html[data-theme="orange"] .mem-row .m-pos { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .mem-row .m-lv.new { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .mem-row .m-lv.mid { background: #f3f4f6; color: #4b5563; }
+    /* 確度（ヨミ）は「分類」なので3つとも灰。A・B・C の文字で見分ける */
+    html[data-theme="orange"] .ymk.a { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .ymk.b { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .ymk.c { background: #f3f4f6; color: #4b5563; }
+    /* 派遣依頼の取り消し */
+    html[data-theme="orange"] .hk-st.cancelled { background: #f3f4f6; color: #4b5563; }
+    /* 希望者の色分け。取り合い（同じ日に複数の案件へ希望）は印が赤なので、面も薄い赤にそろえる */
+    html[data-theme="orange"] .cand-row.multi-apply { background: #fef2f2; }
+    html[data-theme="orange"] .cand-row .cand-note { color: #4b5563; }
+    html[data-theme="orange"] .cstat.only { background: #f3f4f6; color: #4b5563; }
+    /* もう手を付けた行 */
+    html[data-theme="orange"] .cand-row.picked { background: #f3f4f6; }
+    /* メンバーの追加パネル（一覧の行は灰。橙にすると「仮」と見間違える） */
+    html[data-theme="orange"] .pick-box .pk-item:nth-child(even) { background: #f9fafb; }
+    html[data-theme="orange"] .pick-box .pk-item:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .pick-box .pk-spot { background: #f9fafb; }
+    /* 凡例の色見本（上の色分けと同じ色にそろえる） */
+    html[data-theme="orange"] .legend .sw.a { background: #fef2f2; }
+    html[data-theme="orange"] .legend .sw.only { background: #f3f4f6; }
   </style>
 @endverbatim
 @endpush

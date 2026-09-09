@@ -384,6 +384,76 @@
     html[data-theme="dark"] .dpick-pop .dp-btn { background: var(--surface-3); border-color: var(--field-line); }
     html[data-theme="dark"] .dpick-pop .dp-btn.d.on { color: #ffffff; }
     html[data-theme="dark"] .dpick-pop .dp-warn { color: var(--danger-ink); }
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+       ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+    /* 凡例の入れ物（HTML の style="" に直書きされている色）。
+       ⚠ 茶色系だけ灰に寄せる。緑・青・赤・紫はそのまま＝意味を消さない。 */
+    html[data-theme="orange"] {
+      --dirlg-gray: #6b7280;    /* グレー＝未アサイン（茶色みを抜く） */
+      --dirlg-gold: #1f2328;    /* ⭐＝大型。金色をやめて、大型の黒枠と同じ濃さにそろえる */
+      --dirlg-brown: #4b5563;   /* 掛N＝同日の掛け持ち */
+      --dirlg-brown2: #4b5563;  /* その他の部署 */
+    }
+
+    /* 件数バッジ＝ふだんは灰、D未定がある日だけ赤。
+       ⚠ 前はどちらも橙で、警告になっていなかった。 */
+    html[data-theme="orange"] .c-count { background: #6b7280; color: #fff; }
+    html[data-theme="orange"] .c-count.has-undecided { background: #dc2626; color: #fff; }
+    html[data-theme="orange"] .dir-legend .lg-cnt { background: #6b7280; }
+
+    /* 使い方バナー＝ただの説明なので橙をやめる（橙は「仮」だけに使う） */
+    html[data-theme="orange"] .help-note { background: #f9fafb; border-color: #e5e7eb; color: #4b5563; }
+
+    /* カレンダーの面 */
+    html[data-theme="orange"] .cal-cell.other { background: #f9fafb; }
+    html[data-theme="orange"] .cell-empty { color: #6b7280; }
+    html[data-theme="orange"] .agg-bar { background: #e5e7eb; }
+    html[data-theme="orange"] .agg-tbl tr.agg-total td { background: #f9fafb; }
+    html[data-theme="orange"] .cal-dow > div.sat { color: #1d4ed8; }
+    html[data-theme="orange"] .cal-cell .c-date .sat { color: #1d4ed8; }
+
+    /* 大型案件＝金色をやめて黒い太枠で目立たせる（⭐はそのまま残す） */
+    html[data-theme="orange"] .dcase.big { border: 2px solid #1f2328; background: #ffffff; box-shadow: none; }
+    html[data-theme="orange"] .dc-star { color: #1f2328; }
+    html[data-theme="orange"] .mini-badge.big { background: #1f2328; color: #fff; }
+    /* 確定＋大型のチップ＝面は緑（確定）のまま、枠だけ黒くして大型を示す */
+    html[data-theme="orange"] .dcase.locked-chip.big { background: var(--ok-soft); color: #166534; border: 1px solid #1f2328; }
+
+    /* 案件の小バッジ＝面はグレーにそろえ、意味は文字色で出す */
+    html[data-theme="orange"] .mini-badge.real    { background: #f3f4f6; color: #1d4ed8; }
+    html[data-theme="orange"] .mini-badge.long    { background: #f3f4f6; color: #92400e; }
+    html[data-theme="orange"] .mini-badge.online  { background: #f3f4f6; color: #6d28d9; }
+    html[data-theme="orange"] .mini-badge.daytype { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .plamp.none         { background: #f3f4f6; color: #4b5563; }
+
+    /* D未定＝まだ決めていない（仮）なので橙のまま。白地で読める濃さにそろえる。 */
+    html[data-theme="orange"] .dcase.undecided { background: #fff3e6; }
+    html[data-theme="orange"] .dc-pick .pk.d-row select.undef { background: #fff3e6; color: #b45309; border-color: #f0c98a; }
+
+    /* SD行・ピッカー＝べた塗りの茶をやめて灰 */
+    html[data-theme="orange"] .dc-pick .pk.sd-row .lbl { background: #f3f4f6; }
+    html[data-theme="orange"] .dc-pick .pk.sd-row select { background: #f9fafb; }
+    html[data-theme="orange"] .dpick-pop .dp-btn { background: #f9fafb; }
+    html[data-theme="orange"] .dpick-pop .dp-btn.sd.on { background: #6b7280; color: #fff; border-color: #6b7280; }
+
+    /* 社員チップ（未アサイン・掛け持ち・所属未設定の茶色を抜く） */
+    html[data-theme="orange"] .emp-chip:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .emp-chip.free { color: #6b7280; }
+    html[data-theme="orange"] .emp-chip .e-multi { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .emp-chip.dep-other .e-nm { color: #4b5563; }
+    html[data-theme="orange"] .emp-chip.dep-none  .e-nm { color: #6b7280; }
+    html[data-theme="orange"] .dir-legend .lg-dot.gray { background: #6b7280; }
+    html[data-theme="orange"] .dir-legend .lg-tag.multi { background: #f3f4f6; color: #4b5563; }
+
+    /* メモ欄のホバー・影（茶色みを抜く） */
+    html[data-theme="orange"] .dp-note .pn-edit:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .day-tip { box-shadow: 0 8px 24px rgba(31, 35, 40, .15); }
+    html[data-theme="orange"] .dc-tip { box-shadow: 0 8px 24px rgba(31, 35, 40, .15); }
+    html[data-theme="orange"] .dpick-pop { box-shadow: 0 12px 34px rgba(31, 35, 40, .18); }
 </style>
 @endverbatim
 @endpush
@@ -409,7 +479,7 @@
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
           <b>SD と FC は何人でも付けられます</b>（2026-09-02 追加。大型案件はコンテンツごとにSDが2名いたりするため）。<b>D は1案件1名</b>です。<br>
           <span style="color:var(--dirlg-green); font-weight:700;">緑＝D/SD担当</span>／<span style="color:var(--dirlg-blue); font-weight:700;">青＝FC等で稼働</span>／<span style="color:var(--dirlg-gray); font-weight:700;">グレー＝未アサイン</span>／<span style="color:var(--dirlg-gold); font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:var(--dirlg-brown); font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:var(--dirlg-purple); font-weight:700;">新＝新人</span>。
-          名前の<b>文字色は部署</b>（<span style="color:var(--dirlg-orange);font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:var(--dirlg-indigo);font-weight:700;">藍＝セールス</span>・<span style="color:var(--dirlg-cre);font-weight:700;">緑＝クリエイティブ</span>・<span style="color:var(--dirlg-brown2);font-weight:700;">茶＝その他</span>）。
+          名前の<b>文字色は部署</b>（<span style="color:var(--dirlg-orange);font-weight:700;">イベプラ</span>・<span style="color:var(--dirlg-indigo);font-weight:700;">セールス</span>・<span style="color:var(--dirlg-cre);font-weight:700;">クリエイティブ</span>・<span style="color:var(--dirlg-brown2);font-weight:700;">その他</span>）＝この文字の色そのものです。
           右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。<br>
           <b>保存ボタンはありません。押したその場で保存されます</b>（2026-09-02 変更。保存の押し忘れで決めた担当が消えていたため）。
           右上に<b>「保存しました ○:○○」</b>と出ていれば保存できています。

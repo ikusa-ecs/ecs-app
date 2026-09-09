@@ -200,6 +200,52 @@
     html[data-theme="dark"] [style*="#e7f6ec"] { background: var(--ok-soft) !important; color: var(--ok-ink) !important; border-color: var(--ok-line) !important; }  /* 名簿に足しました */
     html[data-theme="dark"] [style*="#b91c1c"] { color: var(--danger-ink) !important; }  /* 追加に失敗したときの赤字 */
     html[data-theme="dark"] [style*="#f1ece4"] { background: var(--chip-bg) !important; color: var(--chip-ink) !important; }  /* 「臨時」バッジ */
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+       ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+    /* 区分バッジ（中堅）・兼任の選択欄・エントリーの一言＝ベージュと茶文字をグレーへ */
+    html[data-theme="orange"] .lv.中堅 { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .role2-sel { color: #4b5563; }
+    html[data-theme="orange"] .entry-note { color: #4b5563; }
+
+    /* この日の稼働希望。「希望あり」の橙は意味が薄いのでグレーへ。
+       ⚠ エントリー中（この案件に応募した人）＝黄はアサインの一番の手がかりなので残す。 */
+    html[data-theme="orange"] .wish.希望 { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .wish.未定 { background: #f3f4f6; color: #6b7280; }
+
+    /* おすすめ度＝あくまで「提案」なので、画面で一番強い色（ベタ塗り）にはしない。
+       白地＋オレンジの枠＋読める濃さの文字にして、確定・不足の色より弱く見せる。 */
+    html[data-theme="orange"] .score-pill.hi { background: #fff; border: 1px solid #f07800; color: #b35500; }
+    html[data-theme="orange"] .score-pill.mid { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .score-pill.lo { background: #f9fafb; color: #6b7280; }
+
+    /* 見落とすと事故になる赤い注記は、文字だけでなく薄赤の帯にする */
+    html[data-theme="orange"] .block-note {
+      background: #fef2f2; color: #b91c1c; display: inline-block;
+      padding: 1px 6px; border-radius: 6px;
+    }
+    html[data-theme="orange"] .dup-warn { background: #fef2f2; color: #b91c1c; }
+
+    /* 上限に近い・超過は「注意」なので橙のままにせず、黄（警告）にそろえる */
+    html[data-theme="orange"] .capb.near { background: #fef3c7; color: #92400e; }
+    html[data-theme="orange"] .pos-slot.over { border-color: #fcd34d; background: #fffbeb; }
+    html[data-theme="orange"] .pos-slot.over .cnt b { color: #92400e; }
+
+    /* 担当の内訳のチップ */
+    html[data-theme="orange"] .role-detail .rd-item { background: #f3f4f6; }
+
+    /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
+       「その色を含むもの」を名指しして !important で読み替える。
+       会社カラーのときだけに効かせるので、既定（ベージュ）の見た目は変わらない。 */
+    html[data-theme="orange"] [style*="#fbf6ef"] { background: #f9fafb !important; }  /* 臨時スタッフの案内・拠点の絞り込み注記 */
+    html[data-theme="orange"] [style*="#f1ece4"] { background: #f3f4f6 !important; color: #4b5563 !important; }  /* 「臨時」バッジ */
+
+  /* ⚠ 新人の印が橙のままだと「仮」と紛れる（橙は仮だけに使う決まり）。
+     D決めの凡例で「新＝紫」を使っているので、そこにそろえる。中堅（灰）とも見分けが付く。 */
+  html[data-theme="orange"] .lv.新人 { background: var(--accent2-soft); color: var(--accent2-ink); }
 </style>
 @endpush
 

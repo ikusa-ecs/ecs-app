@@ -266,6 +266,51 @@
   html[data-theme="dark"] .pe-sep { color: var(--muted); }
 
   html[data-theme="dark"] .sheet-empty { color: var(--muted); }
+
+  /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+     白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+     ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+     ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+  /* 操作バー・凡例の薄い茶文字 */
+  html[data-theme="orange"] .sheet-controls .count,
+  html[data-theme="orange"] .sheet-legend { color: #4b5563; }
+
+  /* 種別の色。東京の橙は「仮」に譲って落ち着いた青灰にする（日付ヘッダーは面積が広い＝
+     ここが橙だと画面がオレンジだらけになり、仮バッジが埋もれる）。その他の茶はグレーへ。 */
+  html[data-theme="orange"] .t-tokyo { background: #4a6484; }
+  html[data-theme="orange"] .t-other { background: #6b7280; }
+
+  /* 足りないタグは赤。橙の帯の上に橙を置くと読めないため。 */
+  html[data-theme="orange"] .htag.fill-short { background: #b91c1c; color: #fff; }
+
+  /* カードの影の茶色みを抜く */
+  html[data-theme="orange"] .acard { box-shadow: 0 1px 2px rgba(16,24,40,.06); }
+  html[data-theme="orange"] .acard-sticky { box-shadow: 0 3px 4px -2px rgba(16,24,40,.12); }
+
+  /* 小さなラベル・薄い文字 */
+  html[data-theme="orange"] .arow .lbl,
+  html[data-theme="orange"] .pe-sep { color: #4b5563; }
+  /* ⚠ :not(.on) を付ける＝チェック済み（緑）の色を消さないため */
+  html[data-theme="orange"] .chip-ck:not(.on) { color: #6b7280; }
+  html[data-theme="orange"] .sheet-empty { color: #6b7280; }
+
+  /* メンバー表 */
+  html[data-theme="orange"] .acard-members .mhead { background: #f3f4f6; color: #4b5563; }
+  html[data-theme="orange"] .mrow { border-top-color: #e5e7eb; }
+  html[data-theme="orange"] .mrow .pos-badge.none { background: #f3f4f6; color: #6b7280; }
+  /* 社員の印は青（他の画面と同じ「社員＝青」にそろえる） */
+  html[data-theme="orange"] .mrow .nm .emp { color: #1d4ed8; }
+  /* 仮＝橙。この画面で橙を使うのはここだけ。 */
+  html[data-theme="orange"] .mrow .st.kari { background: #fff3e6; color: #b45309; }
+  html[data-theme="orange"] .mrow .mempty,
+  html[data-theme="orange"] .mrow .m-tag { color: #6b7280; }
+  html[data-theme="orange"] .mrow .m-remark-tag { color: #4b5563; }
+
+  /* 拠点バッジ（この下の style ブロックで作っているもの）。
+     ベタ塗りの茶・淡い橙は「仮」ではないのでグレーにする。自拠点・ヘルプの緑は残す。 */
+  html[data-theme="orange"] .of-badge { background: #6b7280; }
+  html[data-theme="orange"] .of-share { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
 </style>
 @endpush
 
@@ -301,6 +346,10 @@
      「暗い緑の面＋明るい緑の文字」に置き換える（緑＝自分たちの案件、という意味は変えない）。 */
   html[data-theme="dark"] .of-mine,
   html[data-theme="dark"] .m-help { background: var(--ok-soft); color: var(--ok-ink); border-color: var(--ok-line); }
+
+  /* ⚠ 貼り付くカードの頭が、会社カラーでは面（#ffffff）と同色になり境目が消える。
+     頭を一段だけ変えて、下の行が潜って見えないようにする（2026-09-09 エンジニア点検）。 */
+  html[data-theme="orange"] .acard-sticky { background: var(--surface-2); border-bottom: 1px solid var(--line); }
 </style>
 
 @php

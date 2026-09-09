@@ -335,6 +335,16 @@
 
     /* 全社員一覧の表 */
     html[data-theme="dark"] table.ov-tbl thead th { background: var(--surface-2); color: var(--muted); }
+    /* ===== 会社カラー（2026-09-09 点検）=====
+       ⚠ 表の見出しがベージュ＋茶文字のまま出ていた。
+       ⚠ 貼り付く氏名列が #fff ＝会社カラーの面（#ffffff）と**同色**で、
+         横スクロールしたときに境目が消えて行が潜って見える。面を一段変える。 */
+    html[data-theme="orange"] table.ov-tbl thead th { background: var(--surface-2); color: var(--muted); }
+    html[data-theme="orange"] table.ov-tbl th.namecol { background: var(--surface-2); }
+    html[data-theme="orange"] table.ov-tbl td.namecol { background: var(--panel); border-right: 1px solid var(--line); }
+    html[data-theme="orange"] table.ov-tbl tr.me td.namecol { background: #fff3e6; }
+    html[data-theme="orange"] .ea-tab { color: var(--muted); }
+    html[data-theme="orange"] .dn-btns .cancel { color: var(--ink); }
     html[data-theme="dark"] table.ov-tbl th.namecol { background: var(--surface-2); }
     html[data-theme="dark"] table.ov-tbl td.namecol { background: var(--panel); }
     /* 所属ごとの帯（水色＝イベプラ／緑＝セールス／紫＝クリエイティブ／ベージュ＝その他）。

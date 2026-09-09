@@ -142,7 +142,7 @@
   </table>
 
   <p class="note" style="margin-top:12px;">
-    ※名前の<b>文字色は所属</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>）。<br>
+    ※名前の<b>文字色は所属</b>（<span style="color:#c2410c;font-weight:700;">イベプラ</span>・<span style="color:#4338ca;font-weight:700;">セールス</span>・<span style="color:#16a34a;font-weight:700;">クリエイティブ</span>）＝この文字の色そのものです。<br>
     ※「大型D／大型SD」＝リアルの【大型】案件でD／SDを務めた回数。「リアルD」はリアル案件全体（通常＋ロング）でDを務めた回数です。
   </p>
 

@@ -124,6 +124,37 @@
   html[data-theme="dark"] .am-pick .rl { background:#1a1d23; color:var(--brand-dark); }
   html[data-theme="dark"] .am-slot { background:var(--info-soft); color:var(--info-ink); }
   html[data-theme="dark"] .am-up { color:var(--ok-ink); }
+
+  /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+     白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+     ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+     ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+  /* 月送り・押せないボタン */
+  /* ⚠ :not(.on) を付ける＝いま見ている月（オレンジの面＋白文字）を灰で塗って字を消さないため */
+  html[data-theme="orange"] .am-month a:not(.on):hover { background:#f3f4f6; }
+  html[data-theme="orange"] .am-btn.go:disabled { background:#e5e7eb; color:#6b7280; }
+
+  /* 日・案件のチェック */
+  html[data-theme="orange"] .am-skip .s-day { border-color:#d1d5db; }
+  html[data-theme="orange"] .am-skip .s-day:hover { background:#f3f4f6; }
+  html[data-theme="orange"] .am-skip .s-day.off { background:#f3f4f6; color:#6b7280; border-color:#e5e7eb; }
+  html[data-theme="orange"] .am-skip .s-day .cn { background:#f3f4f6; color:#4b5563; }
+
+  /* 手で仮埋めした案件＝機械が触らない印。⚠ 白地では淡い橙だけだとほとんど見えないので、
+     左に太い線を足して「この案件は別扱い」と分かるようにする（仮＝橙のまま）。 */
+  html[data-theme="orange"] .am-skip .s-day.s-hand { background:#fff3e6; border-color:#f0c98a; border-left:4px solid #f07800; }
+  html[data-theme="orange"] .am-skip .s-day.s-hand.off { background:#f9fafb; border-color:#e5e7eb; border-left-color:#d1d5db; }
+
+  /* 何番目に埋めたかの丸 */
+  html[data-theme="orange"] .am-ord { background:#f3f4f6; color:#4b5563; }
+
+  /* 結果の表。足りない行は赤い帯＋左に赤い線（見落とすと当日に人が足りない） */
+  html[data-theme="orange"] table.am-tbl th { background:#f3f4f6; color:#4b5563; }
+  html[data-theme="orange"] table.am-tbl th,
+  html[data-theme="orange"] table.am-tbl td { border-bottom-color:#e5e7eb; }
+  html[data-theme="orange"] table.am-tbl tr.short td { background:#fef2f2; }
+  html[data-theme="orange"] table.am-tbl tr.short td:first-child { border-left:4px solid #dc2626; }
 </style>
 @endverbatim
 @endpush

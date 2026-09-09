@@ -272,6 +272,56 @@
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
     html[data-theme="dark"] [style*="#fbf6ef"] { background: var(--warn-soft) !important; color: var(--warn-ink) !important; }  /* 拠点の絞り込み注記 */
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+       ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+    /* お知らせ文の入力欄＝クリーム色の白を、まっさらな白に */
+    html[data-theme="orange"] .notice-edit textarea { background: #fff; }
+
+    /* 未公開の数は、下の未公開バッジと同じ赤にそろえる（同じ状態が2色に見えないように） */
+    html[data-theme="orange"] .pub-bar .stat-mini .n.off { color: #b91c1c; }
+
+    /* 月グループの見出し＝ただの区切りなので、橙の帯ではなくグレーの帯にする */
+    html[data-theme="orange"] tr.group-row td { background: #f3f4f6; color: #1f2328; }
+    html[data-theme="orange"] tr.group-row.past td { background: #f9fafb; color: #6b7280; }
+
+    /* 土曜は青（橙の文字だと「仮」と読み違える。日曜の赤と対にする） */
+    html[data-theme="orange"] td.date-cell .dow.sat { color: #2f6fb3; }
+
+    /* 未公開＝赤。⚠ いままで公開ボタンと同じ橙で、状態（未公開）と操作（公開する）の
+       区別が付かなかった。橙は公開ボタン側に残し、状態は赤で見せる。 */
+    html[data-theme="orange"] .pub-badge.off { background: #fef2f2; color: #b91c1c; }
+    html[data-theme="orange"] .pub-badge.off .dot { background: #dc2626; }
+
+    /* 「取り消す」は目立たせる必要がないので、灰の枠線ボタンにする */
+    html[data-theme="orange"] .pub-toggle.undo { background: #fff; color: #1f2328; border-color: #e5e7eb; }
+    html[data-theme="orange"] .pub-toggle.undo:hover { background: #f3f4f6; }
+
+    /* 操作ボタンのホバー・備考行のベージュ */
+    html[data-theme="orange"] td.ops-cell .note-btn:hover,
+    html[data-theme="orange"] td.ops-cell .cat-toggle:hover { background: #f3f4f6; }
+    html[data-theme="orange"] td.ops-cell .note-btn.has { background: #fffbeb; border-color: #fcd34d; }
+    html[data-theme="orange"] tr.note-row > td { background: #f9fafb; }
+
+    /* 登録日の強調は茶ではなく黒に近い文字で */
+    html[data-theme="orange"] td.proj-cell .added b { color: #1f2328; }
+
+    /* タブ・日付チップのベージュ。
+       ⚠ :not(.active) / :not(.on) を付ける＝選んでいるタブ・チップ（オレンジの面＋白文字）を
+         灰色で塗りつぶして字が消えるのを防ぐため。日曜の赤・土曜の青も残す。 */
+    html[data-theme="orange"] .view-tab:not(.active):hover { background: #f3f4f6; }
+    html[data-theme="orange"] .day-chip:not(.on) { border-color: #e5e7eb; }
+    html[data-theme="orange"] .day-chip:not(.on):not(.sun):not(.sat) { color: #1f2328; }
+    html[data-theme="orange"] .day-chip:not(.on):hover { background: #f3f4f6; border-color: #d1d5db; }
+    html[data-theme="orange"] .day-chip:not(.on) .cn { background: #f3f4f6; color: #4b5563; }
+
+    /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
+       「その色を含むもの」を名指しして !important で読み替える。
+       会社カラーのときだけに効かせるので、既定（ベージュ）の見た目は変わらない。 */
+    html[data-theme="orange"] [style*="#fbf6ef"] { background: #f9fafb !important; }  /* 拠点の絞り込み注記 */
   </style>
 @endverbatim
 @endpush

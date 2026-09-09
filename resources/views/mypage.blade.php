@@ -353,6 +353,45 @@
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
     html[data-theme="dark"] [style*="#e7f6ec"] { background: var(--ok-soft) !important; color: var(--ok-ink) !important; border-color: var(--ok-line) !important; }  /* 登録できたときの緑の帯 */
     html[data-theme="dark"] [style*="#fdecec"] { background: var(--danger-soft) !important; color: var(--danger-ink) !important; border-color: var(--danger-line) !important; }  /* 未記入・エラーの赤い帯 */
+
+    /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+       白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+       ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+       ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+    /* 名前の丸・所属バッジ＝意味のない橙・茶はグレーへ（イベプラ＝青／セールス＝緑／
+       クリエイティブ＝紫は意味があるので残す） */
+    html[data-theme="orange"] .prof-avatar { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .dept.other { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .dept.none { background: #f9fafb; color: #6b7280; }
+
+    /* 役割タグ・特徴バッジ。⚠ 種別（大型＝赤／オンライン＝青／リアル＝緑）と
+       予備日・リハの色は意味があるので変えない。 */
+    html[data-theme="orange"] .role-tag.mc { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .mtag.stay { background: #f3f4f6; color: #4b5563; }
+
+    /* 収支入力は「警告」ではなくふつうの操作なので、ふつうのボタンに戻す */
+    html[data-theme="orange"] .fin-btn { color: #1f2328; border-color: #e5e7eb; }
+    html[data-theme="orange"] .fin-btn:hover { background: #f3f4f6; }
+    html[data-theme="orange"] .cal-btn:hover { background: #f3f4f6; }
+    /* ⚠ :not(.danger) を付ける＝解除など赤いボタンのホバー（薄赤）を消さないため */
+    html[data-theme="orange"] .line-btn:not(.danger):hover { background: #f3f4f6; }
+
+    /* リスト／カレンダーの切替。
+       ⚠ :not(.active) を付ける＝選んでいる側（オレンジの面＋白文字）の字を消さないため */
+    html[data-theme="orange"] .view-tab:not(.active) { color: #4b5563; }
+
+    /* カレンダー。土曜は青（橙の文字だと「仮」と読み違える。日曜の赤と対にする）。
+       予定が入っているマスは、中の案件カードが種別の色を持っているので、
+       マスの地はうっすらグレーで足りる（橙を広い面に敷かない）。 */
+    html[data-theme="orange"] .mp-cal-grid .dow.sat,
+    html[data-theme="orange"] .mp-cell.sat .dnum { color: #2f6fb3; }
+    html[data-theme="orange"] .mp-cell.has { background: #f9fafb; border-color: #e5e7eb; }
+    /* ⚠ 土曜・日曜のマスは除く（青・赤の日付が灰色になってしまうため） */
+    html[data-theme="orange"] .mp-cell:not(.sat):not(.sun) .dnum { color: #6b7280; }
+
+    /* 通知のオン・オフ（切ってあるときの下地） */
+    html[data-theme="orange"] .switch .track { background: #d1d5db; }
   </style>
 @endverbatim
 @endpush

@@ -169,6 +169,51 @@
   html[data-theme="dark"] .st-excluded,
   html[data-theme="dark"] .st-excluded-list { background: var(--surface-2); }
   html[data-theme="dark"] .st-csv { color: #ffffff; }
+
+  /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
+     白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
+     ⚠ 橙は「仮」だけに使う。⚠ 緑＝確定／赤＝注意 の意味は変えない。
+     ⚠ 既定（ベージュ）の見た目は変えない。 */
+
+  /* タブ・拠点ボタンのホバーと、その横の小さな茶文字。
+     ⚠ :not(.active) を付ける＝選んでいるタブ・拠点（オレンジの面＋白文字）を
+       灰色で塗りつぶして字が消えるのを防ぐため。 */
+  html[data-theme="orange"] .st-tab:not(.active):hover,
+  html[data-theme="orange"] .st-scope a:not(.active):hover { background: #f3f4f6; }
+  html[data-theme="orange"] .st-scope .sc-label,
+  html[data-theme="orange"] .st-controls .lbl { color: #4b5563; }
+
+  /* KPIカード・パネルの影は茶色みを抜く */
+  html[data-theme="orange"] .st-kpi,
+  html[data-theme="orange"] .st-panel { box-shadow: 0 1px 2px rgba(16,24,40,.06); }
+  /* 合計の上の線だけは会社のオレンジ（線・アイコンにはオレンジを使ってよい） */
+  html[data-theme="orange"] .st-kpi.accent-total { border-top-color: #f07800; }
+  html[data-theme="orange"] .st-kpi .k-label { color: #4b5563; }
+  html[data-theme="orange"] .st-kpi .k-num small { color: #6b7280; }
+
+  /* 昨対比の小さな文字。⚠ 増＝緑／減＝赤 はそのまま。 */
+  html[data-theme="orange"] .k-yoy,
+  html[data-theme="orange"] .k-yoy .flat,
+  html[data-theme="orange"] .k-yoy .prev { color: #6b7280; }
+
+  /* 一覧・表の細かい文字 */
+  html[data-theme="orange"] .st-panel .empty,
+  html[data-theme="orange"] .st-row .r-name .sub,
+  html[data-theme="orange"] .st-row .r-num small,
+  html[data-theme="orange"] .st-emp-table td.l .sub,
+  html[data-theme="orange"] .st-dept .d-sub,
+  html[data-theme="orange"] .st-note { color: #6b7280; }
+  html[data-theme="orange"] .st-row.zero .r-name,
+  html[data-theme="orange"] .st-row.zero .r-num { color: #6b7280; }
+  html[data-theme="orange"] .st-emp-table th { color: #4b5563; }
+  html[data-theme="orange"] .st-emp-table tbody tr:hover { background: #f9fafb; }
+
+  /* 部署別カードの「その他」の茶い線 */
+  html[data-theme="orange"] .st-dept.other { border-top-color: #6b7280; }
+
+  /* 数えなかった案件の帯 */
+  html[data-theme="orange"] .st-excluded,
+  html[data-theme="orange"] .st-excluded-list { background: #f9fafb; }
 </style>
 @endpush
 
