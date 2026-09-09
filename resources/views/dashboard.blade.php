@@ -17,6 +17,9 @@
 </script>
 @verbatim
 <style>
+  /* ⚠ 背景色を画面の中に直接書かないこと（黒ベースのときに白いまま残る）。
+     面の色は var(--panel)、文字は var(--ink) を使う。色の正本は public/ecs/style.css。 */
+
   /* 月次の件数集計テーブル */
   .cnt-sub { font-size: 13px; font-weight: 700; margin: 0 0 5px; color: var(--ink); }
   .cnt-table td { padding: 2px 12px; font-size: 12.5px; line-height: 1.3; }
@@ -76,6 +79,26 @@
   .dgr-item .ddate { min-width:64px; font-weight:700; color:var(--danger); font-size:13px; }
   .dgr-item .drsn { font-size:12.5px; color:var(--ink); }
   .dgr-item .drsn .nm { color:var(--muted); }
+
+  /* ===== 黒ベース（見本・2026-09-09）=====
+     この画面だけ、黒でも読めるように色を差し替えている。
+     ⚠ 白い面（#fff）と、白の上でしか読めない淡い色（#f3f7ff・#fde68a）を置き換えるのが要点。
+     ⚠ 共通の枠（左メニュー・表・ボタン）は public/ecs/style.css の同じ並びで直してある。
+     ⚠ 他の画面はまだ整えていない＝黒はいまURLに ?theme=dark を付けたときだけ出る（保存できない）。 */
+  html[data-theme="dark"] .cnt-table tr.grp td { background:#23272f; }
+  html[data-theme="dark"] .cal-nav,
+  html[data-theme="dark"] .cal-cell,
+  html[data-theme="dark"] .day-panel { background:var(--panel); color:var(--ink); }
+  html[data-theme="dark"] .cal-dow.sat,
+  html[data-theme="dark"] .cal-cell.sat .dnum,
+  html[data-theme="dark"] .cal-cell .cnum { color:#7cb3f0; }          /* 土曜・件数＝黒の上でも見える青 */
+  html[data-theme="dark"] .cal-cell.has,
+  html[data-theme="dark"] .cal-legend .sw.has { background:#1b2836; } /* 案件のある日＝濃い青 */
+  html[data-theme="dark"] .cal-cell .big-mark,
+  html[data-theme="dark"] .cal-legend .sw.big,
+  html[data-theme="dark"] .day-panel .dp-item .big {
+    background:#4a3a10; color:#f5c26b; border-color:#6b5416;          /* 大型の印＝濃い黄 */
+  }
 </style>
 @endverbatim
 @endpush
@@ -144,7 +167,7 @@
           <div class="spacer"></div>
           <label for="cntMonth" class="muted" style="font-size:12.5px; margin-right:6px;">表示する月：</label>
           <select id="cntMonth" onchange="window.ECS_renderCount && window.ECS_renderCount()"
-                  style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px; background:#fff;"></select>
+                  style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px; background:var(--panel); color:var(--ink);"></select>
         </div>
         <div class="grid cols-2">
 

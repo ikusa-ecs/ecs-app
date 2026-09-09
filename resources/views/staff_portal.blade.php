@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="ja">
+{{-- 画面の色（テーマ）＝人ごとに選べる（2026-09-09 baba要望）。設定タブで変えられる。
+     ⚠ 色そのものは public/ecs/style.css の html[data-theme="…"]。ここには色を書かない。 --}}
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -881,6 +883,28 @@
             </form>
 
             <button class="line-btn danger" onclick="doLogout()">ログアウト</button>
+          </div>
+
+          {{-- 画面の色（テーマ）＝人ごとに選べる（2026-09-09 baba要望）。
+               ⚠ ふつうのフォームで送る（JavaScriptを使わない）＝押した瞬間に保存され、その色で開き直る。
+               ⚠ 選択肢も説明も App\Support\Themes が正本。色そのものは public/ecs/style.css。 --}}
+          <div class="m-card">
+            <h3>画面の色</h3>
+            <p class="sub">好きな色を選べます（あなただけに適用されます。スマホでもパソコンでも同じ色になります）。</p>
+            <form method="POST" action="{{ route('theme.save') }}" style="margin:0;">
+              @csrf
+              @foreach (\App\Support\Themes::OPTIONS as $value => $label)
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:8px 2px; cursor:pointer;">
+                  <input type="radio" name="theme" value="{{ $value }}"
+                         {{ \App\Support\Themes::of(Auth::user()) === $value ? 'checked' : '' }}>
+                  <span>
+                    <b>{{ $label }}</b><br>
+                    <span class="sub" style="margin:0;">{{ \App\Support\Themes::NOTES[$value] ?? '' }}</span>
+                  </span>
+                </label>
+              @endforeach
+              <button class="line-btn" type="submit" style="width:100%;">この色にする</button>
+            </form>
           </div>
 
         </div>

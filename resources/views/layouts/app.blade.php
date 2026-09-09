@@ -1,6 +1,9 @@
 {{-- 社員側の画面で共通して使う骨組み（土台）。各画面はこれを @extends して中身だけ書く。 --}}
 <!DOCTYPE html>
-<html lang="ja">
+{{-- 画面の色（テーマ）＝人ごとに選べる（2026-09-09 baba要望）。マイページで変えられる。
+     ⚠ 色そのものは public/ecs/style.css の html[data-theme="…"] に書いてある。
+       ここには色を書かない（2か所に分かれると必ず食い違う）。 --}}
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" id="ecsViewport">
@@ -51,6 +54,15 @@
         <span class="role-pill">{{ $__permLabels[Auth::user()->permission] ?? '社員' }}</span>
       @endauth
     </div>
+    {{-- 「いま見本の色で見ています」の帯（2026-09-09）。
+         ⚠ 見本は保存されていないので、必ずそれと分かるようにする。
+           分からないと「色を変えたつもりが、次に開いたら戻っている」となる。 --}}
+    @if (\App\Support\Themes::previewLabel())
+      <div class="theme-preview-bar">
+        <span>🎨 いま「{{ \App\Support\Themes::previewLabel() }}」の見本を表示しています（保存はされていません）。</span>
+        <a href="{{ request()->url() }}">いつもの色に戻す</a>
+      </div>
+    @endif
     <div class="content">
       @yield('content')
     </div>

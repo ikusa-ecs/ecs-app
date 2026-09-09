@@ -42,6 +42,7 @@ use App\Http\Controllers\RoleRequirementImportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\ThemeController;
 use Illuminate\Support\Facades\Route;
 
 // ── ログイン（Laravel Fortify を利用・照合先は people 名簿）──
@@ -95,6 +96,10 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     Route::view('/guide', 'guide')->middleware('tier:employee')->name('guide');
     // 使い方ガイド（スタッフ向け）。スタッフ画面から開く＝スタッフがやることだけに絞った内容。
     Route::view('/guide-staff', 'guide_staff')->name('guide.staff');
+
+    // 画面の色（テーマ）を本人が選ぶ（2026-09-09 baba要望）。社員もスタッフも使う。
+    // ⚠ 変えられるのは自分のぶんだけ（人のIDを受け取らない）。選択肢の正本＝App\Support\Themes。
+    Route::post('/theme', [ThemeController::class, 'save'])->name('theme.save');
 
     // 本人のパスワード変更（初回ログイン後などに自分で変える）。
     Route::get('/password', [PasswordController::class, 'edit']);

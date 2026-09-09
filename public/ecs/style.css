@@ -19,6 +19,119 @@
   --shadow: 0 1px 3px rgba(60, 40, 20, 0.08), 0 1px 2px rgba(60, 40, 20, 0.04);
 }
 
+/* ===== 画面の色（テーマ）＝人ごとに選べる（2026-09-09 baba要望）=====
+
+   使い方＝<html data-theme="orange"> が付いていると、下の色に入れ替わる。
+   付けるのはサーバー側（layouts/app.blade.php・staff_portal.blade.php）。
+   どのテーマがあるかの正本＝App\Support\Themes（PHP側）。**色そのものはこのファイルだけ**に書く。
+
+   ⚠ テーマを足すときは、Themes::OPTIONS とここの両方に足すこと。
+   ⚠ 上の :root は「いまの色」＝既定。テーマ側では**変える色だけ**を書く
+     （全部書き直すと、片方に色を足したときに反映されない）。
+   ⚠ 黒ベース（ダークモード）はまだ無い。各画面に直書きの色が約1,950か所あり、
+     そのほとんどが「白い背景に濃い文字」前提のため、いま黒にすると読めなくなる。 */
+
+/* 会社カラー（IKUSA コーポレートサイトの雰囲気＝白地×ニュートラルグレー×鮮やかなオレンジ）
+
+   ⚠ ここは「ベージュを薄くしたもの」ではない。**茶色みを全部抜く**のがポイント
+     （baba「ホームページみたいにスタイリッシュな感じの色合いがいい」2026-09-09）。
+     文字とグレーを茶色寄りにすると、とたんに“やわらかい”見た目に戻ってしまう。
+   ⚠ 濃さを変えたいときは、ここの数字だけを直す（画面側には色を書かない）。 */
+html[data-theme="orange"] {
+  --bg: #f7f8f9;        /* ほぼ白のニュートラルグレー（茶色みを入れない） */
+  --panel: #ffffff;     /* まっさらな白 */
+  --ink: #1f2328;       /* ほぼ黒＝コントラストを立ててシャープに見せる */
+  --muted: #6b7280;     /* ニュートラルグレー */
+  --line: #e5e7eb;      /* うすいグレーの罫線 */
+  --brand: #f07800;     /* コーポレートの鮮やかなオレンジ */
+  --brand-dark: #cc6000;
+  --brand-soft: #fff3e6;/* オレンジのごく淡い面（帯・選択中の背景） */
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
+}
+
+/* 黒ベース（見本・2026-09-09 baba「黒もどんな感じか1画面見本で見たい」）
+
+   ⚠ **まだ選んで保存はできない。** URLに ?theme=dark を付けた画面だけ黒で出る（App\Support\Themes）。
+     各画面に直書きの色が約1,950か所あり、そのほとんどが「白い背景に濃い文字」前提のため、
+     いま全画面で使えるようにすると、整えていない画面が読めなくなる。
+   ⚠ 下は「共通の枠」（左メニュー・上のバー・パネル・表・ボタン・バッジ）だけ。
+     画面ごとの色は、その画面のファイルで直す（いまは dashboard.blade.php だけ整えてある）。
+   ⚠ 変数だけでは足りない＝上の枠の色は :root ではなく各ルールに直接書かれているので、
+     ここで同じルールを上書きしている。 */
+/* ねらい＝**シンプル**（baba のイメージ：黒＝シンプル／会社カラー＝スタイリッシュ／いまの色＝やわらかい）。
+   飾りの色を増やさず、黒・グレー・白＋アクセント1色だけで組み立てる。 */
+html[data-theme="dark"] {
+  --bg: #16181d;        /* 画面の下地（真っ黒より少し明るく＝目が痛くならない） */
+  --panel: #1e2128;     /* パネル・カードの面 */
+  --ink: #e6e8ea;       /* 文字（真っ白は避ける＝まぶしさを抑える） */
+  --muted: #9aa2ad;
+  --line: #2f343d;      /* 罫線 */
+  --brand: #f07800;     /* アクセントは会社カラーのオレンジのまま */
+  --brand-dark: #ff9a3c;
+  --brand-soft: #3a2a16;/* オレンジの淡い面（黒の上なので暗い茶にする） */
+  --ok-soft: #16301f;
+  --warn-soft: #33280f;
+  --danger-soft: #3a1c1c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4);
+}
+/* 左メニュー */
+html[data-theme="dark"] .sidebar { background: #1a1d23; color: var(--ink); }
+html[data-theme="dark"] .sidebar nav a { color: #c3c9d1; }
+html[data-theme="dark"] .sidebar nav a:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .sidebar .nav-group .group-label,
+html[data-theme="dark"] .sidebar .userbox { color: var(--muted); }
+html[data-theme="dark"] .sidebar .userbox { border-top-color: var(--line); }
+html[data-theme="dark"] .sidebar .userbox strong { color: var(--ink); }
+html[data-theme="dark"] .sidebar .pc-mode-btn { border-color: #3a414c; color: var(--muted); }
+html[data-theme="dark"] .sidebar .pc-mode-btn:hover { background: #262b33; color: #fff; }
+/* 上のバー */
+html[data-theme="dark"] .topbar { background: var(--panel); border-bottom-color: var(--line); }
+html[data-theme="dark"] .nav-toggle { color: var(--muted); }
+html[data-theme="dark"] .nav-toggle:hover { background: #262b33; color: #fff; }
+/* 表 */
+html[data-theme="dark"] table.tbl th { background: #23272f; color: var(--muted); }
+html[data-theme="dark"] table.tbl tbody tr:hover { background: #23272f; }
+/* ボタン */
+html[data-theme="dark"] .btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
+html[data-theme="dark"] .btn:hover { background: #2f353f; }
+html[data-theme="dark"] .btn.primary { background: var(--brand); border-color: var(--brand); color: #1a1206; }
+/* パネル・カード（背景が #fff で直書きされているもの） */
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .card { background: var(--panel); }
+/* バッジ・バー・お知らせ */
+html[data-theme="dark"] .badge.gray { background: #2b313a; color: #b7bec8; }
+html[data-theme="dark"] .badge.green { color: #7ee2a8; }
+html[data-theme="dark"] .badge.amber { color: #f5c26b; }
+html[data-theme="dark"] .badge.red { color: #f59a9a; }
+html[data-theme="dark"] .cat-通常 { background: #2b313a; color: #b7bec8; }
+html[data-theme="dark"] .cat-体力 { background: #14293a; color: #7cc4f0; }
+html[data-theme="dark"] .cat-安定重視 { background: #241f3a; color: #b8a6f5; }
+html[data-theme="dark"] .cat-育成 { background: #16301f; color: #7ee2a8; }
+html[data-theme="dark"] .bar { background: #2b313a; }
+html[data-theme="dark"] .alert.warn { color: #f5c26b; }
+html[data-theme="dark"] .alert.danger { color: #f59a9a; }
+html[data-theme="dark"] .alert.ok { color: #7ee2a8; }
+/* 変更履歴の欄（灰色系が直書きされている） */
+html[data-theme="dark"] .hist-item { border-bottom-color: var(--line); }
+html[data-theme="dark"] .hist-empty,
+html[data-theme="dark"] .hist-meta,
+html[data-theme="dark"] .hist-more { color: var(--muted); }
+html[data-theme="dark"] .hist-who,
+html[data-theme="dark"] .hist-date-head { color: var(--ink); }
+html[data-theme="dark"] .hist-old,
+html[data-theme="dark"] .hist-arrow,
+html[data-theme="dark"] .hist-field::after { color: #7d858f; }
+/* 入力欄（白地・黒文字が既定のブラウザ標準を上書きする） */
+html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea {
+  background: #23272f; color: var(--ink); border-color: #3a414c;
+}
+/* 「これは見本です」の帯 */
+.theme-preview-bar {
+  background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700;
+  padding: 7px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.theme-preview-bar a { color: #fff; text-decoration: underline; font-weight: 700; }
+
 * { box-sizing: border-box; }
 
 body {

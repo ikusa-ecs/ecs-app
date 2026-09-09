@@ -462,6 +462,42 @@
       @php($me = Auth::user())
       @php($extras = \App\Support\ProfileExtras::of($me))
 
+      {{-- 画面の色（テーマ）＝人ごとに選べる（2026-09-09 baba要望）。
+           ⚠ ふつうのフォームで送る（JavaScript を使わない）＝押した瞬間に保存され、画面もその色で開き直る。
+           ⚠ 選択肢も説明も App\Support\Themes が正本。色そのものは public/ecs/style.css。
+             どちらもここに書き写さない（2か所に分かれると必ず食い違う）。
+           ⚠ この欄は「そのまま出す区間」の外に置くこと。中に入れると差し込みの記号がそのまま画面に出る
+             （2026-09-09 に1回踏んだ。上のプロフィール欄と同じ罠）。 --}}
+      <div class="panel mp-wrap" style="margin-top:12px;">
+        <div class="panel-head"><h2>画面の色</h2></div>
+        <p class="sec-count">好きな色を選べます（あなただけに適用されます。会社のPCでもスマホでも同じ色になります）。</p>
+        <form method="POST" action="{{ route('theme.save') }}" style="padding:10px 14px 14px;">
+          @csrf
+          @foreach (\App\Support\Themes::OPTIONS as $value => $label)
+            <label style="display:flex; align-items:flex-start; gap:8px; padding:7px 0; cursor:pointer;">
+              <input type="radio" name="theme" value="{{ $value }}"
+                     {{ \App\Support\Themes::of($me) === $value ? 'checked' : '' }}>
+              <span>
+                <b>{{ $label }}</b><br>
+                <span class="muted" style="font-size:11.5px;">{{ \App\Support\Themes::NOTES[$value] ?? '' }}</span>
+              </span>
+            </label>
+          @endforeach
+          <button type="submit" class="btn primary" style="margin-top:8px;">この色にする</button>
+        </form>
+        {{-- 黒ベースは「見本」だけ（2026-09-09 baba「黒もどんな感じか1画面見本で見たい」）。
+             ⚠ 選んで保存できるようにはしない＝整えてある画面がまだ1枚だけなので、
+               保存できると他の画面が白いまま残った状態で固定されてしまう。 --}}
+        <div style="padding:0 14px 14px;">
+          <p class="muted" style="font-size:11.5px; margin:0 0 6px;">
+            <b>黒ベース（ダークモード）は、いま見本だけです。</b>
+            画面ごとに色を直す作業（約1,950か所）が要るので、順番に進めています。
+            まずは<b>ダッシュボードの1画面</b>を黒にしてみたので、見た目のご意見をください。
+          </p>
+          <a class="btn" href="{{ \App\Support\Themes::PREVIEW_PATH }}?theme=dark">🎨 黒ベースの見本を見る（保存はされません）</a>
+        </div>
+      </div>
+
       @if (session('status'))
         <div class="panel mp-wrap" style="margin-top:12px; background:#e7f6ec; color:#166534; border-color:#b7e0c2; font-size:13px; padding:12px 14px;">
           {{ session('status') }}
