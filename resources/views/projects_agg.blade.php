@@ -42,7 +42,7 @@
       border: 1px solid var(--line-strong, #d8c4ae); border-radius: 999px; padding: 5px 13px;
     }
     .dept-switch .ds-chip:hover { border-color: var(--brand); }
-    .dept-switch .ds-chip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .dept-switch .ds-chip.active { background: var(--brand-fill); color: #fff; border-color: var(--brand); }
     table.tbl th.num, table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
     table.tbl td.nm { font-weight: 600; }
     /* 名前の文字色＝所属（D決め画面と同じ配色） */
@@ -57,18 +57,18 @@
        上の色は白地むけに直接書いてあるので、黒地だと白いボタン面や茶色の文字が読みにくい。
        所属を表す文字色は、意味を変えずに明るい同系色へ置き換える。 */
     html[data-theme="dark"] .agg-top .month-nav button,
-    html[data-theme="dark"] .agg-top .month-nav .mon-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .agg-top .month-nav .mon-btn:hover { background: #2f353f; }
-    html[data-theme="dark"] .live.on  { color: #7ee2a8; }
-    html[data-theme="dark"] .live.off { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .dept-switch { background: #23272f; }
-    html[data-theme="dark"] .dept-switch .ds-chip { background: #262b33; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .dept-switch .ds-chip.active { background: var(--brand); color: #ffffff; border-color: var(--brand); }
+    html[data-theme="dark"] .agg-top .month-nav .mon-btn { background: var(--surface-3); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .agg-top .month-nav .mon-btn:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .live.on  { color: var(--ok-ink); }
+    html[data-theme="dark"] .live.off { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .dept-switch { background: var(--surface-2); }
+    html[data-theme="dark"] .dept-switch .ds-chip { background: var(--surface-3); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .dept-switch .ds-chip.active { background: var(--brand-fill); color: #ffffff; border-color: var(--brand); }
     html[data-theme="dark"] table.tbl td.nm.dep-plan     { color: #f59a5a; }
     html[data-theme="dark"] table.tbl td.nm.dep-sales    { color: #a5b4fc; }
-    html[data-theme="dark"] table.tbl td.nm.dep-creative { color: #7ee2a8; }
+    html[data-theme="dark"] table.tbl td.nm.dep-creative { color: var(--ok-ink); }
     html[data-theme="dark"] table.tbl td.nm.dep-other    { color: var(--muted); }
-    html[data-theme="dark"] table.tbl td.nm.dep-none     { color: #98a0aa; }
+    html[data-theme="dark"] table.tbl td.nm.dep-none     { color: var(--muted-dim); }
   </style>
   @endverbatim
 </head>

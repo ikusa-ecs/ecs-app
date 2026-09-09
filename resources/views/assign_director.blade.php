@@ -34,7 +34,7 @@
     .dir-controls .spacer { flex: 1; }
     .dir-controls label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); cursor: pointer; }
     .btn-save-dir {
-      border: 1px solid var(--brand); background: var(--brand); color: #fff;
+      border: 1px solid var(--brand); background: var(--brand-fill); color: #fff;
       border-radius: 8px; padding: 8px 16px; font-size: 13.5px; font-weight: 700;
       cursor: pointer; font-family: inherit;
     }
@@ -130,7 +130,7 @@
     .dc-pick .pk { display: flex; align-items: center; gap: 4px; }
     .dc-pick .pk .lbl { font-weight: 700; text-align: center; border-radius: 5px; }
     /* D行＝主役（大きめ・ブランド色） */
-    .dc-pick .pk.d-row .lbl { font-size: 11px; width: 26px; color: #fff; background: var(--brand); padding: 2px 0; }
+    .dc-pick .pk.d-row .lbl { font-size: 11px; width: 26px; color: #fff; background: var(--brand-fill); padding: 2px 0; }
     .dc-pick .pk.d-row select { flex: 1; padding: 4px 6px; border: 1.5px solid var(--brand); border-radius: 6px; font-size: 12px; font-weight: 700; color: var(--brand-dark); font-family: inherit; background: #fff; min-width: 0; }
     .dc-pick .pk.d-row select.undef { border-color: var(--warn); background: #fffbf3; color: #b45309; }
     /* SD行＝控えめ（小さめ・グレー） */
@@ -203,12 +203,12 @@
     table.agg-tbl tr.most td.dcnt { color: #b91c1c; }   /* 一番多い人＝偏りに注意 */
     .agg-panel .agg-note { font-size: 11px; color: var(--muted); line-height: 1.6; margin-top: 8px; }
     .agg-bar { height: 5px; background: #ece3d4; border-radius: 999px; overflow: hidden; margin-top: 2px; }
-    .agg-bar > i { display: block; height: 100%; background: var(--brand); }
+    .agg-bar > i { display: block; height: 100%; background: var(--brand-fill); }
 
     /* ===== 社員主役レイアウト（件数バッジ＋社員チップ＋担当ピッカー）===== */
     .cal-cell .c-date { position: relative; justify-content: space-between; }
     /* 日付の横の件数バッジ（カーソルでその日の案件一覧） */
-    .c-count { font-size: 10px; font-weight: 700; color: #fff; background: var(--brand); border-radius: 999px; padding: 0 7px; cursor: default; }
+    .c-count { font-size: 10px; font-weight: 700; color: #fff; background: var(--brand-fill); border-radius: 999px; padding: 0 7px; cursor: default; }
     .c-count.has-undecided { background: var(--warn); }   /* D未定の案件がある日＝橙で注意 */
     /* 件数ふきだし */
     .day-tip {
@@ -264,7 +264,7 @@
     .dir-legend .lg-tag.newb  { background: #efe6f6; color: #6d28d9; }
     .dir-legend .lg-tag.multi { background: #ece3d4; color: #7a6a58; }
     .dir-legend .lg-tag.role  { background: #e3edf7; color: #2c6ca0; }
-    .dir-legend .lg-cnt { font-size: 10px; font-weight: 700; color: #fff; background: var(--brand); border-radius: 999px; padding: 0 6px; }
+    .dir-legend .lg-cnt { font-size: 10px; font-weight: 700; color: #fff; background: var(--brand-fill); border-radius: 999px; padding: 0 6px; }
 
     /* 担当ピッカー（社員名クリックで開く小窓） */
     .dpick-pop {
@@ -279,7 +279,7 @@
     .dpick-pop .dp-ct { font-size: 10px; color: var(--brand-dark); }
     .dpick-pop .dp-btns { display: flex; gap: 5px; flex-shrink: 0; }
     .dpick-pop .dp-btn { border: 1px solid var(--line); background: #fbf8f2; color: var(--ink); border-radius: 7px; padding: 4px 9px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
-    .dpick-pop .dp-btn.d.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .dpick-pop .dp-btn.d.on { background: var(--brand-fill); color: #fff; border-color: var(--brand); }
     .dpick-pop .dp-btn.sd.on { background: #7a6a58; color: #fff; border-color: #7a6a58; }
     .dpick-pop .dp-btn.fc.on { background: #2c6ca0; color: #fff; border-color: #2c6ca0; }
     .dpick-pop .dp-btn .who { font-size: 8.5px; font-weight: 600; opacity: .85; }
@@ -300,90 +300,90 @@
       --dirlg-brown2: #6e5b49; --dirlg-red: #b91c1c;
     }
     html[data-theme="dark"] {
-      --dirlg-green: #7ee2a8; --dirlg-blue: #7cc4f0; --dirlg-gray: #9aa2ad;
-      --dirlg-gold: #f5c26b; --dirlg-brown: #b7bec8; --dirlg-purple: #b8a6f5;
-      --dirlg-orange: #f0913c; --dirlg-indigo: #9db0f5; --dirlg-cre: #7ee2a8;
-      --dirlg-brown2: #c3b3a0; --dirlg-red: #f59a9a;
+      --dirlg-green: var(--ok-ink); --dirlg-blue: var(--info-ink); --dirlg-gray: #9aa2ad;
+      --dirlg-gold: var(--warn-ink); --dirlg-brown: var(--chip-ink); --dirlg-purple: #b8a6f5;
+      --dirlg-orange: #f0913c; --dirlg-indigo: #9db0f5; --dirlg-cre: var(--ok-ink);
+      --dirlg-brown2: #c3b3a0; --dirlg-red: var(--danger-ink);
     }
     /* 使い方バナー・上部の操作バー */
-    html[data-theme="dark"] .help-note { color: #f5c26b; border-color: #5a4718; }
-    html[data-theme="dark"] .month-nav button { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .month-nav button:hover { background: #2f353f; }
+    html[data-theme="dark"] .help-note { color: var(--warn-ink); border-color: var(--warn-line); }
+    html[data-theme="dark"] .month-nav button { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .month-nav button:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .btn-save-dir { color: #ffffff; }
-    html[data-theme="dark"] .btn-fix-month { background: #14293a; color: #7cc4f0; border-color: #2c5070; }
+    html[data-theme="dark"] .btn-fix-month { background: var(--info-soft); color: var(--info-ink); border-color: #2c5070; }
     /* 保存の状態表示（⚠ 失敗の赤い点滅は消さない） */
-    html[data-theme="dark"] .save-state.ok     { background: #16301f; border-color: #2a5a38; color: #7ee2a8; }
-    html[data-theme="dark"] .save-state.saving { background: #33280f; border-color: #5a4718; color: #f5c26b; }
-    html[data-theme="dark"] .save-state.ng     { background: #3a1c1c; border-color: #6b2f2f; color: #f59a9a;
+    html[data-theme="dark"] .save-state.ok     { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok-ink); }
+    html[data-theme="dark"] .save-state.saving { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn-ink); }
+    html[data-theme="dark"] .save-state.ng     { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-ink);
       animation: saveBlinkDark 1s steps(1) infinite; }
-    @keyframes saveBlinkDark { 50% { background: #6b2f2f; } }
+    @keyframes saveBlinkDark { 50% { background: var(--danger-line); } }
     /* カレンダーのマス */
     html[data-theme="dark"] .cal-cell { background: var(--panel); }
     html[data-theme="dark"] .cal-cell.other { background: #191c21; }
-    html[data-theme="dark"] .c-dayoff { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .c-dayoff { background: var(--warn-soft); color: var(--warn-ink); }
     /* 1日の中の案件カード */
-    html[data-theme="dark"] .dcase { background: #262b33; }
+    html[data-theme="dark"] .dcase { background: var(--surface-3); }
     html[data-theme="dark"] .dcase.undecided { background: #2d2716; }
     html[data-theme="dark"] .dcase.big { background: #2e2a1c; box-shadow: 0 1px 4px rgba(224, 168, 0, .25); }
-    html[data-theme="dark"] .mini-badge.big    { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .mini-badge.real   { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .mini-badge.long   { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .mini-badge.online { background: #241f3a; color: #b8a6f5; }
-    html[data-theme="dark"] .mini-badge.daytype{ background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .mini-badge.repeat { color: #7ee2a8; }
-    html[data-theme="dark"] .plamp.ok    { color: #7ee2a8; }
-    html[data-theme="dark"] .plamp.short { color: #f59a9a; }
-    html[data-theme="dark"] .plamp.none  { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .mini-badge.big    { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .mini-badge.real   { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .mini-badge.long   { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .mini-badge.online { background: var(--accent2-soft); color: #b8a6f5; }
+    html[data-theme="dark"] .mini-badge.daytype{ background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .mini-badge.repeat { color: var(--ok-ink); }
+    html[data-theme="dark"] .plamp.ok    { color: var(--ok-ink); }
+    html[data-theme="dark"] .plamp.short { color: var(--danger-ink); }
+    html[data-theme="dark"] .plamp.none  { background: var(--chip-bg); color: var(--chip-ink); }
     /* D・SD のプルダウン */
     html[data-theme="dark"] .dc-pick .pk.d-row .lbl { color: #ffffff; }
-    html[data-theme="dark"] .dc-pick .pk.d-row select { background: #23272f; }
-    html[data-theme="dark"] .dc-pick .pk.d-row select.undef { background: #2d2716; color: #f5c26b; }
-    html[data-theme="dark"] .dc-pick .pk.sd-row .lbl { background: #2b313a; }
-    html[data-theme="dark"] .dc-pick .pk.sd-row select { background: #23272f; }
+    html[data-theme="dark"] .dc-pick .pk.d-row select { background: var(--surface-2); }
+    html[data-theme="dark"] .dc-pick .pk.d-row select.undef { background: #2d2716; color: var(--warn-ink); }
+    html[data-theme="dark"] .dc-pick .pk.sd-row .lbl { background: var(--chip-bg); }
+    html[data-theme="dark"] .dc-pick .pk.sd-row select { background: var(--surface-2); }
     /* その日のメモ */
-    html[data-theme="dark"] .dp-note { background: #33280f; border-color: #5a4718; color: #f5c26b; }
-    html[data-theme="dark"] .dp-note .pn-edit { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .dp-note .pn-edit:hover { background: #2f353f; }
-    html[data-theme="dark"] .dc-offwarn { color: #f59a9a; }
+    html[data-theme="dark"] .dp-note { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn-ink); }
+    html[data-theme="dark"] .dp-note .pn-edit { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .dp-note .pn-edit:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .dc-offwarn { color: var(--danger-ink); }
     /* 確定案件のチップとふきだし */
-    html[data-theme="dark"] .dcase.locked-chip { color: #7ee2a8; border-color: #2a5a38; }
-    html[data-theme="dark"] .dcase.locked-chip.big { background: #33280f; color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .dcase.locked-chip { color: var(--ok-ink); border-color: var(--ok-line); }
+    html[data-theme="dark"] .dcase.locked-chip.big { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
     html[data-theme="dark"] .dc-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
-    html[data-theme="dark"] .cell-empty { color: #8b939d; }
+    html[data-theme="dark"] .cell-empty { color: var(--muted-dim); }
     /* 担当バランス集計（右パネル） */
-    html[data-theme="dark"] .agg-tbl tr.agg-total td { background: #23272f; }
-    html[data-theme="dark"] .agg-panel .live { color: #7ee2a8; }
-    html[data-theme="dark"] table.agg-tbl tr.most td.dcnt { color: #f59a9a; }
-    html[data-theme="dark"] .agg-bar { background: #2b313a; }
+    html[data-theme="dark"] .agg-tbl tr.agg-total td { background: var(--surface-2); }
+    html[data-theme="dark"] .agg-panel .live { color: var(--ok-ink); }
+    html[data-theme="dark"] table.agg-tbl tr.most td.dcnt { color: var(--danger-ink); }
+    html[data-theme="dark"] .agg-bar { background: var(--chip-bg); }
     /* 件数バッジとふきだし */
     html[data-theme="dark"] .c-count { color: #ffffff; }
     html[data-theme="dark"] .day-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
     /* 社員チップ */
-    html[data-theme="dark"] .emp-chip { background: #262b33; }
-    html[data-theme="dark"] .emp-chip.assigned { color: #7ee2a8; border-color: #2a5a38; }
-    html[data-theme="dark"] .emp-chip.busy { color: #7cc4f0; border-color: #2c5070; background: #14293a; }
+    html[data-theme="dark"] .emp-chip { background: var(--surface-3); }
+    html[data-theme="dark"] .emp-chip.assigned { color: var(--ok-ink); border-color: var(--ok-line); }
+    html[data-theme="dark"] .emp-chip.busy { color: var(--info-ink); border-color: #2c5070; background: var(--info-soft); }
     html[data-theme="dark"] .emp-chip.free { color: var(--muted); }
-    html[data-theme="dark"] .emp-chip .e-role   { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .emp-chip .e-multi  { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .emp-chip .e-newbie { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .emp-chip .e-role   { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .emp-chip .e-multi  { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .emp-chip .e-newbie { background: var(--accent2-soft); color: #b8a6f5; }
     html[data-theme="dark"] .emp-chip.dep-plan     .e-nm { color: var(--dirlg-orange); }
     html[data-theme="dark"] .emp-chip.dep-sales    .e-nm { color: var(--dirlg-indigo); }
     html[data-theme="dark"] .emp-chip.dep-creative .e-nm { color: var(--dirlg-cre); }
     html[data-theme="dark"] .emp-chip.dep-other    .e-nm { color: var(--dirlg-brown2); }
     html[data-theme="dark"] .emp-chip.dep-none     .e-nm { color: var(--muted); }
     /* 凡例バー */
-    html[data-theme="dark"] .dir-legend .lg-dot.green { background: #7ee2a8; }
-    html[data-theme="dark"] .dir-legend .lg-dot.blue  { background: #7cc4f0; }
+    html[data-theme="dark"] .dir-legend .lg-dot.green { background: var(--ok-ink); }
+    html[data-theme="dark"] .dir-legend .lg-dot.blue  { background: var(--info-ink); }
     html[data-theme="dark"] .dir-legend .lg-dot.gray  { background: #9aa2ad; }
-    html[data-theme="dark"] .dir-legend .lg-tag.newb  { background: #241f3a; color: #b8a6f5; }
-    html[data-theme="dark"] .dir-legend .lg-tag.multi { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .dir-legend .lg-tag.role  { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .dir-legend .lg-tag.newb  { background: var(--accent2-soft); color: #b8a6f5; }
+    html[data-theme="dark"] .dir-legend .lg-tag.multi { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .dir-legend .lg-tag.role  { background: var(--info-soft); color: var(--info-ink); }
     html[data-theme="dark"] .dir-legend .lg-cnt { color: #ffffff; }
     /* 担当ピッカー（社員名を押すと開く小窓） */
     html[data-theme="dark"] .dpick-pop { background: var(--panel); box-shadow: 0 12px 34px rgba(0, 0, 0, .6); }
-    html[data-theme="dark"] .dpick-pop .dp-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .dpick-pop .dp-btn { background: var(--surface-3); border-color: var(--field-line); }
     html[data-theme="dark"] .dpick-pop .dp-btn.d.on { color: #ffffff; }
-    html[data-theme="dark"] .dpick-pop .dp-warn { color: #f59a9a; }
+    html[data-theme="dark"] .dpick-pop .dp-warn { color: var(--danger-ink); }
 </style>
 @endverbatim
 @endpush

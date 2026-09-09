@@ -142,17 +142,67 @@ class ThemeTest extends TestCase
     }
 
     /**
-     * ⚠ 色そのものはCSSの1か所（public/ecs/style.css）に書く。
-     *   PHP（Themes）に色コードを書き写していないことを見張る。
+     * 色の置き場所の決まりを守る（2026-09-09 に実態へ合わせて書き直した）。
+     *
+     * 【実際の作り】
+     *   ・共通の枠（左メニュー・表・ボタン）と**色の名前（変数）**＝`public/ecs/style.css` の1か所
+     *   ・画面ごとの色＝各Bladeの `<style>` 末尾の `html[data-theme="dark"] …`
+     * ⚠ 以前この docblock は「色はCSSの1か所だけ」と書いてあったが、
+     *   実際は各Bladeにも黒ベースのルールがある。**通っているのに前提が嘘**という
+     *   いちばん危ない状態だったので直した（引き継いだ人が style.css だけ直して混乱する）。
+     * ⚠ PHP（Themes）には色コードを書かない、はいまも守る決まり。
      */
-    public function test_colors_live_only_in_the_css(): void
+    public function test_colors_live_in_the_css_not_in_php(): void
     {
         $css = (string) file_get_contents(public_path('ecs/style.css'));
         $php = (string) file_get_contents(app_path('Support/Themes.php'));
 
         $this->assertStringContainsString('html[data-theme="orange"]', $css, 'テーマの色がCSSから消えている');
         $this->assertDoesNotMatchRegularExpression('/#[0-9a-fA-F]{6}/', $php,
-            'App\Support\Themes に色コードを書いてはいけない（色はCSSの1か所だけ）');
+            'App\Support\Themes に色コードを書いてはいけない（色はCSSに置く）');
+    }
+
+    /**
+     * ⚠ 選べるテーマは、すべて共通CSSに色の定義があること。
+     *   Themes に足したのに CSS に足し忘れると、選んでも何も変わらない。
+     */
+    public function test_every_theme_has_its_colors_in_the_css(): void
+    {
+        $css = (string) file_get_contents(public_path('ecs/style.css'));
+
+        foreach (array_keys(Themes::OPTIONS) as $value) {
+            if ($value === '') {
+                continue;   // 既定＝:root がそのまま使われる
+            }
+            $this->assertStringContainsString('html[data-theme="'.$value.'"]', $css,
+                'テーマ「'.$value.'」の色が public/ecs/style.css にない＝選んでも変わらない');
+        }
+    }
+
+    /**
+     * ⚠ 骨組み（layouts.app）を使わない独立ページにも `data-theme` を付ける。
+     *
+     * これが無いと、その画面だけ色が変わらない（黒を選んだのに白い画面が出る）。
+     * 実際に「使い方ガイド」で起きた（2026-09-09）。
+     * ⚠ ログイン前の画面は既定のままでよい＝**名前で明示して除外**する
+     *   （新しい独立ページを作った人が必ずここで気づけるようにするため）。
+     */
+    public function test_every_standalone_page_carries_the_theme(): void
+    {
+        $beforeLogin = ['login.blade.php', 'otp_challenge.blade.php',
+            'password_forgot.blade.php', 'password_reset.blade.php'];
+
+        foreach (glob(resource_path('views/*.blade.php')) as $file) {
+            $html = (string) file_get_contents($file);
+            if (preg_match('/<html[^>]*>/', $html, $m) !== 1) {
+                continue;   // 骨組みを使う画面（layouts.app が面倒を見る）
+            }
+            if (in_array(basename($file), $beforeLogin, true)) {
+                continue;
+            }
+            $this->assertStringContainsString('data-theme=', $m[0],
+                basename($file).' に data-theme がない＝この画面だけ色が変わらない');
+        }
     }
 
     /** スタッフ画面にも同じ色が効く（設定タブから選べる）。 */

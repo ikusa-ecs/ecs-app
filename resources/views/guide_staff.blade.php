@@ -2,9 +2,13 @@
 {{-- スタッフがやることだけに絞った内容。機能が増えたらこのファイルを更新する（生きた説明書）。 --}}
 {{-- 更新したら、いちばん下の「更新履歴」にも1行足すこと。 --}}
 {{-- CSSのメディアクエリ等をBladeに解釈させないため、全体をBladeが解釈しない区間で囲んでいる。 --}}
-@verbatim
+{{-- 画面の色（テーマ）を効かせる。⚠ この2行だけ「そのまま出す区間」の外に出してある
+     （その区間の中では差し込みが解釈されないため）。
+     ⚠ このコメントの中に Blade の命令名を書かないこと。書くと本物の命令とみなされて
+       コメントが閉じられず、画面に記号がそのまま出る（2026-09-09 に実際に踏んだ）。 --}}
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
+@verbatim
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +18,25 @@
     --brand:#a15c2e; --brand-soft:#f6ede4; --ink:#2f2a24; --muted:#7a6f63;
     --line:#e6d8c8; --ok:#166534; --ok-soft:#e7f6ec; --warn:#8a5a10; --warn-soft:#fdf3e2;
   }
+  /* ===== 黒ベース（2026-09-09）=====
+     この画面は共通CSS（public/ecs/style.css）を読まない独立ページなので、
+     色の入れ物（上の :root）を黒向けに入れ替える。
+     ⚠ 白い面（#fbf8f4・#fff）と、白の上でしか読めない色は下で個別に上書きする。
+     ⚠ 印刷用の指定（@media print）は触らない＝紙は白いままでよい。 */
+  html[data-theme="dark"]{
+    --brand:#dda94e; --brand-soft:#40340f; --ink:#e6e8ea; --muted:#9aa2ad;
+    --line:#3a414c; --ok:#5cbf8a; --ok-soft:#1d4029; --warn:#dda94e; --warn-soft:#40340f;
+  }
+  html[data-theme="dark"] body{ background:#16181d; }
+  html[data-theme="dark"] nav.toc,
+  html[data-theme="dark"] section{ background:#232830; }
+  html[data-theme="dark"] .note{ border-color:#5c4718; }
+  html[data-theme="dark"] .tip{ border-color:#2c5c3c; }
+  html[data-theme="dark"] th{ color:#dda94e; }
+  html[data-theme="dark"] td,
+  html[data-theme="dark"] th{ border-color:#3a414c; }
+  html[data-theme="dark"] code{ background:#191c22; color:#e6e8ea; }
+
   *{ box-sizing:border-box; }
   html{ scroll-behavior:smooth; }
   body{
@@ -51,7 +74,7 @@
   .steps>li:last-child{ border-bottom:none; }
   .steps>li::before{
     content:counter(s); position:absolute; left:0; top:8px;
-    width:26px; height:26px; border-radius:50%; background:var(--brand); color:#fff;
+    width:26px; height:26px; border-radius:50%; background:var(--brand-fill); color:#fff;
     text-align:center; line-height:26px; font-weight:700; font-size:13px;
   }
   .steps b{ color:var(--brand); }

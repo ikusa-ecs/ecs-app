@@ -74,7 +74,7 @@
     /* おすすめ度（自動アサインの頭脳がつけた点数と理由） */
     .score-pill { font-size: 12.5px; font-weight: 800; padding: 2px 10px; border-radius: 999px;
                   white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .score-pill.hi  { background: var(--brand); color: #fff; }
+    .score-pill.hi  { background: var(--brand-fill); color: #fff; }
     .score-pill.mid { background: var(--brand-soft); color: var(--brand-dark); }
     .score-pill.lo  { background: #eef0f2; color: #8a8f98; }
     .score-reasons { font-size: 10.5px; color: var(--muted); margin-top: 3px; line-height: 1.35; max-width: 230px; }
@@ -151,55 +151,55 @@
     html[data-theme="dark"] .role-sel,
     html[data-theme="dark"] .note-in,
     html[data-theme="dark"] .patrol-in,
-    html[data-theme="dark"] .remark-in { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .remark-in { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
     html[data-theme="dark"] .role2-sel { color: var(--muted); }
 
     /* 区分バッジ・できる役割タグ */
-    html[data-theme="dark"] .lv.中堅 { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .lv.ベテラン { color: #7ee2a8; }
-    html[data-theme="dark"] .can-tag { color: #7ee2a8; }
+    html[data-theme="dark"] .lv.中堅 { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .lv.ベテラン { color: var(--ok-ink); }
+    html[data-theme="dark"] .can-tag { color: var(--ok-ink); }
 
     /* この日の稼働希望バッジ */
-    html[data-theme="dark"] .wish.entry { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .wish.entry { background: var(--warn-soft); color: var(--warn-ink); }
     html[data-theme="dark"] .entry-note { color: var(--muted); }
-    html[data-theme="dark"] .wish.稼働可 { color: #7ee2a8; }
-    html[data-theme="dark"] .wish.NG { color: #f59a9a; }
-    html[data-theme="dark"] .wish.未定 { background: #2b313a; color: #8b929c; }
+    html[data-theme="dark"] .wish.稼働可 { color: var(--ok-ink); }
+    html[data-theme="dark"] .wish.NG { color: var(--danger-ink); }
+    html[data-theme="dark"] .wish.未定 { background: var(--chip-bg); color: var(--muted-dim); }
 
     /* おすすめ度 */
     html[data-theme="dark"] .score-pill.hi { color: #ffffff; }
-    html[data-theme="dark"] .score-pill.lo { background: #2b313a; color: #8b929c; }
-    html[data-theme="dark"] .score-warn { color: #f5c26b; }
-    html[data-theme="dark"] .block-note { color: #f59a9a; }
-    html[data-theme="dark"] .staff-row.blocked .score-pill { color: #f59a9a; }
-    html[data-theme="dark"] .ng-note { color: #f59a9a; }
+    html[data-theme="dark"] .score-pill.lo { background: var(--chip-bg); color: var(--muted-dim); }
+    html[data-theme="dark"] .score-warn { color: var(--warn-ink); }
+    html[data-theme="dark"] .block-note { color: var(--danger-ink); }
+    html[data-theme="dark"] .staff-row.blocked .score-pill { color: var(--danger-ink); }
+    html[data-theme="dark"] .ng-note { color: var(--danger-ink); }
 
     /* 警告バッジ・選択数 */
-    html[data-theme="dark"] .dup-warn { color: #f59a9a; }
-    html[data-theme="dark"] .capb.over { color: #f59a9a; }
-    html[data-theme="dark"] .capb.near { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .selnum.under b { color: #f59a9a; }
-    html[data-theme="dark"] .selnum.exact b { color: #7ee2a8; }
-    html[data-theme="dark"] .selnum.over b { color: #f5c26b; }
+    html[data-theme="dark"] .dup-warn { color: var(--danger-ink); }
+    html[data-theme="dark"] .capb.over { color: var(--danger-ink); }
+    html[data-theme="dark"] .capb.near { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .selnum.under b { color: var(--danger-ink); }
+    html[data-theme="dark"] .selnum.exact b { color: var(--ok-ink); }
+    html[data-theme="dark"] .selnum.over b { color: var(--warn-ink); }
 
     /* ポジション雛型の枠 */
-    html[data-theme="dark"] .pos-slot { background: #23272f; }
-    html[data-theme="dark"] .pos-slot.under .cnt b { color: #f59a9a; }
-    html[data-theme="dark"] .pos-slot.exact { border-color: #2c5c3c; }
-    html[data-theme="dark"] .pos-slot.exact .cnt b { color: #7ee2a8; }
-    html[data-theme="dark"] .pos-slot.over { border-color: #5c4718; background: #33280f; }
-    html[data-theme="dark"] .pos-slot.over .cnt b { color: #f5c26b; }
+    html[data-theme="dark"] .pos-slot { background: var(--surface-2); }
+    html[data-theme="dark"] .pos-slot.under .cnt b { color: var(--danger-ink); }
+    html[data-theme="dark"] .pos-slot.exact { border-color: var(--ok-line); }
+    html[data-theme="dark"] .pos-slot.exact .cnt b { color: var(--ok-ink); }
+    html[data-theme="dark"] .pos-slot.over { border-color: var(--warn-line); background: var(--warn-soft); }
+    html[data-theme="dark"] .pos-slot.over .cnt b { color: var(--warn-ink); }
 
     /* 担当の内訳 */
-    html[data-theme="dark"] .role-detail .rd-item { background: #262b33; }
+    html[data-theme="dark"] .role-detail .rd-item { background: var(--surface-3); }
 
     /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
-    html[data-theme="dark"] [style*="#fbf6ef"] { background: #23272f !important; }  /* 臨時スタッフの案内・拠点の絞り込み注記 */
-    html[data-theme="dark"] [style*="#e7f6ec"] { background: #16301f !important; color: #7ee2a8 !important; border-color: #2c5c3c !important; }  /* 名簿に足しました */
-    html[data-theme="dark"] [style*="#b91c1c"] { color: #f59a9a !important; }  /* 追加に失敗したときの赤字 */
-    html[data-theme="dark"] [style*="#f1ece4"] { background: #2b313a !important; color: #b7bec8 !important; }  /* 「臨時」バッジ */
+    html[data-theme="dark"] [style*="#fbf6ef"] { background: var(--surface-2) !important; }  /* 臨時スタッフの案内・拠点の絞り込み注記 */
+    html[data-theme="dark"] [style*="#e7f6ec"] { background: var(--ok-soft) !important; color: var(--ok-ink) !important; border-color: var(--ok-line) !important; }  /* 名簿に足しました */
+    html[data-theme="dark"] [style*="#b91c1c"] { color: var(--danger-ink) !important; }  /* 追加に失敗したときの赤字 */
+    html[data-theme="dark"] [style*="#f1ece4"] { background: var(--chip-bg) !important; color: var(--chip-ink) !important; }  /* 「臨時」バッジ */
 </style>
 @endpush
 

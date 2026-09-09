@@ -162,7 +162,7 @@
     html[data-theme="dark"] .pk-filter { background:var(--panel); border-color:var(--line); }
     html[data-theme="dark"] .pk-filter input[type=text],
     html[data-theme="dark"] .pk-filter input[type=date],
-    html[data-theme="dark"] .pk-filter select { background:#23272f; color:var(--ink); border-color:#3a414c; }
+    html[data-theme="dark"] .pk-filter select { background:var(--surface-2); color:var(--ink); border-color:var(--field-line); }
     html[data-theme="dark"] .pk-filter .f-label,
     html[data-theme="dark"] .pk-filter .f-tilde { color:var(--muted); }
 
@@ -170,10 +170,10 @@
     html[data-theme="dark"] .pk-section-h { color:var(--ink); }
     html[data-theme="dark"] .pk-pick-list { background:var(--panel); border-color:var(--line); }
     html[data-theme="dark"] .pk-row { border-bottom-color:var(--line); }
-    html[data-theme="dark"] .pk-row:hover { background:#262b33; }
-    html[data-theme="dark"] .pk-row.on { background:#2f353f; }
-    html[data-theme="dark"] .pk-row.pk-row-head { background:#23272f; color:var(--muted); }
-    html[data-theme="dark"] .pk-row.pk-row-head:hover { background:#262b33; }
+    html[data-theme="dark"] .pk-row:hover { background:var(--surface-3); }
+    html[data-theme="dark"] .pk-row.on { background:var(--surface-hover); }
+    html[data-theme="dark"] .pk-row.pk-row-head { background:var(--surface-2); color:var(--muted); }
+    html[data-theme="dark"] .pk-row.pk-row-head:hover { background:var(--surface-3); }
     html[data-theme="dark"] .pk-row-date,
     html[data-theme="dark"] .pk-row-prog,
     html[data-theme="dark"] .pk-row-client,
@@ -182,19 +182,19 @@
     html[data-theme="dark"] .pk-selcount { color:var(--muted); }
     html[data-theme="dark"] .pk-row-name,
     html[data-theme="dark"] .pk-row-prog b { color:var(--ink); }
-    html[data-theme="dark"] .pk-row-prog.short b { color:#f59a9a; }
+    html[data-theme="dark"] .pk-row-prog.short b { color:var(--danger-ink); }
 
     /* バッジ（意味の色は残したまま、暗い面＋明るい文字にする） */
-    html[data-theme="dark"] .dt-badge { background:#33280f; color:#f5c26b; border-color:#5c4718; }
-    html[data-theme="dark"] .dt-badge.yobi { background:#14293a; color:#7cc4f0; border-color:#2b4b66; }
-    html[data-theme="dark"] .dt-badge.reha { background:#262b33; color:#b7bec8; border-color:#3a414c; }
-    html[data-theme="dark"] .dt-badge.setup { background:#3a2a16; color:#ff9a3c; border-color:#5c4718; }
-    html[data-theme="dark"] .day-badge { background:#241f3a; color:#b8a6f5; border-color:#3d3560; }
+    html[data-theme="dark"] .dt-badge { background:var(--warn-soft); color:var(--warn-ink); border-color:var(--warn-line); }
+    html[data-theme="dark"] .dt-badge.yobi { background:var(--info-soft); color:var(--info-ink); border-color:#2b4b66; }
+    html[data-theme="dark"] .dt-badge.reha { background:var(--surface-3); color:var(--chip-ink); border-color:var(--field-line); }
+    html[data-theme="dark"] .dt-badge.setup { background:#3a2a16; color:#ff9a3c; border-color:var(--warn-line); }
+    html[data-theme="dark"] .day-badge { background:var(--accent2-soft); color:#b8a6f5; border-color:#3d3560; }
 
     /* サマリー・案件カード */
     html[data-theme="dark"] .sum-card { background:var(--panel); border-color:var(--line); }
     html[data-theme="dark"] .sum-card .num { color:var(--ink); }
-    html[data-theme="dark"] .sum-card .num.warn { color:#f59a9a; }
+    html[data-theme="dark"] .sum-card .num.warn { color:var(--danger-ink); }
     html[data-theme="dark"] .sum-card .lbl { color:var(--muted); }
     html[data-theme="dark"] .pk-case { background:var(--panel); border-color:var(--line); }
     html[data-theme="dark"] .pk-case-date,
@@ -205,30 +205,30 @@
     html[data-theme="dark"] .pk-case-meta b { color:var(--ink); }
     html[data-theme="dark"] .pk-block-h { color:var(--ink); }
     html[data-theme="dark"] .pk-block-h .cnt { color:var(--muted); }
-    html[data-theme="dark"] .pk-block-h .cnt.short { color:#f59a9a; }
+    html[data-theme="dark"] .pk-block-h .cnt.short { color:var(--danger-ink); }
 
     /* メンバー行 */
     html[data-theme="dark"] .pk-mem { border-bottom-color:var(--line); }
     html[data-theme="dark"] .pk-mem .m-name { color:var(--ink); }
-    html[data-theme="dark"] .pk-mem .e-pos { background:#2b313a; color:#b7bec8; }
-    html[data-theme="dark"] .pk-mem .e-pos.key { background:#14293a; color:#7cc4f0; }
-    html[data-theme="dark"] .pk-mem.multi { background:#33280f; }
+    html[data-theme="dark"] .pk-mem .e-pos { background:var(--chip-bg); color:var(--chip-ink); }
+    html[data-theme="dark"] .pk-mem .e-pos.key { background:var(--info-soft); color:var(--info-ink); }
+    html[data-theme="dark"] .pk-mem.multi { background:var(--warn-soft); }
     html[data-theme="dark"] .pk-mem.multi .m-name { color:var(--ink); }
-    html[data-theme="dark"] .pk-mem .multi-flag { color:#f5c26b; }
+    html[data-theme="dark"] .pk-mem .multi-flag { color:var(--warn-ink); }
     html[data-theme="dark"] .pk-mem .pk-entnote { color:var(--muted); }
 
     /* 稼働バッジ */
-    html[data-theme="dark"] .cstat.cal1 { background:#14293a; color:#7cc4f0; }
-    html[data-theme="dark"] .cstat.only { background:#2b313a; color:#b7bec8; }
-    html[data-theme="dark"] .cstat.done { background:#16301f; color:#7ee2a8; border-color:#2c5c3c; }
+    html[data-theme="dark"] .cstat.cal1 { background:var(--info-soft); color:var(--info-ink); }
+    html[data-theme="dark"] .cstat.only { background:var(--chip-bg); color:var(--chip-ink); }
+    html[data-theme="dark"] .cstat.done { background:var(--ok-soft); color:var(--ok-ink); border-color:var(--ok-line); }
 
     /* ＋追加 / ×外す ボタン */
-    html[data-theme="dark"] .pk-btn { background:#262b33; color:var(--ink); border-color:#3a414c; }
-    html[data-theme="dark"] .pk-btn:hover { background:#2f353f; }
-    html[data-theme="dark"] .pk-btn.add { color:#7ee2a8; border-color:#2c5c3c; }
-    html[data-theme="dark"] .pk-btn.add:hover { background:#16301f; }
-    html[data-theme="dark"] .pk-btn.remove { color:#f59a9a; border-color:#5c2c2c; }
-    html[data-theme="dark"] .pk-btn.remove:hover { background:#3a1c1c; }
+    html[data-theme="dark"] .pk-btn { background:var(--surface-3); color:var(--ink); border-color:var(--field-line); }
+    html[data-theme="dark"] .pk-btn:hover { background:var(--surface-hover); }
+    html[data-theme="dark"] .pk-btn.add { color:var(--ok-ink); border-color:var(--ok-line); }
+    html[data-theme="dark"] .pk-btn.add:hover { background:var(--ok-soft); }
+    html[data-theme="dark"] .pk-btn.remove { color:var(--danger-ink); border-color:var(--danger-line); }
+    html[data-theme="dark"] .pk-btn.remove:hover { background:var(--danger-soft); }
     html[data-theme="dark"] .empty-note { color:var(--muted); }
 
     /* メンバー行の入力欄 */
@@ -236,19 +236,19 @@
     html[data-theme="dark"] .pk-mem-role2,
     html[data-theme="dark"] .pk-mem-note,
     html[data-theme="dark"] .pk-mem-patrol,
-    html[data-theme="dark"] .pk-mem-remark { background:#23272f; color:var(--ink); border-color:#3a414c; }
+    html[data-theme="dark"] .pk-mem-remark { background:var(--surface-2); color:var(--ink); border-color:var(--field-line); }
     html[data-theme="dark"] .pk-mem-role2 { color:#b8a6f5; }
 
     /* 保存ボタン行 */
     html[data-theme="dark"] .pk-save-row { border-top-color:var(--line); }
-    html[data-theme="dark"] .pk-save-msg.ok { color:#7ee2a8; }
-    html[data-theme="dark"] .pk-save-msg.err { color:#f59a9a; }
+    html[data-theme="dark"] .pk-save-msg.ok { color:var(--ok-ink); }
+    html[data-theme="dark"] .pk-save-msg.err { color:var(--danger-ink); }
 
     /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
-    html[data-theme="dark"] [style*="#fbf6ef"] { background:#33280f !important; color:#f5c26b !important; }  /* 拠点の絞り込み注記 */
-    html[data-theme="dark"] [style*="#fbf1da"] { background:#33280f !important; color:#f5c26b !important; }  /* 凡例の「色つき」の見本 */
+    html[data-theme="dark"] [style*="#fbf6ef"] { background:var(--warn-soft) !important; color:var(--warn-ink) !important; }  /* 拠点の絞り込み注記 */
+    html[data-theme="dark"] [style*="#fbf1da"] { background:var(--warn-soft) !important; color:var(--warn-ink) !important; }  /* 凡例の「色つき」の見本 */
 </style>
 @endverbatim
 @endpush

@@ -25,7 +25,7 @@
        将来ログイン前にもテーマを付けられるようになったときのために、書き方だけそろえておく。 */
     html[data-theme="dark"] body { background: var(--bg); }
     html[data-theme="dark"] .login-card { background: var(--panel); }
-    html[data-theme="dark"] .sent { color: #7ee2a8; }
+    html[data-theme="dark"] .sent { color: var(--ok-ink); }
   </style>
 </head>
 <body>

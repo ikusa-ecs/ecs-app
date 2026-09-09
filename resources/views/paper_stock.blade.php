@@ -21,7 +21,7 @@
   td.ok { color: #15803d; }
   .ps-actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; }
   .ps-btn { padding: 9px 18px; border: 1px solid var(--brand-dark); border-radius: 8px; font-size: 13.5px;
-            font-weight: 700; font-family: inherit; background: var(--brand); color: #fff; cursor: pointer; }
+            font-weight: 700; font-family: inherit; background: var(--brand-fill); color: #fff; cursor: pointer; }
   .ps-note { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
   .ps-empty { color: var(--muted); font-size: 13px; padding: 18px 4px; }
   .est { color: #b45309; font-size: 11px; }
@@ -100,20 +100,20 @@
      上の色は白地むけに直接書いてあるので、黒地だと白いカード・薄茶の表見出し・
      生成りの入力欄が読みにくい。意味の色（不足＝赤／足りている＝緑／推定＝橙）は残す。 */
   html[data-theme="dark"] .ps-card { background: var(--panel); }
-  html[data-theme="dark"] table.ps th { background: #23272f; color: var(--muted); }
-  html[data-theme="dark"] table.ps tfoot td { background: #23272f; border-top-color: var(--line); }
-  html[data-theme="dark"] .ps-recv { background: #23272f; color: var(--ink); border-color: #3a414c; }
-  html[data-theme="dark"] td.short { color: #f59a9a; }
-  html[data-theme="dark"] td.ok { color: #7ee2a8; }
-  html[data-theme="dark"] .est { color: #f5c26b; }
-  html[data-theme="dark"] .flash { background: #16301f; border-color: #2f5c40; color: #7ee2a8; }
-  html[data-theme="dark"] .tag-future { color: #f5c26b; }
-  html[data-theme="dark"] .tag-past { background: #2b313a; color: #b7bec8; }
+  html[data-theme="dark"] table.ps th { background: var(--surface-2); color: var(--muted); }
+  html[data-theme="dark"] table.ps tfoot td { background: var(--surface-2); border-top-color: var(--line); }
+  html[data-theme="dark"] .ps-recv { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+  html[data-theme="dark"] td.short { color: var(--danger-ink); }
+  html[data-theme="dark"] td.ok { color: var(--ok-ink); }
+  html[data-theme="dark"] .est { color: var(--warn-ink); }
+  html[data-theme="dark"] .flash { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok-ink); }
+  html[data-theme="dark"] .tag-future { color: var(--warn-ink); }
+  html[data-theme="dark"] .tag-past { background: var(--chip-bg); color: var(--chip-ink); }
   /* スマホで左に貼り付く1列目（下の行が透けないよう背景色が要る） */
   html[data-theme="dark"] table.ps.ps-sticky th.l:first-child,
   html[data-theme="dark"] table.ps.ps-sticky td.l:first-child { background: var(--panel); }
   html[data-theme="dark"] table.ps.ps-sticky thead th.l:first-child,
-  html[data-theme="dark"] table.ps.ps-sticky tfoot td.l:first-child { background: #23272f; }
+  html[data-theme="dark"] table.ps.ps-sticky tfoot td.l:first-child { background: var(--surface-2); }
 </style>
 @endpush
 

@@ -50,7 +50,7 @@
       padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px;
       background: #fff; cursor: pointer; font-size: 14px; color: #6b5544; font-weight: 600;
     }
-    .staff-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .staff-tab.active { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; }
     .pane { display: none; }
     .pane.show { display: block; }
 
@@ -126,22 +126,22 @@
     html[data-theme="dark"] .staff-tab { background: var(--panel); color: var(--ink); }
     html[data-theme="dark"] .staff-tab.active { color: #ffffff; }
     html[data-theme="dark"] .filterbar input[type="text"],
-    html[data-theme="dark"] .filterbar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .lv.mid { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .lv.vet { color: #7ee2a8; }
-    html[data-theme="dark"] .ptag { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
-    html[data-theme="dark"] .ptag.key { background: #14293a; color: #7cc4f0; border-color: #2b4a63; }
-    html[data-theme="dark"] .stag { background: #241f3a; color: #b8a6f5; border-color: #3b3363; }
-    html[data-theme="dark"] tr.detail-row > td { background: #23272f; }
-    html[data-theme="dark"] .detail-box textarea { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .privacy-note { background: #23272f; }
-    html[data-theme="dark"] .act.active   { color: #7ee2a8; }
-    html[data-theme="dark"] .act.semi     { color: #f5c26b; }
-    html[data-theme="dark"] .act.inactive { color: #f59a9a; }
+    html[data-theme="dark"] .filterbar select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .lv.mid { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .lv.vet { color: var(--ok-ink); }
+    html[data-theme="dark"] .ptag { background: var(--chip-bg); color: var(--chip-ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .ptag.key { background: var(--info-soft); color: var(--info-ink); border-color: #2b4a63; }
+    html[data-theme="dark"] .stag { background: var(--accent2-soft); color: #b8a6f5; border-color: #3b3363; }
+    html[data-theme="dark"] tr.detail-row > td { background: var(--surface-2); }
+    html[data-theme="dark"] .detail-box textarea { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .privacy-note { background: var(--surface-2); }
+    html[data-theme="dark"] .act.active   { color: var(--ok-ink); }
+    html[data-theme="dark"] .act.semi     { color: var(--warn-ink); }
+    html[data-theme="dark"] .act.inactive { color: var(--danger-ink); }
     /* 直接 style="" に色が書かれている箇所（削除ボタンの赤・生成りの囲み）。
        CSSからは上書きできないので、黒地のときだけ !important で読める色に差し替える。 */
-    html[data-theme="dark"] .btn[style*="#b91c1c"] { color: #f59a9a !important; border-color: #5a2a2a !important; }
-    html[data-theme="dark"] div[style*="#fbf8f3"] { background: #23272f !important; border-color: var(--line) !important; }
+    html[data-theme="dark"] .btn[style*="#b91c1c"] { color: var(--danger-ink) !important; border-color: var(--danger-line) !important; }
+    html[data-theme="dark"] div[style*="#fbf8f3"] { background: var(--surface-2) !important; border-color: var(--line) !important; }
     html[data-theme="dark"] a[style*="#6b5544"] { color: var(--brand-dark) !important; }
   </style>
 @endverbatim
@@ -912,7 +912,7 @@
         //   列を足すときは、ここの番号も一緒に直す（ずれると別の欄が書き換わる）。
         if (tds[7]) tds[7].innerHTML = relHtml(p);
       }
-      if (statusEl) { statusEl.textContent = '✓ 保存しました'; statusEl.style.color = '#15803d'; }
+      if (statusEl) { statusEl.textContent = '✓ 保存しました'; statusEl.style.color = 'var(--ok-ink)'; }
       if (btn) btn.disabled = false;
       // 氏名を変えたときは、表・詳細・並び順のあちこちに出るので画面を読み込み直す
       // （直した名前が一部だけ古いまま残ると、直っていないように見えるため）。

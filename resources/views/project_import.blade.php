@@ -17,7 +17,7 @@
       background: #fff; color: var(--muted); font-size: 13.5px; font-weight: 600;
     }
     .mode-tabs a:hover { background: #f3ece0; text-decoration: none; }
-    .mode-tabs a.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .mode-tabs a.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
 
     /* 手順ステップ */
     .steps { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -84,23 +84,23 @@
        白い面・生成りの帯・茶色の文字を、暗い面＋明るい文字に置き換える。
        行の色の意味（赤＝エラー／緑＝登録済み）は変えない。 */
     html[data-theme="dark"] .mode-tabs a { background: var(--panel); }
-    html[data-theme="dark"] .mode-tabs a:hover { background: #262b33; }
+    html[data-theme="dark"] .mode-tabs a:hover { background: var(--surface-3); }
     html[data-theme="dark"] .mode-tabs a.active { color: #ffffff; }
-    html[data-theme="dark"] .step .arrow { color: #98a0aa; }
-    html[data-theme="dark"] .cols-help code { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .dropzone { background: #23272f; border-color: #3a414c; }
+    html[data-theme="dark"] .step .arrow { color: var(--muted-dim); }
+    html[data-theme="dark"] .cols-help code { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .dropzone { background: var(--surface-2); border-color: var(--field-line); }
     html[data-theme="dark"] .dropzone.dragover { background: #3a2a16; border-color: var(--brand); }
     html[data-theme="dark"] tr.row-ok td { background: var(--panel); }
-    html[data-theme="dark"] tr.row-err td { background: #3a1c1c; }
+    html[data-theme="dark"] tr.row-err td { background: var(--danger-soft); }
     html[data-theme="dark"] tr.row-err.fixable:hover td { background: #4a2323; }
-    html[data-theme="dark"] .fix-hint { color: #f5c26b; }
-    html[data-theme="dark"] tr.row-done td { background: #16301f !important; }
-    html[data-theme="dark"] .res-done { color: #7ee2a8; }
-    html[data-theme="dark"] .err-detail { color: #f59a9a; }
-    html[data-theme="dark"] .danger-box { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .fix-hint { color: var(--warn-ink); }
+    html[data-theme="dark"] tr.row-done td { background: var(--ok-soft) !important; }
+    html[data-theme="dark"] .res-done { color: var(--ok-ink); }
+    html[data-theme="dark"] .err-detail { color: var(--danger-ink); }
+    html[data-theme="dark"] .danger-box { background: var(--danger-soft); color: var(--danger-ink); }
     /* 直接 style="" に色が書かれている箇所。CSSからは上書きできないので、黒地のときだけ !important で読める色にする。 */
-    html[data-theme="dark"] p[style*="#fbf6ef"] { background: #23272f !important; }
-    html[data-theme="dark"] #doneNote { background: #16301f !important; border-color: #245c37 !important; color: #7ee2a8 !important; }
+    html[data-theme="dark"] p[style*="#fbf6ef"] { background: var(--surface-2) !important; }
+    html[data-theme="dark"] #doneNote { background: var(--ok-soft) !important; border-color: var(--ok-line) !important; color: var(--ok-ink) !important; }
 </style>
 @endverbatim
 @endpush

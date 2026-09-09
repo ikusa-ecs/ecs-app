@@ -118,7 +118,7 @@
       background: #fff; color: var(--muted); font-size: 13.5px; font-weight: 600;
     }
     .mode-tabs a:hover { background: #f3ece0; text-decoration: none; }
-    .mode-tabs a.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .mode-tabs a.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
 
     /* コンテンツのタグ入力（検索付き複数選択） */
     .tag-input { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: #fff; }
@@ -240,59 +240,59 @@
        赤（必須）・黄（後で必要）などの意味の色は残したまま、暗い面＋明るい文字にする。
        ========================================================================= */
     /* 白い面の欄・帯 */
-    html[data-theme="dark"] .multi-pick { background: #23272f; }
-    html[data-theme="dark"] .auto-hint { border-color: #5c4718; }
-    html[data-theme="dark"] .expand-box { background: #23272f; }
-    html[data-theme="dark"] .readonly-field { background: #23272f; }
+    html[data-theme="dark"] .multi-pick { background: var(--surface-2); }
+    html[data-theme="dark"] .auto-hint { border-color: var(--warn-line); }
+    html[data-theme="dark"] .expand-box { background: var(--surface-2); }
+    html[data-theme="dark"] .readonly-field { background: var(--surface-2); }
 
     /* アサイン表からの貼り付け */
-    html[data-theme="dark"] .paste-toggle { background: #262b33; }
-    html[data-theme="dark"] .paste-toggle:hover { background: #2f353f; }
-    html[data-theme="dark"] #pasteBox { background: #23272f; }
+    html[data-theme="dark"] .paste-toggle { background: var(--surface-3); }
+    html[data-theme="dark"] .paste-toggle:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] #pasteBox { background: var(--surface-2); }
     html[data-theme="dark"] .paste-lead { color: var(--muted); }
     html[data-theme="dark"] .paste-row input[type="month"],
-    html[data-theme="dark"] #pasteText { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] #pasteMsg .ok { color: #7ee2a8; }
-    html[data-theme="dark"] #pasteMsg .ng { color: #f59a9a; }
-    html[data-theme="dark"] #pasteMsg .warn { color: #f5c26b; }
+    html[data-theme="dark"] #pasteText { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] #pasteMsg .ok { color: var(--ok-ink); }
+    html[data-theme="dark"] #pasteMsg .ng { color: var(--danger-ink); }
+    html[data-theme="dark"] #pasteMsg .warn { color: var(--warn-ink); }
 
     /* ボタン・タブ */
-    html[data-theme="dark"] .btn-same-time { background: #262b33; }
-    html[data-theme="dark"] .btn-same-time:hover { background: #2f353f; }
+    html[data-theme="dark"] .btn-same-time { background: var(--surface-3); }
+    html[data-theme="dark"] .btn-same-time:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .mode-tabs a { background: var(--panel); }
-    html[data-theme="dark"] .mode-tabs a:hover { background: #262b33; }
+    html[data-theme="dark"] .mode-tabs a:hover { background: var(--surface-3); }
     html[data-theme="dark"] .mode-tabs a.active { color: #ffffff; }
 
     /* コンテンツのタグ入力と候補リスト */
-    html[data-theme="dark"] .tag-input { background: #23272f; }
+    html[data-theme="dark"] .tag-input { background: var(--surface-2); }
     html[data-theme="dark"] .tag-input input { background: transparent; color: var(--ink); }
     html[data-theme="dark"] .suggest { background: var(--panel); }
     html[data-theme="dark"] .suggest .add-new-note { color: var(--muted); }
-    html[data-theme="dark"] .tag .oneoff-mark { background: #33280f; color: #f5c26b; border-color: #5c4718; }
+    html[data-theme="dark"] .tag .oneoff-mark { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
 
     /* 入力必須の3段階（赤＝いま必須／黄＝後で必要／白＝任意） */
-    html[data-theme="dark"] .req-legend { background: #23272f; }
-    html[data-theme="dark"] .req-legend .sw.red { background: #3a1c1c; }
-    html[data-theme="dark"] .req-legend .sw.yellow { background: #33280f; }
+    html[data-theme="dark"] .req-legend { background: var(--surface-2); }
+    html[data-theme="dark"] .req-legend .sw.red { background: var(--danger-soft); }
+    html[data-theme="dark"] .req-legend .sw.yellow { background: var(--warn-soft); }
     html[data-theme="dark"] .req-legend .sw.white { background: var(--panel); }
-    html[data-theme="dark"] .need-red { background: #3a1c1c !important; }
-    html[data-theme="dark"] .need-yellow { background: #33280f !important; }
-    html[data-theme="dark"] .req-mark.red { color: #f59a9a; }
-    html[data-theme="dark"] .req-mark.yellow { color: #f5c26b; }
+    html[data-theme="dark"] .need-red { background: var(--danger-soft) !important; }
+    html[data-theme="dark"] .need-yellow { background: var(--warn-soft) !important; }
+    html[data-theme="dark"] .req-mark.red { color: var(--danger-ink); }
+    html[data-theme="dark"] .req-mark.yellow { color: var(--warn-ink); }
 
     /* 注意書き・危険日ヒント・曜日バッジ */
-    html[data-theme="dark"] .undokai-note { background: #3a1c1c; color: #f59a9a; }
-    html[data-theme="dark"] .danger-hint.warn { background: #3a1c1c; color: #f59a9a; }
-    html[data-theme="dark"] .dow-badge { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .dow-badge.sat { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .dow-badge.sun { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .undokai-note { background: var(--danger-soft); color: var(--danger-ink); }
+    html[data-theme="dark"] .danger-hint.warn { background: var(--danger-soft); color: var(--danger-ink); }
+    html[data-theme="dark"] .dow-badge { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .dow-badge.sat { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .dow-badge.sun { background: var(--danger-soft); color: var(--danger-ink); }
 
     /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
-    html[data-theme="dark"] [style*="#f0fdf4"] { background: #16301f !important; border-color: #2c5c3c !important; color: #7ee2a8 !important; }  /* 保存できたときの緑の帯 */
-    html[data-theme="dark"] [style*="#eef6ff"] { background: #14293a !important; border-color: #2b4b66 !important; color: #7cc4f0 !important; }  /* お知らせの青い帯 */
-    html[data-theme="dark"] [style*="#fff7e6"] { background: #33280f !important; border-color: #5c4718 !important; color: #f5c26b !important; }  /* CSVから引き継いだときの黄色い帯 */
+    html[data-theme="dark"] [style*="#f0fdf4"] { background: var(--ok-soft) !important; border-color: var(--ok-line) !important; color: var(--ok-ink) !important; }  /* 保存できたときの緑の帯 */
+    html[data-theme="dark"] [style*="#eef6ff"] { background: var(--info-soft) !important; border-color: #2b4b66 !important; color: var(--info-ink) !important; }  /* お知らせの青い帯 */
+    html[data-theme="dark"] [style*="#fff7e6"] { background: var(--warn-soft) !important; border-color: var(--warn-line) !important; color: var(--warn-ink) !important; }  /* CSVから引き継いだときの黄色い帯 */
 </style>
 @endverbatim
 @endpush

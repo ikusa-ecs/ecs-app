@@ -17,15 +17,15 @@
   /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
      この画面は色が style="" に直接書かれているので、黒地のときだけ !important で読める色に差し替える。
      お知らせの色の意味（緑＝成功／赤＝失敗）は変えない。 */
-  html[data-theme="dark"] .ac-dept.none { background: #2b313a; color: #b7bec8; }
+  html[data-theme="dark"] .ac-dept.none { background: var(--chip-bg); color: var(--chip-ink); }
   html[data-theme="dark"] .ac-sub { color: var(--muted); }
-  html[data-theme="dark"] div[style*="#e7f6ec"] { background: #16301f !important; color: #7ee2a8 !important; border-color: #245c37 !important; }
-  html[data-theme="dark"] div[style*="#fdecec"] { background: #3a1c1c !important; color: #f59a9a !important; border-color: #5a2a2a !important; }
+  html[data-theme="dark"] div[style*="#e7f6ec"] { background: var(--ok-soft) !important; color: var(--ok-ink) !important; border-color: var(--ok-line) !important; }
+  html[data-theme="dark"] div[style*="#fdecec"] { background: var(--danger-soft) !important; color: var(--danger-ink) !important; border-color: var(--danger-line) !important; }
   html[data-theme="dark"] tr[style*="#6e5b49"] { color: var(--muted) !important; border-bottom-color: var(--line) !important; }
   html[data-theme="dark"] tr[style*="#f0e8dd"] { border-bottom-color: var(--line) !important; }
   html[data-theme="dark"] td[style*="#a08a73"] { color: var(--muted) !important; }
   html[data-theme="dark"] [style*="#3a2d20"] { color: var(--ink) !important; }
-  html[data-theme="dark"] select[style*="#d8c8b6"] { background: #23272f !important; color: var(--ink) !important; border-color: #3a414c !important; }
+  html[data-theme="dark"] select[style*="#d8c8b6"] { background: var(--surface-2) !important; color: var(--ink) !important; border-color: var(--field-line) !important; }
 </style>
 @endpush
 

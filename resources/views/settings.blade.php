@@ -46,7 +46,7 @@
       content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px;
       background: #fff; border-radius: 50%; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
     }
-    .switch input:checked + .track { background: var(--brand); }
+    .switch input:checked + .track { background: var(--brand-fill); }
     .switch input:checked + .track::before { transform: translateX(20px); }
 
     /* 保存ボタンと「保存しました」 */
@@ -62,7 +62,7 @@
       background: #f3ece0; border: 1px solid var(--line); border-radius: 999px;
       padding: 6px 10px 6px 12px; font-size: 13px; font-weight: 600; color: var(--ink);
     }
-    .mtg-chip.is-current { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .mtg-chip.is-current { background: var(--brand-fill); color: #fff; border-color: var(--brand); }
     .mtg-chip b.rm { cursor: pointer; font-weight: 700; opacity: .8; }
     .mtg-chip b.rm:hover { opacity: 1; }
     /* 危険日（手動）：大型案件日の一覧 */
@@ -110,24 +110,24 @@
     /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
        白いボタン・白い入力欄・生成りのチップを、暗い面＋明るい文字に置き換える。
        赤（消す）・オレンジ（今の基準日）の意味は変えない。 */
-    html[data-theme="dark"] .line-btn { background: var(--panel); border-color: #3a414c; }
-    html[data-theme="dark"] .line-btn:hover { background: #262b33; }
-    html[data-theme="dark"] .line-btn.danger { color: #f59a9a; border-color: #5a2a2a; }
-    html[data-theme="dark"] .date-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .switch .track { background: #3a414c; }
+    html[data-theme="dark"] .line-btn { background: var(--panel); border-color: var(--field-line); }
+    html[data-theme="dark"] .line-btn:hover { background: var(--surface-3); }
+    html[data-theme="dark"] .line-btn.danger { color: var(--danger-ink); border-color: var(--danger-line); }
+    html[data-theme="dark"] .date-input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .switch .track { background: var(--field-line); }
     html[data-theme="dark"] .switch .track::before { background: #e6e8ea; }
-    html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
-    html[data-theme="dark"] .mtg-chip { background: #2b313a; border-color: #3a414c; }
-    html[data-theme="dark"] .mtg-chip.is-current { background: var(--brand); color: #ffffff; }
-    html[data-theme="dark"] .mtg-chip.danger { background: #3a1c1c; border-color: #5a2a2a; color: #f59a9a; }
-    html[data-theme="dark"] .big-list { background: #23272f; }
+    html[data-theme="dark"] .saved-msg { color: var(--ok-ink); }
+    html[data-theme="dark"] .mtg-chip { background: var(--chip-bg); border-color: var(--field-line); }
+    html[data-theme="dark"] .mtg-chip.is-current { background: var(--brand-fill); color: #ffffff; }
+    html[data-theme="dark"] .mtg-chip.danger { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-ink); }
+    html[data-theme="dark"] .big-list { background: var(--surface-2); }
     html[data-theme="dark"] .big-row .bclient { color: var(--muted); }
-    html[data-theme="dark"] .big-row .boffice { color: var(--muted); background: #2b313a; border-color: #3a414c; }
-    html[data-theme="dark"] .lk-row { background: #23272f; }
-    html[data-theme="dark"] .lk-row .lk-ord button { background: #2b313a; border-color: #3a414c; }
-    html[data-theme="dark"] .lk-row input { background: #1e2128; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .lk-row input.bad { background: #3a1c1c; border-color: #8a4a4a; }
-    html[data-theme="dark"] .lk-row .lk-rm { background: var(--panel); color: #f59a9a; border-color: #5a2a2a; }
+    html[data-theme="dark"] .big-row .boffice { color: var(--muted); background: var(--chip-bg); border-color: var(--field-line); }
+    html[data-theme="dark"] .lk-row { background: var(--surface-2); }
+    html[data-theme="dark"] .lk-row .lk-ord button { background: var(--chip-bg); border-color: var(--field-line); }
+    html[data-theme="dark"] .lk-row input { background: #1e2128; color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .lk-row input.bad { background: var(--danger-soft); border-color: #8a4a4a; }
+    html[data-theme="dark"] .lk-row .lk-rm { background: var(--panel); color: var(--danger-ink); border-color: var(--danger-line); }
   </style>
 @endverbatim
 @endpush

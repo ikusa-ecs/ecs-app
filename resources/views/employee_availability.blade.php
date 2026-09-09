@@ -14,7 +14,7 @@
       padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px;
       background: #fff; cursor: pointer; font-size: 14px; color: #6b5544; font-weight: 600;
     }
-    .ea-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .ea-tab.active { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; }
 
     /* 月切替バー */
     .ea-monthbar { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 4px 0 16px; }
@@ -96,7 +96,7 @@
                        border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; }
     .dn-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
     .dn-btns button { border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .dn-btns .ok { background: var(--brand); color: #fff; border: none; }
+    .dn-btns .ok { background: var(--brand-fill); color: #fff; border: none; }
     .dn-btns .cancel { background: #fff; color: #6b5544; border: 1px solid var(--line); }
 
     /* イベント候補日（土日祝・長期休暇）＝クリックで 〇×△ */
@@ -140,20 +140,20 @@
     .ea-field textarea { min-height: 60px; resize: vertical; }
     .ea-save { margin-top: 6px; }
     .ea-save button {
-      background: var(--brand); color: #fff; border: none; border-radius: 8px;
+      background: var(--brand-fill); color: #fff; border: none; border-radius: 8px;
       padding: 10px 22px; font-size: 14px; font-weight: 700; cursor: pointer;
     }
-    .ea-save button:hover { background: var(--brand-dark); }
+    .ea-save button:hover { background: var(--brand-fill-hover); }
     .ea-saved { margin-left: 12px; color: #15803d; font-size: 13px; font-weight: 700; display: none; }
 
     /* 常に見える「保存」ボタン（右下に浮く）＝下までスクロールしなくても押せる */
     .ea-float-save {
       position: fixed; right: 28px; bottom: 24px; z-index: 50;
-      background: var(--brand); color: #fff; border: none; border-radius: 999px;
+      background: var(--brand-fill); color: #fff; border: none; border-radius: 999px;
       padding: 14px 26px; font-size: 15px; font-weight: 700; cursor: pointer;
       box-shadow: 0 6px 18px rgba(0,0,0,.18);
     }
-    .ea-float-save:hover { background: var(--brand-dark); }
+    .ea-float-save:hover { background: var(--brand-fill-hover); }
 
     /* 全社員一覧テーブル */
     .ov-wrap { overflow-x: auto; }
@@ -285,100 +285,100 @@
     html[data-theme="dark"] .ea-tab { background: var(--panel); color: var(--ink); }
     html[data-theme="dark"] .ea-tab.active { color: #ffffff; }
     html[data-theme="dark"] .ea-monthbar button { background: var(--panel); color: var(--ink); }
-    html[data-theme="dark"] .ea-monthbar button:hover { background: #262b33; }
+    html[data-theme="dark"] .ea-monthbar button:hover { background: var(--surface-3); }
 
     /* カレンダーのカードとマス */
     html[data-theme="dark"] .ea-card { background: var(--panel); }
     html[data-theme="dark"] .cell { background: var(--panel); }
     html[data-theme="dark"] .cell .dnum { color: var(--muted); }
-    html[data-theme="dark"] .cell .badge { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .cell .badge { background: var(--warn-soft); color: var(--warn-ink); }
     html[data-theme="dark"] .cell .badge.big,
-    html[data-theme="dark"] .cell .chip.big { background: #33280f; color: #f5c26b; border-color: #5c4718; }
-    html[data-theme="dark"] .cell .chip.auto { background: #14293a; color: #7cc4f0; border-color: #2b4b66; }
-    html[data-theme="dark"] .cell .chip.note { background: #23272f; color: var(--muted); border-color: #4a5260; }
-    html[data-theme="dark"] .cell .chip.more { background: #262b33; color: #b7bec8; border-color: #3a414c; }
+    html[data-theme="dark"] .cell .chip.big { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
+    html[data-theme="dark"] .cell .chip.auto { background: var(--info-soft); color: var(--info-ink); border-color: #2b4b66; }
+    html[data-theme="dark"] .cell .chip.note { background: var(--surface-2); color: var(--muted); border-color: #4a5260; }
+    html[data-theme="dark"] .cell .chip.more { background: var(--surface-3); color: var(--chip-ink); border-color: var(--field-line); }
     html[data-theme="dark"] .cell .memobtn { color: var(--muted); }
     html[data-theme="dark"] .cell.has-auto { border-color: #2b4b66; }
 
     /* 〇×△・希望休・要入力の色（意味は変えず、暗い面＋明るい文字にする） */
-    html[data-theme="dark"] .cell.v-ok { border-color: #2c5c3c; }
-    html[data-theme="dark"] .cell.v-ok .st { color: #7ee2a8; }
-    html[data-theme="dark"] .cell.v-ng { border-color: #5c2c2c; }
-    html[data-theme="dark"] .cell.v-ng .st { color: #f59a9a; }
-    html[data-theme="dark"] .cell.v-maybe { background: #33280f; border-color: #5c4718; }
-    html[data-theme="dark"] .cell.v-maybe .st { color: #f5c26b; }
-    html[data-theme="dark"] .cell.event.v-need { background: #241f3a; border-color: #5a4a8a; }
+    html[data-theme="dark"] .cell.v-ok { border-color: var(--ok-line); }
+    html[data-theme="dark"] .cell.v-ok .st { color: var(--ok-ink); }
+    html[data-theme="dark"] .cell.v-ng { border-color: var(--danger-line); }
+    html[data-theme="dark"] .cell.v-ng .st { color: var(--danger-ink); }
+    html[data-theme="dark"] .cell.v-maybe { background: var(--warn-soft); border-color: var(--warn-line); }
+    html[data-theme="dark"] .cell.v-maybe .st { color: var(--warn-ink); }
+    html[data-theme="dark"] .cell.event.v-need { background: var(--accent2-soft); border-color: #5a4a8a; }
     html[data-theme="dark"] .cell.event.v-need .stsub { color: #b8a6f5; }
-    html[data-theme="dark"] .cell.weekday.off { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .cell.weekday.off { background: var(--surface-3); border-color: var(--field-line); }
     html[data-theme="dark"] .cell.weekday.off .st { color: #9fb2cd; }
     html[data-theme="dark"] .cell.weekday.off .stsub { color: var(--muted); }
 
     /* 凡例 */
     html[data-theme="dark"] .ea-legend { color: var(--muted); }
-    html[data-theme="dark"] .lg-ok { border-color: #2c5c3c !important; }
-    html[data-theme="dark"] .lg-ng { border-color: #5c2c2c !important; }
-    html[data-theme="dark"] .lg-maybe { background: #33280f; border-color: #5c4718 !important; }
-    html[data-theme="dark"] .lg-off { background: #262b33; border-color: #3a414c !important; }
-    html[data-theme="dark"] .lg-need { background: #241f3a; border-color: #5a4a8a !important; }
+    html[data-theme="dark"] .lg-ok { border-color: var(--ok-line) !important; }
+    html[data-theme="dark"] .lg-ng { border-color: var(--danger-line) !important; }
+    html[data-theme="dark"] .lg-maybe { background: var(--warn-soft); border-color: var(--warn-line) !important; }
+    html[data-theme="dark"] .lg-off { background: var(--surface-3); border-color: var(--field-line) !important; }
+    html[data-theme="dark"] .lg-need { background: var(--accent2-soft); border-color: #5a4a8a !important; }
 
     /* その日のメモの小窓 */
     html[data-theme="dark"] .dn-box { background: var(--panel); }
-    html[data-theme="dark"] .dn-box .dn-auto { background: #14293a; color: #7cc4f0; border-color: #2b4b66; }
-    html[data-theme="dark"] .dn-box textarea { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .dn-btns .cancel { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .dn-box .dn-auto { background: var(--info-soft); color: var(--info-ink); border-color: #2b4b66; }
+    html[data-theme="dark"] .dn-box textarea { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .dn-btns .cancel { background: var(--surface-3); color: var(--ink); border-color: var(--field-line); }
 
     /* 入力フォーム */
     html[data-theme="dark"] .ea-field label { color: var(--ink); }
     html[data-theme="dark"] .ea-field input[type=number],
-    html[data-theme="dark"] .ea-field textarea { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .ea-saved { color: #7ee2a8; }
+    html[data-theme="dark"] .ea-field textarea { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .ea-saved { color: var(--ok-ink); }
 
     /* 全社員一覧の表 */
-    html[data-theme="dark"] table.ov-tbl thead th { background: #23272f; color: var(--muted); }
-    html[data-theme="dark"] table.ov-tbl th.namecol { background: #23272f; }
+    html[data-theme="dark"] table.ov-tbl thead th { background: var(--surface-2); color: var(--muted); }
+    html[data-theme="dark"] table.ov-tbl th.namecol { background: var(--surface-2); }
     html[data-theme="dark"] table.ov-tbl td.namecol { background: var(--panel); }
     /* 所属ごとの帯（水色＝イベプラ／緑＝セールス／紫＝クリエイティブ／ベージュ＝その他）。
        黒地では淡い色だと文字が読めないので、同じ色あいの暗い面に置き換える。 */
     html[data-theme="dark"] table.ov-tbl tr.dep-plan,
-    html[data-theme="dark"] table.ov-tbl tr.dep-plan td.namecol { background: #14293a; }
+    html[data-theme="dark"] table.ov-tbl tr.dep-plan td.namecol { background: var(--info-soft); }
     html[data-theme="dark"] table.ov-tbl tr.dep-sales,
-    html[data-theme="dark"] table.ov-tbl tr.dep-sales td.namecol { background: #16301f; }
+    html[data-theme="dark"] table.ov-tbl tr.dep-sales td.namecol { background: var(--ok-soft); }
     html[data-theme="dark"] table.ov-tbl tr.dep-creative,
-    html[data-theme="dark"] table.ov-tbl tr.dep-creative td.namecol { background: #241f3a; }
+    html[data-theme="dark"] table.ov-tbl tr.dep-creative td.namecol { background: var(--accent2-soft); }
     html[data-theme="dark"] table.ov-tbl tr.dep-other,
     html[data-theme="dark"] table.ov-tbl tr.dep-other td.namecol { background: #2b2b28; }
     html[data-theme="dark"] table.ov-tbl tr.dep-none,
-    html[data-theme="dark"] table.ov-tbl tr.dep-none td.namecol { background: #23272f; }
+    html[data-theme="dark"] table.ov-tbl tr.dep-none td.namecol { background: var(--surface-2); }
     /* 自分の行（会社カラーのオレンジの暗い面） */
     html[data-theme="dark"] table.ov-tbl tr.me td { background: #262119; }
     html[data-theme="dark"] table.ov-tbl tr.me td.namecol { background: #3a2a16; }
-    html[data-theme="dark"] table.ov-tbl .vh th.holi { color: #f5c26b; }
-    html[data-theme="dark"] .ov-mark.ok { color: #7ee2a8; }
-    html[data-theme="dark"] .ov-mark.ng { color: #f59a9a; }
-    html[data-theme="dark"] .ov-mark.maybe { color: #f5c26b; }
-    html[data-theme="dark"] .ov-mark.none { color: #98a0aa; }
+    html[data-theme="dark"] table.ov-tbl .vh th.holi { color: var(--warn-ink); }
+    html[data-theme="dark"] .ov-mark.ok { color: var(--ok-ink); }
+    html[data-theme="dark"] .ov-mark.ng { color: var(--danger-ink); }
+    html[data-theme="dark"] .ov-mark.maybe { color: var(--warn-ink); }
+    html[data-theme="dark"] .ov-mark.none { color: var(--muted-dim); }
     html[data-theme="dark"] table.ov-tbl th.we.big,
-    html[data-theme="dark"] table.ov-tbl th.holi.big { color: #f5c26b; }
-    html[data-theme="dark"] table.ov-tbl th .bigclient { background: #33280f; color: #f5c26b; border-color: #5c4718; }
+    html[data-theme="dark"] table.ov-tbl th.holi.big { color: var(--warn-ink); }
+    html[data-theme="dark"] table.ov-tbl th .bigclient { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
     html[data-theme="dark"] table.ov-tbl td.offcol { color: #9fb2cd; }
     html[data-theme="dark"] table.ov-tbl td.memocol { color: var(--muted); }
-    html[data-theme="dark"] table.ov-tbl td.ovbusy { background: #14293a; }
+    html[data-theme="dark"] table.ov-tbl td.ovbusy { background: var(--info-soft); }
     html[data-theme="dark"] table.ov-tbl tr.me td.ovbusy { background: #1a3044; }
-    html[data-theme="dark"] table.ov-tbl td.ovbusy .ovbusy-txt { color: #7cc4f0; }
-    html[data-theme="dark"] table.ov-tbl td.ovnote { background: #262b33; }
+    html[data-theme="dark"] table.ov-tbl td.ovbusy .ovbusy-txt { color: var(--info-ink); }
+    html[data-theme="dark"] table.ov-tbl td.ovnote { background: var(--surface-3); }
     html[data-theme="dark"] table.ov-tbl tr.me td.ovnote { background: #2b2a24; }
     html[data-theme="dark"] table.ov-tbl td.ovbusy.ovnote { background: #1e2a33; }
     html[data-theme="dark"] table.ov-tbl td .ovnote-txt { color: var(--muted); }
-    html[data-theme="dark"] table.ov-tbl tfoot td { background: #23272f; color: var(--muted); }
-    html[data-theme="dark"] table.ov-tbl tfoot td.few { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] table.ov-tbl tfoot td { background: var(--surface-2); color: var(--muted); }
+    html[data-theme="dark"] table.ov-tbl tfoot td.few { background: var(--danger-soft); color: var(--danger-ink); }
 
     /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
-    html[data-theme="dark"] [style*="#15803d"] { color: #7ee2a8 !important; }   /* 〇＝出勤可 */
-    html[data-theme="dark"] [style*="#b91c1c"] { color: #f59a9a !important; }   /* ×＝不可 */
-    html[data-theme="dark"] [style*="#b45309"] { color: #f5c26b !important; }   /* △＝条件つき・未定 */
-    html[data-theme="dark"] [style*="#1d4e89"] { color: #7cc4f0 !important; }   /* 青い帯・薄い青のマスの説明 */
+    html[data-theme="dark"] [style*="#15803d"] { color: var(--ok-ink) !important; }   /* 〇＝出勤可 */
+    html[data-theme="dark"] [style*="#b91c1c"] { color: var(--danger-ink) !important; }   /* ×＝不可 */
+    html[data-theme="dark"] [style*="#b45309"] { color: var(--warn-ink) !important; }   /* △＝条件つき・未定 */
+    html[data-theme="dark"] [style*="#1d4e89"] { color: var(--info-ink) !important; }   /* 青い帯・薄い青のマスの説明 */
     html[data-theme="dark"] [style*="#6b5544"] { color: var(--muted) !important; } /* 一覧に出る「その日のメモ」 */
   </style>
 @endverbatim

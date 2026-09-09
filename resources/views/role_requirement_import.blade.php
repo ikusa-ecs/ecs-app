@@ -36,15 +36,15 @@
   /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
      生成りの面と濃い色の文字を、暗い面＋明るい文字に置き換える。
      印の意味（緑＝同じもの／橙＝新規／赤＝要確認）は変えない。 */
-  html[data-theme="dark"] .rr-ok { background: #16301f; border-color: #245c37; color: #7ee2a8; }
-  html[data-theme="dark"] .rr-err { background: #3a1c1c; border-color: #5a2a2a; color: #f59a9a; }
-  html[data-theme="dark"] .rr-warn { background: #33280f; border-color: #5c4a1e; color: #f5c26b; }
-  html[data-theme="dark"] .rr-sum div { background: #23272f; }
-  html[data-theme="dark"] .rr-table th { background: #23272f; color: var(--muted); }
-  html[data-theme="dark"] .rr-new { background: #33280f; border-color: #5c4a1e; color: #f5c26b; }
-  html[data-theme="dark"] .rr-same { background: #16301f; border-color: #245c37; color: #7ee2a8; }
-  html[data-theme="dark"] .rr-ask { background: #3a1c1c; border-color: #5a2a2a; color: #f59a9a; }
-  html[data-theme="dark"] .rr-table select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .rr-ok { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok-ink); }
+  html[data-theme="dark"] .rr-err { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-ink); }
+  html[data-theme="dark"] .rr-warn { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn-ink); }
+  html[data-theme="dark"] .rr-sum div { background: var(--surface-2); }
+  html[data-theme="dark"] .rr-table th { background: var(--surface-2); color: var(--muted); }
+  html[data-theme="dark"] .rr-new { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn-ink); }
+  html[data-theme="dark"] .rr-same { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok-ink); }
+  html[data-theme="dark"] .rr-ask { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-ink); }
+  html[data-theme="dark"] .rr-table select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
 </style>
 @endpush
 

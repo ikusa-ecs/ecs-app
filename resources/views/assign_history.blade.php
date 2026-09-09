@@ -43,7 +43,7 @@
     background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px;
   }
   .reg-chip .rname { color: var(--ink); font-weight: 600; }
-  .reg-chip .rcount { font-size: 11px; font-weight: 700; color: #fff; background: var(--brand);
+  .reg-chip .rcount { font-size: 11px; font-weight: 700; color: #fff; background: var(--brand-fill);
     border-radius: 999px; padding: 0 7px; }
   .reg-empty { font-size: 12.5px; color: var(--muted); }
 
@@ -73,15 +73,15 @@
   /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
      上の色は白地むけに直接書いてあるので、黒地だと白いカード・生成りの帯・
      茶色の文字が読みにくい。その部分だけを暗い面＋明るい文字に置き換える。 */
-  html[data-theme="dark"] .hist-controls select { background: #23272f; border-color: #3a414c; }
+  html[data-theme="dark"] .hist-controls select { background: var(--surface-2); border-color: var(--field-line); }
   html[data-theme="dark"] .client-card { background: var(--panel); }
   html[data-theme="dark"] .client-head .cmeta { color: var(--muted); }
-  html[data-theme="dark"] .regulars { background: #23272f; }
-  html[data-theme="dark"] .reg-chip { background: #262b33; border-color: #3a414c; }
+  html[data-theme="dark"] .regulars { background: var(--surface-2); }
+  html[data-theme="dark"] .reg-chip { background: var(--surface-3); border-color: var(--field-line); }
   html[data-theme="dark"] .reg-chip .rcount { color: #ffffff; }
   html[data-theme="dark"] .proj-item { border-bottom-color: var(--line); }
-  html[data-theme="dark"] .mem-chip { background: #262b33; border-color: #3a414c; }
-  html[data-theme="dark"] .mem-chip .mrole { color: #7cc4f0; }
+  html[data-theme="dark"] .mem-chip { background: var(--surface-3); border-color: var(--field-line); }
+  html[data-theme="dark"] .mem-chip .mrole { color: var(--info-ink); }
   html[data-theme="dark"] .hist-empty { background: var(--panel); color: var(--muted); }
 </style>
 @endpush

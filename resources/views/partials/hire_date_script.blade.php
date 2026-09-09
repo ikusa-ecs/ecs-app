@@ -21,7 +21,8 @@
 
         function say(text, bad) {
           out.textContent = text;
-          out.style.color = bad ? '#a12121' : '#7a6f63';
+          // ⚠ 色を16進で書かない（黒ベースで沈む・JSが書いた色はCSSから直せない）。
+          out.style.color = bad ? 'var(--danger)' : 'var(--muted)';
           out.style.fontWeight = bad ? '700' : 'normal';
         }
 

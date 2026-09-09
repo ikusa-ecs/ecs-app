@@ -47,11 +47,11 @@
        エラーの赤は意味を変えずに「暗い赤の面＋明るい赤の文字」にする。 */
     html[data-theme="dark"] body { background: var(--bg); }
     html[data-theme="dark"] .ob-card { background: var(--panel); }
-    html[data-theme="dark"] .sec { background: #23272f; }
+    html[data-theme="dark"] .sec { background: var(--surface-2); }
     html[data-theme="dark"] .field input,
     html[data-theme="dark"] .field select,
-    html[data-theme="dark"] .field textarea { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .err { background: #3a1c1c; color: #f59a9a; border-color: #6b2f2f; }
+    html[data-theme="dark"] .field textarea { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .err { background: var(--danger-soft); color: var(--danger-ink); border-color: var(--danger-line); }
   </style>
   @endverbatim
 </head>

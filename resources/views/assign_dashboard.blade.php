@@ -22,7 +22,7 @@
   table.na-tbl td.na-fill { font-weight: 700; }
   table.na-tbl td.na-fill.ok  { color: #15803d; }
   /* 黒ベース（2026-09-09）。濃い緑は黒地で沈むので明るい緑にする（意味＝足りている は同じ）。 */
-  html[data-theme="dark"] table.na-tbl td.na-fill.ok { color: #7ee2a8; }
+  html[data-theme="dark"] table.na-tbl td.na-fill.ok { color: var(--ok-ink); }
   table.na-tbl td.na-fill.mid { color: var(--brand-dark); }
   table.na-tbl td.na-fill.low { color: var(--danger); }
   table.na-tbl td.na-fill .na-need { color: var(--muted); font-weight: 400; }

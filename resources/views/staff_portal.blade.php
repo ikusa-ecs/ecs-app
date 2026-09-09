@@ -22,7 +22,7 @@
 
     /* 上部ヘッダー（誰でログインしているか） */
     .s-header {
-      background: var(--brand); color: #fff;
+      background: var(--brand-fill); color: #fff;
       padding: 14px 18px 12px; position: sticky; top: 0; z-index: 10;
     }
     .s-header .app-name { font-size: 12px; opacity: .85; letter-spacing: 1px; }
@@ -52,7 +52,7 @@
     .s-tabs button .lb-l { display: none; }
     .s-tabs button .lb-s { display: inline; }
     .s-tabs button .ti { font-size: 15px; flex: 0 0 auto; }
-    .s-tabs button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .s-tabs button.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
     .s-tabs button .pill {
       font-size: 11px; background: var(--danger); color: #fff;
       border-radius: 999px; padding: 0 6px; font-weight: 700;
@@ -117,7 +117,7 @@
     /* 🆕 新しい募集＝行ごと目立たせる（2026-09-09 baba要望）。変更のお知らせに埋もれさせない。 */
     .news-list li.is-new { background: var(--brand-soft); border-radius: 8px; padding: 8px 8px; }
     .news-new {
-      font-size: 12px; font-weight: 800; color: #fff; background: var(--brand);
+      font-size: 12px; font-weight: 800; color: #fff; background: var(--brand-fill);
       border-radius: 999px; padding: 2px 10px;
     }
     html[data-theme="dark"] .news-new { color: #ffffff; }
@@ -147,7 +147,7 @@
       font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
       white-space: nowrap;
     }
-    .job-toggles .jf-tg.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .job-toggles .jf-tg.on { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
     /* 追加案件は「急ぎ」なので赤で区別する（案件カードの赤枠と揃える）。 */
     .job-toggles .jf-tg.extra { border-color: var(--danger); color: var(--danger); }
     .job-toggles .jf-tg.extra.on { background: var(--danger); border-color: var(--danger); color: #fff; }
@@ -267,9 +267,9 @@
     }
     .apply-btn-sm {
       border: none; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700;
-      cursor: pointer; font-family: inherit; background: var(--brand); color: #fff; white-space: nowrap;
+      cursor: pointer; font-family: inherit; background: var(--brand-fill); color: #fff; white-space: nowrap;
     }
-    .apply-btn-sm:active { background: var(--brand-dark); }
+    .apply-btn-sm:active { background: var(--brand-fill-hover); }
     .apply-btn-sm.cancel { background: #fff; color: var(--brand-dark); border: 1px solid #bbe3c6; }
     .apply-btn-sm.disabled { background: #ece3d4; color: #8a7a66; cursor: default; }
     /* 誤タップ防止の「もう一度押すと…」（2026-09-07）。
@@ -296,7 +296,7 @@
       background: #fff; cursor: pointer; font-size: 13px; font-weight: 700; color: #6b5544;
       font-family: inherit;
     }
-    .jv-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .jv-tab.active { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; }
     .jc-nav {
       border: 1px solid var(--line); background: #fff; border-radius: 8px;
       width: 34px; height: 34px; font-size: 18px; cursor: pointer; font-family: inherit; color: var(--brand-dark);
@@ -411,7 +411,7 @@
     .cell .st { font-size: 9px; margin-top: 1px; }
     .cell.s-ok   { background: var(--ok-soft);    border-color: #bbe3c6; color: #15803d; }
     .cell.s-ng   { background: var(--danger-soft); border-color: #f4c2c2; color: #b91c1c; text-decoration: line-through; }
-    .cell.s-event { background: var(--brand); border-color: var(--brand-dark); color: #fff; font-weight: 700; cursor: default; }
+    .cell.s-event { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; font-weight: 700; cursor: default; }
     .cell.s-event .st { font-size: 8px; }
     /* エントリー中の案件がある日（★） */
     .cell.s-entry { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); font-weight: 700; cursor: default; }
@@ -421,7 +421,7 @@
     .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; border: 1px solid var(--line); }
     .dot.ok { background: var(--ok-soft); border-color: #bbe3c6; }
     .dot.ng { background: var(--danger-soft); border-color: #f4c2c2; }
-    .dot.event { background: var(--brand); border-color: var(--brand-dark); }
+    .dot.event { background: var(--brand-fill); border-color: var(--brand-dark); }
     .dot.entry { background: var(--brand-soft); border-color: var(--brand); }
     .field { margin-bottom: 14px; }
     .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
@@ -430,10 +430,10 @@
       font-size: 15px; font-family: inherit; background: #fff;
     }
     .submit-btn {
-      width: 100%; background: var(--brand); color: #fff; border: none; border-radius: 12px;
+      width: 100%; background: var(--brand-fill); color: #fff; border: none; border-radius: 12px;
       padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
     }
-    .submit-btn:active { background: var(--brand-dark); }
+    .submit-btn:active { background: var(--brand-fill-hover); }
     .saved-msg { display: none; text-align: center; color: #15803d; font-size: 13px; margin-top: 10px; }
 
     /* ===== 確定アサイン（既存スマホ画面から移植） ===== */
@@ -441,7 +441,7 @@
     .assign-item { display: flex; gap: 12px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); color: var(--ink); cursor: pointer; }
     .assign-item:last-child { border-bottom: none; }
     .assign-item:hover { background: #faf6ee; text-decoration: none; border-radius: 8px; }
-    .assign-date { background: var(--brand); color: #fff; border-radius: 10px; text-align: center; padding: 6px 0 5px; width: 54px; flex-shrink: 0; line-height: 1.15; }
+    .assign-date { background: var(--brand-fill); color: #fff; border-radius: 10px; text-align: center; padding: 6px 0 5px; width: 54px; flex-shrink: 0; line-height: 1.15; }
     .assign-date .d { font-size: 15px; font-weight: 700; }
     .assign-date .dow { font-size: 11px; }
     .assign-info { flex: 1; min-width: 0; }
@@ -513,7 +513,7 @@
       content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px;
       background: #fff; border-radius: 50%; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
     }
-    .switch input:checked + .track { background: var(--brand); }
+    .switch input:checked + .track { background: var(--brand-fill); }
     .switch input:checked + .track::before { transform: translateX(20px); }
 
     /* アカウント欄 */
@@ -550,24 +550,24 @@
        ⚠ 黒のときのアクセントはまぶしいオレンジなので、オレンジで塗ったボタンの文字は
           白ではなく濃い色にする（共通CSSの .btn.primary と同じ考え方）。 */
     /* タブ */
-    html[data-theme="dark"] .s-tabs button { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .s-tabs button { background: var(--surface-3); border-color: var(--field-line); }
     html[data-theme="dark"] .s-tabs button.active { color: #ffffff; }
     /* 稼働希望の月切り替え */
-    html[data-theme="dark"] .pref-month-nav .pm-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .pref-month-nav .pm-btn:hover { background: #2f353f; }
-    html[data-theme="dark"] .pref-month-nav .pm-btn.off { color: #98a0aa; background: #20242b; border-color: #2f343d; }
-    html[data-theme="dark"] .pref-month-nav .pm-sel { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .pref-month-nav .pm-btn { background: var(--surface-3); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .pref-month-nav .pm-btn:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .pref-month-nav .pm-btn.off { color: var(--muted-dim); background: #20242b; border-color: #2f343d; }
+    html[data-theme="dark"] .pref-month-nav .pm-sel { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
     /* お知らせ */
-    html[data-theme="dark"] .notice { color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .notice { color: var(--warn-ink); border-color: var(--warn-line); }
     html[data-theme="dark"] .notice b { color: #f7d79a; }
-    html[data-theme="dark"] .extra-notice { color: #f59a9a; border-color: #6b2f2f; }
+    html[data-theme="dark"] .extra-notice { color: var(--danger-ink); border-color: var(--danger-line); }
     html[data-theme="dark"] .extra-notice b { color: #f7b5b5; }
-    html[data-theme="dark"] .news-mine { color: #7ee2a8; }
+    html[data-theme="dark"] .news-mine { color: var(--ok-ink); }
     /* 絞り込み */
     html[data-theme="dark"] .job-filter input,
-    html[data-theme="dark"] .job-filter select { background: #23272f; color: var(--ink); }
-    html[data-theme="dark"] .job-filter .jf-today { background: #262b33; }
-    html[data-theme="dark"] .job-toggles .jf-tg { background: #262b33; }
+    html[data-theme="dark"] .job-filter select { background: var(--surface-2); color: var(--ink); }
+    html[data-theme="dark"] .job-filter .jf-today { background: var(--surface-3); }
+    html[data-theme="dark"] .job-toggles .jf-tg { background: var(--surface-3); }
     html[data-theme="dark"] .job-toggles .jf-tg.on { color: #ffffff; }
     /* 「🔥 追加案件のみ」は黒地だと赤が強すぎて主張が激しい（2026-09-09 baba指摘）。
        意味（赤＝追加案件）は変えず、押していないときは落ち着いた赤、押したときだけ濃い赤にする。 */
@@ -575,83 +575,93 @@
     html[data-theme="dark"] .job-toggles .jf-tg.extra.on { background: #8f3a3a; border-color: #8f3a3a; color: #fff; }
     /* 募集案件の行 */
     html[data-theme="dark"] .job-row { background: var(--panel); }
-    html[data-theme="dark"] .job-row.applied { background: #1b2a20; border-color: #2a5a38; }
-    html[data-theme="dark"] .job-row.extra { border-color: #6b2f2f; }
+    html[data-theme="dark"] .job-row.applied { background: #1b2a20; border-color: var(--ok-line); }
+    html[data-theme="dark"] .job-row.extra { border-color: var(--danger-line); }
     /* 募集の状態の色（リストのバッジとカレンダーのチップで共通。上の :root と同じ役割） */
     html[data-theme="dark"] {
-      --job-applied-fg: #7ee2a8; --job-applied-bd: #2a5a38;
-      --job-closed-bg: #2b313a; --job-closed-fg: #b7bec8;
+      --job-applied-fg: var(--ok-ink); --job-applied-bd: var(--ok-line);
+      --job-closed-bg: var(--chip-bg); --job-closed-fg: var(--chip-ink);
     }
     /* 実施形態のバッジ */
-    html[data-theme="dark"] .fbadge.fmt-real   { background: #16301f; color: #7ee2a8; }
-    html[data-theme="dark"] .fbadge.fmt-long   { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .fbadge.fmt-online { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .fbadge.fmt-arena  { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .fbadge.fmt-real   { background: var(--ok-soft); color: var(--ok-ink); }
+    html[data-theme="dark"] .fbadge.fmt-long   { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .fbadge.fmt-online { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .fbadge.fmt-arena  { background: var(--accent2-soft); color: #b8a6f5; }
     html[data-theme="dark"] .fbadge.fmt-other  { background: #12302c; color: #7ed8c6; }
-    html[data-theme="dark"] .fbadge.fmt-etc    { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .fbadge.fmt-etc    { background: var(--chip-bg); color: var(--chip-ink); }
     /* 小さなタグ（追加・宿泊は元から濃い色なのでそのまま） */
-    html[data-theme="dark"] .tag-mini.yobi { color: #f5c26b; }
-    html[data-theme="dark"] .tag-mini.reha { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .tag-mini.size { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .tag-mini.rep  { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .tag-mini.yobi { color: var(--warn-ink); }
+    html[data-theme="dark"] .tag-mini.reha { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .tag-mini.size { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .tag-mini.rep  { background: var(--chip-bg); color: var(--chip-ink); }
     /* 担当からの伝達・エラー表示 */
-    html[data-theme="dark"] .jr-note { color: #f5c26b; border-color: #5a4718; }
-    html[data-theme="dark"] .jr-error { background: #3a1c1c; border-color: #6b2f2f; color: #f59a9a; }
+    html[data-theme="dark"] .jr-note { color: var(--warn-ink); border-color: var(--warn-line); }
+    html[data-theme="dark"] .jr-error { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-ink); }
     /* 締切・残り人数のチップ */
-    html[data-theme="dark"] .chip.deadline { color: #f5c26b; }
-    html[data-theme="dark"] .chip.slots    { color: #7ee2a8; }
-    html[data-theme="dark"] .chip.slots.few{ color: #f59a9a; }
-    html[data-theme="dark"] .chip.full     { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .chip.deadline { color: var(--warn-ink); }
+    html[data-theme="dark"] .chip.slots    { color: var(--ok-ink); }
+    html[data-theme="dark"] .chip.slots.few{ color: var(--danger-ink); }
+    html[data-theme="dark"] .chip.full     { background: var(--chip-bg); color: var(--chip-ink); }
     /* コメント欄・エントリーボタン */
-    html[data-theme="dark"] .cmt-toggle { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .cmt-toggle:hover { background: #2f353f; }
-    html[data-theme="dark"] .cmt-toggle.on { border-color: #5a4718; }
-    html[data-theme="dark"] .jr-cmt-ok { color: #7ee2a8; }
+    html[data-theme="dark"] .cmt-toggle { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .cmt-toggle:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .cmt-toggle.on { border-color: var(--warn-line); }
+    html[data-theme="dark"] .jr-cmt-ok { color: var(--ok-ink); }
     html[data-theme="dark"] .jr-cmt-hint { color: var(--muted); }
-    html[data-theme="dark"] .jr-comment { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .jr-comment { background: var(--surface-2); color: var(--ink); }
     html[data-theme="dark"] .apply-btn-sm { color: #ffffff; }
-    html[data-theme="dark"] .apply-btn-sm.cancel { background: #262b33; color: var(--brand-dark); border-color: #3a414c; }
-    html[data-theme="dark"] .apply-btn-sm.disabled { background: #2b313a; color: #98a0aa; }
+    html[data-theme="dark"] .apply-btn-sm.cancel { background: var(--surface-3); color: var(--brand-dark); border-color: var(--field-line); }
+    html[data-theme="dark"] .apply-btn-sm.disabled { background: var(--chip-bg); color: var(--muted-dim); }
     html[data-theme="dark"] .apply-btn-sm.confirm { color: #fff; }
     /* 稼働希望・募集カレンダー */
     html[data-theme="dark"] .m-card { background: var(--panel); }
-    html[data-theme="dark"] .jv-tab { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .jv-tab { background: var(--surface-3); color: var(--ink); border-color: var(--field-line); }
     html[data-theme="dark"] .jv-tab.active { color: #ffffff; }
-    html[data-theme="dark"] .jc-nav { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .jc-nav:hover { background: #2f353f; }
+    html[data-theme="dark"] .jc-nav { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .jc-nav:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .jc-cell { background: var(--panel); }
     html[data-theme="dark"] .jc-cell.empty { background: none; }
-    html[data-theme="dark"] .jc-job { background: #262b33; }
-    html[data-theme="dark"] .jc-job.confirmed { background: #14293a; color: #7cc4f0; border-color: #2c5070; }
-    html[data-theme="dark"] .jc-detail-close { background: #262b33; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .jc-detail-close:hover { background: #2f353f; }
+    html[data-theme="dark"] .jc-job { background: var(--surface-3); }
+    html[data-theme="dark"] .jc-job.confirmed { background: var(--info-soft); color: var(--info-ink); border-color: #2c5070; }
+    html[data-theme="dark"] .jc-detail-close { background: var(--surface-3); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .jc-detail-close:hover { background: var(--surface-hover); }
     /* 稼働希望のマス */
     html[data-theme="dark"] .cell { background: var(--panel); }
     html[data-theme="dark"] .cell.empty { background: none; }
-    html[data-theme="dark"] .cell.s-ok { border-color: #2a5a38; color: #7ee2a8; }
-    html[data-theme="dark"] .cell.s-ng { border-color: #6b2f2f; color: #f59a9a; }
+    /* ⚠ タブの中の件数バッジ＝白い面に明るいオレンジの文字だと読めない（1.9:1・2026-09-09 デザイナー指摘）。
+       黒のときは「暗い茶の面＋明るい琥珀の文字」にする。 */
+    html[data-theme="dark"] .s-tabs button.active .pill { background: var(--brand-soft); color: var(--warn-ink); }
+    /* ⚠ 稼働希望カレンダーの ○ と × は、面の色の差が小さすぎて見分けられなかった。
+       小さい印（.dot）は面そのものを色にし、マスは左に色の帯を足す（面の濃さに頼らない）。
+       ⚠ スタッフが自分の出られる日を間違える場所なので、ここは弱くしない。 */
+    html[data-theme="dark"] .dot.ok { background: #3f8f63; border-color: #5cbf8a; }
+    html[data-theme="dark"] .dot.ng { background: #a04f4f; border-color: var(--danger-ink); }
+    html[data-theme="dark"] .cell.s-ok { box-shadow: inset 3px 0 0 var(--ok-ink); }
+    html[data-theme="dark"] .cell.s-ng { box-shadow: inset 3px 0 0 var(--danger-ink); }
+    html[data-theme="dark"] .cell.s-ok { border-color: var(--ok-line); color: var(--ok-ink); }
+    html[data-theme="dark"] .cell.s-ng { border-color: var(--danger-line); color: var(--danger-ink); }
     html[data-theme="dark"] .cell.s-event { color: #ffffff; }
-    html[data-theme="dark"] .dot.ok { border-color: #2a5a38; }
-    html[data-theme="dark"] .dot.ng { border-color: #6b2f2f; }
+    html[data-theme="dark"] .dot.ok { border-color: var(--ok-line); }
+    html[data-theme="dark"] .dot.ng { border-color: var(--danger-line); }
     /* 入力欄・保存ボタン */
     html[data-theme="dark"] .field input,
     html[data-theme="dark"] .field textarea,
-    html[data-theme="dark"] .field select { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .field select { background: var(--surface-2); color: var(--ink); }
     html[data-theme="dark"] .submit-btn { color: #ffffff; }
-    html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
+    html[data-theme="dark"] .saved-msg { color: var(--ok-ink); }
     /* 確定アサイン */
-    html[data-theme="dark"] .assign-item:hover { background: #262b33; }
+    html[data-theme="dark"] .assign-item:hover { background: var(--surface-3); }
     html[data-theme="dark"] .assign-date { color: #ffffff; }
-    html[data-theme="dark"] .ad-box { background: #23272f; }
-    html[data-theme="dark"] .pastToggle { background: #262b33; }
-    html[data-theme="dark"] .pastToggle:hover { background: #2f353f; }
+    html[data-theme="dark"] .ad-box { background: var(--surface-2); }
+    html[data-theme="dark"] .pastToggle { background: var(--surface-3); }
+    html[data-theme="dark"] .pastToggle:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .assign-item.past .assign-info .t { color: #8b93a0; }
     /* 設定タブ */
     html[data-theme="dark"] .lk-item { background: var(--panel); }
-    html[data-theme="dark"] .line-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .line-btn:active { background: #2f353f; }
-    html[data-theme="dark"] .line-btn.danger { border-color: #6b2f2f; }
-    html[data-theme="dark"] .switch .track { background: #3a414c; }
+    html[data-theme="dark"] .line-btn { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .line-btn:active { background: var(--surface-hover); }
+    html[data-theme="dark"] .line-btn.danger { border-color: var(--danger-line); }
+    html[data-theme="dark"] .switch .track { background: var(--field-line); }
   </style>
   @endverbatim
 </head>

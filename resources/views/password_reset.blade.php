@@ -24,7 +24,7 @@
        黒のときだけ強め（!important）に上書きしている。 */
     html[data-theme="dark"] body { background: var(--bg); }
     html[data-theme="dark"] .login-card { background: var(--panel); }
-    html[data-theme="dark"] .login-card input[readonly] { background: #23272f !important; color: var(--ink); }
+    html[data-theme="dark"] .login-card input[readonly] { background: var(--surface-2) !important; color: var(--ink); }
   </style>
 </head>
 <body>

@@ -12,7 +12,7 @@
       padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px;
       background: #fff; cursor: pointer; font-size: 14px; color: #6b5544; font-weight: 600;
     }
-    .ex-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .ex-tab.active { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; }
     .ex-pane { display: none; }
     .ex-pane.show { display: block; }
 
@@ -75,18 +75,18 @@
     html[data-theme="dark"] .ex-tab.active { color: #ffffff; }
     html[data-theme="dark"] .ex-card { background: var(--panel); }
     html[data-theme="dark"] .ex-filters select,
-    html[data-theme="dark"] .ex-filters input[type=search] { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .ex-filters input[type=search] { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
     html[data-theme="dark"] .ex-filters label { color: var(--muted); }
-    html[data-theme="dark"] table.ex-tbl thead th { background: #23272f; color: var(--muted); border-bottom-color: var(--line); }
-    html[data-theme="dark"] table.ex-tbl thead th.sortable:hover { background: #2f353f; }
-    html[data-theme="dark"] table.ex-tbl tbody tr.person:hover { background: #23272f; }
-    html[data-theme="dark"] table.ex-tbl tbody tr.zero td { color: #98a0aa; }
+    html[data-theme="dark"] table.ex-tbl thead th { background: var(--surface-2); color: var(--muted); border-bottom-color: var(--line); }
+    html[data-theme="dark"] table.ex-tbl thead th.sortable:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] table.ex-tbl tbody tr.person:hover { background: var(--surface-2); }
+    html[data-theme="dark"] table.ex-tbl tbody tr.zero td { color: var(--muted-dim); }
     html[data-theme="dark"] .ex-rank,
     html[data-theme="dark"] .ex-sub { color: var(--muted); }
-    html[data-theme="dark"] .ex-badge { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
-    html[data-theme="dark"] .ex-badge.gone { background: #23272f; color: #98a0aa; }
-    html[data-theme="dark"] .ex-chip { background: #14293a; color: #7cc4f0; border-color: #2b4a63; }
-    html[data-theme="dark"] tr.detail td { background: #23272f; }
+    html[data-theme="dark"] .ex-badge { background: var(--chip-bg); color: var(--chip-ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .ex-badge.gone { background: var(--surface-2); color: var(--muted-dim); }
+    html[data-theme="dark"] .ex-chip { background: var(--info-soft); color: var(--info-ink); border-color: #2b4a63; }
+    html[data-theme="dark"] tr.detail td { background: var(--surface-2); }
     html[data-theme="dark"] table.ex-inner td { border-bottom-color: var(--line); }
     html[data-theme="dark"] table.ex-inner td.muted2 { color: var(--muted); }
     html[data-theme="dark"] .ex-dl a { color: var(--brand-dark); }

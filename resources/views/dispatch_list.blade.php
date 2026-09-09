@@ -11,7 +11,7 @@
     font-size: 13px; font-family: inherit; background: #fff; }
   .dl-bar .lbl { font-size: 12px; color: var(--muted); font-weight: 600; }
   .dl-btn { padding: 6px 14px; border: 1px solid var(--brand-dark); border-radius: 8px; font-size: 13px;
-    font-weight: 700; font-family: inherit; background: var(--brand); color: #fff; cursor: pointer; text-decoration: none; }
+    font-weight: 700; font-family: inherit; background: var(--brand-fill); color: #fff; cursor: pointer; text-decoration: none; }
   .dl-btn.ghost { background: #fff; color: var(--brand-dark); }
 
   .dl-sum { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -53,23 +53,23 @@
      白い面・生成りの見出し・茶色の文字を、暗い面＋明るい文字に置き換える。
      状態の色（橙＝打診中／緑＝確定／灰＝中止）は変えない。 */
   html[data-theme="dark"] .dl-bar select,
-  html[data-theme="dark"] .dl-bar input { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .dl-bar input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
   html[data-theme="dark"] .dl-btn { color: #ffffff; }
   html[data-theme="dark"] .dl-btn.ghost { background: var(--panel); color: var(--brand-dark); }
   html[data-theme="dark"] .dl-sum .card { background: var(--panel); }
   html[data-theme="dark"] table.dl { background: var(--panel); }
-  html[data-theme="dark"] table.dl th { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] table.dl th { background: var(--surface-2); color: var(--muted); }
   html[data-theme="dark"] .dl-day { color: var(--ink); }
-  html[data-theme="dark"] .st.asked { color: #f5c26b; }
-  html[data-theme="dark"] .st.fixed { color: #7ee2a8; }
-  html[data-theme="dark"] .st.cancelled { background: #2b313a; color: #b7bec8; }
-  html[data-theme="dark"] .fill.short { color: #f59a9a; }
-  html[data-theme="dark"] .fill.full { color: #7ee2a8; }
-  html[data-theme="dark"] .dl-in { background: #23272f; color: var(--ink); border-color: #3a414c; }
-  html[data-theme="dark"] .dl-x { color: #f59a9a; }
+  html[data-theme="dark"] .st.asked { color: var(--warn-ink); }
+  html[data-theme="dark"] .st.fixed { color: var(--ok-ink); }
+  html[data-theme="dark"] .st.cancelled { background: var(--chip-bg); color: var(--chip-ink); }
+  html[data-theme="dark"] .fill.short { color: var(--danger-ink); }
+  html[data-theme="dark"] .fill.full { color: var(--ok-ink); }
+  html[data-theme="dark"] .dl-in { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+  html[data-theme="dark"] .dl-x { color: var(--danger-ink); }
   html[data-theme="dark"] .dl-empty { background: var(--panel); }
-  html[data-theme="dark"] .dl-saved { color: #7ee2a8; }
-  html[data-theme="dark"] .flash { border-color: #245c37; color: #7ee2a8; }
+  html[data-theme="dark"] .dl-saved { color: var(--ok-ink); }
+  html[data-theme="dark"] .flash { border-color: var(--ok-line); color: var(--ok-ink); }
 </style>
 @endpush
 

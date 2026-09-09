@@ -82,7 +82,7 @@
       background: #fff; cursor: pointer; font-size: 13px; color: #6b5544; font-weight: 700;
       font-family: inherit;
     }
-    .view-tab.active { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .view-tab.active { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; }
 
     /* カレンダー表示（出勤可能日画面の作りを踏襲） */
     .mp-cal { display: none; }
@@ -166,7 +166,7 @@
       content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px;
       background: #fff; border-radius: 50%; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
     }
-    .switch input:checked + .track { background: var(--brand); }
+    .switch input:checked + .track { background: var(--brand-fill); }
     .switch input:checked + .track::before { transform: translateX(20px); }
     .save-bar { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
     .saved-msg { display: none; color: #2e7d32; font-weight: 700; font-size: 13px; }
@@ -298,29 +298,29 @@
        「暗い面＋明るい文字」へ置き換えるだけ。形・大きさは変えない。
        ===================================================================== */
     /* 所属バッジ */
-    html[data-theme="dark"] .dept.plan { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .dept.sales { background: #16301f; color: #7ee2a8; }
-    html[data-theme="dark"] .dept.creative { background: #241f3a; color: #b8a6f5; }
-    html[data-theme="dark"] .dept.other { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .dept.none { background: #23272f; color: var(--muted); }
+    html[data-theme="dark"] .dept.plan { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .dept.sales { background: var(--ok-soft); color: var(--ok-ink); }
+    html[data-theme="dark"] .dept.creative { background: var(--accent2-soft); color: #b8a6f5; }
+    html[data-theme="dark"] .dept.other { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .dept.none { background: var(--surface-2); color: var(--muted); }
 
     /* 月の絞り込み */
-    html[data-theme="dark"] .mp-filter select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .mp-filter select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
 
     /* 役割タグ・案件の特徴バッジ */
-    html[data-theme="dark"] .role-tag { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .role-tag.sd { background: #241f3a; color: #b8a6f5; }
-    html[data-theme="dark"] .role-tag.mc { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .mtag.big { background: #3a1c1c; color: #f59a9a; }
-    html[data-theme="dark"] .mtag.stay { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .mtag.yobi { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .mtag.reha { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .role-tag { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .role-tag.sd { background: var(--accent2-soft); color: #b8a6f5; }
+    html[data-theme="dark"] .role-tag.mc { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .mtag.big { background: var(--danger-soft); color: var(--danger-ink); }
+    html[data-theme="dark"] .mtag.stay { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .mtag.yobi { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .mtag.reha { background: var(--accent2-soft); color: #b8a6f5; }
 
     /* 表の中のボタン */
-    html[data-theme="dark"] .fin-btn { background: #262b33; color: #f5c26b; border-color: #5c4718; }
-    html[data-theme="dark"] .fin-btn:hover { background: #33280f; }
-    html[data-theme="dark"] .cal-btn { background: #262b33; }
-    html[data-theme="dark"] .cal-btn:hover { background: #2f353f; }
+    html[data-theme="dark"] .fin-btn { background: var(--surface-3); color: var(--warn-ink); border-color: var(--warn-line); }
+    html[data-theme="dark"] .fin-btn:hover { background: var(--warn-soft); }
+    html[data-theme="dark"] .cal-btn { background: var(--surface-3); }
+    html[data-theme="dark"] .cal-btn:hover { background: var(--surface-hover); }
 
     /* リスト／カレンダー 切替 */
     html[data-theme="dark"] .view-tab { background: var(--panel); color: var(--ink); }
@@ -328,22 +328,22 @@
 
     /* カレンダー */
     html[data-theme="dark"] .mp-cell { background: var(--panel); }
-    html[data-theme="dark"] .mp-cell.has { border-color: #5c4718; }
+    html[data-theme="dark"] .mp-cell.has { border-color: var(--warn-line); }
     html[data-theme="dark"] .mp-cell .dnum { color: var(--muted); }
-    html[data-theme="dark"] .mp-ev { background: #23272f; }
+    html[data-theme="dark"] .mp-ev { background: var(--surface-2); }
     /* 左の色帯（種別の目印）は明るいままにする＝ここで種別を見分けているため。 */
-    html[data-theme="dark"] .mp-ev.ev-big { background: #3a1c1c; border-color: #5c2c2c; border-left-color: #e8a0a0; }
-    html[data-theme="dark"] .mp-ev.ev-online { background: #14293a; border-color: #2b4b66; border-left-color: #9bb9e0; }
-    html[data-theme="dark"] .mp-ev.ev-real { background: #16301f; border-color: #2c5c3c; border-left-color: #9ccbaa; }
+    html[data-theme="dark"] .mp-ev.ev-big { background: var(--danger-soft); border-color: var(--danger-line); border-left-color: #e8a0a0; }
+    html[data-theme="dark"] .mp-ev.ev-online { background: var(--info-soft); border-color: #2b4b66; border-left-color: #9bb9e0; }
+    html[data-theme="dark"] .mp-ev.ev-real { background: var(--ok-soft); border-color: var(--ok-line); border-left-color: #9ccbaa; }
     /* 黒地では「暗くする」ホバーだと変化が見えないので、明るくする向きにそろえる。 */
     html[data-theme="dark"] .mp-ev:hover { filter: brightness(1.3); }
 
     /* アカウント欄・通知トグル */
-    html[data-theme="dark"] .line-btn { background: #262b33; }
-    html[data-theme="dark"] .line-btn:hover { background: #2f353f; }
-    html[data-theme="dark"] .line-btn.danger { border-color: #5c2c2c; }
-    html[data-theme="dark"] .switch .track { background: #3a414c; }
-    html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
+    html[data-theme="dark"] .line-btn { background: var(--surface-3); }
+    html[data-theme="dark"] .line-btn:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .line-btn.danger { border-color: var(--danger-line); }
+    html[data-theme="dark"] .switch .track { background: var(--field-line); }
+    html[data-theme="dark"] .saved-msg { color: var(--ok-ink); }
 
     /* 「今後をまとめて登録」の小窓 */
     html[data-theme="dark"] .cal-modal { background: var(--panel); }
@@ -351,8 +351,8 @@
     /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
-    html[data-theme="dark"] [style*="#e7f6ec"] { background: #16301f !important; color: #7ee2a8 !important; border-color: #2c5c3c !important; }  /* 登録できたときの緑の帯 */
-    html[data-theme="dark"] [style*="#fdecec"] { background: #3a1c1c !important; color: #f59a9a !important; border-color: #5c2c2c !important; }  /* 未記入・エラーの赤い帯 */
+    html[data-theme="dark"] [style*="#e7f6ec"] { background: var(--ok-soft) !important; color: var(--ok-ink) !important; border-color: var(--ok-line) !important; }  /* 登録できたときの緑の帯 */
+    html[data-theme="dark"] [style*="#fdecec"] { background: var(--danger-soft) !important; color: var(--danger-ink) !important; border-color: var(--danger-line) !important; }  /* 未記入・エラーの赤い帯 */
   </style>
 @endverbatim
 @endpush

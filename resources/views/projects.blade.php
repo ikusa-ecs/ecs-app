@@ -75,7 +75,7 @@
     .ymk.b { background: var(--warn-soft);  color: #b45309; }
     .ymk.c { background: #ece3d4;           color: #7a6a58; }
     /* 大型マーク（日程のヨミの横） */
-    .big-mark { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--brand); color: #fff; }
+    .big-mark { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--brand-fill); color: #fff; }
 
     /* 案件名セル（3行：コンテンツ名／実施形態／会社名） */
     td.proj-cell { min-width: 190px; }
@@ -90,7 +90,7 @@
     .tag-mini.reha  { background: #ece3d4;            color: #7a6a58; }
     .tag-mini.stay  { background: #e8833a;            color: #fff; }
     .tag-mini.draft { background: #6b5544;            color: #fff; }
-    .tag-mini.repeat{ background: var(--brand);       color: #fff; }  /* リピート（常連）クライアント */
+    .tag-mini.repeat{ background: var(--brand-fill);       color: #fff; }  /* リピート（常連）クライアント */
 
     /* 下書きの行（準備中とわかるよう薄い色＋左に印） */
     tr.main-row.draft { background: #f3eee4; }
@@ -244,7 +244,7 @@
       background: #fff; color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer;
     }
     .list-tab:hover { background: #f3ece0; text-decoration: none; }
-    .list-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .list-tab.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
     .tab-badge {
       display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 4px;
       border-radius: 999px; background: #6b5544; color: #fff;
@@ -283,7 +283,7 @@
     .ym-year-btn  { padding: 6px 10px; font-size: 12.5px; font-weight: 700; }
     .ym-month-btn { padding: 5px 10px 5px 26px; font-size: 12.5px; }
     .ym-year-btn:hover, .ym-month-btn:hover { background: #dccbb1; color: #4f4338; }
-    .ym-month-btn.active { background: var(--brand); color: #fff; font-weight: 700; }
+    .ym-month-btn.active { background: var(--brand-fill); color: #fff; font-weight: 700; }
     .ym-caret { width: 12px; font-size: 10px; color: #a08a73; flex-shrink: 0; }
     .ym-year-btn .ym-ycount, .ym-month-btn .ym-mcount {
       margin-left: auto; font-size: 11px; color: #a08a73; font-weight: 600;
@@ -294,7 +294,7 @@
 
     /* 月へジャンプしたときの見出し点滅 */
     @keyframes groupFlash {
-      0%   { background: var(--brand); color: #fff; }
+      0%   { background: var(--brand-fill); color: #fff; }
       100% { background: var(--brand-soft); color: var(--brand-dark); }
     }
     tr.group-row.flash td { animation: groupFlash 1.4s ease-out; }
@@ -333,7 +333,7 @@
       cursor: pointer; font-family: inherit;
     }
     .view-tab:hover { background: #f3ece0; }
-    .view-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .view-tab.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
 
     /* ===== カレンダー表示（ダッシュボードの危険日カレンダーと同じ見た目にそろえる） ===== */
     .cal-head { display: flex; align-items: center; gap: 10px; }
@@ -359,7 +359,7 @@
       display: block; width: 100%; box-sizing: border-box; text-align: left;
       border: none; border-radius: 5px; padding: 2px 5px; margin-top: 3px;
       font-family: inherit; font-size: 10.5px; font-weight: 600; line-height: 1.45;
-      color: #fff; background: var(--brand); cursor: pointer;
+      color: #fff; background: var(--brand-fill); cursor: pointer;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .cal-ev:hover { filter: brightness(1.12); }
@@ -433,81 +433,79 @@
     html[data-theme="dark"] { --pj-has-bg: #2a2f38; }
     /* 絞り込み・行の色 */
     html[data-theme="dark"] .filter-bar .f-item input,
-    html[data-theme="dark"] .filter-bar .f-item select { background: #23272f; color: var(--ink); }
-    html[data-theme="dark"] tr.group-row.past td { background: #23272f; }
-    html[data-theme="dark"] tr.main-row:hover { background: #262b33; }
+    html[data-theme="dark"] .filter-bar .f-item select { background: var(--surface-2); color: var(--ink); }
+    html[data-theme="dark"] tr.group-row.past td { background: var(--surface-2); }
+    html[data-theme="dark"] tr.main-row:hover { background: var(--surface-3); }
     html[data-theme="dark"] tr.main-row.draft { background: #22252b; }
     html[data-theme="dark"] tr.main-row.draft:hover { background: #2a2e35; }
     /* 確度・大型・小タグ */
-    html[data-theme="dark"] .ymk.b { color: #f5c26b; }
-    html[data-theme="dark"] .ymk.c { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .ymk.b { color: var(--warn-ink); }
+    html[data-theme="dark"] .ymk.c { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .big-mark { color: #ffffff; }
-    html[data-theme="dark"] .tag-mini.add    { color: #f59a9a; }
-    html[data-theme="dark"] .tag-mini.yobi   { color: #f5c26b; }
-    html[data-theme="dark"] .tag-mini.reha   { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .tag-mini.add    { color: var(--danger-ink); }
+    html[data-theme="dark"] .tag-mini.yobi   { color: var(--warn-ink); }
+    html[data-theme="dark"] .tag-mini.reha   { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .tag-mini.repeat { color: #ffffff; }
     /* 実施形態のバッジ */
-    html[data-theme="dark"] .fbadge.fmt-real   { background: #16301f; color: #7ee2a8; }
-    html[data-theme="dark"] .fbadge.fmt-long   { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] .fbadge.fmt-online { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .fbadge.fmt-arena  { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .fbadge.fmt-real   { background: var(--ok-soft); color: var(--ok-ink); }
+    html[data-theme="dark"] .fbadge.fmt-long   { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .fbadge.fmt-online { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .fbadge.fmt-arena  { background: var(--accent2-soft); color: #b8a6f5; }
     html[data-theme="dark"] .fbadge.fmt-other  { background: #12302c; color: #7ed8c6; }
-    html[data-theme="dark"] .fbadge.fmt-etc    { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .fbadge.fmt-cancel { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .fbadge.fmt-etc    { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .fbadge.fmt-cancel { background: var(--danger-soft); color: var(--danger-ink); }
     html[data-theme="dark"] .fmt-was { color: var(--muted); }
     html[data-theme="dark"] tr.main-row.row-cancelled { background: #2a2022; }
     html[data-theme="dark"] tr.main-row.row-cancelled .proj-cell strong { color: var(--muted); }
-    html[data-theme="dark"] td.time-cell .ev.tbd { color: #f5c26b; }
+    html[data-theme="dark"] td.time-cell .ev.tbd { color: var(--warn-ink); }
     /* 募集状態 */
-    html[data-theme="dark"] .recruit-badge.closed { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .recruit-badge.pre    { color: #f5c26b; }
-    html[data-theme="dark"] .recruit-badge.unpub  { background: #33280f; color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .recruit-badge.closed { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .recruit-badge.pre    { color: var(--warn-ink); }
+    html[data-theme="dark"] .recruit-badge.unpub  { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
     /* 詳細（折りたたみ）行と入力欄 */
-    html[data-theme="dark"] tr.detail-row > td { background: #23272f; }
+    html[data-theme="dark"] tr.detail-row > td { background: var(--surface-2); }
     html[data-theme="dark"] .detail-panel .cat-select,
-    html[data-theme="dark"] .detail-panel .cat-note { background: #23272f; color: var(--ink); }
-    html[data-theme="dark"] .sheet-link { background: #262b33; }
-    html[data-theme="dark"] .sheet-link:hover { background: #2f353f; }
-    html[data-theme="dark"] .cell-edit { background: #23272f; }
-    html[data-theme="dark"] .pick-pop > summary { background: #262b33; }
-    html[data-theme="dark"] .pick-pop > summary:hover { background: #2f353f; }
+    html[data-theme="dark"] .detail-panel .cat-note { background: var(--surface-2); color: var(--ink); }
+    html[data-theme="dark"] .sheet-link { background: var(--surface-3); }
+    html[data-theme="dark"] .sheet-link:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .cell-edit { background: var(--surface-2); }
+    html[data-theme="dark"] .pick-pop > summary { background: var(--surface-3); }
+    html[data-theme="dark"] .pick-pop > summary:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .pick-pop .pick-list { background: var(--panel); }
-    html[data-theme="dark"] .note-text { background: #23272f; }
+    html[data-theme="dark"] .note-text { background: var(--surface-2); }
     /* 一覧 / 下書き のタブ */
-    html[data-theme="dark"] .list-tab { background: #262b33; }
-    html[data-theme="dark"] .list-tab:hover { background: #2f353f; }
+    html[data-theme="dark"] .list-tab { background: var(--surface-3); }
+    html[data-theme="dark"] .list-tab:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .list-tab.active { color: #ffffff; }
     /* 集計・書き出しのモーダル */
     html[data-theme="dark"] .agg-modal { background: var(--panel); }
-    html[data-theme="dark"] .agg-head .month-nav button { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .agg-close { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .agg-head .month-nav button { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .agg-close { background: var(--surface-3); border-color: var(--field-line); }
     html[data-theme="dark"] .exp-modal { background: var(--panel); }
-    html[data-theme="dark"] .exp-row select { background: #23272f; color: var(--ink); }
-    html[data-theme="dark"] .exp-ta { background: #23272f; }
-    html[data-theme="dark"] .exp-steps { background: #23272f; }
-    html[data-theme="dark"] .copied-msg { color: #7ee2a8; }
+    html[data-theme="dark"] .exp-row select { background: var(--surface-2); color: var(--ink); }
+    html[data-theme="dark"] .exp-ta { background: var(--surface-2); }
+    html[data-theme="dark"] .exp-steps { background: var(--surface-2); }
+    html[data-theme="dark"] .copied-msg { color: var(--ok-ink); }
     /* サイドバーの年月フォルダ（ふだんの色は共通CSS側で黒に切り替わる） */
-    html[data-theme="dark"] .ym-month-btn.active { color: #ffffff; }
-    html[data-theme="dark"] .ym-month-btn.active .ym-mcount { color: rgba(26, 18, 6, .75); }
     /* 表示の切替とカレンダー */
-    html[data-theme="dark"] .view-tab { background: #262b33; }
-    html[data-theme="dark"] .view-tab:hover { background: #2f353f; }
+    html[data-theme="dark"] .view-tab { background: var(--surface-3); }
+    html[data-theme="dark"] .view-tab:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .view-tab.active { color: #ffffff; }
-    html[data-theme="dark"] .cal-nav { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .cal-dow.sat { color: #7cc4f0; }
+    html[data-theme="dark"] .cal-nav { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .cal-dow.sat { color: var(--info-ink); }
     html[data-theme="dark"] .cal-cell { background: var(--panel); }
     html[data-theme="dark"] .cal-cell.empty { background: transparent; }
     html[data-theme="dark"] .cal-cell.has { background: var(--pj-has-bg); }
-    html[data-theme="dark"] .cal-cell.sat .dnum { color: #7cc4f0; }
+    html[data-theme="dark"] .cal-cell.sat .dnum { color: var(--info-ink); }
     /* 拠点まわり（下の2つ目の <style> にある指定を、黒地向けに上書きする） */
-    html[data-theme="dark"] .of-mine { color: #7ee2a8; background: #16301f; border-color: #2a5a38; }
+    html[data-theme="dark"] .of-mine { color: var(--ok-ink); background: var(--ok-soft); border-color: var(--ok-line); }
 </style>
 @endverbatim
 @endpush
 
 @section('content')
 @if (session('status'))
-<div class="mock-note" style="background:#e7f0e9; border-color:#cdeccf; color:#15803d;">✓ {{ session('status') }}</div>
+<div class="mock-note" style="background:var(--ok-soft); border-color:var(--ok-line); color:var(--ok-ink);">✓ {{ session('status') }}</div>
 @endif
 @include('partials.office_switch')
 <style>

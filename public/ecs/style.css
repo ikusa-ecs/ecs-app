@@ -86,40 +86,70 @@ html[data-theme="orange"] .sidebar .ym-month-btn.active .ym-mcount { color: rgba
      画面ごとの色は、その画面のファイルの <style> 末尾に html[data-theme="dark"] で書いてある。
    ⚠ 変数だけでは足りない＝上の枠の色は :root ではなく各ルールに直接書かれているので、
      ここで同じルールを上書きしている。
-   ⚠ 灰色の文字は #98a0aa より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。
+   ⚠ 灰色の文字は var(--muted-dim) より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。
    ⚠ **オレンジの面（選択中・押せるボタン）の文字は白**。濃い文字にすると
      「黒くて見えにくい」（2026-09-09 baba指摘。マイページのリスト/カレンダー切替で発覚）。 */
 /* ねらい＝**シンプル**（baba のイメージ：黒＝シンプル／会社カラー＝スタイリッシュ／いまの色＝やわらかい）。
    飾りの色を増やさず、黒・グレー・白＋アクセント1色だけで組み立てる。 */
 html[data-theme="dark"] {
-  --bg: #16181d;        /* 画面の下地（真っ黒より少し明るく＝目が痛くならない） */
-  --panel: #1e2128;     /* パネル・カードの面 */
-  --ink: #e6e8ea;       /* 文字（真っ白は避ける＝まぶしさを抑える） */
-  --muted: #9aa2ad;
-  --line: #2f343d;      /* 罫線 */
-  /* アクセントのオレンジ。⚠ **少し濃くしている**（2026-09-09 baba指摘）。
-     鮮やかな #f07800 のままだと、オレンジ地に白文字が読みにくく、
-     濃い文字にすると「黒くて見えにくい」と言われた。⇒ **濃いオレンジ＋白文字**にそろえた。
-     ⚠ これは「面（背景）に敷く色」と「文字にも使う色」の兼用なので、
-       これ以上濃くすると黒地の上の文字（色だけで使う場所）が沈む。 */
-  --brand: #d96f0a;
-  --brand-dark: #ff9a3c;
-  --brand-soft: #3a2a16;/* オレンジの淡い面（黒の上なので暗い茶にする） */
-  --ok-soft: #16301f;
-  --warn-soft: #33280f;
-  --danger-soft: #3a1c1c;
+  /* ── 面は4段（2026-09-09 デザイナー指摘で作り直し）──────────────
+     ⚠ 段の差が無いと「左メニュー・本文・カード・入力欄」が1枚の黒い板に見える。
+       影は黒地では効かないので、**面の明るさと罫線**で段差を作る。
+     ⚠ 入力欄は面より**暗く**（へこむ＝書き込む場所）、ボタンは面より**明るく**（出る＝押す場所）。
+       ここを同じ明るさにすると「押せるものが分からない」と言われる。 */
+  --bg: #16181d;             /* 画面の下地（真っ黒より少し明るく＝目が痛くならない） */
+  --panel: #232830;          /* カード・パネルの面（下地とちゃんと差をつける） */
+  --surface-2: #191c22;      /* へこむ面＝入力欄・表の見出し・うっすら区切る帯 */
+  --surface-3: #2d323b;      /* 出る面＝ボタン */
+  --surface-hover: #363c46;  /* ボタン・行にカーソルを乗せたとき */
+  --chip-bg: var(--chip-bg);        /* 灰色のバッジの面 */
+  --chip-ink: var(--chip-ink);       /* 灰色のバッジの文字 */
+  --line: var(--field-line);           /* 罫線（入力欄の枠と同じ濃さにそろえた） */
+  --field-line: var(--field-line);     /* 入力欄・ボタンの枠 */
+  --ink: #e6e8ea;            /* 文字（真っ白は避ける＝まぶしさを抑える） */
+  --muted: #9aa2ad;          /* 薄い文字 */
+  --muted-dim: var(--muted-dim);      /* ⚠ 灰色の下限。**これより暗い灰色は使わない**（黒地で沈む） */
+
+  /* ── アクセント（オレンジ）は「面用」と「文字用」を分ける ──────────
+     ⚠ 1つの値を兼用すると必ず行き止まる＝面に合わせて濃くすると文字が沈み、
+       文字に合わせて明るくすると**白文字が読めない**（2026-09-09 デザイナー指摘）。
+     ⚠ 面に敷くのは --brand-fill（白文字で5.4:1）。文字・線に使うのは --brand。 */
+  --brand: #d96f0a;           /* 文字・線・アイコン用 */
+  --brand-fill: #a8520a;      /* 面に敷く用（選択中・押せるボタン。文字は白） */
+  --brand-fill-hover: #c05f0c;/* その面にカーソルを乗せたとき（⚠ 明るくしすぎない） */
+  --brand-dark: #ff9a3c;      /* 黒地の上で「強い」文字（⚠ 面には敷かない） */
+  --brand-soft: #4d3616;      /* オレンジの淡い面 */
+
+  /* ── 意味の色。**面（soft）・文字（ink）・枠（line）の3段**を必ずそろえる ────
+     ⚠ 白地用の --ok/--warn/--danger をそのまま黒地に出していたので「足りない」側が沈んでいた
+       （2026-09-09 アサイン担当・デザイナーの両方から指摘）。
+     ⚠ 文字の色は本文（--ink）より一段暗くする＝本文が一番明るい、という順番を守るため。
+     ⚠ --warn は --brand と**明るさ・色みを離す**（近いと「注意」と「選択中」が同じ色に見える）。
+     ⚠ 帯（soft）は「面（--panel）との差が 1.15 以上」を目安にする。暗すぎると帯が見えず、
+       小さな色文字だけが頼りになる（＝エラーに気づけない。2026-09-09 デザイナー指摘）。
+     ⚠ 黒地では**彩度の高い色を広い面に敷かない**（縁がにじんで疲れる）。強調は枠と左の色帯で作る。 */
+  --ok: #45a877;      --ok-ink: #5cbf8a;      --ok-soft: #1d4029;      --ok-line: var(--ok-line);
+  --warn: #d9a441;    --warn-ink: #dda94e;    --warn-soft: #40340f;    --warn-line: var(--warn-line);
+  --danger: #d96a6a;  --danger-ink: #e08585;  --danger-soft: #5a2727;  --danger-line: var(--danger-line);
+  --info-ink: #63aede;    --info-soft: #1a3855;    --info-line: #2b4b66;
+  --accent2-ink: #a793e8; --accent2-soft: #3a3163;
+
   --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4);
 }
+/* ⚠ 面に敷くオレンジは --brand-fill を使う（--brand は文字用）。
+   ここで既定・会社カラーにも同じ名前を用意しておくことで、画面側は var(--brand-fill) だけ書けばよい。 */
+:root { --brand-fill: var(--brand); --brand-fill-hover: var(--brand-dark); }
+html[data-theme="orange"] { --brand-fill: #d96b00; --brand-fill-hover: #b35500; }
 /* 左メニュー */
 html[data-theme="dark"] .sidebar { background: #1a1d23; color: var(--ink); }
 html[data-theme="dark"] .sidebar nav a { color: #c3c9d1; }
-html[data-theme="dark"] .sidebar nav a:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .sidebar nav a:hover { background: var(--surface-3); color: #fff; }
 html[data-theme="dark"] .sidebar .nav-group .group-label,
 html[data-theme="dark"] .sidebar .userbox { color: var(--muted); }
 html[data-theme="dark"] .sidebar .userbox { border-top-color: var(--line); }
 html[data-theme="dark"] .sidebar .userbox strong { color: var(--ink); }
-html[data-theme="dark"] .sidebar .pc-mode-btn { border-color: #3a414c; color: var(--muted); }
-html[data-theme="dark"] .sidebar .pc-mode-btn:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .sidebar .pc-mode-btn { border-color: var(--field-line); color: var(--muted); }
+html[data-theme="dark"] .sidebar .pc-mode-btn:hover { background: var(--surface-3); color: #fff; }
 html[data-theme="dark"] .sidebar .logo,
 html[data-theme="dark"] .sidebar .logo small { color: var(--ink); }
 html[data-theme="dark"] .sidebar nav .group-label { color: var(--muted); }
@@ -127,37 +157,43 @@ html[data-theme="dark"] .sidebar nav .group-label { color: var(--muted); }
 html[data-theme="dark"] .sidebar .ym-year-btn,
 html[data-theme="dark"] .sidebar .ym-month-btn { color: #c3c9d1; }
 html[data-theme="dark"] .sidebar .ym-year-btn:hover,
-html[data-theme="dark"] .sidebar .ym-month-btn:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .sidebar .ym-month-btn:hover { background: var(--surface-3); color: #fff; }
 html[data-theme="dark"] .sidebar .ym-caret,
 html[data-theme="dark"] .sidebar .ym-ycount,
 html[data-theme="dark"] .sidebar .ym-mcount { color: var(--muted); }
 /* 上のバー */
 html[data-theme="dark"] .topbar { background: var(--panel); border-bottom-color: var(--line); }
 html[data-theme="dark"] .nav-toggle { color: var(--muted); }
-html[data-theme="dark"] .nav-toggle:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .nav-toggle:hover { background: var(--surface-3); color: #fff; }
 /* 表 */
-html[data-theme="dark"] table.tbl th { background: #23272f; color: var(--muted); }
-html[data-theme="dark"] table.tbl tbody tr:hover { background: #23272f; }
+html[data-theme="dark"] table.tbl th { background: var(--surface-2); color: var(--muted); }
+html[data-theme="dark"] table.tbl tbody tr:hover { background: var(--surface-2); }
 /* ボタン */
-html[data-theme="dark"] .btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
-html[data-theme="dark"] .btn:hover { background: #2f353f; }
-html[data-theme="dark"] .btn.primary { background: var(--brand); border-color: var(--brand); color: #ffffff; }
+html[data-theme="dark"] .btn { background: var(--surface-3); color: var(--ink); border-color: #464d59; }
+html[data-theme="dark"] .btn:hover { background: var(--surface-hover); }
+html[data-theme="dark"] .btn.primary { background: var(--brand-fill); border-color: var(--brand-fill); color: #ffffff; }
+/* ⚠ オレンジの面のホバーは**濃く**する。明るくすると白文字が読めなくなる
+   （2026-09-09 アサイン担当指摘＝毎日押す「詳細」「公開する」「保存」で文字が消えていた）。 */
+html[data-theme="dark"] .btn.primary:hover { background: var(--brand-fill-hover); }
+/* 左メニューの「選択中の月」の件数バッジ＝オレンジの面なので文字は白（1か所で決める） */
+html[data-theme="dark"] .sidebar .ym-month-btn.active { color: #fff; }
+html[data-theme="dark"] .sidebar .ym-month-btn.active .ym-mcount { color: rgba(255, 255, 255, .85); }
 /* パネル・カード（背景が #fff で直書きされているもの） */
 html[data-theme="dark"] .panel,
 html[data-theme="dark"] .card { background: var(--panel); }
 /* バッジ・バー・お知らせ */
-html[data-theme="dark"] .badge.gray { background: #2b313a; color: #b7bec8; }
-html[data-theme="dark"] .badge.green { color: #7ee2a8; }
-html[data-theme="dark"] .badge.amber { color: #f5c26b; }
-html[data-theme="dark"] .badge.red { color: #f59a9a; }
-html[data-theme="dark"] .cat-通常 { background: #2b313a; color: #b7bec8; }
-html[data-theme="dark"] .cat-体力 { background: #14293a; color: #7cc4f0; }
-html[data-theme="dark"] .cat-安定重視 { background: #241f3a; color: #b8a6f5; }
-html[data-theme="dark"] .cat-育成 { background: #16301f; color: #7ee2a8; }
-html[data-theme="dark"] .bar { background: #2b313a; }
-html[data-theme="dark"] .alert.warn { color: #f5c26b; }
-html[data-theme="dark"] .alert.danger { color: #f59a9a; }
-html[data-theme="dark"] .alert.ok { color: #7ee2a8; }
+html[data-theme="dark"] .badge.gray { background: var(--chip-bg); color: var(--chip-ink); }
+html[data-theme="dark"] .badge.green { color: var(--ok-ink); }
+html[data-theme="dark"] .badge.amber { color: var(--warn-ink); }
+html[data-theme="dark"] .badge.red { color: var(--danger-ink); }
+html[data-theme="dark"] .cat-通常 { background: var(--chip-bg); color: var(--chip-ink); }
+html[data-theme="dark"] .cat-体力 { background: var(--info-soft); color: var(--info-ink); }
+html[data-theme="dark"] .cat-安定重視 { background: var(--accent2-soft); color: #b8a6f5; }
+html[data-theme="dark"] .cat-育成 { background: var(--ok-soft); color: var(--ok-ink); }
+html[data-theme="dark"] .bar { background: var(--chip-bg); }
+html[data-theme="dark"] .alert.warn { color: var(--warn-ink); }
+html[data-theme="dark"] .alert.danger { color: var(--danger-ink); }
+html[data-theme="dark"] .alert.ok { color: var(--ok-ink); }
 /* 変更履歴の欄（灰色系が直書きされている） */
 html[data-theme="dark"] .hist-item { border-bottom-color: var(--line); }
 html[data-theme="dark"] .hist-empty,
@@ -167,13 +203,13 @@ html[data-theme="dark"] .hist-who,
 html[data-theme="dark"] .hist-date-head { color: var(--ink); }
 html[data-theme="dark"] .hist-old,
 html[data-theme="dark"] .hist-arrow,
-html[data-theme="dark"] .hist-field::after { color: #98a0aa; }
+html[data-theme="dark"] .hist-field::after { color: var(--muted-dim); }
 /* 入力欄（白地・黒文字が既定のブラウザ標準を上書きする） */
 html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea {
-  background: #23272f; color: var(--ink); border-color: #3a414c;
+  background: var(--surface-2); color: var(--ink); border-color: var(--field-line);
 }
 /* 画面の上によく出る黄色い注記（.mock-note）。黒地では「暗い黄＋明るい文字」にする。 */
-html[data-theme="dark"] .mock-note { border-color: #5c4718; color: #f5c26b; }
+html[data-theme="dark"] .mock-note { border-color: var(--warn-line); color: var(--warn-ink); }
 
 /* ===== 黒ベース：JavaScript が直接書き込む文字色の救済（2026-09-09 baba「黒文字の箇所ある」）=====
 
@@ -205,28 +241,28 @@ html[data-theme="dark"] [style*="color: #a08a73"] { color: var(--muted) !importa
 html[data-theme="dark"] [style*="color:#b45309"]:not([style*="background-color:#b45309"]),
 html[data-theme="dark"] [style*="color: #b45309"],
 html[data-theme="dark"] [style*="color:#8a5a10"]:not([style*="background-color:#8a5a10"]),
-html[data-theme="dark"] [style*="color:#7a5200"]:not([style*="background-color:#7a5200"]) { color: #f5c26b !important; }
+html[data-theme="dark"] [style*="color:#7a5200"]:not([style*="background-color:#7a5200"]) { color: var(--warn-ink) !important; }
 html[data-theme="dark"] [style*="color:#b5673a"]:not([style*="background-color:#b5673a"]),
 html[data-theme="dark"] [style*="color: #b5673a"],
 html[data-theme="dark"] [style*="color:#b4530a"]:not([style*="background-color:#b4530a"]) { color: #e0a070 !important; }
 html[data-theme="dark"] [style*="color:#b91c1c"]:not([style*="background-color:#b91c1c"]),
 html[data-theme="dark"] [style*="color: #b91c1c"],
 html[data-theme="dark"] [style*="color:#c0392b"]:not([style*="background-color:#c0392b"]),
-html[data-theme="dark"] [style*="color:#a12121"]:not([style*="background-color:#a12121"]) { color: #f59a9a !important; }
+html[data-theme="dark"] [style*="color:#a12121"]:not([style*="background-color:#a12121"]) { color: var(--danger-ink) !important; }
 html[data-theme="dark"] [style*="color:#15803d"]:not([style*="background-color:#15803d"]),
 html[data-theme="dark"] [style*="color: #15803d"],
 html[data-theme="dark"] [style*="color:#166534"]:not([style*="background-color:#166534"]),
-html[data-theme="dark"] [style*="color:#2e7d32"]:not([style*="background-color:#2e7d32"]) { color: #7ee2a8 !important; }
+html[data-theme="dark"] [style*="color:#2e7d32"]:not([style*="background-color:#2e7d32"]) { color: var(--ok-ink) !important; }
 html[data-theme="dark"] [style*="color:#2c6ca0"]:not([style*="background-color:#2c6ca0"]),
 html[data-theme="dark"] [style*="color:#0369a1"]:not([style*="background-color:#0369a1"]),
-html[data-theme="dark"] [style*="color:#3b6db5"]:not([style*="background-color:#3b6db5"]) { color: #7cc4f0 !important; }
+html[data-theme="dark"] [style*="color:#3b6db5"]:not([style*="background-color:#3b6db5"]) { color: var(--info-ink) !important; }
 html[data-theme="dark"] [style*="color:#6b7280"]:not([style*="background-color:#6b7280"]),
 html[data-theme="dark"] [style*="color: #6b7280"],
 html[data-theme="dark"] [style*="color:#374151"]:not([style*="background-color:#374151"]),
-html[data-theme="dark"] [style*="color:#333"]:not([style*="background-color:#333"]) { color: #98a0aa !important; }
+html[data-theme="dark"] [style*="color:#333"]:not([style*="background-color:#333"]) { color: var(--muted-dim) !important; }
 /* 「これは見本です」の帯 */
 .theme-preview-bar {
-  background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700;
+  background: var(--brand-fill); color: #fff; font-size: 12.5px; font-weight: 700;
   padding: 7px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .theme-preview-bar a { color: #fff; text-decoration: underline; font-weight: 700; }
@@ -290,7 +326,7 @@ a:hover { text-decoration: underline; }
   gap: 10px;
 }
 .sidebar nav a:hover { background: #dccbb1; color: #4f4338; text-decoration: none; }
-.sidebar nav a.active { background: var(--brand); color: #fff; }
+.sidebar nav a.active { background: var(--brand-fill); color: #fff; }
 .sidebar nav .group-label {
   font-size: 11px;
   color: #a08a73;
@@ -478,8 +514,8 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-family: inherit;
 }
 .btn:hover { background: #f3ece0; text-decoration: none; }
-.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
-.btn.primary:hover { background: var(--brand-dark); }
+.btn.primary { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-fill-hover); }
 .btn.ghost { background: transparent; }
 .btn.sm { padding: 5px 11px; font-size: 12.5px; }
 
@@ -514,7 +550,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ===== バー（充足率など） ===== */
 .bar { background: #ece3d4; border-radius: 999px; height: 8px; overflow: hidden; }
-.bar > span { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
+.bar > span { display: block; height: 100%; background: var(--brand-fill); border-radius: 999px; }
 .bar > span.ok { background: var(--ok); }
 .bar > span.warn { background: var(--warn); }
 .bar > span.danger { background: var(--danger); }

@@ -192,18 +192,18 @@
        意味の色（大型＝赤／オンライン＝青／リアル＝緑／宿泊＝橙／利益＝緑）は残したまま、
        「暗い面＋明るい文字」に置き換える。 */
     html[data-theme="dark"] .pick-bar select,
-    html[data-theme="dark"] .yen-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .type-badge.type-big    { background: #3a1c1c; color: #f59a9a; }
-    html[data-theme="dark"] .type-badge.type-online { background: #14293a; color: #7cc4f0; }
-    html[data-theme="dark"] .type-badge.type-real   { background: #16301f; color: #7ee2a8; }
-    html[data-theme="dark"] .stay-badge { background: #33280f; color: #f5c26b; }
-    html[data-theme="dark"] tr.profit-row td { background: #16301f; color: var(--ink); }
-    html[data-theme="dark"] tr.profit-row td.minus { color: #f59a9a; }
-    html[data-theme="dark"] .saved-ping { color: #7ee2a8; }
+    html[data-theme="dark"] .yen-input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .type-badge.type-big    { background: var(--danger-soft); color: var(--danger-ink); }
+    html[data-theme="dark"] .type-badge.type-online { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .type-badge.type-real   { background: var(--ok-soft); color: var(--ok-ink); }
+    html[data-theme="dark"] .stay-badge { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] tr.profit-row td { background: var(--ok-soft); color: var(--ink); }
+    html[data-theme="dark"] tr.profit-row td.minus { color: var(--danger-ink); }
+    html[data-theme="dark"] .saved-ping { color: var(--ok-ink); }
     /* スマホでカード表示になる経費の行（白地が書いてある）。マウスを乗せたときの色も合わせて指定する */
     html[data-theme="dark"] #costBody tr { background: var(--panel); }
-    html[data-theme="dark"] #costBody tr:hover { background: #23272f; }
-    html[data-theme="dark"] #finPanel tr.profit-row { background: #16301f; }
+    html[data-theme="dark"] #costBody tr:hover { background: var(--surface-2); }
+    html[data-theme="dark"] #finPanel tr.profit-row { background: var(--ok-soft); }
   </style>
 @endverbatim
 @endpush

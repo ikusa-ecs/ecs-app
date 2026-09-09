@@ -59,7 +59,7 @@
     .rate .rbar { width: 70px; height: 8px; background: #ece3d4; border-radius: 999px; overflow: hidden; }
     .rate .rbar > i { display: block; height: 100%; }
     .rate .rbar > i.hi { background: var(--ok); }
-    .rate .rbar > i.mid { background: var(--brand); }
+    .rate .rbar > i.mid { background: var(--brand-fill); }
     .rate .rbar > i.low { background: var(--warn); }
     .rate .rtxt { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; width: 36px; }
 
@@ -90,9 +90,9 @@
       width: 30px; height: 30px; font-size: 15px; text-decoration: none; color: var(--ink);
     }
     .wl-month .wl-mon-btn.wide { width: auto; padding: 0 10px; font-size: 12.5px; font-weight: 700; }
-    .wl-month .wl-mon-btn.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .wl-month .wl-mon-btn.on { background: var(--brand-fill); color: #fff; border-color: var(--brand); }
     .wl-month .wl-mon-btn:hover { background: #f3ece0; }
-    .wl-month .wl-mon-btn.on:hover { background: var(--brand); }
+    .wl-month .wl-mon-btn.on:hover { background: var(--brand-fill); }
     .wl-month .wl-mon { font-size: 14px; font-weight: 700; min-width: 96px; text-align: center; }
     /* その月の希望が1件も無いとき。空の表だけだと「壊れている」と誤解されるので理由を出す。 */
     .wl-empty {
@@ -104,17 +104,17 @@
        上の色は白地むけに直接書いてあるので、黒地だと白い入力欄・ベージュのタグ・
        生成りのお知らせ帯が読みにくい。意味の色（ベテラン＝緑など）はそのまま残す。 */
     html[data-theme="dark"] .wl-filter select,
-    html[data-theme="dark"] .wl-filter input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .lv.mid { background: #2b313a; color: #b7bec8; }
-    html[data-theme="dark"] .lv.vet { color: #7ee2a8; }
-    html[data-theme="dark"] .rate .rbar { background: #2b313a; }
-    html[data-theme="dark"] .ptag { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .wl-filter input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .lv.mid { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .lv.vet { color: var(--ok-ink); }
+    html[data-theme="dark"] .rate .rbar { background: var(--chip-bg); }
+    html[data-theme="dark"] .ptag { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .ptag.key { background: var(--brand-soft); color: var(--brand-dark); }
-    html[data-theme="dark"] .wl-month .wl-mon-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .wl-month .wl-mon-btn:hover { background: #2f353f; }
+    html[data-theme="dark"] .wl-month .wl-mon-btn { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .wl-month .wl-mon-btn:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .wl-month .wl-mon-btn.on,
-    html[data-theme="dark"] .wl-month .wl-mon-btn.on:hover { background: var(--brand); color: #ffffff; border-color: var(--brand); }
-    html[data-theme="dark"] .wl-empty { background: #33280f; border-color: #5c4a20; color: #f5c26b; }
+    html[data-theme="dark"] .wl-month .wl-mon-btn.on:hover { background: var(--brand-fill); color: #ffffff; border-color: var(--brand); }
+    html[data-theme="dark"] .wl-empty { background: var(--warn-soft); border-color: #5c4a20; color: var(--warn-ink); }
   </style>
   @endverbatim
 </head>

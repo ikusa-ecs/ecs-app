@@ -58,8 +58,8 @@
      白い入力欄・薄いグレーのバー・茶色のバッジ文字だけを黒地向けに置き換える。
      アサインの進み具合を表す帯（緑/橙/赤）は意味なので、色はそのまま。 */
   html[data-theme="dark"] .pick-bar select,
-  html[data-theme="dark"] .pick-bar input[type="date"] { background: #23272f; color: var(--ink); border-color: #3a414c; }
-  html[data-theme="dark"] .fill .bar { background: #2b313a; }
+  html[data-theme="dark"] .pick-bar input[type="date"] { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+  html[data-theme="dark"] .fill .bar { background: var(--chip-bg); }
   html[data-theme="dark"] .badge-cat { background: var(--brand-soft); color: var(--brand-dark); }
 </style>
 @endverbatim

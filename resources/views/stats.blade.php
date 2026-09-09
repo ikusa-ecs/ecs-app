@@ -14,7 +14,7 @@
     background: #fff; color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; text-decoration: none;
   }
   .st-tab:hover { background: #f3ece0; text-decoration: none; }
-  .st-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .st-tab.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
 
   /* 表示範囲（全拠点／各拠点）を選ぶボタン列 */
   .st-scope { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
@@ -24,7 +24,7 @@
     background: #fff; color: var(--muted); font-size: 12.5px; font-weight: 700; text-decoration: none;
   }
   .st-scope a:hover { background: #f3ece0; }
-  .st-scope a.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .st-scope a.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
   .st-scope a.all { border-style: dashed; }
 
   /* 上部の操作バー（選んだ粒度の中で期間を選ぶ）。タブの下にくっつける。 */
@@ -91,7 +91,7 @@
   /* CSV出力ボタン */
   .st-csv {
     padding: 7px 14px; border: 1px solid var(--brand); border-radius: 8px;
-    background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700;
+    background: var(--brand-fill); color: #fff; font-size: 12.5px; font-weight: 700;
     text-decoration: none; white-space: nowrap;
   }
   .st-csv:hover { opacity: .9; text-decoration: none; }
@@ -141,33 +141,33 @@
      白い面と茶色系の細かい文字が黒地に残ると読めないので、暗い面＋明るい文字にする。
      増＝緑／減＝赤 の意味は変えない。 */
   html[data-theme="dark"] .st-tab { background: var(--panel); }
-  html[data-theme="dark"] .st-tab:hover { background: #262b33; }
+  html[data-theme="dark"] .st-tab:hover { background: var(--surface-3); }
   html[data-theme="dark"] .st-tab.active { color: #ffffff; }
   html[data-theme="dark"] .st-scope .sc-label { color: var(--muted); }
   html[data-theme="dark"] .st-scope a { background: var(--panel); }
-  html[data-theme="dark"] .st-scope a:hover { background: #262b33; }
+  html[data-theme="dark"] .st-scope a:hover { background: var(--surface-3); }
   html[data-theme="dark"] .st-scope a.active { color: #ffffff; }
-  html[data-theme="dark"] .st-controls select { background: #23272f; border-color: #3a414c; }
+  html[data-theme="dark"] .st-controls select { background: var(--surface-2); border-color: var(--field-line); }
   html[data-theme="dark"] .st-controls .lbl { color: var(--muted); }
   html[data-theme="dark"] .st-kpi .k-label { color: var(--muted); }
   html[data-theme="dark"] .st-kpi .k-num small { color: var(--muted); }
   html[data-theme="dark"] .k-yoy { color: var(--muted); }
-  html[data-theme="dark"] .k-yoy .up { color: #7ee2a8; }
-  html[data-theme="dark"] .k-yoy .down { color: #f59a9a; }
+  html[data-theme="dark"] .k-yoy .up { color: var(--ok-ink); }
+  html[data-theme="dark"] .k-yoy .down { color: var(--danger-ink); }
   html[data-theme="dark"] .k-yoy .flat,
   html[data-theme="dark"] .k-yoy .prev { color: var(--muted); }
   html[data-theme="dark"] .st-panel .empty { color: var(--muted); }
   html[data-theme="dark"] .st-row .r-name .sub,
   html[data-theme="dark"] .st-row .r-num small { color: var(--muted); }
   html[data-theme="dark"] .st-row.zero .r-name,
-  html[data-theme="dark"] .st-row.zero .r-num { color: #98a0aa; }
+  html[data-theme="dark"] .st-row.zero .r-num { color: var(--muted-dim); }
   html[data-theme="dark"] .st-emp-table th { color: var(--muted); }
   html[data-theme="dark"] .st-emp-table td.l .sub { color: var(--muted); }
-  html[data-theme="dark"] .st-emp-table tbody tr:hover { background: #23272f; }
+  html[data-theme="dark"] .st-emp-table tbody tr:hover { background: var(--surface-2); }
   html[data-theme="dark"] .st-dept .d-sub { color: var(--muted); }
   html[data-theme="dark"] .st-note { color: var(--muted); }
   html[data-theme="dark"] .st-excluded,
-  html[data-theme="dark"] .st-excluded-list { background: #23272f; }
+  html[data-theme="dark"] .st-excluded-list { background: var(--surface-2); }
   html[data-theme="dark"] .st-csv { color: #ffffff; }
 </style>
 @endpush

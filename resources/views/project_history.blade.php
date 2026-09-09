@@ -15,7 +15,7 @@
   }
   .ph-count { font-size: 12.5px; color: var(--muted); margin-left: auto; }
   /* 黒ベース（2026-09-09）。白いプルダウンのままだと黒地で浮く。 */
-  html[data-theme="dark"] .ph-bar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .ph-bar select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
   .ph-pager { display: flex; gap: 10px; align-items: center; margin-top: 16px; font-size: 13px; }
   .ph-pager .spacer { flex: 1; }
   /* スマホでは絞り込みを縦に積む（横並びだと1行に収まらず押しにくいため） */

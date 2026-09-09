@@ -67,7 +67,7 @@
       padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
       font-family: inherit; border: 1px solid var(--line); background: #fff; color: var(--brand-dark);
     }
-    .m-btn.primary { background: var(--brand); border-color: var(--brand-dark); color: #fff; }
+    .m-btn.primary { background: var(--brand-fill); border-color: var(--brand-dark); color: #fff; }
     .m-btn.danger { color: var(--danger); border-color: #f0b9b9; }
     .m-btn:hover { filter: brightness(.97); }
     a.m-btn { text-decoration: none; display: inline-flex; align-items: center; white-space: nowrap; }
@@ -79,18 +79,18 @@
     /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
        上の色は白地むけに直接書いてあるので、黒地だと白いボタン・白い入力欄・
        茶色の文字が読みにくい。緑＝完了／赤＝エラーの意味はそのまま残す。 */
-    html[data-theme="dark"] .m-nav a { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .m-nav a:hover { background: #2f353f; }
-    html[data-theme="dark"] .flash { border-color: #2f5c40; color: #7ee2a8; }
-    html[data-theme="dark"] .m-err { border-color: #6b2f2f; color: #f59a9a; }
+    html[data-theme="dark"] .m-nav a { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .m-nav a:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] .flash { border-color: var(--ok-line); color: var(--ok-ink); }
+    html[data-theme="dark"] .m-err { border-color: var(--danger-line); color: var(--danger-ink); }
     html[data-theme="dark"] .m-row.add { border-top-color: var(--line); }
     html[data-theme="dark"] .m-req { color: var(--ink); }
     html[data-theme="dark"] .m-id { color: var(--muted); }
     html[data-theme="dark"] .m-row input[type=text],
-    html[data-theme="dark"] .m-row input[type=number] { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .m-btn { background: #262b33; border-color: #3a414c; }
-    html[data-theme="dark"] .m-btn.primary { background: var(--brand); border-color: var(--brand); color: #ffffff; }
-    html[data-theme="dark"] .m-btn.danger { color: #f59a9a; border-color: #6b2f2f; background: #262b33; }
+    html[data-theme="dark"] .m-row input[type=number] { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .m-btn { background: var(--surface-3); border-color: var(--field-line); }
+    html[data-theme="dark"] .m-btn.primary { background: var(--brand-fill); border-color: var(--brand); color: #ffffff; }
+    html[data-theme="dark"] .m-btn.danger { color: var(--danger-ink); border-color: var(--danger-line); background: var(--surface-3); }
 </style>
 @endpush
 

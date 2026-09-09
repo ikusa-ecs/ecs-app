@@ -35,16 +35,16 @@
      取り込みの合否（緑＝OK／赤＝NG）の意味は変えない。 */
   html[data-theme="dark"] .pi-steps,
   html[data-theme="dark"] .pi-cols { color: var(--muted); }
-  html[data-theme="dark"] .pi-drop { background: #23272f; color: var(--muted); }
-  html[data-theme="dark"] .pi-drop.drag { background: #16301f; color: #7ee2a8; border-color: #3d8a5f; }
-  html[data-theme="dark"] .pi-summary .ok { color: #7ee2a8; }
-  html[data-theme="dark"] .pi-summary .ng { color: #f59a9a; }
-  html[data-theme="dark"] table.pi-table th { background: #23272f; color: var(--muted); }
-  html[data-theme="dark"] table.pi-table tr.row-ng td { background: #3a1c1c; }
-  html[data-theme="dark"] table.pi-table tr.row-ok td { background: #16301f; }
-  html[data-theme="dark"] .pi-reason { color: #f59a9a; }
-  html[data-theme="dark"] .pi-flash.ok { background: #16301f; color: #7ee2a8; border-color: #245c37; }
-  html[data-theme="dark"] .pi-flash.err { background: #3a1c1c; color: #f59a9a; border-color: #5a2a2a; }
+  html[data-theme="dark"] .pi-drop { background: var(--surface-2); color: var(--muted); }
+  html[data-theme="dark"] .pi-drop.drag { background: var(--ok-soft); color: var(--ok-ink); border-color: #3d8a5f; }
+  html[data-theme="dark"] .pi-summary .ok { color: var(--ok-ink); }
+  html[data-theme="dark"] .pi-summary .ng { color: var(--danger-ink); }
+  html[data-theme="dark"] table.pi-table th { background: var(--surface-2); color: var(--muted); }
+  html[data-theme="dark"] table.pi-table tr.row-ng td { background: var(--danger-soft); }
+  html[data-theme="dark"] table.pi-table tr.row-ok td { background: var(--ok-soft); }
+  html[data-theme="dark"] .pi-reason { color: var(--danger-ink); }
+  html[data-theme="dark"] .pi-flash.ok { background: var(--ok-soft); color: var(--ok-ink); border-color: var(--ok-line); }
+  html[data-theme="dark"] .pi-flash.err { background: var(--danger-soft); color: var(--danger-ink); border-color: var(--danger-line); }
   /* 直接 style="" に色が書かれている箇所。CSSからは上書きできないので、黒地のときだけ !important で読める色にする。 */
   html[data-theme="dark"] [style*="#8a7a66"] { color: var(--muted) !important; }
 </style>

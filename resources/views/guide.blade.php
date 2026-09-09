@@ -2,9 +2,13 @@
 {{-- 機能が増えたらこのファイルを更新する＝アプリ内のガイドが最新になる（生きた説明書）。 --}}
 {{-- 更新したら、いちばん下の「更新履歴」にも1行足すこと。 --}}
 {{-- CSSのメディアクエリ等をBladeに解釈させないため、全体をBladeが解釈しない区間で囲んでいる。 --}}
-@verbatim
+{{-- 画面の色（テーマ）を効かせる。⚠ この2行だけ「そのまま出す区間」の外に出してある
+     （その区間の中では差し込みが解釈されないため）。
+     ⚠ このコメントの中に Blade の命令名を書かないこと。書くと本物の命令とみなされて
+       コメントが閉じられず、画面に記号がそのまま出る（2026-09-09 に実際に踏んだ）。 --}}
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
+@verbatim
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +18,25 @@
     --brand:#a15c2e; --brand-soft:#f6ede4; --ink:#2f2a24; --muted:#7a6f63;
     --line:#e6d8c8; --ok:#166534; --ok-soft:#e7f6ec; --warn:#8a5a10; --warn-soft:#fdf3e2;
   }
+  /* ===== 黒ベース（2026-09-09）=====
+     この画面は共通CSS（public/ecs/style.css）を読まない独立ページなので、
+     色の入れ物（上の :root）を黒向けに入れ替える。
+     ⚠ 白い面（#fbf8f4・#fff）と、白の上でしか読めない色は下で個別に上書きする。
+     ⚠ 印刷用の指定（@media print）は触らない＝紙は白いままでよい。 */
+  html[data-theme="dark"]{
+    --brand:#dda94e; --brand-soft:#40340f; --ink:#e6e8ea; --muted:#9aa2ad;
+    --line:#3a414c; --ok:#5cbf8a; --ok-soft:#1d4029; --warn:#dda94e; --warn-soft:#40340f;
+  }
+  html[data-theme="dark"] body{ background:#16181d; }
+  html[data-theme="dark"] nav.toc,
+  html[data-theme="dark"] section{ background:#232830; }
+  html[data-theme="dark"] .note{ border-color:#5c4718; }
+  html[data-theme="dark"] .tip{ border-color:#2c5c3c; }
+  html[data-theme="dark"] th{ color:#dda94e; }
+  html[data-theme="dark"] td,
+  html[data-theme="dark"] th{ border-color:#3a414c; }
+  html[data-theme="dark"] code{ background:#191c22; color:#e6e8ea; }
+
   *{ box-sizing:border-box; }
   html{ scroll-behavior:smooth; }
   body{
@@ -57,7 +80,7 @@
   .steps>li:last-child{ border-bottom:none; }
   .steps>li::before{
     content:counter(s); position:absolute; left:0; top:8px;
-    width:28px; height:28px; border-radius:50%; background:var(--brand); color:#fff;
+    width:28px; height:28px; border-radius:50%; background:var(--brand-fill); color:#fff;
     text-align:center; line-height:28px; font-weight:700; font-size:14px;
   }
   .steps b{ color:var(--brand); }
@@ -68,7 +91,7 @@
   .menu{ display:inline-block; background:#f3ece4; border:1px solid var(--line); border-radius:6px; padding:0 7px; font-size:13.5px; font-weight:700; }
 
   .fb-btn{
-    display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
+    display:inline-block; background:var(--brand-fill); color:#fff; text-decoration:none;
     padding:10px 22px; border-radius:24px; font-weight:700; font-size:14.5px;
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }
@@ -423,6 +446,22 @@
       <tr><th style="width:110px;">日付</th><th>変わったこと</th></tr>
       <tr>
         <td>2026-09-09</td>
+        <td><b>黒ベースを<u>3つの立場（アサイン担当・エンジニア・デザイナー）で点検</u>し、見つかった問題を直しました。</b><br>
+          直したのは次のとおりです。
+          <span class="why">※ ①<b>ボタンにマウスを乗せると文字が消えていた</b>（毎日押す「詳細」「公開する」「保存」）＝オレンジが明るくなる向きだったのを、濃くする向きに直しました。<br>
+          ※ ②<b>「足りない」側が沈んでいた</b>＝緑・橙・赤の基本色を黒ベース用に入れ替えていませんでした（「あと◯名」「不足バー」「D未定の日」が目立たない状態でした）。<br>
+          ※ ③<b>「注意」と「選択中」が同じオレンジ</b>だったのを、色を離しました。<br>
+          ※ ④<b>左メニューと本文が同じ黒で境目が無かった</b>のを、メニューを暗くして境界線を足しました。<br>
+          ※ ⑤<b>入力欄とボタンが同じ色</b>だったのを、入力欄は暗く（へこむ）・ボタンは明るく（出る）に分けました。入力中の欄も枠が光るようにしました。<br>
+          ※ ⑥<b>スタッフの稼働希望カレンダーの ○ と × が見分けられなかった</b>のを直しました（自分の出られる日を間違える箇所でした）。<br>
+          ※ ⑦<b>使い方ガイド（このページ）も黒に対応</b>しました。<br>
+          ※ ⑧ 保存できたときの緑帯など、<b>黒にすると前より読めなくなっていた3か所</b>を直しました。<br>
+          ※ 色の名前を1か所にまとめ（面4段・意味の色は面/文字/枠の3段）、画面側の直書き<b>約1,200か所</b>をその名前に寄せました＝「もう少し明るく」の一言で全画面直せます。<br>
+          ※ 明るい画面（いまの色・会社カラー）の見た目は<b>変わっていません</b>。</span>
+        </td>
+      </tr>
+      <tr>
+        <td>2026-09-09</td>
         <td><b>黒ベースで<u>「選択しているところ」の文字が黒く見えていた</u>のを直しました。</b>（baba指摘）<br>
           例＝マイページの「📋 リスト表示／📅 カレンダー表示」を選んでいるとき。
           <span class="why">※ 原因＝オレンジの面に<b>濃い色の文字</b>を置いていたためです（まぶしさを抑えるつもりでしたが、黒っぽく見えて逆に読みにくくなっていました）。<br>
@@ -437,7 +476,7 @@
           原因は3つで、すべて直しました。
           <span class="why">※ ①<b>黒対応が抜けていた画面が4つ</b>（CSV一括取込のハブ・編集履歴・アサインダッシュボード・申し送りの付箋の入力欄）。<br>
           ※ ②<b>画面のプログラムが直接書き込んでいた文字色</b>＝ふつうのやり方では上書きできないため、黒のときだけ読める色に置き換える仕掛けを共通CSSに入れました。<br>
-          ※ ③<b>灰色が暗すぎた箇所</b>＝黒地で沈んでいたので明るくしました（今後も<b>#98a0aa より暗い灰色は使わない</b>ことにしています）。<br>
+          ※ ③<b>灰色が暗すぎた箇所</b>＝黒地で沈んでいたので明るくしました（今後も<b>var(--muted-dim) より暗い灰色は使わない</b>ことにしています）。<br>
           ※ 明るい画面（いまの色・会社カラー）の見た目は<b>変わっていません</b>。<br>
           ※ ⚠ まだ見にくい場所があれば、<b>どの画面のどこか</b>を教えてください（画面ごとに直せます）。使い方ガイド自体は白い紙のままです。</span>
         </td>

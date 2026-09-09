@@ -14,7 +14,7 @@
     height:30px; min-width:30px; padding:0 9px; font-size:14px; text-decoration:none; color:var(--ink);
   }
   .am-month a:hover { background:#f3ece0; }
-  .am-month a.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .am-month a.on { background:var(--brand-fill); color:#fff; border-color:var(--brand); }
   .am-month .lbl { font-size:15px; font-weight:700; min-width:104px; text-align:center; }
 
   .am-flash { background:var(--ok-soft); color:#166534; border:1px solid #bbe3c6;
@@ -35,8 +35,8 @@
   .am-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 0 18px; }
   .am-btn { border:none; border-radius:10px; padding:11px 20px; font-family:inherit;
     font-size:14px; font-weight:700; cursor:pointer; }
-  .am-btn.go { background:var(--brand); color:#fff; }
-  .am-btn.go:hover { background:var(--brand-dark); }
+  .am-btn.go { background:var(--brand-fill); color:#fff; }
+  .am-btn.go:hover { background:var(--brand-fill-hover); }
   .am-btn.go:disabled { background:#ddd3c4; color:#8a7a66; cursor:default; }
   .am-btn.undo { background:#fff; color:#b91c1c; border:1px solid #f0b9b9; }
   .am-btn.undo:hover { background:#fdecec; }
@@ -99,31 +99,31 @@
   /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
      白い面・茶色の文字・淡い色の帯を、暗い面＋明るい文字に置き換える。意味の色（緑＝増えた／赤＝戻す）は変えない。 */
   html[data-theme="dark"] .am-month a { background:var(--panel); }
-  html[data-theme="dark"] .am-month a:hover { background:#262b33; }
-  html[data-theme="dark"] .am-month a.on { background:var(--brand); color:#ffffff; }
-  html[data-theme="dark"] .am-flash { background:#16301f; color:#7ee2a8; border-color:#245c37; }
+  html[data-theme="dark"] .am-month a:hover { background:var(--surface-3); }
+  html[data-theme="dark"] .am-month a.on { background:var(--brand-fill); color:#ffffff; }
+  html[data-theme="dark"] .am-flash { background:var(--ok-soft); color:var(--ok-ink); border-color:var(--ok-line); }
   html[data-theme="dark"] .am-lead { background:var(--panel); }
-  html[data-theme="dark"] .am-warn { color:#f5c26b; }
+  html[data-theme="dark"] .am-warn { color:var(--warn-ink); }
   html[data-theme="dark"] .am-kpi { background:var(--panel); }
   html[data-theme="dark"] .am-btn.go { color:#ffffff; }
-  html[data-theme="dark"] .am-btn.go:disabled { background:#2b313a; color:#98a0aa; }
-  html[data-theme="dark"] .am-btn.undo { background:var(--panel); color:#f59a9a; border-color:#5a2a2a; }
-  html[data-theme="dark"] .am-btn.undo:hover { background:#3a1c1c; }
+  html[data-theme="dark"] .am-btn.go:disabled { background:var(--chip-bg); color:var(--muted-dim); }
+  html[data-theme="dark"] .am-btn.undo { background:var(--panel); color:var(--danger-ink); border-color:var(--danger-line); }
+  html[data-theme="dark"] .am-btn.undo:hover { background:var(--danger-soft); }
   html[data-theme="dark"] .am-skip { background:var(--panel); }
-  html[data-theme="dark"] .am-skip .s-day { background:#23272f; border-color:#3a414c; color:var(--ink); }
-  html[data-theme="dark"] .am-skip .s-day:hover { background:#262b33; }
-  html[data-theme="dark"] .am-skip .s-day.off { background:#23272f; color:#98a0aa; border-color:#343a44; }
-  html[data-theme="dark"] .am-skip .s-day .cn { background:#2b313a; color:#b7bec8; }
+  html[data-theme="dark"] .am-skip .s-day { background:var(--surface-2); border-color:var(--field-line); color:var(--ink); }
+  html[data-theme="dark"] .am-skip .s-day:hover { background:var(--surface-3); }
+  html[data-theme="dark"] .am-skip .s-day.off { background:var(--surface-2); color:var(--muted-dim); border-color:#343a44; }
+  html[data-theme="dark"] .am-skip .s-day .cn { background:var(--chip-bg); color:var(--chip-ink); }
   html[data-theme="dark"] .am-skip .s-day.s-hand { border-color:#7a5a1e; background:#2a2418; }
-  html[data-theme="dark"] .am-skip .s-day.s-hand.off { border-color:#4a4230; background:#23272f; }
-  html[data-theme="dark"] .am-ord { background:#2b313a; color:#b7bec8; }
+  html[data-theme="dark"] .am-skip .s-day.s-hand.off { border-color:#4a4230; background:var(--surface-2); }
+  html[data-theme="dark"] .am-ord { background:var(--chip-bg); color:var(--chip-ink); }
   html[data-theme="dark"] table.am-tbl { background:var(--panel); }
   html[data-theme="dark"] table.am-tbl th, html[data-theme="dark"] table.am-tbl td { border-bottom-color:var(--line); }
-  html[data-theme="dark"] table.am-tbl th { background:#23272f; }
-  html[data-theme="dark"] table.am-tbl tr.short td { background:#33280f; }
+  html[data-theme="dark"] table.am-tbl th { background:var(--surface-2); }
+  html[data-theme="dark"] table.am-tbl tr.short td { background:var(--warn-soft); }
   html[data-theme="dark"] .am-pick .rl { background:#1a1d23; color:var(--brand-dark); }
-  html[data-theme="dark"] .am-slot { background:#14293a; color:#7cc4f0; }
-  html[data-theme="dark"] .am-up { color:#7ee2a8; }
+  html[data-theme="dark"] .am-slot { background:var(--info-soft); color:var(--info-ink); }
+  html[data-theme="dark"] .am-up { color:var(--ok-ink); }
 </style>
 @endverbatim
 @endpush

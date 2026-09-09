@@ -40,15 +40,15 @@
       .pnote .pn-msg    { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #b45309; }
       .pnote .pn-msg.ok { color: #15803d; }
       /* 黒ベース（2026-09-09）。黄色い付箋は「暗い黄＋明るい文字」に置き換える（意味＝申し送り事項は同じ）。 */
-      html[data-theme="dark"] .pnote { background: #33280f; border-color: #5c4718; color: #f5c26b; }
-      html[data-theme="dark"] .pnote.is-empty { background: #23272f; border-color: var(--line); color: var(--muted); }
+      html[data-theme="dark"] .pnote { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn-ink); }
+      html[data-theme="dark"] .pnote.is-empty { background: var(--surface-2); border-color: var(--line); color: var(--muted); }
       html[data-theme="dark"] .pnote .pn-body.empty { color: var(--muted); }
-      html[data-theme="dark"] .pnote .pn-btn { background: var(--panel); color: #f5c26b; border-color: #5c4718; }
+      html[data-theme="dark"] .pnote .pn-btn { background: var(--panel); color: var(--warn-ink); border-color: var(--warn-line); }
       html[data-theme="dark"] .pnote .pn-btn:hover { background: #3a2f14; }
       html[data-theme="dark"] .pnote .pn-btn.save { background: #a87c22; border-color: #a87c22; color: #ffffff; }
-      html[data-theme="dark"] .pnote .pn-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-      html[data-theme="dark"] .pnote .pn-msg { color: #f5c26b; }
-      html[data-theme="dark"] .pnote .pn-msg.ok { color: #7ee2a8; }
+      html[data-theme="dark"] .pnote .pn-input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+      html[data-theme="dark"] .pnote .pn-msg { color: var(--warn-ink); }
+      html[data-theme="dark"] .pnote .pn-msg.ok { color: var(--ok-ink); }
     </style>
     <script>window.ECS_NOTE_CSRF = '{{ csrf_token() }}';</script>
     @verbatim

@@ -95,20 +95,20 @@
        白い面・生成りの帯・茶色の文字を、暗い面＋明るい文字に置き換える。
        バッジの色の意味（紫＝スキル／緑＝D経験あり など）は変えない。 */
     html[data-theme="dark"] .filterbar input[type="text"],
-    html[data-theme="dark"] .filterbar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .stag { background: #241f3a; color: #b8a6f5; border-color: #3b3363; }
-    html[data-theme="dark"] .ctag { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
-    html[data-theme="dark"] .ctag.dir { color: #7ee2a8; border-color: #245c37; }
-    html[data-theme="dark"] .ctag .tag-x { color: #f59a9a; }
+    html[data-theme="dark"] .filterbar select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .stag { background: var(--accent2-soft); color: #b8a6f5; border-color: #3b3363; }
+    html[data-theme="dark"] .ctag { background: var(--chip-bg); color: var(--chip-ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .ctag.dir { color: var(--ok-ink); border-color: var(--ok-line); }
+    html[data-theme="dark"] .ctag .tag-x { color: var(--danger-ink); }
     html[data-theme="dark"] .ctag .tag-x:hover { color: #ffc9c9; }
-    html[data-theme="dark"] .tag-add select { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .save-ok { color: #7ee2a8; }
-    html[data-theme="dark"] tr.detail-row > td { background: #23272f; }
-    html[data-theme="dark"] .size-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] .privacy-note { background: #23272f; }
+    html[data-theme="dark"] .tag-add select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .save-ok { color: var(--ok-ink); }
+    html[data-theme="dark"] tr.detail-row > td { background: var(--surface-2); }
+    html[data-theme="dark"] .size-input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] .privacy-note { background: var(--surface-2); }
     /* 直接 style="" に色が書かれている箇所。CSSからは上書きできないので、黒地のときだけ !important で読める色にする。 */
     html[data-theme="dark"] .hire-date-echo[style] { color: var(--muted) !important; }
-    html[data-theme="dark"] .btn[style*="#b91c1c"] { color: #f59a9a !important; border-color: #5a2a2a !important; }
+    html[data-theme="dark"] .btn[style*="#b91c1c"] { color: var(--danger-ink) !important; border-color: var(--danger-line) !important; }
     html[data-theme="dark"] span[style*="#b5673a"] { color: #f5a97a !important; }
     html[data-theme="dark"] a[style*="#6b5544"] { color: var(--brand-dark) !important; }
   </style>

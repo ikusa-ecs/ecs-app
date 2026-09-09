@@ -80,12 +80,11 @@
   .dgr-item .drsn { font-size:12.5px; color:var(--ink); }
   .dgr-item .drsn .nm { color:var(--muted); }
 
-  /* ===== 黒ベース（見本・2026-09-09）=====
-     この画面だけ、黒でも読めるように色を差し替えている。
+  /* ===== 黒ベース（2026-09-09）=====
+     黒でも読めるように色を差し替えている。
      ⚠ 白い面（#fff）と、白の上でしか読めない淡い色（#f3f7ff・#fde68a）を置き換えるのが要点。
-     ⚠ 共通の枠（左メニュー・表・ボタン）は public/ecs/style.css の同じ並びで直してある。
-     ⚠ 他の画面はまだ整えていない＝黒はいまURLに ?theme=dark を付けたときだけ出る（保存できない）。 */
-  html[data-theme="dark"] .cnt-table tr.grp td { background:#23272f; }
+     ⚠ 共通の枠（左メニュー・表・ボタン）と色の名前は public/ecs/style.css が正本。 */
+  html[data-theme="dark"] .cnt-table tr.grp td { background:var(--surface-2); }
   html[data-theme="dark"] .cal-nav,
   html[data-theme="dark"] .cal-cell,
   html[data-theme="dark"] .day-panel { background:var(--panel); color:var(--ink); }
@@ -97,7 +96,7 @@
   html[data-theme="dark"] .cal-cell .big-mark,
   html[data-theme="dark"] .cal-legend .sw.big,
   html[data-theme="dark"] .day-panel .dp-item .big {
-    background:#4a3a10; color:#f5c26b; border-color:#6b5416;          /* 大型の印＝濃い黄 */
+    background:#4a3a10; color:var(--warn-ink); border-color:#6b5416;          /* 大型の印＝濃い黄 */
   }
 </style>
 @endverbatim
@@ -109,7 +108,8 @@
            ⚠ この差し込みは「そのまま出す区間」の外に置くこと（中に入れると記号がそのまま画面に出る）。 --}}
       @include('partials.office_switch')
       @if (!empty($officeScope))
-        <p class="mock-note" style="background:#fbf6ef;">
+        {{-- ⚠ 背景色をここに書かない（黒ベースのとき薄ベージュのまま残って読めなくなる）。 --}}
+        <p class="mock-note" style="background:var(--panel);">
           <b>{{ $officeScope }}</b>の案件だけで数えています（KPI・危険日カレンダー・件数集計のすべて）。
         </p>
       @endif

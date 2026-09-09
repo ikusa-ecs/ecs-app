@@ -123,8 +123,8 @@
     /* 操作の各ボタンは折り返して縦に並ぶ＝横幅を取らない（2026-08-21 baba） */
     td.ops-cell > * { margin: 2px 3px 2px 0 !important; }
     .pub-toggle { border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
-    .pub-toggle.go   { background: var(--brand); color: #fff; }
-    .pub-toggle.go:hover { background: var(--brand-dark); }
+    .pub-toggle.go   { background: var(--brand-fill); color: #fff; }
+    .pub-toggle.go:hover { background: var(--brand-fill-hover); }
     .pub-toggle.undo { background: #fff; color: #15803d; border: 1px solid #bbe3c6; }
     .pub-toggle.undo:hover { background: var(--ok-soft); }
     td.ops-cell a.detail-link { font-size: 11.5px; white-space: nowrap; }
@@ -160,7 +160,7 @@
     .ym-year-btn  { padding: 6px 10px; font-size: 12.5px; font-weight: 700; }
     .ym-month-btn { padding: 5px 10px 5px 26px; font-size: 12.5px; }
     .ym-year-btn:hover, .ym-month-btn:hover { background: #dccbb1; color: #4f4338; }
-    .ym-month-btn.active { background: var(--brand); color: #fff; font-weight: 700; }
+    .ym-month-btn.active { background: var(--brand-fill); color: #fff; font-weight: 700; }
     .ym-caret { width: 14px; display: inline-block; font-size: 10px; }
     .ym-year-btn .ym-ycount, .ym-month-btn .ym-mcount { margin-left: auto; font-size: 11px; color: #a08a73; }
     .ym-month-btn.active .ym-mcount { color: rgba(255,255,255,.85); }
@@ -172,7 +172,7 @@
     .view-tab { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
       color: var(--muted); font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
     .view-tab:hover { background: #f3ece0; }
-    .view-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .view-tab.active { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
     .view-tab .vt-count { font-weight: 600; opacity: .85; margin-left: 4px; }
 
     /* 登録日（いつ追加したか） */
@@ -193,7 +193,7 @@
       display: inline-flex; align-items: center; gap: 4px;
     }
     .day-chip:hover { background: #f7f1e8; border-color: var(--brand); }
-    .day-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .day-chip.on { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
     .day-chip .dw { font-size: 10.5px; opacity: .8; }
     .day-chip .cn { font-size: 10.5px; font-weight: 700; background: #f0e6d8; color: #6e5b49; border-radius: 999px; padding: 0 5px; }
     .day-chip.on .cn { background: rgba(255,255,255,.28); color: #fff; }
@@ -214,64 +214,64 @@
        公開＝緑・未公開＝オレンジ・追加案件＝赤、という意味の色は変えない。
        ========================================================================= */
     /* お知らせ文の編集 */
-    html[data-theme="dark"] .notice-edit textarea { background: #23272f; border-color: #3a414c; }
-    html[data-theme="dark"] .notice-edit .saved { color: #7ee2a8; }
+    html[data-theme="dark"] .notice-edit textarea { background: var(--surface-2); border-color: var(--field-line); }
+    html[data-theme="dark"] .notice-edit .saved { color: var(--ok-ink); }
 
     /* 上のサマリー・一括操作バー */
-    html[data-theme="dark"] .pub-bar .stat-mini .n.on { color: #7ee2a8; }
-    html[data-theme="dark"] .pub-bar .stat-mini .n.off { color: #f5c26b; }
-    html[data-theme="dark"] .pub-bar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .pub-bar .stat-mini .n.on { color: var(--ok-ink); }
+    html[data-theme="dark"] .pub-bar .stat-mini .n.off { color: var(--warn-ink); }
+    html[data-theme="dark"] .pub-bar select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
 
     /* 月グループ見出し */
-    html[data-theme="dark"] tr.group-row.past td { background: #23272f; }
+    html[data-theme="dark"] tr.group-row.past td { background: var(--surface-2); }
     /* 黒地では「暗くする」ホバーだと変化が見えないので、明るくする向きにそろえる。 */
     html[data-theme="dark"] tr.group-row td:hover { filter: brightness(1.35); }
 
     /* 集合時刻・必要人数の入力欄 */
     html[data-theme="dark"] td.meet-cell input.smeet,
-    html[data-theme="dark"] .need-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
-    html[data-theme="dark"] td.meet-cell .diff { color: #f5c26b; }
+    html[data-theme="dark"] .need-input { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
+    html[data-theme="dark"] td.meet-cell .diff { color: var(--warn-ink); }
 
     /* 公開状態バッジ */
-    html[data-theme="dark"] .pub-badge.on { color: #7ee2a8; }
-    html[data-theme="dark"] .pub-badge.off { color: #f5c26b; }
+    html[data-theme="dark"] .pub-badge.on { color: var(--ok-ink); }
+    html[data-theme="dark"] .pub-badge.off { color: var(--warn-ink); }
 
     /* 操作ボタン */
     html[data-theme="dark"] .pub-toggle.go { color: #ffffff; }
-    html[data-theme="dark"] .pub-toggle.undo { background: #262b33; color: #7ee2a8; border-color: #2c5c3c; }
+    html[data-theme="dark"] .pub-toggle.undo { background: var(--surface-3); color: var(--ok-ink); border-color: var(--ok-line); }
     html[data-theme="dark"] td.ops-cell .note-btn,
-    html[data-theme="dark"] td.ops-cell .cat-toggle { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] td.ops-cell .cat-toggle { background: var(--surface-3); border-color: var(--field-line); }
     html[data-theme="dark"] td.ops-cell .note-btn:hover,
-    html[data-theme="dark"] td.ops-cell .cat-toggle:hover { background: #2f353f; }
-    html[data-theme="dark"] td.ops-cell .note-btn.has { border-color: #5c4718; color: #f5c26b; }
-    html[data-theme="dark"] td.ops-cell .cat-toggle.is-extra { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] td.ops-cell .cat-toggle:hover { background: var(--surface-hover); }
+    html[data-theme="dark"] td.ops-cell .note-btn.has { border-color: var(--warn-line); color: var(--warn-ink); }
+    html[data-theme="dark"] td.ops-cell .cat-toggle.is-extra { background: var(--danger-soft); color: var(--danger-ink); }
 
     /* 備考の折りたたみ行 */
-    html[data-theme="dark"] tr.note-row > td { background: #23272f; }
-    html[data-theme="dark"] tr.note-row textarea { background: #23272f; border-color: #3a414c; }
-    html[data-theme="dark"] tr.note-row .saved { color: #7ee2a8; }
+    html[data-theme="dark"] tr.note-row > td { background: var(--surface-2); }
+    html[data-theme="dark"] tr.note-row textarea { background: var(--surface-2); border-color: var(--field-line); }
+    html[data-theme="dark"] tr.note-row .saved { color: var(--ok-ink); }
 
     /* 公開ボード / アーカイブ タブ */
     html[data-theme="dark"] .view-tab { background: var(--panel); }
-    html[data-theme="dark"] .view-tab:hover { background: #262b33; }
+    html[data-theme="dark"] .view-tab:hover { background: var(--surface-3); }
     html[data-theme="dark"] .view-tab.active { color: #ffffff; }
 
     /* 追加案件のバッジ */
-    html[data-theme="dark"] .badge.extra { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .badge.extra { background: var(--danger-soft); color: var(--danger-ink); }
 
     /* 日付を押してその日へ飛ぶ並び */
-    html[data-theme="dark"] .day-chip { background: #262b33; border-color: #3a414c; color: var(--ink); }
-    html[data-theme="dark"] .day-chip:hover { background: #2f353f; }
+    html[data-theme="dark"] .day-chip { background: var(--surface-3); border-color: var(--field-line); color: var(--ink); }
+    html[data-theme="dark"] .day-chip:hover { background: var(--surface-hover); }
     html[data-theme="dark"] .day-chip.on { color: #ffffff; }
-    html[data-theme="dark"] .day-chip .cn { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .day-chip .cn { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .day-chip.on .cn { background: rgba(0,0,0,.28); color: #ffffff; }
-    html[data-theme="dark"] .day-chip.sun { color: #f59a9a; }
-    html[data-theme="dark"] .day-chip.sat { color: #7cc4f0; }
+    html[data-theme="dark"] .day-chip.sun { color: var(--danger-ink); }
+    html[data-theme="dark"] .day-chip.sat { color: var(--info-ink); }
 
     /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
        「その色を含むもの」を名指しして !important で読み替える。
        黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
-    html[data-theme="dark"] [style*="#fbf6ef"] { background: #33280f !important; color: #f5c26b !important; }  /* 拠点の絞り込み注記 */
+    html[data-theme="dark"] [style*="#fbf6ef"] { background: var(--warn-soft) !important; color: var(--warn-ink) !important; }  /* 拠点の絞り込み注記 */
   </style>
 @endverbatim
 @endpush
