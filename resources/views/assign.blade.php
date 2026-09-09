@@ -824,6 +824,63 @@
     return list.indexOf(role) >= 0;
   }
 
+  /**
+   * 他拠点の人を入れたときのお知らせ（2026-09-09 baba
+   * 「日別ボードで他拠点の社員さんを自拠点にアサインするときはヘルプ扱いに自動でしてほしい」）。
+   *
+   * ⚠ 記録そのものはサーバー側（App\Support\CrossOfficeHelp）が付ける。画面はお知らせを出すだけ。
+   * ⚠ 黙って記録しない＝拠点間のやり取りが、本人の知らないところで残るのを避ける。
+   *   出るのは**新しく記録したときだけ**（同じ拠点から2人目以降は出ない）。
+   */
+  function noticeHelpRecorded(res){
+    if (!(res && res.help_recorded)) return;
+    alert('他拠点の方が入ったので、この案件を「ヘルプ」として記録しました。' + String.fromCharCode(10)
+      + '（拠点別の集計に「手伝ってもらった案件」として出ます。案件そのものは元の拠点のままです）');
+  }
+
+  /**
+   * 「なぜ入らなかったか」を日本語にする（2026-09-09 baba
+   * 「まだえらばれていないスタッフさんがいるのに、もうアサインできる人がいないになる」）。
+   *
+   * ⚠ いちばん多い理由は **「この案件が必要としている役割ができる登録が、その人に無い」**。
+   *   2026-09-07 から、自動アサインは案件の必要ポジション（コンテンツ×規模）の枠に入れる作りなので、
+   *   枠に合う人が1人もいないと、候補が何人いても0名になる。
+   *   これを書かずに「メンバー／同日かぶり／今月上限」とだけ出していたので、原因を探せなかった。
+   * ⚠ 数えるだけ。ここでアサインの中身を変えない（何が起きたかを正しく伝えるのが仕事）。
+   */
+  function autoWhyText(c, pool, why){
+    const NL = String.fromCharCode(10);
+    const lines = [];
+    const outCount = why.emp + why.member + why.busy + why.cap + why.noid;
+    if (outCount > 0) {
+      const parts = [];
+      if (why.member) parts.push('すでにメンバー ' + why.member + '名');
+      if (why.busy)   parts.push('同じ日に別の案件 ' + why.busy + '名');
+      if (why.cap)    parts.push('今月の上限（' + MONTH_CAP + '件）' + why.cap + '名');
+      if (why.emp)    parts.push('社員 ' + why.emp + '名（自動アサインでは入れません）');
+      if (why.noid)   parts.push('名簿とつながっていない ' + why.noid + '名');
+      lines.push('・外れた人：' + parts.join(' ／ '));
+    }
+    if (pool.length > 0) {
+      // ここまで残ったのに入らなかった＝役割が合わなかった人。
+      const tpl = c.template || {};
+      const names = Object.keys(tpl).filter(k => (tpl[k] || 0) > 0)
+        .map(k => (window.ECS_ROLE_OPTIONS || {})[k] || k);
+      lines.push('・残り ' + pool.length + '名は、この案件が必要としている役割'
+        + (names.length ? '（' + names.join('・') + '）' : '')
+        + 'が「できる役割」に登録されていません。');
+      lines.push('　→ 名簿のその人の「できるポジション」に足すか、「手動編集」で直接入れてください。');
+    }
+    if (lines.length === 0) {
+      lines.push('・この案件に希望を出している人がいません（エントリーも、その日の稼働可も無し）。');
+    }
+    lines.push('');
+    lines.push('※ 自動アサインが選ぶのはスタッフだけです（社員は入れません）。');
+    lines.push('→「手動編集」で名簿・社員・派遣から足せます。');
+
+    return lines.join(NL);
+  }
+
   // 自動アサイン＝希望者から、同じ日にかぶらない人を必要数ぶん埋める。
   // DBボード（ECS_BOARD）＝この案件の実際の希望者（id付き）から選び、1人ずつ本物のアサインとして保存する
   //   ＝追加後すぐ担当/巡回/備考を編集できる。見本フォールバックのときだけ従来の合成プールを使う。
@@ -860,6 +917,11 @@
       const assignedIds = new Set(c.assigned.map(m => m.id).filter(Boolean));
       const dayCases = cases.filter(z => z.off === c.off);
       const seenPick = new Set();   // このクリック内で同じ人を2回入れない
+      // ⚠ 「希望者はいるのに1人も入らない」の理由を数えておく（2026-09-09 baba
+      //   「まだえらばれていないスタッフさんがいるのに、もうアサインできる人がいないになる」）。
+      //   数えていないと、お知らせに書いてある理由（メンバー／同日かぶり／今月上限）と
+      //   本当の理由（役割ができる登録がない）が食い違い、原因を探せない。
+      const why = { emp: 0, member: 0, busy: 0, cap: 0, noid: 0 };
       const pool = dayPeople(c.off, dayCases)
         .filter(p => p.applied.includes(c.id) || p.cal)
         // ⚠ 社員は自動アサインで選ばない（2026-09-09 baba「日別ボードで自動アサインを押したら
@@ -867,9 +929,14 @@
         //   社員の出勤可能日も希望者と同じ表（shift_preferences）に入るので、印を付けて外す。
         //   社員を入れるかどうかは人が決めること＝「手動編集」から足せる（機械が勝手に入れない）。
         //   ⚠ 月まとめ自動アサインは、はじめからスタッフだけを見ている（MonthAutoAssign::candidatePeople）。
-        .filter(p => !p.emp)
-        .filter(p => p.id && !assignedIds.has(p.id) && !already.has(p.name) && !taken.has(p.name)
-                     && monthCountOf(p.name, amap) < MONTH_CAP)
+        .filter(p => { if (p.emp) { why.emp++; return false; } return true; })
+        .filter(p => {
+          if (!p.id) { why.noid++; return false; }
+          if (assignedIds.has(p.id) || already.has(p.name)) { why.member++; return false; }
+          if (taken.has(p.name)) { why.busy++; return false; }
+          if (monthCountOf(p.name, amap) >= MONTH_CAP) { why.cap++; return false; }
+          return true;
+        })
         .filter(p => { if (seenPick.has(p.id)) return false; seenPick.add(p.id); return true; });
       // ⚠⚠ ここが「必要ポジションを見て入れる」ところ（2026-09-07 baba指摘で作り直し）。
       //   前は**その人の主ポジションをそのまま付けていた**ので、
@@ -909,7 +976,8 @@
       if (silent) return { name: c.name, picked: picked.length, need: c.need, total: total, skipped: false };
       render();
       if (picked.length === 0) {
-        alert('⚡ 自動で足せるスタッフがいませんでした。\n（この案件の希望者が、すでにメンバー／同日かぶり／今月上限のいずれかです）\n※ 自動アサインが選ぶのはスタッフだけです（社員は入れません）。\n→「手動編集」で名簿・社員・派遣から足してください。');
+        alert('⚡ 自動で足せるスタッフがいませんでした。' + String.fromCharCode(10) + String.fromCharCode(10)
+          + autoWhyText(c, pool, why));
       } else if (total < c.need) {
         alert('⚡ 自動アサインしました（希望者から ' + picked.length + '名）。\n必要 ' + c.need + '名に ' + (c.need - total) + '名 不足しています。\n→「手動編集」で名簿・社員・派遣を足して補ってください。');
       } else {
@@ -988,7 +1056,7 @@
       body: JSON.stringify({ project_id: caseId, staff_id: id, action: 'assign', role: rc, status: '仮' })
     })
       .then(r => r.json())
-      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); } })
+      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; } noticeHelpRecorded(res); })
       .catch(() => { alert('通信エラーでメンバー追加を保存できませんでした。'); });
     render();
   }
@@ -1384,7 +1452,7 @@
       body: JSON.stringify({ project_id: caseId, staff_id: pp.id, action: 'assign', role: roleCode, status: '仮' })
     })
       .then(r => r.json())
-      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); } })
+      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; } noticeHelpRecorded(res); })
       .catch(() => { alert('通信エラーでメンバー追加を保存できませんでした。'); });
     render();
   }
@@ -1886,7 +1954,15 @@
     const short = results.filter(r => r.total < r.need);
     let msg = '⚡ この日の ' + list.length + '件に、あわせて ' + added + '名を入れました（「仮」）。';
     if (added === 0) {
-      msg += '\n\n入れられる希望者がいませんでした。\n（希望者がすでにメンバー／同じ日に別の案件へ入っている／今月の上限に達している、のいずれかです）';
+      // ⚠ ここに「できる役割の登録がない」を必ず書く（2026-09-09）。
+      //   自動アサインは案件の必要ポジションの枠に入れるので、枠に合う人がいないと0名になる。
+      //   これを書かないと、希望者が並んで見えているのに理由が分からない。
+      msg += '\n\n入れられるスタッフがいませんでした。よくある理由は次の4つです。'
+           + '\n・その案件が必要としている役割が、その人の「できるポジション」に登録されていない'
+           + '\n・すでにその案件のメンバーになっている'
+           + '\n・同じ日に別の案件へ入っている'
+           + '\n・今月の上限（' + MONTH_CAP + '件）に達している'
+           + '\n※ 1件ずつ ⚡ を押すと、その案件で何名がどの理由で外れたかが出ます。';
     }
     if (short.length) {
       msg += '\n\n⚠ まだ人数が足りない案件が ' + short.length + '件あります：\n'
