@@ -48,6 +48,37 @@ html[data-theme="orange"] {
   --brand-soft: #fff3e6;/* オレンジのごく淡い面（帯・選択中の背景） */
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
 }
+/* 左メニューも会社カラーにする（2026-09-09 baba「左側のメニューのところは会社カラーにはできない？」）。
+   ⚠ 背景は **濃いめのオレンジ** にしている。鮮やかなオレンジ（--brand）のままだと
+     白い文字とのコントラストが足りず、13px のメニュー文字が読みにくい。
+   ⚠ いま開いている項目は「白い面にオレンジの文字」。濃いオレンジの上に --brand を敷くと
+     オレンジ同士で境目が見えなくなる。 */
+html[data-theme="orange"] .sidebar { background: #b35500; color: #fff; }
+html[data-theme="orange"] .sidebar .logo { color: #fff; }
+html[data-theme="orange"] .sidebar nav a { color: rgba(255, 255, 255, .92); }
+html[data-theme="orange"] .sidebar nav a:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+html[data-theme="orange"] .sidebar nav a.active { background: #fff; color: #b35500; font-weight: 700; }
+html[data-theme="orange"] .sidebar .nav-group .group-label { color: rgba(255, 255, 255, .75); }
+html[data-theme="orange"] .sidebar .nav-group .group-label:hover { color: #fff; }
+html[data-theme="orange"] .sidebar .userbox { border-top-color: rgba(255, 255, 255, .28); color: rgba(255, 255, 255, .8); }
+html[data-theme="orange"] .sidebar .userbox strong { color: #fff; }
+html[data-theme="orange"] .sidebar .pc-mode-btn { border-color: rgba(255, 255, 255, .5); color: rgba(255, 255, 255, .9); }
+html[data-theme="orange"] .sidebar .pc-mode-btn:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+html[data-theme="orange"] .sidebar .logo small { color: rgba(255, 255, 255, .78); }
+html[data-theme="orange"] .sidebar nav .group-label { color: rgba(255, 255, 255, .78); }
+/* 左メニューの中の「年月フォルダ」。
+   ⚠ この見た目は projects.blade.php と assign_publish.blade.php に書かれているが、
+     出る場所は共通の左メニューなので、色の切り替えはここ（共通CSS）でまとめて面倒を見る。
+     画面側に書くと、2つの画面で別々に直すことになって必ず食い違う。 */
+html[data-theme="orange"] .sidebar .ym-year-btn,
+html[data-theme="orange"] .sidebar .ym-month-btn { color: rgba(255, 255, 255, .92); }
+html[data-theme="orange"] .sidebar .ym-year-btn:hover,
+html[data-theme="orange"] .sidebar .ym-month-btn:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+html[data-theme="orange"] .sidebar .ym-month-btn.active { background: #fff; color: #b35500; }
+html[data-theme="orange"] .sidebar .ym-caret,
+html[data-theme="orange"] .sidebar .ym-ycount,
+html[data-theme="orange"] .sidebar .ym-mcount { color: rgba(255, 255, 255, .75); }
+html[data-theme="orange"] .sidebar .ym-month-btn.active .ym-mcount { color: rgba(179, 85, 0, .8); }
 
 /* 黒ベース（見本・2026-09-09 baba「黒もどんな感じか1画面見本で見たい」）
 
@@ -84,6 +115,17 @@ html[data-theme="dark"] .sidebar .userbox { border-top-color: var(--line); }
 html[data-theme="dark"] .sidebar .userbox strong { color: var(--ink); }
 html[data-theme="dark"] .sidebar .pc-mode-btn { border-color: #3a414c; color: var(--muted); }
 html[data-theme="dark"] .sidebar .pc-mode-btn:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .sidebar .logo,
+html[data-theme="dark"] .sidebar .logo small { color: var(--ink); }
+html[data-theme="dark"] .sidebar nav .group-label { color: var(--muted); }
+/* 年月フォルダ（見た目の元は画面側にあるが、出る場所は共通の左メニュー。上の orange と同じ理由でここに置く） */
+html[data-theme="dark"] .sidebar .ym-year-btn,
+html[data-theme="dark"] .sidebar .ym-month-btn { color: #c3c9d1; }
+html[data-theme="dark"] .sidebar .ym-year-btn:hover,
+html[data-theme="dark"] .sidebar .ym-month-btn:hover { background: #262b33; color: #fff; }
+html[data-theme="dark"] .sidebar .ym-caret,
+html[data-theme="dark"] .sidebar .ym-ycount,
+html[data-theme="dark"] .sidebar .ym-mcount { color: var(--muted); }
 /* 上のバー */
 html[data-theme="dark"] .topbar { background: var(--panel); border-bottom-color: var(--line); }
 html[data-theme="dark"] .nav-toggle { color: var(--muted); }

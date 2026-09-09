@@ -116,6 +116,27 @@ class ThemeTest extends TestCase
             ->assertSee('data-theme=""', false);
     }
 
+
+    /**
+     * 左メニューも会社カラーになること（2026-09-09 baba「左側のメニューのところは会社カラーにはできない？」）。
+     *
+     * ⚠ 左メニューの色は :root の変数ではなく `.sidebar` に直接書かれているので、
+     *   テーマごとに上書きが要る。消すとメニューだけベージュのまま取り残される。
+     * ⚠ 左メニューの中の「年月フォルダ（.ym-…）」の見た目は画面側（案件一覧・公開ボード）にあるが、
+     *   切り替えは共通CSSでまとめて面倒を見る。2画面で別々に直すと必ず食い違う。
+     */
+    public function test_the_sidebar_follows_the_theme(): void
+    {
+        $css = (string) file_get_contents(public_path('ecs/style.css'));
+
+        $this->assertStringContainsString('html[data-theme="orange"] .sidebar {', $css,
+            '会社カラーのとき、左メニューだけベージュのまま取り残される');
+        $this->assertStringContainsString('html[data-theme="orange"] .sidebar nav a.active', $css);
+        $this->assertStringContainsString('html[data-theme="orange"] .sidebar .ym-month-btn.active', $css,
+            '左メニューの年月フォルダが会社カラーで読めなくなる');
+        $this->assertStringContainsString('html[data-theme="dark"] .sidebar {', $css);
+    }
+
     /**
      * ⚠ 色そのものはCSSの1か所（public/ecs/style.css）に書く。
      *   PHP（Themes）に色コードを書き写していないことを見張る。
