@@ -30,9 +30,16 @@ class DashboardController extends Controller
     {
         $today = Carbon::today();
 
+        // 表示範囲＝全拠点（既定）／特定の拠点（2026-09-09 baba「ダッシュボードは拠点ごとに必要」）。
+        // ⚠ 一般社員は自拠点で固定（OfficeScope が面倒を見る）。管理者以上だけスイッチが出る。
+        // ⚠ 絞ると KPI・危険日カレンダー・件数集計の**全部**がその拠点のものになる
+        //   （どれか1つだけ絞ると、同じ画面の中で数字の意味が食い違う）。
+        $office = OfficeScope::filter($request);
+
         // cases.js と同じ項目名に詰め替える（既存の表示JSをそのまま動かすため）。
         // KPI とカレンダーが使う項目だけに絞る：off / scale / fmt / need / name / 下書き・完了。
-        $cases = Project::orderBy('start_date')
+        $cases = OfficeScope::applyToProjects(Project::query(), $office)
+            ->orderBy('start_date')
             ->get()
             ->map(function (Project $p) use ($today) {
                 // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。cases.js の off と同じ意味。
@@ -79,7 +86,9 @@ class DashboardController extends Controller
             // 危険日（手動指定）＝設定画面で足した日。カレンダーが自動判定に加えて赤くする。
             // ⚠ 拠点ごとの危険日に対応（2026-08-26）。出すのは「全拠点共通 ＋ 自分の拠点」。
             //   管理者が「全拠点」で見ているとき（filter が null）は、どこかの拠点の危険日も出す。
-            'manualDanger' => DangerDays::dates(OfficeScope::filter($request)),
+            'manualDanger' => DangerDays::dates($office),
+            // 拠点スイッチのハイライト用（''＝全拠点）。画面はこれを見て「◯◯の案件だけ」と出す。
+            'officeScope' => $office,
         ]);
     }
 

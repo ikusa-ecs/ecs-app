@@ -104,6 +104,15 @@
 @endpush
 
 @section('content')
+      {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点で固定＝スイッチは出ない）。
+           2026-09-09 baba「ダッシュボードは拠点ごとに必要だと思うから切り替えられるようにしてほしい」。
+           ⚠ この差し込みは「そのまま出す区間」の外に置くこと（中に入れると記号がそのまま画面に出る）。 --}}
+      @include('partials.office_switch')
+      @if (!empty($officeScope))
+        <p class="mock-note" style="background:#fbf6ef;">
+          <b>{{ $officeScope }}</b>の案件だけで数えています（KPI・危険日カレンダー・件数集計のすべて）。
+        </p>
+      @endif
 @verbatim
       <div class="mock-note">ここに出ている数値は<b>登録された本物の案件データ</b>から自動計算しています（KPI・危険日カレンダー・件数集計とも）。※ 危険日判定で使う「稼働スタッフ40名」は今は暫定の目安です。</div>
 
