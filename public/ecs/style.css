@@ -167,6 +167,8 @@ html[data-theme="dark"] .hist-field::after { color: #7d858f; }
 html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea {
   background: #23272f; color: var(--ink); border-color: #3a414c;
 }
+/* 画面の上によく出る黄色い注記（.mock-note）。黒地では「暗い黄＋明るい文字」にする。 */
+html[data-theme="dark"] .mock-note { border-color: #5c4718; color: #f5c26b; }
 /* 「これは見本です」の帯 */
 .theme-preview-bar {
   background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700;

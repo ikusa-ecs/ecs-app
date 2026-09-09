@@ -95,6 +95,25 @@
     .ps-actions { flex-wrap: wrap; gap: 8px; }
     .ps-btn { width: 100%; padding: 12px 18px; font-size: 14px; }
   }
+
+  /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+     上の色は白地むけに直接書いてあるので、黒地だと白いカード・薄茶の表見出し・
+     生成りの入力欄が読みにくい。意味の色（不足＝赤／足りている＝緑／推定＝橙）は残す。 */
+  html[data-theme="dark"] .ps-card { background: var(--panel); }
+  html[data-theme="dark"] table.ps th { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] table.ps tfoot td { background: #23272f; border-top-color: var(--line); }
+  html[data-theme="dark"] .ps-recv { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] td.short { color: #f59a9a; }
+  html[data-theme="dark"] td.ok { color: #7ee2a8; }
+  html[data-theme="dark"] .est { color: #f5c26b; }
+  html[data-theme="dark"] .flash { background: #16301f; border-color: #2f5c40; color: #7ee2a8; }
+  html[data-theme="dark"] .tag-future { color: #f5c26b; }
+  html[data-theme="dark"] .tag-past { background: #2b313a; color: #b7bec8; }
+  /* スマホで左に貼り付く1列目（下の行が透けないよう背景色が要る） */
+  html[data-theme="dark"] table.ps.ps-sticky th.l:first-child,
+  html[data-theme="dark"] table.ps.ps-sticky td.l:first-child { background: var(--panel); }
+  html[data-theme="dark"] table.ps.ps-sticky thead th.l:first-child,
+  html[data-theme="dark"] table.ps.ps-sticky tfoot td.l:first-child { background: #23272f; }
 </style>
 @endpush
 

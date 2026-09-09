@@ -10,7 +10,7 @@
       </div>
 
       @if (session('status'))
-        <div style="background:var(--ok-soft, #e7f6ec); color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px; max-width:560px;">
+        <div style="background:var(--ok-soft, #e7f6ec); color:var(--ink); border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px; max-width:560px;">
           {{ session('status') }}
         </div>
       @endif

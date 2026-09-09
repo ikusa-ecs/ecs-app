@@ -48,6 +48,28 @@
     .ef-note { color: #6e5b49; font-size: 12px; }
     .ef-empty { color: var(--muted, #8a7a6b); padding: 26px 0; text-align: center; }
     .ef-link { font-size: 12px; white-space: nowrap; }
+
+    /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+       白い面と茶色の文字が黒地に残ると読めないので、ここで暗い面＋明るい文字に置き換える。
+       色の意味（緑＝OK／赤＝NG など）は変えない。 */
+    html[data-theme="dark"] .ef-filter { background: var(--panel); }
+    html[data-theme="dark"] .ef-filter a.chip { background: var(--panel); color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .ef-filter a.chip.on { background: var(--brand); color: #1a1206; border-color: var(--brand); }
+    html[data-theme="dark"] .ef-sum .card { background: var(--panel); }
+    html[data-theme="dark"] table.ef { background: var(--panel); }
+    html[data-theme="dark"] table.ef th { background: #23272f; }
+    html[data-theme="dark"] table.ef td.when { color: var(--muted); }
+    html[data-theme="dark"] table.ef tr.is-new td { background: #2a2418; }
+    html[data-theme="dark"] .tag.new   { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .tag.extra { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .tag.fix   { background: #16301f; color: #7ee2a8; }
+    html[data-theme="dark"] .tag.tmp   { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .tag.todo  { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .tag.many  { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .tag.ok    { background: #16301f; color: #7ee2a8; }
+    html[data-theme="dark"] .tag.ng    { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .tag.none  { color: #7d858f; }
+    html[data-theme="dark"] .ef-note { color: var(--muted); }
 </style>
 @endpush
 

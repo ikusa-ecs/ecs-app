@@ -17,6 +17,12 @@
     .login-card p.lead { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }
     .code-input { text-align:center; letter-spacing: 8px; font-size: 22px; font-family: monospace; }
     .alt { margin-top: 14px; text-align:center; }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       この画面はログイン前なので、いまは今までどおりの色で出ます（テーマは分からないため）。
+       将来ログイン前にもテーマを付けられるようになったときのために、書き方だけそろえておく。 */
+    html[data-theme="dark"] body { background: var(--bg); }
+    html[data-theme="dark"] .login-card { background: var(--panel); }
   </style>
 </head>
 <body>

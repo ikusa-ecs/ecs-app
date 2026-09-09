@@ -287,19 +287,116 @@
     .dpick-pop .dp-warn { font-size: 10.5px; color: #b91c1c; font-weight: 700; margin-top: 7px; }
     .dpick-pop .dp-close { margin-top: 9px; text-align: right; }
     .dpick-pop .dp-close button { border: none; background: none; color: var(--brand); cursor: pointer; font-size: 12px; font-family: inherit; }
+    /* ===== 黒ベース（2026-09-09）=====
+       白い面と茶色の文字を、黒地でも読める色に置き換える。
+       ⚠ 色の意味（緑＝D/SD担当／青＝FC等／赤＝注意／金＝大型）は変えない。
+       ⚠ 変数（--panel など）の定義は public/ecs/style.css にある。
+       ⚠ 凡例の文字色は HTML の style="" に直書きされていて CSS から上書きできないので、
+          下の --dirlg-○○ という入れ物を使って、白地と黒地で中身だけ差し替えている。 */
+    :root {
+      --dirlg-green: #15803d; --dirlg-blue: #2c6ca0; --dirlg-gray: #9c8f80;
+      --dirlg-gold: #92600a; --dirlg-brown: #7a6a58; --dirlg-purple: #6d28d9;
+      --dirlg-orange: #c2410c; --dirlg-indigo: #4338ca; --dirlg-cre: #16a34a;
+      --dirlg-brown2: #6e5b49; --dirlg-red: #b91c1c;
+    }
+    html[data-theme="dark"] {
+      --dirlg-green: #7ee2a8; --dirlg-blue: #7cc4f0; --dirlg-gray: #9aa2ad;
+      --dirlg-gold: #f5c26b; --dirlg-brown: #b7bec8; --dirlg-purple: #b8a6f5;
+      --dirlg-orange: #f0913c; --dirlg-indigo: #9db0f5; --dirlg-cre: #7ee2a8;
+      --dirlg-brown2: #c3b3a0; --dirlg-red: #f59a9a;
+    }
+    /* 使い方バナー・上部の操作バー */
+    html[data-theme="dark"] .help-note { color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .month-nav button { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .month-nav button:hover { background: #2f353f; }
+    html[data-theme="dark"] .btn-save-dir { color: #1a1206; }
+    html[data-theme="dark"] .btn-fix-month { background: #14293a; color: #7cc4f0; border-color: #2c5070; }
+    /* 保存の状態表示（⚠ 失敗の赤い点滅は消さない） */
+    html[data-theme="dark"] .save-state.ok     { background: #16301f; border-color: #2a5a38; color: #7ee2a8; }
+    html[data-theme="dark"] .save-state.saving { background: #33280f; border-color: #5a4718; color: #f5c26b; }
+    html[data-theme="dark"] .save-state.ng     { background: #3a1c1c; border-color: #6b2f2f; color: #f59a9a;
+      animation: saveBlinkDark 1s steps(1) infinite; }
+    @keyframes saveBlinkDark { 50% { background: #6b2f2f; } }
+    /* カレンダーのマス */
+    html[data-theme="dark"] .cal-cell { background: var(--panel); }
+    html[data-theme="dark"] .cal-cell.other { background: #191c21; }
+    html[data-theme="dark"] .c-dayoff { background: #33280f; color: #f5c26b; }
+    /* 1日の中の案件カード */
+    html[data-theme="dark"] .dcase { background: #262b33; }
+    html[data-theme="dark"] .dcase.undecided { background: #2d2716; }
+    html[data-theme="dark"] .dcase.big { background: #2e2a1c; box-shadow: 0 1px 4px rgba(224, 168, 0, .25); }
+    html[data-theme="dark"] .mini-badge.big    { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .mini-badge.real   { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .mini-badge.long   { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .mini-badge.online { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .mini-badge.daytype{ background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .mini-badge.repeat { color: #7ee2a8; }
+    html[data-theme="dark"] .plamp.ok    { color: #7ee2a8; }
+    html[data-theme="dark"] .plamp.short { color: #f59a9a; }
+    html[data-theme="dark"] .plamp.none  { background: #2b313a; color: #b7bec8; }
+    /* D・SD のプルダウン */
+    html[data-theme="dark"] .dc-pick .pk.d-row .lbl { color: #1a1206; }
+    html[data-theme="dark"] .dc-pick .pk.d-row select { background: #23272f; }
+    html[data-theme="dark"] .dc-pick .pk.d-row select.undef { background: #2d2716; color: #f5c26b; }
+    html[data-theme="dark"] .dc-pick .pk.sd-row .lbl { background: #2b313a; }
+    html[data-theme="dark"] .dc-pick .pk.sd-row select { background: #23272f; }
+    /* その日のメモ */
+    html[data-theme="dark"] .dp-note { background: #33280f; border-color: #5a4718; color: #f5c26b; }
+    html[data-theme="dark"] .dp-note .pn-edit { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .dp-note .pn-edit:hover { background: #2f353f; }
+    html[data-theme="dark"] .dc-offwarn { color: #f59a9a; }
+    /* 確定案件のチップとふきだし */
+    html[data-theme="dark"] .dcase.locked-chip { color: #7ee2a8; border-color: #2a5a38; }
+    html[data-theme="dark"] .dcase.locked-chip.big { background: #33280f; color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .dc-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
+    html[data-theme="dark"] .cell-empty { color: #5a616b; }
+    /* 担当バランス集計（右パネル） */
+    html[data-theme="dark"] .agg-tbl tr.agg-total td { background: #23272f; }
+    html[data-theme="dark"] .agg-panel .live { color: #7ee2a8; }
+    html[data-theme="dark"] table.agg-tbl tr.most td.dcnt { color: #f59a9a; }
+    html[data-theme="dark"] .agg-bar { background: #2b313a; }
+    /* 件数バッジとふきだし */
+    html[data-theme="dark"] .c-count { color: #1a1206; }
+    html[data-theme="dark"] .day-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
+    /* 社員チップ */
+    html[data-theme="dark"] .emp-chip { background: #262b33; }
+    html[data-theme="dark"] .emp-chip.assigned { color: #7ee2a8; border-color: #2a5a38; }
+    html[data-theme="dark"] .emp-chip.busy { color: #7cc4f0; border-color: #2c5070; background: #14293a; }
+    html[data-theme="dark"] .emp-chip.free { color: var(--muted); }
+    html[data-theme="dark"] .emp-chip .e-role   { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .emp-chip .e-multi  { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .emp-chip .e-newbie { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .emp-chip.dep-plan     .e-nm { color: var(--dirlg-orange); }
+    html[data-theme="dark"] .emp-chip.dep-sales    .e-nm { color: var(--dirlg-indigo); }
+    html[data-theme="dark"] .emp-chip.dep-creative .e-nm { color: var(--dirlg-cre); }
+    html[data-theme="dark"] .emp-chip.dep-other    .e-nm { color: var(--dirlg-brown2); }
+    html[data-theme="dark"] .emp-chip.dep-none     .e-nm { color: var(--muted); }
+    /* 凡例バー */
+    html[data-theme="dark"] .dir-legend .lg-dot.green { background: #7ee2a8; }
+    html[data-theme="dark"] .dir-legend .lg-dot.blue  { background: #7cc4f0; }
+    html[data-theme="dark"] .dir-legend .lg-dot.gray  { background: #9aa2ad; }
+    html[data-theme="dark"] .dir-legend .lg-tag.newb  { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .dir-legend .lg-tag.multi { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .dir-legend .lg-tag.role  { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .dir-legend .lg-cnt { color: #1a1206; }
+    /* 担当ピッカー（社員名を押すと開く小窓） */
+    html[data-theme="dark"] .dpick-pop { background: var(--panel); box-shadow: 0 12px 34px rgba(0, 0, 0, .6); }
+    html[data-theme="dark"] .dpick-pop .dp-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .dpick-pop .dp-btn.d.on { color: #1a1206; }
+    html[data-theme="dark"] .dpick-pop .dp-warn { color: #f59a9a; }
 </style>
 @endverbatim
 @endpush
 
 @section('content')
       @if (session('status'))
-        <div class="mock-note" style="background:#e7f6e9; border-color:#bfe4c4; color:#15803d;">{{ session('status') }}</div>
+        <div class="mock-note" style="background:var(--ok-soft); border-color:var(--ok); color:var(--dirlg-green);">{{ session('status') }}</div>
       @endif
 
       {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
       @include('partials.office_switch')
       @if ($officeScope)
-        <p class="mock-note" style="background:#fbf6ef; border-color:#e6d8c8; color:#7a6a58;">
+        <p class="mock-note" style="background:var(--panel); border-color:var(--line); color:var(--muted);">
           <b>{{ $officeScope }}</b>の案件と社員だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
         </p>
       @endif
@@ -311,12 +408,12 @@
           日付の横の<b>●件数</b>にカーソルを当てると、その日の案件一覧が出ます。
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
           <b>SD と FC は何人でも付けられます</b>（2026-09-02 追加。大型案件はコンテンツごとにSDが2名いたりするため）。<b>D は1案件1名</b>です。<br>
-          <span style="color:#15803d; font-weight:700;">緑＝D/SD担当</span>／<span style="color:#2c6ca0; font-weight:700;">青＝FC等で稼働</span>／<span style="color:#9c8f80; font-weight:700;">グレー＝未アサイン</span>／<span style="color:#92600a; font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:#7a6a58; font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:#6d28d9; font-weight:700;">新＝新人</span>。
-          名前の<b>文字色は部署</b>（<span style="color:#c2410c;font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:#4338ca;font-weight:700;">藍＝セールス</span>・<span style="color:#16a34a;font-weight:700;">緑＝クリエイティブ</span>・<span style="color:#6e5b49;font-weight:700;">茶＝その他</span>）。
+          <span style="color:var(--dirlg-green); font-weight:700;">緑＝D/SD担当</span>／<span style="color:var(--dirlg-blue); font-weight:700;">青＝FC等で稼働</span>／<span style="color:var(--dirlg-gray); font-weight:700;">グレー＝未アサイン</span>／<span style="color:var(--dirlg-gold); font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:var(--dirlg-brown); font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:var(--dirlg-purple); font-weight:700;">新＝新人</span>。
+          名前の<b>文字色は部署</b>（<span style="color:var(--dirlg-orange);font-weight:700;">オレンジ＝イベプラ</span>・<span style="color:var(--dirlg-indigo);font-weight:700;">藍＝セールス</span>・<span style="color:var(--dirlg-cre);font-weight:700;">緑＝クリエイティブ</span>・<span style="color:var(--dirlg-brown2);font-weight:700;">茶＝その他</span>）。
           右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。<br>
           <b>保存ボタンはありません。押したその場で保存されます</b>（2026-09-02 変更。保存の押し忘れで決めた担当が消えていたため）。
           右上に<b>「保存しました ○:○○」</b>と出ていれば保存できています。
-          <span style="color:#b91c1c;font-weight:700;">赤い「⚠ 保存できていません」</span>が出たときだけ、<b>「保存し直す」</b>を押してください（保存先＝アサイン台帳）。<br>
+          <span style="color:var(--dirlg-red);font-weight:700;">赤い「⚠ 保存できていません」</span>が出たときだけ、<b>「保存し直す」</b>を押してください（保存先＝アサイン台帳）。<br>
           <b>2026-09-01 に変えたところ</b>＝
           ① <b>その日「×」「希望休」を出している方は並べません</b>（マスの下に「お休み ◯名」と出ます）。
           ② <b>他の拠点の方は並べません</b>（以前は、一度この拠点の案件で担当に入ると全部の日に出ていました）。
@@ -362,9 +459,9 @@
         <span><span class="lg-tag multi">掛N</span>＝同日N件の掛け持ち</span>
         <span><span class="lg-cnt">N件（数）</span>＝その日の案件数（カッコ内＝<span style="color:var(--warn);font-weight:700;">D未定の数</span>）</span>
         <b>文字色＝部署</b>
-        <span style="color:#c2410c;font-weight:700;">イベプラ</span>
-        <span style="color:#4338ca;font-weight:700;">セールス</span>
-        <span style="color:#16a34a;font-weight:700;">クリエイティブ</span>
+        <span style="color:var(--dirlg-orange);font-weight:700;">イベプラ</span>
+        <span style="color:var(--dirlg-indigo);font-weight:700;">セールス</span>
+        <span style="color:var(--dirlg-cre);font-weight:700;">クリエイティブ</span>
       </div>
 @endverbatim
       <!-- 保存フォーム（JSが dir[案件ID]/sd[案件ID] の hidden を作って送る） -->
@@ -417,7 +514,7 @@
             <tfoot id="aggFoot"></tfoot>
           </table>
           <p class="agg-note">
-            この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:#b91c1c;font-weight:700;">赤字</span>＝偏りに注意。<br>
+            この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:var(--dirlg-red);font-weight:700;">赤字</span>＝偏りに注意。<br>
             <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
             ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。

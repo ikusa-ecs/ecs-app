@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="ja">
+{{-- 画面の色（テーマ）＝人ごとの設定を効かせる。この画面は共通の骨組み（layouts.app）を
+     使っていない独立ページなので、ここにも同じ印を付ける（2026-09-09）。
+     ⚠ 色そのものは public/ecs/style.css。ここには色を書かない。 --}}
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -49,6 +52,23 @@
     table.tbl td.nm.dep-other    { color: #6e5b49; }   /* その他＝茶（イベプラ/セールス/クリエイティブ以外をまとめた色） */
     table.tbl td.nm.dep-none     { color: #a3968a; }   /* 所属が未設定 */
     tr.agg-total td { font-weight: 700; background: var(--brand-soft); color: var(--brand-dark); }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       上の色は白地むけに直接書いてあるので、黒地だと白いボタン面や茶色の文字が読みにくい。
+       所属を表す文字色は、意味を変えずに明るい同系色へ置き換える。 */
+    html[data-theme="dark"] .agg-top .month-nav button,
+    html[data-theme="dark"] .agg-top .month-nav .mon-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .agg-top .month-nav .mon-btn:hover { background: #2f353f; }
+    html[data-theme="dark"] .live.on  { color: #7ee2a8; }
+    html[data-theme="dark"] .live.off { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .dept-switch { background: #23272f; }
+    html[data-theme="dark"] .dept-switch .ds-chip { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .dept-switch .ds-chip.active { background: var(--brand); color: #1a1206; border-color: var(--brand); }
+    html[data-theme="dark"] table.tbl td.nm.dep-plan     { color: #f59a5a; }
+    html[data-theme="dark"] table.tbl td.nm.dep-sales    { color: #a5b4fc; }
+    html[data-theme="dark"] table.tbl td.nm.dep-creative { color: #7ee2a8; }
+    html[data-theme="dark"] table.tbl td.nm.dep-other    { color: var(--muted); }
+    html[data-theme="dark"] table.tbl td.nm.dep-none     { color: #7d858f; }
   </style>
   @endverbatim
 </head>

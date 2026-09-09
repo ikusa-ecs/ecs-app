@@ -369,6 +369,114 @@
     .legend .lg { display: inline-flex; align-items: center; gap: 6px; }
     .legend .sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid var(--line); }
     .legend .sw.a { background: #fdecd9; } .legend .sw.c1 { background: #e3edf7; } .legend .sw.c2 { background: #efe6f6; } .legend .sw.only { background: #ece3d4; }
+
+    /* ===== 黒ベース（2026-09-09）=====
+       白い面と茶色の文字を、黒地でも読める色に置き換える。
+       ⚠ 色の意味（緑＝OK／赤＝かぶり注意／橙＝仮／青＝社員／紫＝派遣）は変えない。
+       ⚠ 変数（--panel など）の定義は public/ecs/style.css にある。
+       ⚠ 書く順番は上のふつうの指定と同じにそろえる（同じ強さの指定は「あとに書いた方」が勝つため）。 */
+    /* 上部の操作バー */
+    html[data-theme="dark"] .month-nav button { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .month-nav button:hover { background: #2f353f; }
+    html[data-theme="dark"] .board-controls select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .lh-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .lh-btn.active { color: #1a1206; }
+    /* 日付の帯 */
+    html[data-theme="dark"] .day-head { box-shadow: 0 2px 6px rgba(0, 0, 0, .5); }
+    html[data-theme="dark"] .day-head .d-pool .remain.ok { color: #7ee2a8; }
+    html[data-theme="dark"] .day-head .day-bulk { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .day-head .day-bulk:hover { background: #2f353f; }
+    html[data-theme="dark"] .day-head .day-bulk.auto { background: #33280f; border-color: #5a4718; color: #f5c26b; }
+    html[data-theme="dark"] .day-head .day-bulk.auto:hover { background: #43350f; }
+    /* 実施形態のバッジ */
+    html[data-theme="dark"] .fbadge.fmt-real   { background: #16301f; color: #7ee2a8; }
+    html[data-theme="dark"] .fbadge.fmt-long   { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .fbadge.fmt-online { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .fbadge.fmt-arena  { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .fbadge.fmt-other  { background: #12302c; color: #7ed8c6; }
+    html[data-theme="dark"] .fbadge.fmt-etc    { background: #2b313a; color: #b7bec8; }
+    /* 案件カード */
+    html[data-theme="dark"] .case-card { background: var(--panel); }
+    html[data-theme="dark"] .xcase.same { color: #f59a9a; }
+    html[data-theme="dark"] .xcase.cont { color: #7ee2a8; }
+    html[data-theme="dark"] .renkin-badge { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .renkin-badge.hi { color: #f59a9a; }
+    html[data-theme="dark"] .cc-nocontent { color: #f5c26b; }
+    /* 状態バッジ */
+    html[data-theme="dark"] .sb.todo { color: #f5c26b; }
+    html[data-theme="dark"] .sb.adj  { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .sb.fix  { color: #7ee2a8; }
+    /* 充足バー・ポジションランプ・タグ */
+    html[data-theme="dark"] .cc-fill .fbar { background: #2b313a; }
+    html[data-theme="dark"] .plamp.ok    { color: #7ee2a8; }
+    html[data-theme="dark"] .plamp.short { color: #f59a9a; }
+    html[data-theme="dark"] .plamp.none  { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .ctag.setup  { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .ctag.renkin { color: #f59a9a; }
+    html[data-theme="dark"] .ctag.stay   { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .open-btn { color: #1a1206; }
+    /* メンバー行 */
+    html[data-theme="dark"] .m-st.kari { background: #33280f; color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .m-st.fix  { color: #7ee2a8; border-color: #2a5a38; }
+    html[data-theme="dark"] .kari-warn { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .m-note { color: #b8a6f5; }
+    html[data-theme="dark"] .m-patrol { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .m-kenin { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .m-remark { color: var(--muted); }
+    html[data-theme="dark"] .mem-row .m-pos-sel { background: #23272f; }
+    html[data-theme="dark"] .mem-row .m-lv.mid { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .mem-row .m-lv.vet { color: #7ee2a8; }
+    html[data-theme="dark"] .cand-toggle { color: #f5c26b; }
+    html[data-theme="dark"] .auto-btn { background: #262b33; }
+    /* 社員・派遣・確度 */
+    html[data-theme="dark"] .m-type.emp   { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .m-type.haken { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .ymk.b { color: #f5c26b; }
+    html[data-theme="dark"] .ymk.c { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .m-name.emp   { color: #7cc4f0; }
+    html[data-theme="dark"] .m-name.haken { color: #b8a6f5; }
+    html[data-theme="dark"] .fix-emp { background: #14293a; color: #7cc4f0; border-color: #2c5070; }
+    html[data-theme="dark"] .hk-row { background: #241f3a; }
+    html[data-theme="dark"] .hk-st.asked { color: #f5c26b; }
+    html[data-theme="dark"] .hk-st.fixed { color: #7ee2a8; }
+    html[data-theme="dark"] .hk-st.cancelled { background: #2b313a; color: #b7bec8; }
+    /* ⚠ かぶりの赤は社員の青より「あと」に書く（ふつうの指定と同じ順番）。 */
+    html[data-theme="dark"] .m-name.dup { color: #f59a9a; }
+    /* 希望者の色分け */
+    html[data-theme="dark"] .cand-row.multi-apply { background: #33280f; }
+    html[data-theme="dark"] .cand-row.multi-cal   { background: #241f3a; }
+    html[data-theme="dark"] .cand-row.cal-one     { background: #14293a; }
+    html[data-theme="dark"] .cand-row .cand-note { color: var(--muted); }
+    html[data-theme="dark"] .cstat.apply2 { color: #f59a9a; }
+    html[data-theme="dark"] .cstat.cal2   { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .cstat.cal1   { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .cstat.only   { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .cstat.done   { color: #7ee2a8; }
+    html[data-theme="dark"] .capb.over { color: #f59a9a; }
+    html[data-theme="dark"] .capb.near { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .cand-row.picked { background: #262b33; }
+    html[data-theme="dark"] .cand-row.busy { background: #3a1c1c; border-color: #6b2f2f; }
+    html[data-theme="dark"] .cstat.busy { color: #f59a9a; }
+    /* 手動編集の操作・メンバー追加パネル */
+    html[data-theme="dark"] .edit-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .edit-btn.on { color: #1a1206; }
+    html[data-theme="dark"] .add-row .mini { background: #262b33; }
+    html[data-theme="dark"] .pick-box { background: var(--panel); }
+    html[data-theme="dark"] .pick-box .pk-q { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .pick-box .pk-item:nth-child(even) { background: #23272f; }
+    html[data-theme="dark"] .pick-box .pk-item:hover { background: var(--brand-soft); }
+    html[data-theme="dark"] .pick-box .pk-item.busy { background: #3a1c1c; }
+    html[data-theme="dark"] .pick-box .pk-item.busy:hover { background: #4a2424; }
+    html[data-theme="dark"] .pick-box .pk-item .busy-tag { color: #f59a9a; }
+    html[data-theme="dark"] .pick-box .pk-sep { background: #3a1c1c; color: #f59a9a; border-top-color: #6b2f2f; }
+    html[data-theme="dark"] .pick-box .pk-spot { background: #23272f; }
+    /* 凡例の色見本（上の色分けと同じ色にそろえる） */
+    html[data-theme="dark"] .legend .sw.a { background: #33280f; }
+    html[data-theme="dark"] .legend .sw.c1 { background: #14293a; }
+    html[data-theme="dark"] .legend .sw.c2 { background: #241f3a; }
+    html[data-theme="dark"] .legend .sw.only { background: #2b313a; }
+    /* 「見本です」の帯（背景はHTMLに直書きなので、文字色だけ黒地向けに戻す） */
+    html[data-theme="dark"] .mock-note { color: var(--ink); border-color: var(--line); }
   </style>
 @endverbatim
 @endpush
@@ -379,7 +487,7 @@
       {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
       @include('partials.office_switch')
       @if ($officeScope)
-        <p class="mock-note" style="background:#fbf6ef;">
+        <p class="mock-note" style="background:var(--panel);">
           <b>{{ $officeScope }}</b>の案件と、{{ $officeScope }}のスタッフ（希望者）だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
         </p>
       @endif

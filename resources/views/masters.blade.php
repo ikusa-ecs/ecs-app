@@ -75,6 +75,22 @@
     .m-fixed { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px; font-size: 13px; }
     .m-fixed .code { font-weight: 800; color: var(--brand-dark); }
     .m-note { font-size: 11.5px; color: var(--muted); margin: 10px 0 0; }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       上の色は白地むけに直接書いてあるので、黒地だと白いボタン・白い入力欄・
+       茶色の文字が読みにくい。緑＝完了／赤＝エラーの意味はそのまま残す。 */
+    html[data-theme="dark"] .m-nav a { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .m-nav a:hover { background: #2f353f; }
+    html[data-theme="dark"] .flash { border-color: #2f5c40; color: #7ee2a8; }
+    html[data-theme="dark"] .m-err { border-color: #6b2f2f; color: #f59a9a; }
+    html[data-theme="dark"] .m-row.add { border-top-color: var(--line); }
+    html[data-theme="dark"] .m-req { color: var(--ink); }
+    html[data-theme="dark"] .m-id { color: var(--muted); }
+    html[data-theme="dark"] .m-row input[type=text],
+    html[data-theme="dark"] .m-row input[type=number] { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .m-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .m-btn.primary { background: var(--brand); border-color: var(--brand); color: #1a1206; }
+    html[data-theme="dark"] .m-btn.danger { color: #f59a9a; border-color: #6b2f2f; background: #262b33; }
 </style>
 @endpush
 

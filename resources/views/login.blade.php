@@ -19,6 +19,13 @@
     .mock-entry { margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--line, #e6cdb8); display: flex; flex-direction: column; gap: 10px; }
     .mock-entry-label { text-align:center; color: var(--muted); font-size: 11.5px; margin: 0 0 2px; }
     .mock-entry .btn { width: 100%; justify-content: center; font-size: 13px; }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       この画面はログイン前なので、いまは今までどおりの色で出ます（テーマは分からないため）。
+       将来ログイン前にもテーマを付けられるようになったときのために、書き方だけそろえておく。 */
+    html[data-theme="dark"] body { background: var(--bg); }
+    html[data-theme="dark"] .login-card { background: var(--panel); }
+    html[data-theme="dark"] .sent { color: #7ee2a8; }
   </style>
 </head>
 <body>

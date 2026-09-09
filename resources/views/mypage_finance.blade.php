@@ -186,6 +186,24 @@
       /* 下の注意書きは小さすぎると読めないので少しだけ大きく・行間を広げる */
       #finPanel > p.note-cell { font-size: 12px; line-height: 1.7; }
     }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       上の色は白地むけに直接書いてあるので、黒地だと白い入力欄や淡い色の帯が読みにくい。
+       意味の色（大型＝赤／オンライン＝青／リアル＝緑／宿泊＝橙／利益＝緑）は残したまま、
+       「暗い面＋明るい文字」に置き換える。 */
+    html[data-theme="dark"] .pick-bar select,
+    html[data-theme="dark"] .yen-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .type-badge.type-big    { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .type-badge.type-online { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .type-badge.type-real   { background: #16301f; color: #7ee2a8; }
+    html[data-theme="dark"] .stay-badge { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] tr.profit-row td { background: #16301f; color: var(--ink); }
+    html[data-theme="dark"] tr.profit-row td.minus { color: #f59a9a; }
+    html[data-theme="dark"] .saved-ping { color: #7ee2a8; }
+    /* スマホでカード表示になる経費の行（白地が書いてある）。マウスを乗せたときの色も合わせて指定する */
+    html[data-theme="dark"] #costBody tr { background: var(--panel); }
+    html[data-theme="dark"] #costBody tr:hover { background: #23272f; }
+    html[data-theme="dark"] #finPanel tr.profit-row { background: #16301f; }
   </style>
 @endverbatim
 @endpush

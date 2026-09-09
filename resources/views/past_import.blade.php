@@ -84,6 +84,54 @@
   .pj-dup-ask  { background: #fdf3e2; border: 1px solid #ecd9b6; border-radius: 6px; padding: 5px 6px; }
   .pj-dup-note { font-size: 11px; line-height: 1.5; color: #8a5a10; margin-bottom: 4px; }
   .pj-dup-ask select { width: 100%; font-size: 11.5px; padding: 3px 4px; font-family: inherit; }
+
+  /* =========================================================================
+     黒ベース（ダークモード）用の色の上書き。
+     白い入力欄・淡い色の帯のままだと黒地で読めないので、
+     共通の変数（--panel / --ink / --muted / --line）と暗い面に読み替える。
+     緑＝取り込める／赤＝取り込めない／黄＝入れてほしい、という意味の色は変えない。
+     ========================================================================= */
+  html[data-theme="dark"] .pj-lead { color: var(--muted); }
+  html[data-theme="dark"] .pj-flash.ok { color: #7ee2a8; border-color: #2c5c3c; }
+  html[data-theme="dark"] .pj-flash.err { background: #3a1c1c; color: #f59a9a; border-color: #5c2c2c; }
+  html[data-theme="dark"] .pj-flash.warn { background: #33280f; color: #f5c26b; border-color: #5c4718; }
+
+  /* ファイルの置き場・入れ方タブ・貼り付け欄 */
+  html[data-theme="dark"] .pj-drop { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] .pj-drop.drag { background: #16301f; color: #7ee2a8; border-color: #2c5c3c; }
+  html[data-theme="dark"] .pj-file { color: #7ee2a8; }
+  html[data-theme="dark"] .pj-tab { background: #262b33; color: var(--muted); }
+  html[data-theme="dark"] .pj-tab.on { background: var(--panel); color: var(--ink); border-bottom-color: var(--panel); }
+  html[data-theme="dark"] #pjPaste,
+  html[data-theme="dark"] .pj-period input[type="month"],
+  html[data-theme="dark"] .pj-miss-foot select,
+  html[data-theme="dark"] .pj-dup-ask select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+
+  /* 名簿に無かった人をその場で足す欄 */
+  html[data-theme="dark"] .pj-miss-name { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .pj-miss-msg.ok { color: #7ee2a8; }
+  html[data-theme="dark"] .pj-miss-msg.ng { color: #f59a9a; }
+  html[data-theme="dark"] .pj-summary .ok { color: #7ee2a8; }
+  html[data-theme="dark"] .pj-summary .ng { color: #f59a9a; }
+
+  /* 取り込み内容の確認表 */
+  html[data-theme="dark"] table.pj-table th { background: #23272f; }
+  html[data-theme="dark"] table.pj-table tr.row-ng td { background: #3a1c1c; }
+  html[data-theme="dark"] table.pj-table tr.row-ok td { background: #16301f; }
+  html[data-theme="dark"] .pj-reason { color: #f59a9a; }
+  html[data-theme="dark"] .pj-miss { color: #f5c26b; }
+  html[data-theme="dark"] table.pj-table input[type="text"],
+  html[data-theme="dark"] table.pj-table input[type="date"] { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] table.pj-table input.edited { background: #16301f; border-color: #2c5c3c; }
+  html[data-theme="dark"] table.pj-table input.pj-need { background: #33280f; border-color: #5c4718; }
+  html[data-theme="dark"] table.pj-table input.pj-need::placeholder { color: #d9a94a; }
+  html[data-theme="dark"] table.pj-table tr.row-skip td { background: #23272f; color: #7a8189; }
+
+  /* すでに入っている案件との重なり */
+  html[data-theme="dark"] .pj-dup-same { background: #14293a; color: #7cc4f0; }
+  html[data-theme="dark"] .pj-dup-new { color: var(--muted); }
+  html[data-theme="dark"] .pj-dup-ask { background: #33280f; border-color: #5c4718; }
+  html[data-theme="dark"] .pj-dup-note { color: #f5c26b; }
 </style>
 @endpush
 

@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="ja">
+{{-- 画面の色（テーマ）＝人ごとの設定を効かせる。この画面は共通の骨組み（layouts.app）を
+     使っていない独立ページなので、ここにも同じ印を付ける（2026-09-09）。
+     ⚠ 色そのものは public/ecs/style.css。ここには色を書かない。 --}}
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -96,6 +99,22 @@
       margin: 10px 0 0; padding: 12px 14px; border-radius: 10px;
       background: #fdf6e8; border: 1px solid #e8d3ac; font-size: 13px; line-height: 1.7;
     }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       上の色は白地むけに直接書いてあるので、黒地だと白い入力欄・ベージュのタグ・
+       生成りのお知らせ帯が読みにくい。意味の色（ベテラン＝緑など）はそのまま残す。 */
+    html[data-theme="dark"] .wl-filter select,
+    html[data-theme="dark"] .wl-filter input { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .lv.mid { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .lv.vet { color: #7ee2a8; }
+    html[data-theme="dark"] .rate .rbar { background: #2b313a; }
+    html[data-theme="dark"] .ptag { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .ptag.key { background: var(--brand-soft); color: var(--brand-dark); }
+    html[data-theme="dark"] .wl-month .wl-mon-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .wl-month .wl-mon-btn:hover { background: #2f353f; }
+    html[data-theme="dark"] .wl-month .wl-mon-btn.on,
+    html[data-theme="dark"] .wl-month .wl-mon-btn.on:hover { background: var(--brand); color: #1a1206; border-color: var(--brand); }
+    html[data-theme="dark"] .wl-empty { background: #33280f; border-color: #5c4a20; color: #f5c26b; }
   </style>
   @endverbatim
 </head>

@@ -47,6 +47,24 @@
   .fl-noedit { font-size: 11.5px; color: var(--muted); }
   .fl-empty { color: var(--muted); font-size: 13px; padding: 20px 4px; }
   .fl-note { font-size: 11.5px; color: var(--muted); line-height: 1.8; margin-top: 12px; }
+
+  /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+     白い面・生成りの見出し・茶色の文字を、暗い面＋明るい文字に置き換える。
+     数字の色の意味（緑＝利益／赤＝マイナス・遅れ／橙＝未入力）は変えない。 */
+  html[data-theme="dark"] .fl-bar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .fl-kpi { background: var(--panel); }
+  html[data-theme="dark"] .fl-kpi.profit .num { color: #7ee2a8; }
+  html[data-theme="dark"] .fl-kpi.profit .num.minus { color: #f59a9a; }
+  html[data-theme="dark"] .fl-kpi.todo .num { color: #f5c26b; }
+  html[data-theme="dark"] table.fl { background: var(--panel); }
+  html[data-theme="dark"] table.fl th { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] table.fl tfoot td { border-top-color: #5c4a1e; }
+  html[data-theme="dark"] table.fl tr.unfilled td { background: #2a2418; }
+  html[data-theme="dark"] table.fl td.minus { color: #f59a9a; }
+  html[data-theme="dark"] .pill.ok { color: #7ee2a8; }
+  html[data-theme="dark"] .pill.todo { color: #f5c26b; }
+  html[data-theme="dark"] .pill.late { color: #f59a9a; }
+  html[data-theme="dark"] .pill.day { background: #2b313a; color: #b7bec8; }
 </style>
 @endverbatim
 @endpush

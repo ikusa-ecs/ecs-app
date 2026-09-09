@@ -119,6 +119,30 @@
     .gobusata { font-variant-numeric: tabular-nums; }
     .gobusata.warn { color: var(--warn); font-weight: 600; }
     .gobusata.bad  { color: var(--danger); font-weight: 700; }
+
+    /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+       白い面・茶色の文字・淡い色のバッジを、暗い面＋明るい文字に置き換える。
+       バッジの色の意味（緑＝よく出ている／赤＝ご無沙汰 など）は変えない。 */
+    html[data-theme="dark"] .staff-tab { background: var(--panel); color: var(--ink); }
+    html[data-theme="dark"] .staff-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .filterbar input[type="text"],
+    html[data-theme="dark"] .filterbar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .lv.mid { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .lv.vet { color: #7ee2a8; }
+    html[data-theme="dark"] .ptag { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
+    html[data-theme="dark"] .ptag.key { background: #14293a; color: #7cc4f0; border-color: #2b4a63; }
+    html[data-theme="dark"] .stag { background: #241f3a; color: #b8a6f5; border-color: #3b3363; }
+    html[data-theme="dark"] tr.detail-row > td { background: #23272f; }
+    html[data-theme="dark"] .detail-box textarea { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .privacy-note { background: #23272f; }
+    html[data-theme="dark"] .act.active   { color: #7ee2a8; }
+    html[data-theme="dark"] .act.semi     { color: #f5c26b; }
+    html[data-theme="dark"] .act.inactive { color: #f59a9a; }
+    /* 直接 style="" に色が書かれている箇所（削除ボタンの赤・生成りの囲み）。
+       CSSからは上書きできないので、黒地のときだけ !important で読める色に差し替える。 */
+    html[data-theme="dark"] .btn[style*="#b91c1c"] { color: #f59a9a !important; border-color: #5a2a2a !important; }
+    html[data-theme="dark"] div[style*="#fbf8f3"] { background: #23272f !important; border-color: var(--line) !important; }
+    html[data-theme="dark"] a[style*="#6b5544"] { color: var(--brand-dark) !important; }
   </style>
 @endverbatim
 @endpush

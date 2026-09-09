@@ -90,6 +90,27 @@
     .exp-block:first-child { margin-top: 0; }
 
     .privacy-note { font-size: 12px; color: var(--muted); background: #f8f3ea; border: 1px dashed var(--line); border-radius: 8px; padding: 8px 12px; margin-top: 14px; }
+
+    /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+       白い面・生成りの帯・茶色の文字を、暗い面＋明るい文字に置き換える。
+       バッジの色の意味（紫＝スキル／緑＝D経験あり など）は変えない。 */
+    html[data-theme="dark"] .filterbar input[type="text"],
+    html[data-theme="dark"] .filterbar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .stag { background: #241f3a; color: #b8a6f5; border-color: #3b3363; }
+    html[data-theme="dark"] .ctag { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
+    html[data-theme="dark"] .ctag.dir { color: #7ee2a8; border-color: #245c37; }
+    html[data-theme="dark"] .ctag .tag-x { color: #f59a9a; }
+    html[data-theme="dark"] .ctag .tag-x:hover { color: #ffc9c9; }
+    html[data-theme="dark"] .tag-add select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .save-ok { color: #7ee2a8; }
+    html[data-theme="dark"] tr.detail-row > td { background: #23272f; }
+    html[data-theme="dark"] .size-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .privacy-note { background: #23272f; }
+    /* 直接 style="" に色が書かれている箇所。CSSからは上書きできないので、黒地のときだけ !important で読める色にする。 */
+    html[data-theme="dark"] .hire-date-echo[style] { color: var(--muted) !important; }
+    html[data-theme="dark"] .btn[style*="#b91c1c"] { color: #f59a9a !important; border-color: #5a2a2a !important; }
+    html[data-theme="dark"] span[style*="#b5673a"] { color: #f5a97a !important; }
+    html[data-theme="dark"] a[style*="#6b5544"] { color: var(--brand-dark) !important; }
   </style>
 @endverbatim
 @endpush

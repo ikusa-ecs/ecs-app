@@ -422,6 +422,85 @@
       .cal-cell .dnum { font-size: 11px; }
       .cal-ev { font-size: 9px; padding: 1px 3px; }
     }
+
+    /* ===== 黒ベース（2026-09-09）=====
+       白い面と茶色の文字を、黒地でも読める色に置き換える。
+       ⚠ 色の意味（緑＝募集中／赤＝キャンセル・注意／橙＝未公開／拠点ごとの色）は変えない。
+       ⚠ 変数（--panel など）の定義は public/ecs/style.css にある。
+       ⚠ カレンダーの「案件あり」の色は凡例の見本がHTMLに直書きなので、
+          --pj-has-bg という入れ物にして、本体と凡例が必ず同じ色になるようにしてある。 */
+    :root { --pj-has-bg: #fbf8f2; }
+    html[data-theme="dark"] { --pj-has-bg: #2a2f38; }
+    /* 絞り込み・行の色 */
+    html[data-theme="dark"] .filter-bar .f-item input,
+    html[data-theme="dark"] .filter-bar .f-item select { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] tr.group-row.past td { background: #23272f; }
+    html[data-theme="dark"] tr.main-row:hover { background: #262b33; }
+    html[data-theme="dark"] tr.main-row.draft { background: #22252b; }
+    html[data-theme="dark"] tr.main-row.draft:hover { background: #2a2e35; }
+    /* 確度・大型・小タグ */
+    html[data-theme="dark"] .ymk.b { color: #f5c26b; }
+    html[data-theme="dark"] .ymk.c { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .big-mark { color: #1a1206; }
+    html[data-theme="dark"] .tag-mini.add    { color: #f59a9a; }
+    html[data-theme="dark"] .tag-mini.yobi   { color: #f5c26b; }
+    html[data-theme="dark"] .tag-mini.reha   { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .tag-mini.repeat { color: #1a1206; }
+    /* 実施形態のバッジ */
+    html[data-theme="dark"] .fbadge.fmt-real   { background: #16301f; color: #7ee2a8; }
+    html[data-theme="dark"] .fbadge.fmt-long   { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .fbadge.fmt-online { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .fbadge.fmt-arena  { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .fbadge.fmt-other  { background: #12302c; color: #7ed8c6; }
+    html[data-theme="dark"] .fbadge.fmt-etc    { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .fbadge.fmt-cancel { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .fmt-was { color: var(--muted); }
+    html[data-theme="dark"] tr.main-row.row-cancelled { background: #2a2022; }
+    html[data-theme="dark"] tr.main-row.row-cancelled .proj-cell strong { color: var(--muted); }
+    html[data-theme="dark"] td.time-cell .ev.tbd { color: #f5c26b; }
+    /* 募集状態 */
+    html[data-theme="dark"] .recruit-badge.closed { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .recruit-badge.pre    { color: #f5c26b; }
+    html[data-theme="dark"] .recruit-badge.unpub  { background: #33280f; color: #f5c26b; border-color: #5a4718; }
+    /* 詳細（折りたたみ）行と入力欄 */
+    html[data-theme="dark"] tr.detail-row > td { background: #23272f; }
+    html[data-theme="dark"] .detail-panel .cat-select,
+    html[data-theme="dark"] .detail-panel .cat-note { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .sheet-link { background: #262b33; }
+    html[data-theme="dark"] .sheet-link:hover { background: #2f353f; }
+    html[data-theme="dark"] .cell-edit { background: #23272f; }
+    html[data-theme="dark"] .pick-pop > summary { background: #262b33; }
+    html[data-theme="dark"] .pick-pop > summary:hover { background: #2f353f; }
+    html[data-theme="dark"] .pick-pop .pick-list { background: var(--panel); }
+    html[data-theme="dark"] .note-text { background: #23272f; }
+    /* 一覧 / 下書き のタブ */
+    html[data-theme="dark"] .list-tab { background: #262b33; }
+    html[data-theme="dark"] .list-tab:hover { background: #2f353f; }
+    html[data-theme="dark"] .list-tab.active { color: #1a1206; }
+    /* 集計・書き出しのモーダル */
+    html[data-theme="dark"] .agg-modal { background: var(--panel); }
+    html[data-theme="dark"] .agg-head .month-nav button { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .agg-close { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .exp-modal { background: var(--panel); }
+    html[data-theme="dark"] .exp-row select { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .exp-ta { background: #23272f; }
+    html[data-theme="dark"] .exp-steps { background: #23272f; }
+    html[data-theme="dark"] .copied-msg { color: #7ee2a8; }
+    /* サイドバーの年月フォルダ（ふだんの色は共通CSS側で黒に切り替わる） */
+    html[data-theme="dark"] .ym-month-btn.active { color: #1a1206; }
+    html[data-theme="dark"] .ym-month-btn.active .ym-mcount { color: rgba(26, 18, 6, .75); }
+    /* 表示の切替とカレンダー */
+    html[data-theme="dark"] .view-tab { background: #262b33; }
+    html[data-theme="dark"] .view-tab:hover { background: #2f353f; }
+    html[data-theme="dark"] .view-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .cal-nav { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .cal-dow.sat { color: #7cc4f0; }
+    html[data-theme="dark"] .cal-cell { background: var(--panel); }
+    html[data-theme="dark"] .cal-cell.empty { background: transparent; }
+    html[data-theme="dark"] .cal-cell.has { background: var(--pj-has-bg); }
+    html[data-theme="dark"] .cal-cell.sat .dnum { color: #7cc4f0; }
+    /* 拠点まわり（下の2つ目の <style> にある指定を、黒地向けに上書きする） */
+    html[data-theme="dark"] .of-mine { color: #7ee2a8; background: #16301f; border-color: #2a5a38; }
 </style>
 @endverbatim
 @endpush
@@ -629,7 +708,7 @@
             この月には、絞り込みに合う案件がありません。「‹ ›」で前後の月へ移動するか、上の絞り込みを外してみてください。
           </div>
           <div class="cal-legend">
-            <span class="lg"><span class="sw" style="background:#fbf8f2;"></span>案件あり</span>
+            <span class="lg"><span class="sw" style="background:var(--pj-has-bg);"></span>案件あり</span>
             <span class="lg"><span class="sw" style="background:#8a5a33;border-color:#8a5a33;"></span>拠点ごとに色分け（下書きは茶色）</span>
             <span class="lg">マスの右の数字＝その日の件数</span>
             <span class="lg">案件名の前＝集合時間</span>

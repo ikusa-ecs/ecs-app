@@ -139,6 +139,67 @@
     }
     .save-bar .spacer { flex: 1; }
     .save-bar .hint { font-size: 12px; color: var(--muted); }
+
+    /* =========================================================================
+       黒ベース（ダークモード）用の色の上書き。
+       白い入力欄・濃い緑や赤の文字は黒地だと読めない（暗すぎる）ので、
+       共通の変数（--panel / --ink / --muted / --line）と明るい文字に読み替える。
+       緑＝足りている・赤＝足りない/NG・橙＝多すぎ、という意味の色は変えない。
+       ========================================================================= */
+    /* 検索・入力欄 */
+    html[data-theme="dark"] .asg-bar input[type=text],
+    html[data-theme="dark"] .role-sel,
+    html[data-theme="dark"] .note-in,
+    html[data-theme="dark"] .patrol-in,
+    html[data-theme="dark"] .remark-in { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .role2-sel { color: var(--muted); }
+
+    /* 区分バッジ・できる役割タグ */
+    html[data-theme="dark"] .lv.中堅 { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .lv.ベテラン { color: #7ee2a8; }
+    html[data-theme="dark"] .can-tag { color: #7ee2a8; }
+
+    /* この日の稼働希望バッジ */
+    html[data-theme="dark"] .wish.entry { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .entry-note { color: var(--muted); }
+    html[data-theme="dark"] .wish.稼働可 { color: #7ee2a8; }
+    html[data-theme="dark"] .wish.NG { color: #f59a9a; }
+    html[data-theme="dark"] .wish.未定 { background: #2b313a; color: #8b929c; }
+
+    /* おすすめ度 */
+    html[data-theme="dark"] .score-pill.hi { color: #1a1206; }
+    html[data-theme="dark"] .score-pill.lo { background: #2b313a; color: #8b929c; }
+    html[data-theme="dark"] .score-warn { color: #f5c26b; }
+    html[data-theme="dark"] .block-note { color: #f59a9a; }
+    html[data-theme="dark"] .staff-row.blocked .score-pill { color: #f59a9a; }
+    html[data-theme="dark"] .ng-note { color: #f59a9a; }
+
+    /* 警告バッジ・選択数 */
+    html[data-theme="dark"] .dup-warn { color: #f59a9a; }
+    html[data-theme="dark"] .capb.over { color: #f59a9a; }
+    html[data-theme="dark"] .capb.near { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .selnum.under b { color: #f59a9a; }
+    html[data-theme="dark"] .selnum.exact b { color: #7ee2a8; }
+    html[data-theme="dark"] .selnum.over b { color: #f5c26b; }
+
+    /* ポジション雛型の枠 */
+    html[data-theme="dark"] .pos-slot { background: #23272f; }
+    html[data-theme="dark"] .pos-slot.under .cnt b { color: #f59a9a; }
+    html[data-theme="dark"] .pos-slot.exact { border-color: #2c5c3c; }
+    html[data-theme="dark"] .pos-slot.exact .cnt b { color: #7ee2a8; }
+    html[data-theme="dark"] .pos-slot.over { border-color: #5c4718; background: #33280f; }
+    html[data-theme="dark"] .pos-slot.over .cnt b { color: #f5c26b; }
+
+    /* 担当の内訳 */
+    html[data-theme="dark"] .role-detail .rd-item { background: #262b33; }
+
+    /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
+       「その色を含むもの」を名指しして !important で読み替える。
+       黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
+    html[data-theme="dark"] [style*="#fbf6ef"] { background: #23272f !important; }  /* 臨時スタッフの案内・拠点の絞り込み注記 */
+    html[data-theme="dark"] [style*="#e7f6ec"] { background: #16301f !important; color: #7ee2a8 !important; border-color: #2c5c3c !important; }  /* 名簿に足しました */
+    html[data-theme="dark"] [style*="#b91c1c"] { color: #f59a9a !important; }  /* 追加に失敗したときの赤字 */
+    html[data-theme="dark"] [style*="#f1ece4"] { background: #2b313a !important; color: #b7bec8 !important; }  /* 「臨時」バッジ */
 </style>
 @endpush
 

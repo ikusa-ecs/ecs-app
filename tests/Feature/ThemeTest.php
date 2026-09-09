@@ -78,20 +78,24 @@ class ThemeTest extends TestCase
 
 
     /**
-     * 黒ベースは「見本」だけ＝**保存できない**（2026-09-09）。
-     * ⚠ 保存できてしまうと、まだ整えていない画面が白いまま残った状態で固定される。
+     * 黒ベースも選んで保存できる（2026-09-09 baba「全画面進めてOK」で見本から格上げ）。
+     * ⚠ 全画面に `html[data-theme="dark"]` の読み替えを入れたうえで格上げしたもの。
+     *   画面を新しく作るときに白や茶色を直に書くと、その画面だけ黒で読めなくなる。
      */
-    public function test_dark_cannot_be_saved(): void
+    public function test_dark_can_be_saved(): void
     {
         $me = PersonFactory::new()->create(['permission' => 'admin', 'must_onboard' => false]);
 
         $this->actingAsPerson($me)->post('/theme', ['theme' => 'dark'])->assertRedirect();
 
-        $this->assertSame(Themes::DEFAULT, $me->fresh()->theme, '見本の色を保存してしまっている');
+        $this->assertSame('dark', $me->fresh()->theme);
     }
 
-    /** URLに ?theme=dark を付けた画面だけ黒で出る（見本）。保存はされない。 */
-    public function test_dark_can_be_previewed_from_the_url(): void
+    /**
+     * URLに ?theme=… を付けると、その画面だけその色で見られる（見本）。保存はされない。
+     * ⚠ この仕掛けは、これから新しい色を試すときにも使う（保存できない色を安全に見せる道）。
+     */
+    public function test_a_theme_can_be_previewed_from_the_url(): void
     {
         $me = PersonFactory::new()->create(['permission' => 'admin', 'must_onboard' => false]);
 

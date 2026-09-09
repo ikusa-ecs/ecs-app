@@ -72,12 +72,12 @@
           {{-- 同じ名前の人が名簿にいたときだけ出す確認（2026-08-28）。
                二重登録を一度止めて、それでも登録したい（同姓同名の別人）ときだけ進めるようにする。 --}}
           @if ($errors->has('duplicate_name'))
-            <div class="form-row" style="background:#fdf3e2; border:1px solid #e6c98f; border-radius:10px; padding:12px;">
+            <div class="form-row" style="background:var(--warn-soft); border:1px solid #e6c98f; border-radius:10px; padding:12px;">
               <label style="display:inline-flex; align-items:flex-start; gap:8px; font-weight:400;">
                 <input type="checkbox" name="allow_duplicate_name" value="1" style="width:auto; margin-top:3px;"
                        @checked(old('allow_duplicate_name'))>
                 <span><b>同姓同名の別の方として登録する</b>
-                  <span style="display:block; font-size:12px; color:#8a7a66; margin-top:2px;">
+                  <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">
                     上に出ている方とは<b>別人</b>のときだけチェックしてください。<br>
                     同じ方であれば、名簿からその人を直す方が安全です（記録が分かれません）。
                   </span>
@@ -109,7 +109,7 @@
               <input type="checkbox" name="no_login" id="noLogin" value="1" style="width:auto; margin-top:3px;"
                      @checked(old('no_login')) onchange="noLoginChanged()">
               <span><b>メールアドレスはあとで（いまは名簿に登録するだけ）</b>
-                <span style="display:block; font-size:12px; color:#8a7a66; margin-top:2px;">
+                <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">
                   ログインは作らず、名簿にだけ登録します（アサインにはすぐ使えます）。<br>
                   メアドが来たら、<b>名簿の詳細 → 「📧 ログイン案内メールを送る」</b>でその場で発行できます。
                 </span>
@@ -182,7 +182,7 @@
             <label style="display:inline-flex; align-items:flex-start; gap:8px; font-weight:400;">
               <input type="checkbox" name="send_invite" value="1" style="width:auto; margin-top:3px;">
               <span>この方に<b>ログイン案内メールを送る</b>
-                <span style="display:block; font-size:12px; color:#8a7a66; margin-top:2px;">
+                <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">
                   メールには<b>パスワードを書きません</b>。本人がリンクを開いて自分で決めます（有効7日間）。<br>
                   ※ メールを使わず、下の仮パスワードを口頭などで伝える場合はチェック不要です。
                 </span>

@@ -37,6 +37,24 @@
   .cr-result { border-left: 4px solid var(--brand); background: #faf7f1; padding: 12px 14px; border-radius: 8px;
                white-space: pre-wrap; font-size: 13px; line-height: 1.7; margin-bottom: 16px; }
   .cr-result.err { border-left-color: #b91c1c; background: #fdf2f2; }
+
+  /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+     上の色は白地むけに直接書いてあるので、黒地だと白い面や茶色の文字が読みにくい。
+     その部分だけを暗い面＋明るい文字に置き換える（意味の色＝緑/橙/赤の区別は残す）。 */
+  html[data-theme="dark"] .cr-card { background: var(--panel); }
+  html[data-theme="dark"] .cr-badge.ok   { color: #7ee2a8; }
+  html[data-theme="dark"] .cr-badge.warn { color: #f5c26b; }
+  html[data-theme="dark"] .cr-badge.bad  { color: #f59a9a; }
+  html[data-theme="dark"] .cr-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .cr-btn.dry { background: #2f353f; }
+  html[data-theme="dark"] .cr-btn.test { background: var(--brand-soft); color: var(--brand-dark); border-color: var(--brand-soft); }
+  html[data-theme="dark"] table.cr th { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] .days-left { color: var(--muted); }
+  html[data-theme="dark"] .days-left.urgent { color: #f59a9a; }
+  html[data-theme="dark"] .sent-tag { background: #2b313a; color: #b7bec8; }
+  html[data-theme="dark"] .todo-tag { color: #f5c26b; }
+  html[data-theme="dark"] .cr-result { background: #23272f; }
+  html[data-theme="dark"] .cr-result.err { background: #3a1c1c; color: #f59a9a; border-left-color: #f59a9a; }
 </style>
 @endpush
 

@@ -222,6 +222,141 @@
     .empty-note { color:#a08a73; padding:30px; text-align:center; font-size:13px; }
     .view { display:none; }
     .view.active { display:block; }
+
+    /* ===== 黒ベース（2026-09-09）=====
+       白い面と茶色の文字を、黒地でも読める色に置き換える。
+       ⚠ 色の意味（緑＝OK／赤＝注意／黄＝仮／青＝空いてるだけ）は変えない。
+       ⚠ 変数（--panel など）の定義は public/ecs/style.css にある。 */
+    /* タブ */
+    html[data-theme="dark"] .ent-tabs { border-bottom-color:var(--line); }
+    html[data-theme="dark"] .ent-tab { color:var(--muted); }
+    html[data-theme="dark"] .ent-tab:hover { color:var(--ink); }
+    /* 絞り込みバー */
+    html[data-theme="dark"] .ent-filter { background:var(--panel); border-color:var(--line); }
+    html[data-theme="dark"] .ent-filter input[type=date],
+    html[data-theme="dark"] .ent-filter input[type=text],
+    html[data-theme="dark"] .ent-filter select { background:#23272f; color:var(--ink); border-color:#3a414c; }
+    html[data-theme="dark"] .ent-filter .f-today { background:#262b33; color:var(--ink); border-color:#3a414c; }
+    html[data-theme="dark"] .ent-filter .f-today:hover { background:#2f353f; }
+    html[data-theme="dark"] .ent-filter .f-label { color:var(--muted); }
+    html[data-theme="dark"] .ent-filter .f-check { color:var(--ink); }
+    /* 日付チップ */
+    html[data-theme="dark"] .day-chip { background:var(--panel); border-color:var(--line); color:var(--ink); }
+    html[data-theme="dark"] .day-chip:hover { background:#262b33; }
+    html[data-theme="dark"] .day-chip .cn { background:#2b313a; color:#b7bec8; }
+    html[data-theme="dark"] .day-chip.sun { color:#f08a8a; }
+    html[data-theme="dark"] .day-chip.sat { color:#7cc4f0; }
+    html[data-theme="dark"] .day-chip.clear { background:#262b33; color:var(--ink); }
+    html[data-theme="dark"] .day-chip.around { background:#14293a; border-color:#2c5070; color:#7cc4f0; }
+    html[data-theme="dark"] .day-chip.on { color:#1a1206; }
+    html[data-theme="dark"] .day-chip.on.sun,
+    html[data-theme="dark"] .day-chip.on.sat { color:#1a1206; }
+    html[data-theme="dark"] .day-chip.on .cn { background:rgba(0,0,0,.25); color:#1a1206; }
+    /* 数値カード */
+    html[data-theme="dark"] .sum-card { background:var(--panel); border-color:var(--line); }
+    html[data-theme="dark"] .sum-card .num { color:var(--ink); }
+    html[data-theme="dark"] .sum-card .num.warn { color:#f59a9a; }
+    html[data-theme="dark"] .sum-card .lbl { color:var(--muted); }
+    /* 案件カード */
+    html[data-theme="dark"] .ecase { background:var(--panel); border-color:var(--line); }
+    html[data-theme="dark"] .ecase-date { color:var(--muted); }
+    html[data-theme="dark"] .ecase-name { color:var(--ink); }
+    html[data-theme="dark"] .ecase-client { color:var(--muted); }
+    html[data-theme="dark"] .ecase-counts .c { color:var(--muted); }
+    html[data-theme="dark"] .ecase-counts .c b { color:var(--ink); }
+    html[data-theme="dark"] .ecase-counts .c.short b { color:#f59a9a; }
+    html[data-theme="dark"] .ecase-counts .c.filtered { color:#f5c26b; }
+    /* バッジ類（意味の色は保つ） */
+    html[data-theme="dark"] .dt-badge { background:#2b313a; color:#b7bec8; border-color:#3a414c; }
+    html[data-theme="dark"] .st-badge.todo { background:#2b313a; color:#b7bec8; }
+    html[data-theme="dark"] .st-badge.adj  { background:#33280f; color:#f5c26b; }
+    html[data-theme="dark"] .st-badge.fix  { background:#16301f; color:#7ee2a8; }
+    html[data-theme="dark"] .st-badge.pub  { background:#12302c; color:#7ed8c6; }
+    html[data-theme="dark"] .rec-badge.open  { background:#16301f; color:#7ee2a8; }
+    html[data-theme="dark"] .rec-badge.close { background:#2b313a; color:#9aa2ad; }
+    /* エントリー者テーブル */
+    html[data-theme="dark"] .ent-table th,
+    html[data-theme="dark"] .ent-table td { border-bottom-color:var(--line); }
+    html[data-theme="dark"] .ent-table th { color:var(--muted); }
+    html[data-theme="dark"] .ent-table tr.assigned { background:#23272f; }
+    html[data-theme="dark"] .ent-table tr.fromcal td { background:#1a1d23; }
+    /* 空いている人カレンダー */
+    html[data-theme="dark"] .wc-dow { color:var(--muted); }
+    html[data-theme="dark"] .wc-dow.wc-sun { color:#f08a8a; }
+    html[data-theme="dark"] .wc-dow.wc-sat { color:#7cc4f0; }
+    html[data-theme="dark"] .wc-cell { background:var(--panel); border-color:var(--line); }
+    html[data-theme="dark"] .wc-cell.wc-blank { background:transparent; }
+    html[data-theme="dark"] .wc-cell.wc-sun { background:#2a2022; }
+    html[data-theme="dark"] .wc-cell.wc-sat { background:#1f242c; }
+    html[data-theme="dark"] .wc-d { color:var(--ink); }
+    html[data-theme="dark"] .wc-n { background:#16301f; color:#7ee2a8; }
+    html[data-theme="dark"] .wc-cases a { background:#33280f; color:#f5c26b; }
+    html[data-theme="dark"] .wc-p { color:var(--ink); }
+    html[data-theme="dark"] .wc-p.ent { color:#f5c26b; }
+    html[data-theme="dark"] .wc-p.asg { color:#6f7883; }
+    html[data-theme="dark"] .wc-none { color:#5a616b; }
+    /* その日の稼働希望・レベル・ポジション */
+    html[data-theme="dark"] .e-wish.ok { background:#16301f; color:#7ee2a8; }
+    html[data-theme="dark"] .e-wish.ng { background:#3a1c1c; color:#f59a9a; }
+    html[data-theme="dark"] .e-lv.new { background:#241f3a; color:#b8a6f5; }
+    html[data-theme="dark"] .e-lv.mid { background:#2b313a; color:#b7bec8; }
+    html[data-theme="dark"] .e-lv.vet { background:#3a2a16; color:#f0a860; }
+    html[data-theme="dark"] .e-pos { background:#2b313a; color:#b7bec8; }
+    html[data-theme="dark"] .e-pos.key { background:#14293a; color:#7cc4f0; }
+    html[data-theme="dark"] .e-stat.assigned { color:#7ee2a8; }
+    html[data-theme="dark"] .e-stat.waiting { color:var(--muted); }
+    html[data-theme="dark"] .e-src.ent { background:#16301f; color:#7ee2a8; }
+    html[data-theme="dark"] .e-src.cal { background:#14293a; color:#7cc4f0; }
+    html[data-theme="dark"] .ent-note { color:var(--muted); }
+    html[data-theme="dark"] .ent-remark { background:#23272f; color:var(--ink); border-color:#3a414c; }
+    /* 月ごと */
+    html[data-theme="dark"] .month-head { color:var(--ink); }
+    html[data-theme="dark"] .month-head .cnt { color:var(--muted); }
+    html[data-theme="dark"] .month-head.past { border-left-color:#4a5058; color:var(--muted); }
+    html[data-theme="dark"] .mrow { background:var(--panel); border-color:var(--line); }
+    html[data-theme="dark"] .mrow-date { color:var(--muted); }
+    html[data-theme="dark"] .mrow-name { color:var(--ink); }
+    html[data-theme="dark"] .mrow-mini { color:var(--muted); }
+    html[data-theme="dark"] .mrow-mini b { color:var(--ink); }
+    html[data-theme="dark"] .mrow-ent { border-top-color:var(--line); }
+    html[data-theme="dark"] .ent-chip { background:#2b313a; color:#b7bec8; }
+    html[data-theme="dark"] .ent-chip.assigned { background:#16301f; color:#7ee2a8; }
+    /* 月ごとの一覧表（スタッフ×案件） */
+    html[data-theme="dark"] .mtx-legend { color:var(--muted); }
+    html[data-theme="dark"] .mtx-wrap { background:var(--panel); border-color:var(--line); }
+    html[data-theme="dark"] table.mtx th,
+    html[data-theme="dark"] table.mtx td { border-bottom-color:var(--line); border-right-color:var(--line); }
+    html[data-theme="dark"] table.mtx thead th { background:#23272f; color:var(--muted); }
+    html[data-theme="dark"] table.mtx th.staffcol,
+    html[data-theme="dark"] table.mtx td.staffcol { background:var(--panel); color:var(--ink); }
+    html[data-theme="dark"] table.mtx th.entcol,
+    html[data-theme="dark"] table.mtx td.entcol { background:#23272f; }
+    html[data-theme="dark"] table.mtx thead th.staffcol { background:#23272f; color:var(--muted); }
+    html[data-theme="dark"] table.mtx .coldate { color:var(--muted); }
+    html[data-theme="dark"] table.mtx .colclient { color:var(--ink); }
+    html[data-theme="dark"] table.mtx .colmeta { color:var(--muted); }
+    html[data-theme="dark"] table.mtx td.totcol,
+    html[data-theme="dark"] table.mtx th.totcol { background:#23272f; }
+    html[data-theme="dark"] table.mtx .m-asg { color:#7ee2a8; }
+    html[data-theme="dark"] table.mtx .m-tmp { background:#33280f; color:#f5c26b; border-color:#5a4718; }
+    html[data-theme="dark"] table.mtx .m-ent { color:#f5c26b; }
+    html[data-theme="dark"] table.mtx .m-none { color:#5a616b; }
+    html[data-theme="dark"] table.mtx .m-cal { background:#14293a; color:#7cc4f0; border-color:#2c5070; }
+    html[data-theme="dark"] table.mtx .m-ng { color:#f59a9a; }
+    html[data-theme="dark"] table.mtx td.assignable:hover { background:#2f353f; }
+    html[data-theme="dark"] table.mtx td.is-tmp { background:#33280f; }
+    html[data-theme="dark"] table.mtx td.is-fix { background:#16301f; }
+    html[data-theme="dark"] table.mtx td.is-cal { background:#14293a; }
+    html[data-theme="dark"] table.mtx td.is-ng  { background:#3a1c1c; }
+    html[data-theme="dark"] table.mtx td.is-pub { background:#12302c; }
+    html[data-theme="dark"] table.mtx .m-x { color:#c9a0a0; }
+    html[data-theme="dark"] table.mtx .m-x:hover { color:#f59a9a; }
+    html[data-theme="dark"] table.mtx tbody tr:hover td { background:#262b33; }
+    html[data-theme="dark"] table.mtx tbody tr:hover td.staffcol { background:#2f353f; }
+    html[data-theme="dark"] table.mtx tfoot td { background:#23272f; color:var(--ink); }
+    html[data-theme="dark"] .empty-note { color:var(--muted); }
+    /* 「見本です」の帯（背景はHTMLに直書きなので、文字色だけ黒地向けに戻す） */
+    html[data-theme="dark"] .mock-note { color:var(--ink); border-color:var(--line); }
   </style>
 @endverbatim
 @endpush
@@ -230,7 +365,7 @@
       {{-- 拠点の切替（管理者以上だけ表示。一般社員は自拠点固定＝スイッチは出ない） --}}
       @include('partials.office_switch')
       @if ($officeScope)
-        <p class="mock-note" style="background:#fbf6ef;">
+        <p class="mock-note" style="background:var(--panel);">
           <b>{{ $officeScope }}</b>の案件だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
         </p>
       @endif

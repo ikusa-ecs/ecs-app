@@ -224,6 +224,48 @@
     /* 案件が無いときの案内。40pxの余白は狭い画面では大きすぎる。 */
     .sheet-empty { padding: 24px 12px; font-size: 13px; }
   }
+
+  /* =========================================================================
+     黒ベース（ダークモード）用の色の上書き。
+     カードの面が白・項目名が茶色のままだと黒地で読めないので、
+     共通の変数（--panel / --ink / --muted / --line）に読み替える。
+     日付ヘッダーの種別の色（青・緑・紫など）は意味を持つのでそのまま残す。
+     ========================================================================= */
+  html[data-theme="dark"] .sheet-controls select,
+  html[data-theme="dark"] .sheet-controls input[type="search"] { background: #23272f; border-color: #3a414c; }
+  html[data-theme="dark"] .sheet-controls .count,
+  html[data-theme="dark"] .sheet-legend { color: var(--muted); }
+
+  /* カードの面 */
+  html[data-theme="dark"] .acard { background: var(--panel); }
+  html[data-theme="dark"] .acard-sticky { background: var(--panel); }
+  html[data-theme="dark"] .arow .lbl { color: var(--muted); }
+  html[data-theme="dark"] .arow a.val { color: #7cc4f0; }
+  html[data-theme="dark"] .chip-ck { color: var(--muted); }
+  html[data-theme="dark"] .chip-ck.on { background: #16301f; border-color: #2c5c3c; color: #7ee2a8; }
+
+  /* メンバー表 */
+  html[data-theme="dark"] .acard-members .mhead { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] .mrow { border-top-color: var(--line); }
+  html[data-theme="dark"] .mrow .pos-badge { background: #14293a; color: #7cc4f0; }
+  html[data-theme="dark"] .mrow .pos-badge.d { background: #241f3a; color: #b8a6f5; }
+  html[data-theme="dark"] .mrow .pos-badge.none { background: #2b313a; color: #8b929c; }
+  html[data-theme="dark"] .mrow .nm .emp { color: var(--brand-dark); }
+  html[data-theme="dark"] .mrow .st.kari { background: #33280f; color: #f5c26b; }
+  html[data-theme="dark"] .mrow .mempty,
+  html[data-theme="dark"] .mrow .m-tag { color: var(--muted); }
+  html[data-theme="dark"] .mrow .m-remark-tag { color: var(--muted); }
+
+  /* 編集モードの入力欄 */
+  html[data-theme="dark"] .mhead .m-edit-btn { background: #14293a; color: #7cc4f0; }
+  html[data-theme="dark"] .mrow .m-role,
+  html[data-theme="dark"] .mrow .m-note,
+  html[data-theme="dark"] .mrow .m-patrol,
+  html[data-theme="dark"] .mrow .m-remark,
+  html[data-theme="dark"] .pe-in { background: #23272f; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .pe-sep { color: var(--muted); }
+
+  html[data-theme="dark"] .sheet-empty { color: var(--muted); }
 </style>
 @endpush
 
@@ -254,6 +296,11 @@
     font-size: 10px; font-weight: 800; color: #166534;
     background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 999px; padding: 1px 7px; margin-left: 6px;
   }
+
+  /* 黒ベース（ダークモード）：自拠点・ヘルプの緑バッジは淡い緑のままだと黒地で読めないので、
+     「暗い緑の面＋明るい緑の文字」に置き換える（緑＝自分たちの案件、という意味は変えない）。 */
+  html[data-theme="dark"] .of-mine,
+  html[data-theme="dark"] .m-help { background: #16301f; color: #7ee2a8; border-color: #2c5c3c; }
 </style>
 
 @php

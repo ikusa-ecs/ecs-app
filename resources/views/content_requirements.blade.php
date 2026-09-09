@@ -33,6 +33,16 @@
     }
     .r-btn:hover { filter: brightness(.97); }
     .r-note { font-size: 11.5px; color: var(--muted); margin: 12px 0 0; }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       上の色は白地むけに直接書いてあるので、黒地だと白いボタン・生成りの表見出し・
+       白い入力欄が読みにくい。そこだけを暗い面＋明るい文字に置き換える。 */
+    html[data-theme="dark"] .r-nav a { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .r-nav a:hover { background: #2f353f; }
+    html[data-theme="dark"] .flash { border-color: #2f5c40; color: #7ee2a8; }
+    html[data-theme="dark"] .r-grid thead th { background: #23272f; color: var(--muted); }
+    html[data-theme="dark"] .r-grid td .cnt { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .r-btn { background: var(--brand); border-color: var(--brand); color: #1a1206; }
 </style>
 @endpush
 

@@ -69,6 +69,20 @@
     background: #fff; border: 1px solid var(--line); border-radius: 12px;
     padding: 44px 20px; text-align: center; color: #a08a73; font-size: 14px;
   }
+
+  /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+     上の色は白地むけに直接書いてあるので、黒地だと白いカード・生成りの帯・
+     茶色の文字が読みにくい。その部分だけを暗い面＋明るい文字に置き換える。 */
+  html[data-theme="dark"] .hist-controls select { background: #23272f; border-color: #3a414c; }
+  html[data-theme="dark"] .client-card { background: var(--panel); }
+  html[data-theme="dark"] .client-head .cmeta { color: var(--muted); }
+  html[data-theme="dark"] .regulars { background: #23272f; }
+  html[data-theme="dark"] .reg-chip { background: #262b33; border-color: #3a414c; }
+  html[data-theme="dark"] .reg-chip .rcount { color: #1a1206; }
+  html[data-theme="dark"] .proj-item { border-bottom-color: var(--line); }
+  html[data-theme="dark"] .mem-chip { background: #262b33; border-color: #3a414c; }
+  html[data-theme="dark"] .mem-chip .mrole { color: #7cc4f0; }
+  html[data-theme="dark"] .hist-empty { background: var(--panel); color: var(--muted); }
 </style>
 @endpush
 

@@ -98,11 +98,11 @@
       <strong>{{ $u->name }} さん</strong>
       {{ $permLabels[$u->permission] ?? '社員' }}
       <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
-        <a href="/profile" style="color:#a08a73; text-decoration:underline;">マイプロフィール</a>
-        <a href="/password" style="color:#a08a73; text-decoration:underline;">パスワード変更</a>
+        <a href="/profile" style="color:var(--muted); text-decoration:underline;">マイプロフィール</a>
+        <a href="/password" style="color:var(--muted); text-decoration:underline;">パスワード変更</a>
         <form method="POST" action="/logout" style="margin:2px 0 0;">
           @csrf
-          <button type="submit" style="background:none; border:none; padding:0; color:#a08a73; cursor:pointer; font:inherit; text-decoration:underline;">ログアウト</button>
+          <button type="submit" style="background:none; border:none; padding:0; color:var(--muted); cursor:pointer; font:inherit; text-decoration:underline;">ログアウト</button>
         </form>
       </div>
     @endauth

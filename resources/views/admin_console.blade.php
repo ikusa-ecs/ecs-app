@@ -13,6 +13,19 @@
   {!! App\Support\Departments::badgeCss('.ac-dept') !!}
   .ac-dept.none { background: #efeae3; color: #8a7a66; }
   .ac-sub { color: #a08a73; font-size: 11px; }
+
+  /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+     この画面は色が style="" に直接書かれているので、黒地のときだけ !important で読める色に差し替える。
+     お知らせの色の意味（緑＝成功／赤＝失敗）は変えない。 */
+  html[data-theme="dark"] .ac-dept.none { background: #2b313a; color: #b7bec8; }
+  html[data-theme="dark"] .ac-sub { color: var(--muted); }
+  html[data-theme="dark"] div[style*="#e7f6ec"] { background: #16301f !important; color: #7ee2a8 !important; border-color: #245c37 !important; }
+  html[data-theme="dark"] div[style*="#fdecec"] { background: #3a1c1c !important; color: #f59a9a !important; border-color: #5a2a2a !important; }
+  html[data-theme="dark"] tr[style*="#6e5b49"] { color: var(--muted) !important; border-bottom-color: var(--line) !important; }
+  html[data-theme="dark"] tr[style*="#f0e8dd"] { border-bottom-color: var(--line) !important; }
+  html[data-theme="dark"] td[style*="#a08a73"] { color: var(--muted) !important; }
+  html[data-theme="dark"] [style*="#3a2d20"] { color: var(--ink) !important; }
+  html[data-theme="dark"] select[style*="#d8c8b6"] { background: #23272f !important; color: var(--ink) !important; border-color: #3a414c !important; }
 </style>
 @endpush
 

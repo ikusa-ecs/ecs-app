@@ -232,6 +232,67 @@
       .radio-row { flex-wrap: wrap; gap: 10px 18px; }
       .req-legend { gap: 8px 14px; padding: 10px 12px; }
     }
+
+    /* =========================================================================
+       黒ベース（ダークモード）用の色の上書き。
+       この画面は入力欄や説明の帯を白・生成りで直に書いているので、黒地だと読めない。
+       共通の変数（--panel / --ink / --muted / --line）に読み替えるだけで、形は変えない。
+       赤（必須）・黄（後で必要）などの意味の色は残したまま、暗い面＋明るい文字にする。
+       ========================================================================= */
+    /* 白い面の欄・帯 */
+    html[data-theme="dark"] .multi-pick { background: #23272f; }
+    html[data-theme="dark"] .auto-hint { border-color: #5c4718; }
+    html[data-theme="dark"] .expand-box { background: #23272f; }
+    html[data-theme="dark"] .readonly-field { background: #23272f; }
+
+    /* アサイン表からの貼り付け */
+    html[data-theme="dark"] .paste-toggle { background: #262b33; }
+    html[data-theme="dark"] .paste-toggle:hover { background: #2f353f; }
+    html[data-theme="dark"] #pasteBox { background: #23272f; }
+    html[data-theme="dark"] .paste-lead { color: var(--muted); }
+    html[data-theme="dark"] .paste-row input[type="month"],
+    html[data-theme="dark"] #pasteText { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] #pasteMsg .ok { color: #7ee2a8; }
+    html[data-theme="dark"] #pasteMsg .ng { color: #f59a9a; }
+    html[data-theme="dark"] #pasteMsg .warn { color: #f5c26b; }
+
+    /* ボタン・タブ */
+    html[data-theme="dark"] .btn-same-time { background: #262b33; }
+    html[data-theme="dark"] .btn-same-time:hover { background: #2f353f; }
+    html[data-theme="dark"] .mode-tabs a { background: var(--panel); }
+    html[data-theme="dark"] .mode-tabs a:hover { background: #262b33; }
+    html[data-theme="dark"] .mode-tabs a.active { color: #1a1206; }
+
+    /* コンテンツのタグ入力と候補リスト */
+    html[data-theme="dark"] .tag-input { background: #23272f; }
+    html[data-theme="dark"] .tag-input input { background: transparent; color: var(--ink); }
+    html[data-theme="dark"] .suggest { background: var(--panel); }
+    html[data-theme="dark"] .suggest .add-new-note { color: var(--muted); }
+    html[data-theme="dark"] .tag .oneoff-mark { background: #33280f; color: #f5c26b; border-color: #5c4718; }
+
+    /* 入力必須の3段階（赤＝いま必須／黄＝後で必要／白＝任意） */
+    html[data-theme="dark"] .req-legend { background: #23272f; }
+    html[data-theme="dark"] .req-legend .sw.red { background: #3a1c1c; }
+    html[data-theme="dark"] .req-legend .sw.yellow { background: #33280f; }
+    html[data-theme="dark"] .req-legend .sw.white { background: var(--panel); }
+    html[data-theme="dark"] .need-red { background: #3a1c1c !important; }
+    html[data-theme="dark"] .need-yellow { background: #33280f !important; }
+    html[data-theme="dark"] .req-mark.red { color: #f59a9a; }
+    html[data-theme="dark"] .req-mark.yellow { color: #f5c26b; }
+
+    /* 注意書き・危険日ヒント・曜日バッジ */
+    html[data-theme="dark"] .undokai-note { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .danger-hint.warn { background: #3a1c1c; color: #f59a9a; }
+    html[data-theme="dark"] .dow-badge { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .dow-badge.sat { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .dow-badge.sun { background: #3a1c1c; color: #f59a9a; }
+
+    /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
+       「その色を含むもの」を名指しして !important で読み替える。
+       黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
+    html[data-theme="dark"] [style*="#f0fdf4"] { background: #16301f !important; border-color: #2c5c3c !important; color: #7ee2a8 !important; }  /* 保存できたときの緑の帯 */
+    html[data-theme="dark"] [style*="#eef6ff"] { background: #14293a !important; border-color: #2b4b66 !important; color: #7cc4f0 !important; }  /* お知らせの青い帯 */
+    html[data-theme="dark"] [style*="#fff7e6"] { background: #33280f !important; border-color: #5c4718 !important; color: #f5c26b !important; }  /* CSVから引き継いだときの黄色い帯 */
 </style>
 @endverbatim
 @endpush

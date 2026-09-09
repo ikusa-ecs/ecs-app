@@ -25,6 +25,19 @@
   .a-off-cell { background: #eef2ff; color: #4338ca; }
   .a-skip { opacity: .45; }
   .a-memo { display: block; font-size: 10px; color: var(--muted); max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+     上の色は白地むけに直接書いてあるので、黒地だと淡い色の帯やマスの中の文字が読みにくい。
+     〇＝緑／×＝赤／△＝橙／休＝紫 の意味はそのままに、暗い面＋明るい文字へ置き換える。 */
+  html[data-theme="dark"] .a-ok   { background: #16301f; border-color: #2f5c40; color: #7ee2a8; }
+  html[data-theme="dark"] .a-err  { background: #3a1c1c; border-color: #6b2f2f; color: #f59a9a; }
+  html[data-theme="dark"] .a-warn { background: #33280f; border-color: #5c4a20; color: #f5c26b; }
+  html[data-theme="dark"] .a-table th.name,
+  html[data-theme="dark"] .a-table td.name { background: #23272f; }
+  html[data-theme="dark"] .a-ok-cell    { background: #16301f; color: #7ee2a8; }
+  html[data-theme="dark"] .a-ng-cell    { background: #3a1c1c; color: #f59a9a; }
+  html[data-theme="dark"] .a-maybe-cell { background: #33280f; color: #f5c26b; }
+  html[data-theme="dark"] .a-off-cell   { background: #241f3a; color: #b8a6f5; }
 </style>
 @endpush
 

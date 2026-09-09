@@ -206,6 +206,72 @@
     tr.group-row.flash td { animation: pubFlash 1.4s ease-out; }
     /* 他の画面から名指しで開いた案件の行を光らせる（どれのことか分かるように）。 */
     tr.flash td { animation: pubFlash 1.4s ease-out; }
+
+    /* =========================================================================
+       黒ベース（ダークモード）用の色の上書き。
+       白い入力欄・淡い色の帯をそのままにすると黒地で読めないので、
+       共通の変数（--panel / --ink / --muted / --line）と暗い面に読み替える。
+       公開＝緑・未公開＝オレンジ・追加案件＝赤、という意味の色は変えない。
+       ========================================================================= */
+    /* お知らせ文の編集 */
+    html[data-theme="dark"] .notice-edit textarea { background: #23272f; border-color: #3a414c; }
+    html[data-theme="dark"] .notice-edit .saved { color: #7ee2a8; }
+
+    /* 上のサマリー・一括操作バー */
+    html[data-theme="dark"] .pub-bar .stat-mini .n.on { color: #7ee2a8; }
+    html[data-theme="dark"] .pub-bar .stat-mini .n.off { color: #f5c26b; }
+    html[data-theme="dark"] .pub-bar select { background: #23272f; color: var(--ink); border-color: #3a414c; }
+
+    /* 月グループ見出し */
+    html[data-theme="dark"] tr.group-row.past td { background: #23272f; }
+    /* 黒地では「暗くする」ホバーだと変化が見えないので、明るくする向きにそろえる。 */
+    html[data-theme="dark"] tr.group-row td:hover { filter: brightness(1.35); }
+
+    /* 集合時刻・必要人数の入力欄 */
+    html[data-theme="dark"] td.meet-cell input.smeet,
+    html[data-theme="dark"] .need-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] td.meet-cell .diff { color: #f5c26b; }
+
+    /* 公開状態バッジ */
+    html[data-theme="dark"] .pub-badge.on { color: #7ee2a8; }
+    html[data-theme="dark"] .pub-badge.off { color: #f5c26b; }
+
+    /* 操作ボタン */
+    html[data-theme="dark"] .pub-toggle.go { color: #1a1206; }
+    html[data-theme="dark"] .pub-toggle.undo { background: #262b33; color: #7ee2a8; border-color: #2c5c3c; }
+    html[data-theme="dark"] td.ops-cell .note-btn,
+    html[data-theme="dark"] td.ops-cell .cat-toggle { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] td.ops-cell .note-btn:hover,
+    html[data-theme="dark"] td.ops-cell .cat-toggle:hover { background: #2f353f; }
+    html[data-theme="dark"] td.ops-cell .note-btn.has { border-color: #5c4718; color: #f5c26b; }
+    html[data-theme="dark"] td.ops-cell .cat-toggle.is-extra { background: #3a1c1c; color: #f59a9a; }
+
+    /* 備考の折りたたみ行 */
+    html[data-theme="dark"] tr.note-row > td { background: #23272f; }
+    html[data-theme="dark"] tr.note-row textarea { background: #23272f; border-color: #3a414c; }
+    html[data-theme="dark"] tr.note-row .saved { color: #7ee2a8; }
+
+    /* 公開ボード / アーカイブ タブ */
+    html[data-theme="dark"] .view-tab { background: var(--panel); }
+    html[data-theme="dark"] .view-tab:hover { background: #262b33; }
+    html[data-theme="dark"] .view-tab.active { color: #1a1206; }
+
+    /* 追加案件のバッジ */
+    html[data-theme="dark"] .badge.extra { background: #3a1c1c; color: #f59a9a; }
+
+    /* 日付を押してその日へ飛ぶ並び */
+    html[data-theme="dark"] .day-chip { background: #262b33; border-color: #3a414c; color: var(--ink); }
+    html[data-theme="dark"] .day-chip:hover { background: #2f353f; }
+    html[data-theme="dark"] .day-chip.on { color: #1a1206; }
+    html[data-theme="dark"] .day-chip .cn { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .day-chip.on .cn { background: rgba(0,0,0,.28); color: #1a1206; }
+    html[data-theme="dark"] .day-chip.sun { color: #f59a9a; }
+    html[data-theme="dark"] .day-chip.sat { color: #7cc4f0; }
+
+    /* HTMLに直接書かれた色（style="..."）は、ふつうのCSSでは上書きできないので
+       「その色を含むもの」を名指しして !important で読み替える。
+       黒のときだけに効かせるので、いまの明るい画面の見た目は変わらない。 */
+    html[data-theme="dark"] [style*="#fbf6ef"] { background: #33280f !important; color: #f5c26b !important; }  /* 拠点の絞り込み注記 */
   </style>
 @endverbatim
 @endpush

@@ -67,6 +67,29 @@
       .ex-filters select, .ex-filters input[type=search] { flex: 1 1 46%; min-width: 0; }
       table.ex-tbl { min-width: 620px; }
     }
+
+    /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+       白い面・生成りの見出し・茶色の文字を、暗い面＋明るい文字に置き換える。
+       青いチップ（コンテンツ）は色の意味を残したまま暗い青にする。 */
+    html[data-theme="dark"] .ex-tab { background: var(--panel); color: var(--ink); }
+    html[data-theme="dark"] .ex-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .ex-card { background: var(--panel); }
+    html[data-theme="dark"] .ex-filters select,
+    html[data-theme="dark"] .ex-filters input[type=search] { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .ex-filters label { color: var(--muted); }
+    html[data-theme="dark"] table.ex-tbl thead th { background: #23272f; color: var(--muted); border-bottom-color: var(--line); }
+    html[data-theme="dark"] table.ex-tbl thead th.sortable:hover { background: #2f353f; }
+    html[data-theme="dark"] table.ex-tbl tbody tr.person:hover { background: #23272f; }
+    html[data-theme="dark"] table.ex-tbl tbody tr.zero td { color: #7d858f; }
+    html[data-theme="dark"] .ex-rank,
+    html[data-theme="dark"] .ex-sub { color: var(--muted); }
+    html[data-theme="dark"] .ex-badge { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
+    html[data-theme="dark"] .ex-badge.gone { background: #23272f; color: #7d858f; }
+    html[data-theme="dark"] .ex-chip { background: #14293a; color: #7cc4f0; border-color: #2b4a63; }
+    html[data-theme="dark"] tr.detail td { background: #23272f; }
+    html[data-theme="dark"] table.ex-inner td { border-bottom-color: var(--line); }
+    html[data-theme="dark"] table.ex-inner td.muted2 { color: var(--muted); }
+    html[data-theme="dark"] .ex-dl a { color: var(--brand-dark); }
 </style>
 @endverbatim
 @endpush

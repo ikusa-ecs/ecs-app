@@ -27,6 +27,11 @@
   }
   .office-switch .os-chip:hover { border-color: var(--brand, #8a5a33); }
   .office-switch .os-chip.active { background: var(--brand, #8a5a33); color: #fff; border-color: var(--brand, #8a5a33); }
+  /* 黒ベース（2026-09-09）。生成りの帯と白いボタンのままだと黒地で浮くので、暗い面にする。 */
+  html[data-theme="dark"] .office-switch { background: #23272f; }
+  html[data-theme="dark"] .office-switch .os-chip { background: var(--panel); color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .office-switch .os-chip:hover { background: #262b33; }
+  html[data-theme="dark"] .office-switch .os-chip.active { color: #1a1206; }
 </style>
 <div class="office-switch">
   <span class="os-label">表示する拠点</span>

@@ -37,6 +37,24 @@
   .cr-result { border-left: 4px solid var(--brand); background: #faf7f1; padding: 12px 14px; border-radius: 8px;
                white-space: pre-wrap; font-size: 13px; line-height: 1.7; margin-bottom: 16px; }
   .cr-result.err { border-left-color: #b91c1c; background: #fdf2f2; }
+
+  /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+     白い面・生成りの帯・茶色の文字を、暗い面＋明るい文字に置き換える。
+     バッジの色の意味（緑＝OK／橙＝注意／赤＝遅れ）は変えない。 */
+  html[data-theme="dark"] .cr-card { background: var(--panel); }
+  html[data-theme="dark"] .cr-badge.ok   { color: #7ee2a8; }
+  html[data-theme="dark"] .cr-badge.warn { color: #f5c26b; }
+  html[data-theme="dark"] .cr-badge.bad  { color: #f59a9a; }
+  html[data-theme="dark"] .cr-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
+  html[data-theme="dark"] .cr-btn.dry { background: #23272f; }
+  html[data-theme="dark"] .cr-btn.live { background: #8a2020; color: #ffe3e3; border-color: #8a2020; }
+  html[data-theme="dark"] table.cr th { background: #23272f; color: var(--muted); }
+  html[data-theme="dark"] .days-late { color: #f5c26b; }
+  html[data-theme="dark"] .days-late.bad { color: #f59a9a; }
+  html[data-theme="dark"] .sent-tag { background: #2b313a; color: #b7bec8; }
+  html[data-theme="dark"] .todo-tag { color: #f5c26b; }
+  html[data-theme="dark"] .cr-result { background: #23272f; }
+  html[data-theme="dark"] .cr-result.err { background: #3a1c1c; border-left-color: #f59a9a; color: #f59a9a; }
 </style>
 @endpush
 

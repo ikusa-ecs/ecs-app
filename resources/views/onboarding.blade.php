@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="ja">
+{{-- 画面の色（テーマ）＝人ごとの設定を効かせる。この画面は共通の骨組み（layouts.app）を
+     使っていない独立ページなので、ここにも同じ印を付ける（2026-09-09）。
+     ⚠ 色そのものは public/ecs/style.css。ここには色を書かない。 --}}
+<html lang="ja" data-theme="{{ \App\Support\Themes::current() }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,6 +41,17 @@
     @media (max-width: 520px){ .field-row2, .field-row3 { grid-template-columns: 1fr; } }
 
     .err { background: #fdecec; color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px; border:1px solid #f3c0c0; }
+
+    /* ここから下は「黒ベース（ダークモード）」のときだけ効く上書き。
+       白いカード・生成りの枠・白い入力欄を、黒地でも読める色に置き換える。
+       エラーの赤は意味を変えずに「暗い赤の面＋明るい赤の文字」にする。 */
+    html[data-theme="dark"] body { background: var(--bg); }
+    html[data-theme="dark"] .ob-card { background: var(--panel); }
+    html[data-theme="dark"] .sec { background: #23272f; }
+    html[data-theme="dark"] .field input,
+    html[data-theme="dark"] .field select,
+    html[data-theme="dark"] .field textarea { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .err { background: #3a1c1c; color: #f59a9a; border-color: #6b2f2f; }
   </style>
   @endverbatim
 </head>

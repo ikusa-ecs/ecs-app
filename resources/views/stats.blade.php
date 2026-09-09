@@ -136,6 +136,39 @@
                       border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px; font-size: 12.5px; }
   .st-excluded-list li { padding: 3px 0; border-top: 1px dashed var(--line); color: var(--ink); }
   .st-excluded-list .why { color: var(--muted); font-size: 11.5px; }
+
+  /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+     白い面と茶色系の細かい文字が黒地に残ると読めないので、暗い面＋明るい文字にする。
+     増＝緑／減＝赤 の意味は変えない。 */
+  html[data-theme="dark"] .st-tab { background: var(--panel); }
+  html[data-theme="dark"] .st-tab:hover { background: #262b33; }
+  html[data-theme="dark"] .st-tab.active { color: #1a1206; }
+  html[data-theme="dark"] .st-scope .sc-label { color: var(--muted); }
+  html[data-theme="dark"] .st-scope a { background: var(--panel); }
+  html[data-theme="dark"] .st-scope a:hover { background: #262b33; }
+  html[data-theme="dark"] .st-scope a.active { color: #1a1206; }
+  html[data-theme="dark"] .st-controls select { background: #23272f; border-color: #3a414c; }
+  html[data-theme="dark"] .st-controls .lbl { color: var(--muted); }
+  html[data-theme="dark"] .st-kpi .k-label { color: var(--muted); }
+  html[data-theme="dark"] .st-kpi .k-num small { color: var(--muted); }
+  html[data-theme="dark"] .k-yoy { color: var(--muted); }
+  html[data-theme="dark"] .k-yoy .up { color: #7ee2a8; }
+  html[data-theme="dark"] .k-yoy .down { color: #f59a9a; }
+  html[data-theme="dark"] .k-yoy .flat,
+  html[data-theme="dark"] .k-yoy .prev { color: var(--muted); }
+  html[data-theme="dark"] .st-panel .empty { color: var(--muted); }
+  html[data-theme="dark"] .st-row .r-name .sub,
+  html[data-theme="dark"] .st-row .r-num small { color: var(--muted); }
+  html[data-theme="dark"] .st-row.zero .r-name,
+  html[data-theme="dark"] .st-row.zero .r-num { color: #7d858f; }
+  html[data-theme="dark"] .st-emp-table th { color: var(--muted); }
+  html[data-theme="dark"] .st-emp-table td.l .sub { color: var(--muted); }
+  html[data-theme="dark"] .st-emp-table tbody tr:hover { background: #23272f; }
+  html[data-theme="dark"] .st-dept .d-sub { color: var(--muted); }
+  html[data-theme="dark"] .st-note { color: var(--muted); }
+  html[data-theme="dark"] .st-excluded,
+  html[data-theme="dark"] .st-excluded-list { background: #23272f; }
+  html[data-theme="dark"] .st-csv { color: #1a1206; }
 </style>
 @endpush
 

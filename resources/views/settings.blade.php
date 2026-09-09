@@ -106,6 +106,28 @@
       border: 1px solid #f0b9b9; background: #fff; color: var(--danger); border-radius: 8px;
       padding: 7px 11px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
     }
+
+    /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
+       白いボタン・白い入力欄・生成りのチップを、暗い面＋明るい文字に置き換える。
+       赤（消す）・オレンジ（今の基準日）の意味は変えない。 */
+    html[data-theme="dark"] .line-btn { background: var(--panel); border-color: #3a414c; }
+    html[data-theme="dark"] .line-btn:hover { background: #262b33; }
+    html[data-theme="dark"] .line-btn.danger { color: #f59a9a; border-color: #5a2a2a; }
+    html[data-theme="dark"] .date-input { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .switch .track { background: #3a414c; }
+    html[data-theme="dark"] .switch .track::before { background: #e6e8ea; }
+    html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
+    html[data-theme="dark"] .mtg-chip { background: #2b313a; border-color: #3a414c; }
+    html[data-theme="dark"] .mtg-chip.is-current { background: var(--brand); color: #1a1206; }
+    html[data-theme="dark"] .mtg-chip.danger { background: #3a1c1c; border-color: #5a2a2a; color: #f59a9a; }
+    html[data-theme="dark"] .big-list { background: #23272f; }
+    html[data-theme="dark"] .big-row .bclient { color: var(--muted); }
+    html[data-theme="dark"] .big-row .boffice { color: var(--muted); background: #2b313a; border-color: #3a414c; }
+    html[data-theme="dark"] .lk-row { background: #23272f; }
+    html[data-theme="dark"] .lk-row .lk-ord button { background: #2b313a; border-color: #3a414c; }
+    html[data-theme="dark"] .lk-row input { background: #1e2128; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .lk-row input.bad { background: #3a1c1c; border-color: #8a4a4a; }
+    html[data-theme="dark"] .lk-row .lk-rm { background: var(--panel); color: #f59a9a; border-color: #5a2a2a; }
   </style>
 @endverbatim
 @endpush

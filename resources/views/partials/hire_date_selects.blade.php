@@ -57,6 +57,6 @@
   {{-- 選んだ内容を「勤続◯年◯か月」に言い換えて出す。
        ⚠ 生年月日を選ぶと「勤続21年」のように出て、ひと目でおかしいと分かる＝いちばん効く歯止め。
        JavaScript が動かなくても、ここが空になるだけで入力そのものは今までどおりできる。 --}}
-  <span class="hire-date-echo" style="display:block; margin-top:5px; font-size:13px; color:#7a6f63;"></span>
+  <span class="hire-date-echo" style="display:block; margin-top:5px; font-size:13px; color:var(--muted);"></span>
 </span>
 @include('partials.hire_date_script')
