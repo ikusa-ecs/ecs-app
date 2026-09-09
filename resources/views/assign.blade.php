@@ -862,6 +862,12 @@
       const seenPick = new Set();   // このクリック内で同じ人を2回入れない
       const pool = dayPeople(c.off, dayCases)
         .filter(p => p.applied.includes(c.id) || p.cal)
+        // ⚠ 社員は自動アサインで選ばない（2026-09-09 baba「日別ボードで自動アサインを押したら
+        //   社員も選ばれるから社員は外してほしい」）。
+        //   社員の出勤可能日も希望者と同じ表（shift_preferences）に入るので、印を付けて外す。
+        //   社員を入れるかどうかは人が決めること＝「手動編集」から足せる（機械が勝手に入れない）。
+        //   ⚠ 月まとめ自動アサインは、はじめからスタッフだけを見ている（MonthAutoAssign::candidatePeople）。
+        .filter(p => !p.emp)
         .filter(p => p.id && !assignedIds.has(p.id) && !already.has(p.name) && !taken.has(p.name)
                      && monthCountOf(p.name, amap) < MONTH_CAP)
         .filter(p => { if (seenPick.has(p.id)) return false; seenPick.add(p.id); return true; });
@@ -903,7 +909,7 @@
       if (silent) return { name: c.name, picked: picked.length, need: c.need, total: total, skipped: false };
       render();
       if (picked.length === 0) {
-        alert('⚡ 自動で足せる希望者がいませんでした。\n（この案件の希望者が、すでにメンバー／同日かぶり／今月上限のいずれかです）\n→「手動編集」で名簿・社員・派遣から足してください。');
+        alert('⚡ 自動で足せるスタッフがいませんでした。\n（この案件の希望者が、すでにメンバー／同日かぶり／今月上限のいずれかです）\n※ 自動アサインが選ぶのはスタッフだけです（社員は入れません）。\n→「手動編集」で名簿・社員・派遣から足してください。');
       } else if (total < c.need) {
         alert('⚡ 自動アサインしました（希望者から ' + picked.length + '名）。\n必要 ' + c.need + '名に ' + (c.need - total) + '名 不足しています。\n→「手動編集」で名簿・社員・派遣を足して補ってください。');
       } else {

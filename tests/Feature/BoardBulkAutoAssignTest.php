@@ -67,6 +67,25 @@ class BoardBulkAutoAssignTest extends TestCase
         $this->assertStringContainsString('${(filled < c.need && canAuto(c)) ?', $blade);
     }
 
+
+    /**
+     * ⚠ 自動アサインが選ぶのは**スタッフだけ**（2026-09-09 baba
+     * 「日別ボードで自動アサインを押したら社員も選ばれるから社員は外してほしい」）。
+     *
+     * 社員の出勤可能日も、スタッフの稼働希望と同じ表（shift_preferences）に入るので、
+     * 印（emp）で外さないと候補に混ざる。社員を入れるかどうかは人が決めること
+     * ＝「手動編集」から足せる（機械が勝手に入れない）。
+     * ⚠ 月まとめ自動アサインは、はじめからスタッフだけを見ている（MonthAutoAssign::candidatePeople）。
+     */
+    public function test_it_does_not_pick_employees(): void
+    {
+        $this->assertStringContainsString(
+            '.filter(p => !p.emp)',
+            $this->boardBlade(),
+            '自動アサインの候補から社員を外す仕掛けが消えています'
+        );
+    }
+
     /** 1件ずつの自動アサインは、これまでどおりお知らせを出すこと（silent は一括のときだけ）。 */
     public function test_single_auto_assign_still_alerts(): void
     {
