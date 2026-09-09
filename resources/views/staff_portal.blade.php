@@ -555,7 +555,7 @@
     /* 稼働希望の月切り替え */
     html[data-theme="dark"] .pref-month-nav .pm-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
     html[data-theme="dark"] .pref-month-nav .pm-btn:hover { background: #2f353f; }
-    html[data-theme="dark"] .pref-month-nav .pm-btn.off { color: #6f7883; background: #20242b; border-color: #2f343d; }
+    html[data-theme="dark"] .pref-month-nav .pm-btn.off { color: #98a0aa; background: #20242b; border-color: #2f343d; }
     html[data-theme="dark"] .pref-month-nav .pm-sel { background: #23272f; color: var(--ink); border-color: #3a414c; }
     /* お知らせ */
     html[data-theme="dark"] .notice { color: #f5c26b; border-color: #5a4718; }
@@ -607,7 +607,7 @@
     html[data-theme="dark"] .jr-comment { background: #23272f; color: var(--ink); }
     html[data-theme="dark"] .apply-btn-sm { color: #1a1206; }
     html[data-theme="dark"] .apply-btn-sm.cancel { background: #262b33; color: var(--brand-dark); border-color: #3a414c; }
-    html[data-theme="dark"] .apply-btn-sm.disabled { background: #2b313a; color: #7d858f; }
+    html[data-theme="dark"] .apply-btn-sm.disabled { background: #2b313a; color: #98a0aa; }
     html[data-theme="dark"] .apply-btn-sm.confirm { color: #fff; }
     /* 稼働希望・募集カレンダー */
     html[data-theme="dark"] .m-card { background: var(--panel); }

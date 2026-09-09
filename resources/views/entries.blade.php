@@ -293,8 +293,8 @@
     html[data-theme="dark"] .wc-cases a { background:#33280f; color:#f5c26b; }
     html[data-theme="dark"] .wc-p { color:var(--ink); }
     html[data-theme="dark"] .wc-p.ent { color:#f5c26b; }
-    html[data-theme="dark"] .wc-p.asg { color:#6f7883; }
-    html[data-theme="dark"] .wc-none { color:#5a616b; }
+    html[data-theme="dark"] .wc-p.asg { color:#98a0aa; }
+    html[data-theme="dark"] .wc-none { color:#8b939d; }
     /* その日の稼働希望・レベル・ポジション */
     html[data-theme="dark"] .e-wish.ok { background:#16301f; color:#7ee2a8; }
     html[data-theme="dark"] .e-wish.ng { background:#3a1c1c; color:#f59a9a; }
@@ -340,7 +340,7 @@
     html[data-theme="dark"] table.mtx .m-asg { color:#7ee2a8; }
     html[data-theme="dark"] table.mtx .m-tmp { background:#33280f; color:#f5c26b; border-color:#5a4718; }
     html[data-theme="dark"] table.mtx .m-ent { color:#f5c26b; }
-    html[data-theme="dark"] table.mtx .m-none { color:#5a616b; }
+    html[data-theme="dark"] table.mtx .m-none { color:#8b939d; }
     html[data-theme="dark"] table.mtx .m-cal { background:#14293a; color:#7cc4f0; border-color:#2c5070; }
     html[data-theme="dark"] table.mtx .m-ng { color:#f59a9a; }
     html[data-theme="dark"] table.mtx td.assignable:hover { background:#2f353f; }

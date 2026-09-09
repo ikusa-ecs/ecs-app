@@ -80,11 +80,11 @@
     html[data-theme="dark"] table.ex-tbl thead th { background: #23272f; color: var(--muted); border-bottom-color: var(--line); }
     html[data-theme="dark"] table.ex-tbl thead th.sortable:hover { background: #2f353f; }
     html[data-theme="dark"] table.ex-tbl tbody tr.person:hover { background: #23272f; }
-    html[data-theme="dark"] table.ex-tbl tbody tr.zero td { color: #7d858f; }
+    html[data-theme="dark"] table.ex-tbl tbody tr.zero td { color: #98a0aa; }
     html[data-theme="dark"] .ex-rank,
     html[data-theme="dark"] .ex-sub { color: var(--muted); }
     html[data-theme="dark"] .ex-badge { background: #2b313a; color: #b7bec8; border-color: #3a414c; }
-    html[data-theme="dark"] .ex-badge.gone { background: #23272f; color: #7d858f; }
+    html[data-theme="dark"] .ex-badge.gone { background: #23272f; color: #98a0aa; }
     html[data-theme="dark"] .ex-chip { background: #14293a; color: #7cc4f0; border-color: #2b4a63; }
     html[data-theme="dark"] tr.detail td { background: #23272f; }
     html[data-theme="dark"] table.ex-inner td { border-bottom-color: var(--line); }

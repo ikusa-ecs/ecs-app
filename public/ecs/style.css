@@ -28,8 +28,8 @@
    ⚠ テーマを足すときは、Themes::OPTIONS とここの両方に足すこと。
    ⚠ 上の :root は「いまの色」＝既定。テーマ側では**変える色だけ**を書く
      （全部書き直すと、片方に色を足したときに反映されない）。
-   ⚠ 黒ベース（ダークモード）はまだ無い。各画面に直書きの色が約1,950か所あり、
-     そのほとんどが「白い背景に濃い文字」前提のため、いま黒にすると読めなくなる。 */
+   ⚠ **画面を新しく作るときは、面の色を var(--panel)・文字を var(--ink) で書く。**
+     白や茶色を直に書くと、その画面だけ黒ベースで読めなくなる（2026-09-09 に45画面ぶん直した）。 */
 
 /* 会社カラー（IKUSA コーポレートサイトの雰囲気＝白地×ニュートラルグレー×鮮やかなオレンジ）
 
@@ -80,15 +80,13 @@ html[data-theme="orange"] .sidebar .ym-ycount,
 html[data-theme="orange"] .sidebar .ym-mcount { color: rgba(255, 255, 255, .75); }
 html[data-theme="orange"] .sidebar .ym-month-btn.active .ym-mcount { color: rgba(179, 85, 0, .8); }
 
-/* 黒ベース（見本・2026-09-09 baba「黒もどんな感じか1画面見本で見たい」）
+/* 黒ベース（2026-09-09 baba要望。同日に45画面ぶん整えて「選べる色」にした）
 
-   ⚠ **まだ選んで保存はできない。** URLに ?theme=dark を付けた画面だけ黒で出る（App\Support\Themes）。
-     各画面に直書きの色が約1,950か所あり、そのほとんどが「白い背景に濃い文字」前提のため、
-     いま全画面で使えるようにすると、整えていない画面が読めなくなる。
    ⚠ 下は「共通の枠」（左メニュー・上のバー・パネル・表・ボタン・バッジ）だけ。
-     画面ごとの色は、その画面のファイルで直す（いまは dashboard.blade.php だけ整えてある）。
+     画面ごとの色は、その画面のファイルの <style> 末尾に html[data-theme="dark"] で書いてある。
    ⚠ 変数だけでは足りない＝上の枠の色は :root ではなく各ルールに直接書かれているので、
-     ここで同じルールを上書きしている。 */
+     ここで同じルールを上書きしている。
+   ⚠ 灰色の文字は #98a0aa より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。 */
 /* ねらい＝**シンプル**（baba のイメージ：黒＝シンプル／会社カラー＝スタイリッシュ／いまの色＝やわらかい）。
    飾りの色を増やさず、黒・グレー・白＋アクセント1色だけで組み立てる。 */
 html[data-theme="dark"] {
@@ -162,13 +160,63 @@ html[data-theme="dark"] .hist-who,
 html[data-theme="dark"] .hist-date-head { color: var(--ink); }
 html[data-theme="dark"] .hist-old,
 html[data-theme="dark"] .hist-arrow,
-html[data-theme="dark"] .hist-field::after { color: #7d858f; }
+html[data-theme="dark"] .hist-field::after { color: #98a0aa; }
 /* 入力欄（白地・黒文字が既定のブラウザ標準を上書きする） */
 html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea {
   background: #23272f; color: var(--ink); border-color: #3a414c;
 }
 /* 画面の上によく出る黄色い注記（.mock-note）。黒地では「暗い黄＋明るい文字」にする。 */
 html[data-theme="dark"] .mock-note { border-color: #5c4718; color: #f5c26b; }
+
+/* ===== 黒ベース：JavaScript が直接書き込む文字色の救済（2026-09-09 baba「黒文字の箇所ある」）=====
+
+   ⚠ 画面のJavaScriptが style="color:#…" の形で色を書いているところは、
+     クラスの指定では上書きできない（インラインの指定が必ず勝つ）。
+     そこで黒ベースのときだけ、その文字色を読める色に読み替える。
+   ⚠ **JavaScript（文字列）は触らない** ＝ 明るい画面の見た目は1ピクセルも変わらない。
+   ⚠ 意味の色は保つ（橙は橙・赤は赤・緑は緑のまま、明るくするだけ）。
+   ⚠ `background-color:#…` を巻き込まないように :not() で除いている。
+   ⚠ 増やすときは「色を書き込んでいるJSを直す」のが本筋。ここは応急の受け皿。 */
+html[data-theme="dark"] [style*="color:#6b5544"]:not([style*="background-color:#6b5544"]),
+html[data-theme="dark"] [style*="color: #6b5544"],
+html[data-theme="dark"] [style*="color:#8a7a6b"]:not([style*="background-color:#8a7a6b"]),
+html[data-theme="dark"] [style*="color: #8a7a6b"],
+html[data-theme="dark"] [style*="color:#7a6f63"]:not([style*="background-color:#7a6f63"]),
+html[data-theme="dark"] [style*="color: #7a6f63"],
+html[data-theme="dark"] [style*="color:#6b5c49"]:not([style*="background-color:#6b5c49"]),
+html[data-theme="dark"] [style*="color: #6b5c49"],
+html[data-theme="dark"] [style*="color:#5a4a38"]:not([style*="background-color:#5a4a38"]),
+html[data-theme="dark"] [style*="color:#3a2d20"]:not([style*="background-color:#3a2d20"]),
+html[data-theme="dark"] [style*="color:#4a4238"]:not([style*="background-color:#4a4238"]),
+html[data-theme="dark"] [style*="color:#7a6a58"]:not([style*="background-color:#7a6a58"]),
+html[data-theme="dark"] [style*="color:#8a7a66"]:not([style*="background-color:#8a7a66"]),
+html[data-theme="dark"] [style*="color:#6e5b49"]:not([style*="background-color:#6e5b49"]),
+html[data-theme="dark"] [style*="color:#4f4338"]:not([style*="background-color:#4f4338"]),
+html[data-theme="dark"] [style*="color:#a08a73"]:not([style*="background-color:#a08a73"]),
+html[data-theme="dark"] [style*="color: #a08a73"] { color: var(--muted) !important; }
+/* 意味のある色（橙＝注意／赤＝いけない／緑＝よい／青＝情報）は、明るい同系色に置き換える。 */
+html[data-theme="dark"] [style*="color:#b45309"]:not([style*="background-color:#b45309"]),
+html[data-theme="dark"] [style*="color: #b45309"],
+html[data-theme="dark"] [style*="color:#8a5a10"]:not([style*="background-color:#8a5a10"]),
+html[data-theme="dark"] [style*="color:#7a5200"]:not([style*="background-color:#7a5200"]) { color: #f5c26b !important; }
+html[data-theme="dark"] [style*="color:#b5673a"]:not([style*="background-color:#b5673a"]),
+html[data-theme="dark"] [style*="color: #b5673a"],
+html[data-theme="dark"] [style*="color:#b4530a"]:not([style*="background-color:#b4530a"]) { color: #e0a070 !important; }
+html[data-theme="dark"] [style*="color:#b91c1c"]:not([style*="background-color:#b91c1c"]),
+html[data-theme="dark"] [style*="color: #b91c1c"],
+html[data-theme="dark"] [style*="color:#c0392b"]:not([style*="background-color:#c0392b"]),
+html[data-theme="dark"] [style*="color:#a12121"]:not([style*="background-color:#a12121"]) { color: #f59a9a !important; }
+html[data-theme="dark"] [style*="color:#15803d"]:not([style*="background-color:#15803d"]),
+html[data-theme="dark"] [style*="color: #15803d"],
+html[data-theme="dark"] [style*="color:#166534"]:not([style*="background-color:#166534"]),
+html[data-theme="dark"] [style*="color:#2e7d32"]:not([style*="background-color:#2e7d32"]) { color: #7ee2a8 !important; }
+html[data-theme="dark"] [style*="color:#2c6ca0"]:not([style*="background-color:#2c6ca0"]),
+html[data-theme="dark"] [style*="color:#0369a1"]:not([style*="background-color:#0369a1"]),
+html[data-theme="dark"] [style*="color:#3b6db5"]:not([style*="background-color:#3b6db5"]) { color: #7cc4f0 !important; }
+html[data-theme="dark"] [style*="color:#6b7280"]:not([style*="background-color:#6b7280"]),
+html[data-theme="dark"] [style*="color: #6b7280"],
+html[data-theme="dark"] [style*="color:#374151"]:not([style*="background-color:#374151"]),
+html[data-theme="dark"] [style*="color:#333"]:not([style*="background-color:#333"]) { color: #98a0aa !important; }
 /* 「これは見本です」の帯 */
 .theme-preview-bar {
   background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700;

@@ -356,7 +356,7 @@
     html[data-theme="dark"] .ov-mark.ok { color: #7ee2a8; }
     html[data-theme="dark"] .ov-mark.ng { color: #f59a9a; }
     html[data-theme="dark"] .ov-mark.maybe { color: #f5c26b; }
-    html[data-theme="dark"] .ov-mark.none { color: #6b7280; }
+    html[data-theme="dark"] .ov-mark.none { color: #98a0aa; }
     html[data-theme="dark"] table.ov-tbl th.we.big,
     html[data-theme="dark"] table.ov-tbl th.holi.big { color: #f5c26b; }
     html[data-theme="dark"] table.ov-tbl th .bigclient { background: #33280f; color: #f5c26b; border-color: #5c4718; }

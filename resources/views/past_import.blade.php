@@ -125,7 +125,7 @@
   html[data-theme="dark"] table.pj-table input.edited { background: #16301f; border-color: #2c5c3c; }
   html[data-theme="dark"] table.pj-table input.pj-need { background: #33280f; border-color: #5c4718; }
   html[data-theme="dark"] table.pj-table input.pj-need::placeholder { color: #d9a94a; }
-  html[data-theme="dark"] table.pj-table tr.row-skip td { background: #23272f; color: #7a8189; }
+  html[data-theme="dark"] table.pj-table tr.row-skip td { background: #23272f; color: #98a0aa; }
 
   /* すでに入っている案件との重なり */
   html[data-theme="dark"] .pj-dup-same { background: #14293a; color: #7cc4f0; }

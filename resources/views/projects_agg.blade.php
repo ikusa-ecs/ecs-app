@@ -68,7 +68,7 @@
     html[data-theme="dark"] table.tbl td.nm.dep-sales    { color: #a5b4fc; }
     html[data-theme="dark"] table.tbl td.nm.dep-creative { color: #7ee2a8; }
     html[data-theme="dark"] table.tbl td.nm.dep-other    { color: var(--muted); }
-    html[data-theme="dark"] table.tbl td.nm.dep-none     { color: #7d858f; }
+    html[data-theme="dark"] table.tbl td.nm.dep-none     { color: #98a0aa; }
   </style>
   @endverbatim
 </head>

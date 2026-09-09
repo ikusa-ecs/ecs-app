@@ -349,7 +349,7 @@
     html[data-theme="dark"] .dcase.locked-chip { color: #7ee2a8; border-color: #2a5a38; }
     html[data-theme="dark"] .dcase.locked-chip.big { background: #33280f; color: #f5c26b; border-color: #5a4718; }
     html[data-theme="dark"] .dc-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
-    html[data-theme="dark"] .cell-empty { color: #5a616b; }
+    html[data-theme="dark"] .cell-empty { color: #8b939d; }
     /* 担当バランス集計（右パネル） */
     html[data-theme="dark"] .agg-tbl tr.agg-total td { background: #23272f; }
     html[data-theme="dark"] .agg-panel .live { color: #7ee2a8; }

@@ -13,6 +13,10 @@
   .im-card h2 { font-size: 15px; margin: 0 0 6px; color: var(--ink); }
   .im-card p { font-size: 12.5px; color: #6b5c49; line-height: 1.7; margin: 0 0 14px; flex: 1; }
   .im-card .btn { align-self: flex-start; }
+
+  /* 黒ベース（2026-09-09）。説明文が茶色のままだと黒地で読めないので薄いグレーにする。 */
+  html[data-theme="dark"] .im-lead,
+  html[data-theme="dark"] .im-card p { color: var(--muted); }
 </style>
 @endpush
 

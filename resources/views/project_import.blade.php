@@ -86,7 +86,7 @@
     html[data-theme="dark"] .mode-tabs a { background: var(--panel); }
     html[data-theme="dark"] .mode-tabs a:hover { background: #262b33; }
     html[data-theme="dark"] .mode-tabs a.active { color: #1a1206; }
-    html[data-theme="dark"] .step .arrow { color: #6b7280; }
+    html[data-theme="dark"] .step .arrow { color: #98a0aa; }
     html[data-theme="dark"] .cols-help code { background: #2b313a; color: #b7bec8; }
     html[data-theme="dark"] .dropzone { background: #23272f; border-color: #3a414c; }
     html[data-theme="dark"] .dropzone.dragover { background: #3a2a16; border-color: var(--brand); }

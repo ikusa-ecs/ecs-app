@@ -68,7 +68,7 @@
     html[data-theme="dark"] .tag.many  { background: #14293a; color: #7cc4f0; }
     html[data-theme="dark"] .tag.ok    { background: #16301f; color: #7ee2a8; }
     html[data-theme="dark"] .tag.ng    { background: #3a1c1c; color: #f59a9a; }
-    html[data-theme="dark"] .tag.none  { color: #7d858f; }
+    html[data-theme="dark"] .tag.none  { color: #98a0aa; }
     html[data-theme="dark"] .ef-note { color: var(--muted); }
 </style>
 @endpush

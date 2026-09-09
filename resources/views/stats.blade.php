@@ -160,7 +160,7 @@
   html[data-theme="dark"] .st-row .r-name .sub,
   html[data-theme="dark"] .st-row .r-num small { color: var(--muted); }
   html[data-theme="dark"] .st-row.zero .r-name,
-  html[data-theme="dark"] .st-row.zero .r-num { color: #7d858f; }
+  html[data-theme="dark"] .st-row.zero .r-num { color: #98a0aa; }
   html[data-theme="dark"] .st-emp-table th { color: var(--muted); }
   html[data-theme="dark"] .st-emp-table td.l .sub { color: var(--muted); }
   html[data-theme="dark"] .st-emp-table tbody tr:hover { background: #23272f; }
