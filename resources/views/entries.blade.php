@@ -189,6 +189,8 @@
     table.mtx td.cell { text-align:center; }
     table.mtx .coldate { font-size:11px; color:#6e5b49; }
     table.mtx .colname { font-size:11px; max-width:96px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:bottom; }
+    /* 企業名（お客様）＝どの案件かを見分ける主役なので、案件名より濃く・太く出す（2026-09-09 baba要望） */
+    table.mtx .colclient { font-size:11px; font-weight:700; color:#5a4a38; max-width:96px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:bottom; }
     table.mtx .colmeta { font-size:10px; color:#a08a73; font-weight:600; }
     table.mtx td.totcol, table.mtx th.totcol { background:#faf7f1; text-align:center; }
     table.mtx .m-asg  { color:#3d7a45; font-weight:700; }
@@ -373,6 +375,11 @@
   function dateLabel(off){ const d = caseDate(off); return (d.getMonth()+1) + '/' + d.getDate() + '（' + DOW[d.getDay()] + '）'; }
   function ymKey(off){ const d = caseDate(off); return d.getFullYear() + '-' + (d.getMonth()+1); }
   function ymLabel(off){ const d = caseDate(off); return d.getFullYear() + '年 ' + (d.getMonth()+1) + '月'; }
+
+  // 案件の呼び名＝「企業名／案件名」（2026-09-09 baba要望）。
+  // ⚠ 案件名だけだと同じコンテンツ名が並んで、どのお客様の案件か分からない
+  //   （「謎解き」が何本も横に並ぶ）。企業名を必ず添えて見分けられるようにする。
+  function caseLabel(c){ return (c.client ? c.client + '／' : '') + (c.name || ''); }
 
   // 募集状態（モック簡易ルール）：確定 or 必要人数を満たした → 締切／それ以外 → 募集中
   function recruitState(c){
@@ -825,7 +832,10 @@
         const all = entrantsOf(c);
         const entCnt = all.filter(e => (e.src || 'entry') === 'entry').length;
         const calCnt = all.length - entCnt;
-        head += `<th title="${esc(c.name)}"><span class="coldate">${dateLabel(c.off)}</span><br>`
+        // ⚠ 企業名（お客様）を必ず出す。案件名だけだと同じコンテンツ名が横に並んで
+        //   どの案件か分からない（2026-09-09 baba要望）。企業名が空のときだけ省く。
+        head += `<th title="${escAttr(caseLabel(c))}"><span class="coldate">${dateLabel(c.off)}</span><br>`
+          + (c.client ? `<span class="colclient" title="${escAttr(c.client)}">${esc(c.client)}</span><br>` : '')
           + `<span class="colname">${esc(c.name)}</span><br>`
           + `<span class="colmeta">必${c.need}/応${entCnt}/空${calCnt}</span></th>`;
       });
@@ -861,7 +871,7 @@
             const cls = st === 'fix' ? 'is-fix' : (st === 'tmp' ? 'is-tmp' : (st === 'ng' ? 'is-ng' : (st === 'cal' ? 'is-cal' : 'is-ent')));
             body += `<td class="cell assignable ${cls}${(st==='fix'&&pub)?' is-pub':''}"`
               + ` data-pid="${esc(c.id)}" data-sid="${esc(e.id)}" data-role="${esc(e.role)}" data-state="${st}"`
-              + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${esc(c.name)}"`
+              + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${escAttr(caseLabel(c))}"`
               + ` title="${tip}">` + mark + lock + rmBtn + '</td>';
           } else {
             body += `<td class="cell">${mark}</td>`;

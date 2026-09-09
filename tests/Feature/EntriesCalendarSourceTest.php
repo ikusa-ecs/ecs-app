@@ -183,6 +183,42 @@ class EntriesCalendarSourceTest extends TestCase
             ->assertSee('String.fromCharCode(10)', false);
     }
 
+    /**
+     * 月ごとの表の見出しに「企業名」も出ること（2026-09-09 baba要望）。
+     *
+     * ⚠ 案件名（コンテンツ名）だけだと、同じ名前の列が横にいくつも並んで
+     *   どのお客様の案件か分からない。企業名を必ず添える。
+     * ⚠ 呼び名の作り方は caseLabel の1か所だけ（見出し・確認メッセージで食い違わないように）。
+     */
+    public function test_month_view_shows_client_name(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+
+        $this->actingAsPerson($me)->get('/entries')
+            ->assertOk()
+            ->assertSee('function caseLabel(c){', false)
+            ->assertSee('class="colclient"', false)
+            // 確定を外すときの確認メッセージも「企業名／案件名」で出す
+            ->assertSee('data-cname="${escAttr(caseLabel(c))}"', false);
+    }
+
+    /** 案件のデータに企業名（client）が入っていること＝画面が出せる材料があるか。 */
+    public function test_cases_carry_client(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
+        $p = ProjectFactory::new()->create([
+            'start_date' => Carbon::today()->addDays(3)->format('Y-m-d'),
+            'office' => '東京',
+            'client' => '○○商事',
+        ]);
+
+        $cases = collect(
+            $this->actingAsPerson($me)->get('/entries')->assertOk()->original->getData()['entriesCases']
+        )->keyBy('id');
+
+        $this->assertSame('○○商事', $cases[$p->id]['client'] ?? null);
+    }
+
     /** ⚠ 「空」のマスもクリックで仮アサインできること（押せないと候補に出す意味がない）。 */
     public function test_calendar_cells_are_clickable(): void
     {
