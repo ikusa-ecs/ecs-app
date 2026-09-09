@@ -569,6 +569,10 @@
     html[data-theme="dark"] .job-filter .jf-today { background: #262b33; }
     html[data-theme="dark"] .job-toggles .jf-tg { background: #262b33; }
     html[data-theme="dark"] .job-toggles .jf-tg.on { color: #ffffff; }
+    /* 「🔥 追加案件のみ」は黒地だと赤が強すぎて主張が激しい（2026-09-09 baba指摘）。
+       意味（赤＝追加案件）は変えず、押していないときは落ち着いた赤、押したときだけ濃い赤にする。 */
+    html[data-theme="dark"] .job-toggles .jf-tg.extra { border-color: #7a3b3b; color: #e2a2a2; }
+    html[data-theme="dark"] .job-toggles .jf-tg.extra.on { background: #8f3a3a; border-color: #8f3a3a; color: #fff; }
     /* 募集案件の行 */
     html[data-theme="dark"] .job-row { background: var(--panel); }
     html[data-theme="dark"] .job-row.applied { background: #1b2a20; border-color: #2a5a38; }
