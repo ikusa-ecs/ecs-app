@@ -183,7 +183,14 @@ class MonthAutoAssign
 
             $picks = [];
             $used = [];   // この案件で入れた人（同じ人を2つの枠に入れない）
-            foreach ($slots as $role) {
+            // ⚠ 役割の決まった枠を埋められなかったぶんは、あとから「未定」で埋め直す
+            //   （2026-09-09 baba「未定で埋めてOK」）。
+            //   埋めないと、候補が残っているのに人数が足りないまま終わる。
+            //   ⚠ 先に役割つきの枠を回してから未定を入れる（順番を変えると、
+            //     MC ができる人が未定の枠に取られて MC が埋まらなくなる）。
+            // 1枠ぶん埋める。入れられたら true。
+            $fillOne = function (string $role) use (&$picks, &$used, &$monthCount, &$addedByStaff,
+                &$busyByDay, &$memberOf, &$roleFilled, $scored, $p, $day): bool {
                 foreach ($scored as $s) {
                     $sid = $s['id'];
                     if (isset($used[$sid])) {
@@ -191,7 +198,8 @@ class MonthAutoAssign
                     }
                     // ⚠ 役割の決まった枠には「その役割ができる人」だけ。
                     //   できない人を入れると、当日その役割が回らない。
-                    if ($role !== '' && ! $this->canDo($s['person'], $role)) {
+                    //   （FC・CK は「みんなできる」扱い＝正本は AssignmentRole::needsEligibility）
+                    if (! $this->canDo($s['person'], $role)) {
                         continue;
                     }
                     $used[$sid] = true;
@@ -199,7 +207,7 @@ class MonthAutoAssign
                         'id' => $sid,
                         'name' => $s['person']->name,
                         // ⚠ 入れる役割は**枠の役割**。その人の主ポジションではない。
-                        //   空（''）＝必要ポジションの外の枠＝担当はあとで人が決める。
+                        //   空（''）＝担当は未定＝あとで人が決める。
                         'role' => $role,
                         'score' => $s['ev']['score'],
                         'reasons' => $s['ev']['reasons'],
@@ -211,7 +219,27 @@ class MonthAutoAssign
                     $busyByDay[$day][$sid] = $p->project_name;
                     $memberOf[$p->id][$sid] = true;
                     $roleFilled[$p->id][$role] = ($roleFilled[$p->id][$role] ?? 0) + 1;
-                    break;
+
+                    return true;
+                }
+
+                return false;
+            };
+
+            // ⚠ 先に「役割の決まった枠」を回す。順番を変えると、MC ができる人が
+            //   未定の枠に取られて MC が埋まらなくなる。
+            $unfilled = 0;
+            foreach ($slots as $role) {
+                if (! $fillOne($role)) {
+                    $unfilled++;
+                }
+            }
+            // ⚠ 役割が埋まらなかったぶんは「未定」で埋める（2026-09-09 baba「未定で埋めてOK」）。
+            //   埋めないと、候補が残っているのに人数が足りないまま終わる。
+            //   担当はあとで人が決める＝間違った役割を機械が付けることにはならない。
+            for ($i = 0; $i < $unfilled; $i++) {
+                if (! $fillOne('')) {
+                    break;   // もう入れられる人がいない
                 }
             }
 
@@ -612,10 +640,14 @@ class MonthAutoAssign
         return $slots;
     }
 
-    /** その人がその役割をできるか（staff_role_eligibility）。空の枠は誰でも入れる。 */
+    /**
+     * その人がその役割をできるか（staff_role_eligibility）。空の枠は誰でも入れる。
+     * ⚠ FC・CK は「みんなできる」扱い（2026-09-09 baba確定）。判定の正本＝AssignmentRole::needsEligibility。
+     *   ここに役割名を直書きしないこと（日別ボードと食い違う）。
+     */
     private function canDo(Person $p, string $role): bool
     {
-        if ($role === '') {
+        if (! AssignmentRole::needsEligibility($role)) {
             return true;
         }
         $can = $p->relationLoaded('roleEligibilities')

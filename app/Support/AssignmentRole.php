@@ -56,6 +56,32 @@ class AssignmentRole
     /** スタッフの「できる役割（staff_role_eligibility）」で使うポジション（SDを除く7種）。 */
     public const POSITIONS = [self::D, self::OP, self::MC, self::FC, self::CK, self::SP, self::RP];
 
+    /**
+     * 「登録が無くても、みんなできる」とみなす役割（2026-09-09 baba確定）。
+     *
+     * 【babaの言葉】「みんなFCとCKはできる認識をもってほしい。
+     *   特別扱いしてほしいのは MC, OP, 軍師、サポーター」（軍師・サポーターはどちらも SP）
+     *
+     * 【なぜ要るか】自動アサインは案件の必要ポジションの枠に人を入れる。
+     * FC（巡回ファシリ）・CK（チェッカー）まで「登録がある人だけ」にしていたので、
+     * **候補が並んでいるのに1人も入らない**ことが起きていた（枠の多くは FC）。
+     *
+     * ⚠ ここに足すほど「誰でも入れる」役割が増える＝当日その役割が回らない危険が上がる。
+     *   D（ディレクター）・RP（受付）は**今までどおり登録が要る**（baba の指定に無いため変えていない）。
+     * ⚠ この決まりを使うのは自動アサインの役割判定だけ。名簿の「できるポジション」の表示は変えない
+     *   （本人がどう申告しているかは、そのまま見えるべきなので）。
+     */
+    public const ANYONE_CAN = [self::FC, self::CK];
+
+    /**
+     * その役割に「できる登録」が要るか（＝特別扱いの役割か）。
+     * ⚠ 判定はここ1か所。画面（日別ボード）にも window.ECS_ANYONE_ROLES として同じ一覧を渡している。
+     */
+    public static function needsEligibility(string $role): bool
+    {
+        return $role !== '' && ! in_array($role, self::ANYONE_CAN, true);
+    }
+
     /** assignments.role に入りうる全コード（配列）。 */
     public static function all(): array
     {

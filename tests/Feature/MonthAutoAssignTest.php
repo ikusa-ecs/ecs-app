@@ -153,6 +153,83 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame(1, $plan['totals']['added']);
     }
 
+
+    /**
+     * ⚠ FC・CK は「みんなできる」扱い（2026-09-09 baba
+     * 「みんなFCとCKはできる認識をもってほしい。特別扱いしてほしいのは MC, OP, 軍師、サポーター」）。
+     *
+     * これまで FC の枠にも「できる登録」を求めていたので、
+     * 枠のほとんどが FC の案件で、候補がいるのに1人も入らないことがあった。
+     */
+    public function test_everyone_can_do_fc_and_ck(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        \App\Models\ContentRoleRequirement::create([
+            'content_id' => 'CT-FC', 'scale' => '中型', 'position' => 'FC', 'count' => 1,
+        ]);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+            'content_ids' => ['CT-FC'], 'scale' => '中型',
+        ]);
+        // ⚠ 「できる役割」を1つも登録していない人。
+        $s = PersonFactory::new()->staff()->create(['name' => '登録なし子', 'office' => '東京']);
+        $this->wish($s, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+
+        $this->assertSame(1, $plan['totals']['added'], 'FCの枠は登録が無くても入れること');
+        $this->assertSame('FC', $plan['projects'][0]['picks'][0]['role']);
+    }
+
+    /**
+     * ⚠ 役割の埋まらない枠は「未定」で埋める（2026-09-09 baba「未定で埋めてOK」）。
+     *   埋めないと、候補が残っているのに人数が足りないまま終わる。
+     *   担当は未定＝間違った役割を機械が付けることにはならない（あとで人が決める）。
+     */
+    public function test_unfillable_role_slots_are_filled_as_undecided(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        \App\Models\ContentRoleRequirement::create([
+            'content_id' => 'CT-MC', 'scale' => '中型', 'position' => 'MC', 'count' => 1,
+        ]);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+            'content_ids' => ['CT-MC'], 'scale' => '中型',
+        ]);
+        // MC ができる登録が無い人だけ（MC は特別扱いの役割）。
+        $s = PersonFactory::new()->staff()->create(['name' => 'MCできない子', 'office' => '東京']);
+        $this->wish($s, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+
+        $this->assertSame(1, $plan['totals']['added'], '枠が埋まらないままで終わっている');
+        $this->assertSame('', $plan['projects'][0]['picks'][0]['role'], '担当は未定で入れること');
+    }
+
+    /** ⚠ 役割つきの枠を先に埋める（未定を先に埋めると、MCができる人が取られてMCが埋まらない）。 */
+    public function test_named_slots_are_filled_before_undecided_ones(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        \App\Models\ContentRoleRequirement::create([
+            'content_id' => 'CT-MC2', 'scale' => '中型', 'position' => 'MC', 'count' => 1,
+        ]);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
+            'content_ids' => ['CT-MC2'], 'scale' => '中型',
+        ]);
+        $mc = PersonFactory::new()->staff()->create(['name' => 'MCできる子', 'office' => '東京']);
+        \App\Models\StaffRoleEligibility::create(['staff_id' => $mc->id, 'position' => 'MC']);
+        $other = PersonFactory::new()->staff()->create(['name' => 'ふつうの子', 'office' => '東京']);
+        $this->wish($mc, $day);
+        $this->wish($other, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $roles = collect($plan['projects'][0]['picks'])->pluck('role', 'name')->all();
+
+        $this->assertSame('MC', $roles['MCできる子'] ?? null, 'MCの枠はMCができる人に入れること');
+        $this->assertSame('', $roles['ふつうの子'] ?? null);
+    }
+
     /** ⚠ 運営人数が未入力（0）の案件は対象外（何人必要か決まっていない）。 */
     public function test_project_without_required_count_is_skipped(): void
     {
@@ -612,8 +689,16 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame('', $picks[0]['role'], '役割は空（あとで人が決める）');
     }
 
-    /** ⚠ 役割ができる人がいなければ、その枠は空いたまま（できない人を入れない）。 */
-    public function test_leaves_the_slot_empty_when_nobody_can_do_it(): void
+    /**
+     * 役割ができる人がいないときは、**担当を「未定」にして人だけ入れる**。
+     *
+     * ⚠ 2026-09-09 に決まりが変わった（baba「未定で埋めてOK」）。
+     *   それまでは枠を空けたままにしていたが、
+     *   **候補が残っているのに人数が足りないまま終わる**ので、日別ボードでも月まとめでも
+     *   「まだスタッフがいるのにアサインできない」が起きていた。
+     * ⚠ 入れるのは「未定」＝間違った役割を機械が付けることにはならない（担当はあとで人が決める）。
+     */
+    public function test_unfillable_slot_is_filled_with_an_undecided_role(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['MC' => 1]);
@@ -628,7 +713,7 @@ class MonthAutoAssignTest extends TestCase
         $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
         $row = collect($plan['projects'])->firstWhere('id', $p->id);
 
-        $this->assertCount(0, $row['picks']);
-        $this->assertSame(1, $row['stillShort']);
+        $this->assertCount(1, $row['picks'], '候補がいるのに空けたままにしている');
+        $this->assertSame('', $row['picks'][0]['role'], '担当は未定で入れること');
     }
 }

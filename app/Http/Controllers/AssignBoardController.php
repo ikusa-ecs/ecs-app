@@ -90,6 +90,9 @@ class AssignBoardController extends Controller
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
             'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
             'roleOptions' => AssignmentRole::positionLabels(), // ポジション編集プルダウンの選択肢（正本）
+            // 「登録が無くても、みんなできる」役割（2026-09-09 baba＝FC・CK）。自動アサインの判定に使う。
+            // ⚠ 画面に役割名を直書きしない（正本＝AssignmentRole::ANYONE_CAN。月まとめ自動アサインも同じものを見る）。
+            'anyoneRoles' => AssignmentRole::ANYONE_CAN,
             'noteOptions' => $this->allNoteOptions(),          // 担当メモ入力の候補（軍師/サポ 等）
             'officeScope' => $office,                          // 今絞っている拠点（null＝全拠点）。注記に使う
             'usingDb' => Project::exists(),                    // DBに案件があるか（絞って0件でも見本に戻さない旗）

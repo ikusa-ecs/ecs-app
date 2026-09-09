@@ -478,6 +478,9 @@
 <!-- ポジション編集：選択肢（役割コードの正本）＋保存先＋CSRF。メンバーのポジションをDB(assignments)に保存する。 -->
 <script>
   window.ECS_ROLE_OPTIONS = @json($roleOptions ?? []);
+  {{-- 「登録が無くても、みんなできる」役割（2026-09-09 baba＝FC・CK）。
+       ⚠ ここに役割名を書かない。正本は App\Support\AssignmentRole::ANYONE_CAN（月まとめ自動アサインも同じ）。 --}}
+  window.ECS_ANYONE_ROLES = @json($anyoneRoles ?? []);
   // 担当メモ（軍師・サポ等）の入力候補。datalist に流し込む。
   window.ECS_NOTE_OPTIONS = @json($noteOptions ?? []);
   window.ECS_QUICK_URL = '/entries/assign';
@@ -817,9 +820,14 @@
     return out;
   }
   // その人がその役割をできるか（名簿の「できるポジション」）。空の枠は誰でも入れる。
+  // ⚠ FC・CK は「みんなできる」扱い（2026-09-09 baba「みんなFCとCKはできる認識をもってほしい。
+  //   特別扱いしてほしいのは MC, OP, 軍師、サポーター」）。
+  //   ⚠ 役割名をここに書かない。一覧は window.ECS_ANYONE_ROLES（正本＝App\Support\AssignmentRole::ANYONE_CAN）。
+  //     書き写すと、月まとめ自動アサインと食い違って「日別では入るのに月まとめでは入らない」になる。
   // ⚠ できる役割の一覧が届いていない古いデータのときは、主ポジションで見る（何も入らないより良い）。
   function canDoRole(cand, role){
     if (role === '') return true;
+    if ((window.ECS_ANYONE_ROLES || []).indexOf(role) >= 0) return true;
     const list = (cand.roles && cand.roles.length) ? cand.roles : (cand.roleCode ? [cand.roleCode] : []);
     return list.indexOf(role) >= 0;
   }
@@ -945,17 +953,27 @@
       const slots = openSlotsOf(c, room);
       const picked = [];
       const usedIds = {};
-      slots.forEach(role => {
+      // 1枠ぶん埋める。入れられたら true。
+      function fillOneSlot(role){
         for (let i = 0; i < pool.length; i++) {
           const cand = pool[i];
           if (usedIds[cand.id]) continue;
-          // ⚠ 役割の決まった枠には「その役割ができる人」だけ。
+          // ⚠ 役割の決まった枠には「その役割ができる人」だけ（FC・CK はみんなできる扱い）。
           if (role !== '' && !canDoRole(cand, role)) continue;
           usedIds[cand.id] = true;
           picked.push({ p: cand, role: role });
-          break;
+          return true;
         }
-      });
+        return false;
+      }
+      // ⚠ 先に「役割の決まった枠」を回す。順番を変えると、MCができる人が
+      //   未定の枠に取られてMCが埋まらなくなる。
+      let unfilled = 0;
+      slots.forEach(role => { if (!fillOneSlot(role)) unfilled++; });
+      // ⚠ 役割が埋まらなかったぶんは「未定」で埋める（2026-09-09 baba「未定で埋めてOK」）。
+      //   埋めないと、候補が残っているのに人数が足りないまま終わる。
+      //   担当は未定＝間違った役割を機械が付けることにはならない（あとで人が決める）。
+      for (let i = 0; i < unfilled; i++) { if (!fillOneSlot('')) break; }
       if (c.state === 'todo') c.state = 'adj';
       if ((c.stat || c.state) === 'todo') c.stat = 'adj';
       picked.forEach(sel => {

@@ -86,6 +86,26 @@ class BoardBulkAutoAssignTest extends TestCase
         );
     }
 
+
+    /**
+     * ⚠ 日別ボードも、月まとめと同じ2つの決まりで動くこと（2026-09-09 baba）。
+     *   ① FC・CK は「みんなできる」＝一覧は window.ECS_ANYONE_ROLES から受け取る
+     *      （画面に役割名を書き写すと、月まとめと食い違って
+     *        「日別では入るのに月まとめでは入らない」になる）
+     *   ② 役割が埋まらない枠は「未定」で埋める（候補が残っているのに人数が足りない、を無くす）
+     */
+    public function test_it_shares_the_role_rules_with_the_month_engine(): void
+    {
+        $blade = $this->boardBlade();
+
+        $this->assertStringContainsString("window.ECS_ANYONE_ROLES", $blade,
+            'FC・CKを「みんなできる」とする一覧を画面が受け取っていません');
+        $this->assertStringContainsString("if ((window.ECS_ANYONE_ROLES || []).indexOf(role) >= 0) return true;", $blade);
+        $this->assertStringContainsString('function fillOneSlot(role){', $blade);
+        $this->assertStringContainsString("for (let i = 0; i < unfilled; i++) { if (!fillOneSlot('')) break; }", $blade,
+            '役割が埋まらない枠を「未定」で埋める仕掛けが消えています');
+    }
+
     /** 1件ずつの自動アサインは、これまでどおりお知らせを出すこと（silent は一括のときだけ）。 */
     public function test_single_auto_assign_still_alerts(): void
     {
