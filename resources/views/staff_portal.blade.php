@@ -91,6 +91,28 @@
     }
     .extra-notice b { color: #991b1b; }
 
+    /* 🔔 最近の変更（あなたに関係するもの）＝2026-09-09。たたんだ状態で置く。 */
+    .news-box {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 10px 13px; margin: 0 0 12px; font-size: 13px;
+    }
+    .news-box > summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+    .news-hint { color: var(--muted); font-size: 11.5px; font-weight: 400; margin-left: 6px; }
+    .news-list { list-style: none; margin: 8px 0 0; padding: 0; }
+    .news-list li {
+      padding: 7px 0; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap;
+      gap: 4px 8px; align-items: baseline; font-size: 12.5px;
+    }
+    .news-at { color: var(--muted); font-size: 11px; min-width: 92px; }
+    .news-name { font-weight: 700; }
+    .news-mine {
+      font-size: 10.5px; font-weight: 700; color: #15803d;
+      background: var(--ok-soft); border-radius: 999px; padding: 1px 8px;
+    }
+    .news-what { color: var(--brand); font-weight: 700; }
+    .news-diff { color: var(--muted); }
+    .news-diff b { color: var(--ink); }
+
     .sec-title { font-size: 14px; font-weight: 700; margin: 4px 2px 8px; }
 
     /* かんたん絞り込み */
@@ -557,6 +579,36 @@
         </div>
 
         <div class="notice extra-notice" id="extraNotice" style="display:none;"></div>
+
+        {{-- 🔔 最近の変更（あなたに関係するもの）＝社員側の編集履歴のうち、スタッフに関係するものだけ
+             （2026-09-09 baba要望）。中身の選び方の正本＝App\Support\StaffProjectNews。
+             ⚠ たたんだ状態で置く（開いたままだと、案件の一覧が下へ押し出されて探しにくい）。
+             ⚠ JavaScript を使わない（details タグ）＝画面のJSが壊れても開ける。 --}}
+        @if (!empty($news))
+          <details class="news-box">
+            <summary>🔔 最近の変更（{{ count($news) }}件）<span class="news-hint">集合時間や会場が変わったとき・新しい募集が出たときに出ます</span></summary>
+            <ul class="news-list">
+              @foreach ($news as $n)
+                <li>
+                  <span class="news-at">{{ $n['at'] }}</span>
+                  <span class="news-name">{{ $n['name'] }}@if ($n['date'])（{{ \Illuminate\Support\Carbon::parse($n['date'])->format('n/j') }}）@endif</span>
+                  @if ($n['mine'])<span class="news-mine">あなたの案件</span>@endif
+                  @if ($n['action'] === 'created')
+                    <span class="news-what">新しい募集が出ました</span>
+                  @else
+                    <span class="news-what">{{ $n['label'] }}が変わりました</span>
+                    <span class="news-diff">{{ $n['from'] !== '' ? $n['from'] : '（空）' }} → <b>{{ $n['to'] !== '' ? $n['to'] : '（空）' }}</b></span>
+                  @endif
+                </li>
+              @endforeach
+            </ul>
+            <p class="news-hint" style="margin:6px 0 0;">
+              ※ ここに出るのは、<b>あなたが関わる案件</b>と<b>いま募集中の案件</b>の、
+              スタッフに関係する変更（開催日・集合/解散時間・集合場所・会場・実施形態など）だけです。
+              過去の案件の変更は出ません。
+            </p>
+          </details>
+        @endif
 
         <div class="job-filter">
           <input type="text" id="jobKw" placeholder="🔍 案件名・会場で探す" oninput="renderJobs()">

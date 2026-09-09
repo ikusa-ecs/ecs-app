@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
+use App\Support\StaffProjectNews;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
@@ -178,6 +179,9 @@ class StaffPortalController extends Controller
             //   （使うと過去の月まで印が付いて、希望の入力と紛らわしくなる）。
             'pastJobs' => $pastJobs,
             'recruitJobs' => $this->recruitJobs($today, $me),
+            // 「最近の変更（あなたに関係するもの）」＝社員側の編集履歴のうち、
+            // スタッフに関係する項目だけ（2026-09-09 baba要望）。正本＝App\Support\StaffProjectNews。
+            'news' => StaffProjectNews::forPerson($me),
             // お知らせ文＝本人の拠点のもの（2026-08-25 baba要望：拠点ごとに出し分ける）。
             'notice' => OfficeSettings::get(OfficeSettings::NOTICE, OfficeScope::filter(request())),
             // 体験用（見本）アカウントか。true のときは応募・希望が保存されないので、
