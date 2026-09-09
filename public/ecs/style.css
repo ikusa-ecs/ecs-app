@@ -112,7 +112,7 @@ html[data-theme="orange"] .sidebar .ym-month-btn.active .ym-mcount { color: rgba
      画面ごとの色は、その画面のファイルの <style> 末尾に html[data-theme="dark"] で書いてある。
    ⚠ 変数だけでは足りない＝上の枠の色は :root ではなく各ルールに直接書かれているので、
      ここで同じルールを上書きしている。
-   ⚠ 灰色の文字は var(--muted-dim) より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。
+   ⚠ 灰色の文字は #98a0aa（--muted-dim）より暗くしない（黒地で沈んで読めなくなる。2026-09-09 baba指摘）。
    ⚠ **オレンジの面（選択中・押せるボタン）の文字は白**。濃い文字にすると
      「黒くて見えにくい」（2026-09-09 baba指摘。マイページのリスト/カレンダー切替で発覚）。 */
 /* ねらい＝**シンプル**（baba のイメージ：黒＝シンプル／会社カラー＝スタイリッシュ／いまの色＝やわらかい）。
@@ -128,13 +128,13 @@ html[data-theme="dark"] {
   --surface-2: #191c22;      /* へこむ面＝入力欄・表の見出し・うっすら区切る帯 */
   --surface-3: #2d323b;      /* 出る面＝ボタン */
   --surface-hover: #363c46;  /* ボタン・行にカーソルを乗せたとき */
-  --chip-bg: var(--chip-bg);        /* 灰色のバッジの面 */
-  --chip-ink: var(--chip-ink);       /* 灰色のバッジの文字 */
-  --line: var(--field-line);           /* 罫線（入力欄の枠と同じ濃さにそろえた） */
-  --field-line: var(--field-line);     /* 入力欄・ボタンの枠 */
+  --chip-bg: #2b313a;        /* 灰色のバッジの面 */
+  --chip-ink: #b7bec8;       /* 灰色のバッジの文字 */
+  --line: #3a414c;           /* 罫線（入力欄の枠と同じ濃さにそろえた） */
+  --field-line: #3a414c;     /* 入力欄・ボタンの枠 */
   --ink: #e6e8ea;            /* 文字（真っ白は避ける＝まぶしさを抑える） */
   --muted: #9aa2ad;          /* 薄い文字 */
-  --muted-dim: var(--muted-dim);      /* ⚠ 灰色の下限。**これより暗い灰色は使わない**（黒地で沈む） */
+  --muted-dim: #98a0aa;      /* ⚠ 灰色の下限。**これより暗い灰色は使わない**（黒地で沈む） */
 
   /* ── アクセント（オレンジ）は「面用」と「文字用」を分ける ──────────
      ⚠ 1つの値を兼用すると必ず行き止まる＝面に合わせて濃くすると文字が沈み、
@@ -154,9 +154,9 @@ html[data-theme="dark"] {
      ⚠ 帯（soft）は「面（--panel）との差が 1.15 以上」を目安にする。暗すぎると帯が見えず、
        小さな色文字だけが頼りになる（＝エラーに気づけない。2026-09-09 デザイナー指摘）。
      ⚠ 黒地では**彩度の高い色を広い面に敷かない**（縁がにじんで疲れる）。強調は枠と左の色帯で作る。 */
-  --ok: #45a877;      --ok-ink: #5cbf8a;      --ok-soft: #1d4029;      --ok-line: var(--ok-line);
-  --warn: #d9a441;    --warn-ink: #dda94e;    --warn-soft: #40340f;    --warn-line: var(--warn-line);
-  --danger: #d96a6a;  --danger-ink: #e08585;  --danger-soft: #5a2727;  --danger-line: var(--danger-line);
+  --ok: #45a877;      --ok-ink: #5cbf8a;      --ok-soft: #1d4029;      --ok-line: #2c5c3c;
+  --warn: #d9a441;    --warn-ink: #dda94e;    --warn-soft: #40340f;    --warn-line: #5c4718;
+  --danger: #d96a6a;  --danger-ink: #e08585;  --danger-soft: #5a2727;  --danger-line: #5a2a2a;
   --info-ink: #63aede;    --info-soft: #1a3855;    --info-line: #2b4b66;
   --accent2-ink: #a793e8; --accent2-soft: #3a3163;
 
@@ -166,7 +166,41 @@ html[data-theme="dark"] {
    ここで既定・会社カラーにも同じ名前を用意しておくことで、画面側は var(--brand-fill) だけ書けばよい。 */
 /* ⚠ 面に敷くオレンジ（--brand-fill）と文字に使うオレンジ（--brand-ink）は役目が違う。
    既定と黒は「いままでと同じ色」を入れておく＝見た目を変えずに、画面側は var() だけ書ける。 */
-:root { --brand-fill: var(--brand); --brand-fill-hover: var(--brand-dark); --brand-ink: var(--brand); }
+:root {
+  --brand-fill: var(--brand); --brand-fill-hover: var(--brand-dark); --brand-ink: var(--brand);
+  /* ⚠ 下の名前は**3つのテーマぜんぶに値が要る**（2026-09-09 エンジニア点検）。
+     片方にしか無いと、画面が var(--ok-ink) と書いた瞬間に「値が無い＝その指定ごと消える」。
+     ここは既定（ベージュ）の“いままでの色”をそのまま入れてある＝見た目は変わらない。 */
+  --surface-2: #f8f3ea;      /* 表の見出し・うっすら帯 */
+  --surface-3: #ffffff;      /* ボタンの面 */
+  --surface-hover: #f3ece0;  /* ボタン・行のホバー */
+  --chip-bg: #ece3d4;        /* 灰バッジの面 */
+  --chip-ink: #8a7a66;       /* 灰バッジの文字 */
+  --field-line: var(--line); /* 入力欄・ボタンの枠 */
+  --muted-dim: #a89680;      /* いちばん薄い文字 */
+  --ok-ink: #15803d;    --ok-line: #b7e0c2;
+  --warn-ink: #b45309;  --warn-line: #ecd9b6;
+  --danger-ink: #b91c1c; --danger-line: #f3c0c0;
+  --info-ink: #2c6ca0;  --info-soft: #e3edf7;  --info-line: #cddff0;
+  --accent2-ink: #6d28d9; --accent2-soft: #efe6f6;
+}
+/* 会社カラー＝同じ名前に「茶色みを抜いた」値を入れる。
+   ⚠ 面は #f9fafb（うっすら）と #f3f4f6（見出し・ホバー・灰バッジ）の2つだけ。
+   ⚠ 意味の色は**白地で読める濃さ**にする（淡い面＋中間色の文字は 3.7〜4.4:1 しかなかった）。 */
+html[data-theme="orange"] {
+  --surface-2: #f9fafb;
+  --surface-3: #ffffff;
+  --surface-hover: #f3f4f6;
+  --chip-bg: #f3f4f6;
+  --chip-ink: #4b5563;
+  --field-line: #e5e7eb;
+  --muted-dim: #6b7280;
+  --ok-ink: #166534;    --ok-line: #a7f3d0;
+  --warn-ink: #92400e;  --warn-line: #fde68a;
+  --danger-ink: #991b1b; --danger-line: #fecaca;
+  --info-ink: #1d4ed8;  --info-soft: #eff6ff;  --info-line: #bfdbfe;
+  --accent2-ink: #6d28d9; --accent2-soft: #f5f3ff;
+}
 html[data-theme="dark"] { --brand-ink: var(--brand); }
 html[data-theme="orange"] { --brand-fill: #d96b00; --brand-fill-hover: #b35500; }
 /* 左メニュー */
