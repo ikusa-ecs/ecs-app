@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\EventCount;
 use App\Support\HireDate;
+use App\Support\ProjectScale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -17,7 +18,8 @@ use Illuminate\Support\Collection;
  * 集計ダッシュボード（/stats）。
  *
  * ねらい：これまで無かった「経営・運営の全体集計」を1画面にまとめる（baba 2026-07-24）。
- *  ・イベント数（拠点ごと／オンライン・リアル）
+ *  ・イベント数（合計／規模別＝小型・中型・大型／拠点ごと）＋**前年同期との比較（昨対比）**
+ *    ⚠ 2026-09-09 上長要望で、主役を「リアル／オンライン」から「小型・中型・大型」に入れ替えた。
  *  ・メンバー全員のイベント出勤数（ランキング）
  *  ・部署（イベプラ／セールス）の合計出勤数
  * 期間は「月／四半期／年」で切り替える。
@@ -80,13 +82,25 @@ class StatsController extends Controller
             $rows[] = ['数えていない案件', $data['excludedCount'],
                 $data['excludedReasons']->map(fn ($n, $reason) => "{$reason} {$n}件")->implode(' / ')];
         }
-        $rows[] = ['リアル', $data['realEvents']];
-        $rows[] = ['オンライン', $data['onlineEvents']];
         $rows[] = [];
-        $rows[] = ['■ 規模別イベント数'];
+        // 規模別＋昨対比（2026-09-09 上長要望）。⚠ 前年のデータが無い期間は「-」にする（0件と区別する）。
+        $ly = $data['lastYear'];
+        $yoyCell = fn (array $y) => $y['has'] ? $y['prev'] : '-';
+        $diffCell = fn (array $y) => $y['has']
+            ? (($y['diff'] > 0 ? '+' : '') . $y['diff'] . ($y['pct'] === null ? '' : '（' . ($y['pct'] > 0 ? '+' : '') . $y['pct'] . '%）'))
+            : 'データなし';
+        $rows[] = ['■ 規模別イベント数（昨対比つき）'];
+        $rows[] = ['', '今期', '前年同期' . ($ly['label'] !== '' ? '（' . $ly['label'] . '）' : ''), '増減'];
+        $rows[] = ['合計', $data['totalEvents'], $yoyCell($data['yoyTotal']), $diffCell($data['yoyTotal'])];
         foreach ($data['byScale'] as $s) {
-            $rows[] = [$s['scale'], $s['count']];
+            $rows[] = [$s['scale'], $s['count'], $yoyCell($s['yoy']), $diffCell($s['yoy'])];
         }
+        if ($data['scaleUnsetCount'] > 0) {
+            $rows[] = ['※ うち案件規模が未入力', $data['scaleUnsetCount'],
+                '', '「' . $data['scaleUnsetGoesTo'] . '」に数えています'];
+        }
+        $rows[] = ['のべ出勤数', $data['totalAttendance'],
+            $yoyCell($data['yoyAttendance']), $diffCell($data['yoyAttendance'])];
         $rows[] = [];
         $rows[] = ['■ 他拠点依頼数'];
         foreach ($data['otherBase'] as $o) {
@@ -232,8 +246,6 @@ class StatsController extends Controller
 
         // ── イベント数の集計 ──
         $totalEvents = $inPeriod->count();
-        $onlineEvents = $inPeriod->filter(fn (Project $p) => $this->isOnline($p->format))->count();
-        $realEvents = $totalEvents - $onlineEvents;
 
         // 拠点（事務所）別イベント数。各案件は1つの拠点だけに数える＝拠点別の合計＝totalEvents（二重計上しない）。
         // 定番拠点（東京〜東北）は0でも常に表示。当てはまらない案件は末尾に「他拠点（未指定）／その他」で出す。
@@ -256,10 +268,23 @@ class StatsController extends Controller
             ->map(fn ($cnt, $office) => ['office' => $office, 'count' => $cnt, 'big' => $officeBig[$office] ?? 0])
             ->values();
 
-        // 規模別イベント数（大型／中型／小型）。0件でも常に表示。
-        $byScale = collect(['大型', '中型', '小型'])->map(fn ($s) => [
+        // ── 規模別イベント数（小型／中型／大型）＝この画面の主役（2026-09-09 上長要望）──
+        // ⚠ どの規模に数えるかの正本は App\Support\ProjectScale の1か所（空欄の扱いもそこで決める）。
+        //   ここに「空なら小型」と書き写さない。
+        $scaleCounts = $this->countByScale($inPeriod);
+        // 規模が入っていない案件の数＝画面に必ず添える（小型が多いのか、入力漏れが多いのか分かるように）。
+        $scaleUnsetCount = $inPeriod->filter(fn (Project $p) => ProjectScale::isUnset($p->scale))->count();
+
+        // ── 昨対比（前年同期）──（2026-09-09 上長要望）
+        // ⚠ ECSに去年のデータが入っていない期間では、0件と「データなし」を必ず区別する。
+        //   区別しないと「去年より100%減」と出てしまい、数字を信じてもらえなくなる。
+        $lastYear = $this->lastYearFigures($allProjects, $span, $selected, $scopeOffice, $scopeDept);
+
+        $byScale = collect(ProjectScale::all())->map(fn ($s) => [
             'scale' => $s,
-            'count' => $inPeriod->filter(fn (Project $p) => (string) $p->scale === $s)->count(),
+            'count' => $scaleCounts[$s],
+            // 前年同期の同じ規模（データが無ければ has=false）。
+            'yoy' => $this->yoy($scaleCounts[$s], $lastYear['byScale'][$s] ?? 0, $lastYear['hasData']),
         ]);
 
         // 他拠点依頼数（拠点をまたぐ共有 project_shares から集計・全拠点運用 設計書19.2）。
@@ -481,14 +506,140 @@ class StatsController extends Controller
                 'name' => (string) $p->project_name,
                 'why'  => EventCount::label($p),
             ])->values(),
-            'realEvents'      => $realEvents,
-            'onlineEvents'    => $onlineEvents,
             'byOffice'        => $byOffice,
             'byScale'         => $byScale,
+            // 規模別の内訳（KPIの大きい数字に使う）と、規模が入っていない件数（注記に必ず出す）。
+            'scaleCounts'     => $scaleCounts,
+            'scaleUnsetCount' => $scaleUnsetCount,
+            'scaleUnsetGoesTo' => ProjectScale::UNSET_GOES_TO,
+            // 昨対比（前年同期）。hasData=false のときは画面に「前年のデータがありません」と出す。
+            'lastYear'        => $lastYear,
+            'yoyTotal'        => $this->yoy($totalEvents, $lastYear['total'], $lastYear['hasData']),
             'otherBase'       => $otherBase,
             'totalAttendance' => $totalAttendance,
+            'yoyAttendance'   => $this->yoy($totalAttendance, $lastYear['attendance'], $lastYear['hasData']),
             'byDept'          => $byDept,
             'members'         => $members,
+        ];
+    }
+
+    /**
+     * 規模ごとの件数（小型／中型／大型）。0件でも必ず3つとも返す。
+     * ⚠ どの規模に数えるかは App\Support\ProjectScale が正本。
+     *
+     * @return array<string, int>
+     */
+    private function countByScale(Collection $projects): array
+    {
+        $out = array_fill_keys(ProjectScale::all(), 0);
+        foreach ($projects as $p) {
+            $out[ProjectScale::of($p->scale)]++;
+        }
+
+        return $out;
+    }
+
+    /**
+     * 前年同期（昨対比）の数字（2026-09-09 上長要望「昨対比とかだせるとめっちゃいい」）。
+     *
+     * 【考え方】いま見ている期間の**1年前の同じ期間**と比べる。
+     *   月＝2026年9月 ⇄ 2025年9月／四半期＝2026-Q3 ⇄ 2025-Q3／年＝2026年 ⇄ 2025年。
+     *
+     * ⚠ **0件と「データが無い」を必ず区別する。** ECSは2026年から使い始めたので、
+     *   前年に案件が1件も入っていない期間がある。そこを「0件」と扱うと
+     *   **どの数字も「前年比 -100%」**になり、画面全体が信用されなくなる。
+     *   ⇒ 前年の同じ期間に案件が1件も無い（数えない案件も含めて0件）ときは hasData=false にして、
+     *      画面には「前年のデータがありません」と出す。
+     * ⚠ 拠点・所属の絞り込みは、いま見ている条件と同じものを掛ける（条件が違う数字と比べないため）。
+     *
+     * @return array{key:string, label:string, hasData:bool, total:int, byScale:array<string,int>, attendance:int}
+     */
+    private function lastYearFigures(Collection $allProjects, string $span, string $selected,
+        string $scopeOffice, string $scopeDept): array
+    {
+        $key = $this->lastYearKey($selected, $span);
+
+        $prevAll = $allProjects
+            ->filter(fn (Project $p) => $this->periodKey($p->start_date, $span) === $key)
+            ->when($scopeOffice !== '', fn (Collection $c) => $c->filter(fn (Project $p) => $this->officeOf($p) === $scopeOffice));
+
+        // ⚠ 「数えない案件（体験会・EXPO）」しか無かった期間も“データはある”とみなす
+        //   （その期間は本当に0件だった、と言えるため）。
+        $hasData = $key !== '' && $prevAll->isNotEmpty();
+
+        $prev = $prevAll->filter(fn (Project $p) => EventCount::counts($p))->values();
+
+        return [
+            'key'        => $key,
+            'label'      => $key !== '' ? $this->periodLabel($key, $span) : '',
+            'hasData'    => $hasData,
+            'total'      => $prev->count(),
+            'byScale'    => $this->countByScale($prev),
+            'attendance' => $hasData ? $this->attendanceOf($prev, $scopeDept) : 0,
+        ];
+    }
+
+    /**
+     * その案件たちの「のべ出勤数」（キャンセル以外のアサインの行数＝出勤日数）。
+     * 所属で絞っているときは、その所属の社員ぶんだけを足す（画面のいまの条件に合わせる）。
+     */
+    private function attendanceOf(Collection $projects, string $scopeDept): int
+    {
+        if ($projects->isEmpty()) {
+            return 0;
+        }
+
+        $rows = Assignment::whereIn('project_id', $projects->pluck('id')->all())
+            ->where('status', '!=', 'キャンセル')
+            ->get(['staff_id']);
+
+        if ($scopeDept === '' || $rows->isEmpty()) {
+            return $rows->count();
+        }
+
+        // 所属で絞っているとき＝その所属の社員のぶんだけ数える（スタッフに所属は無いので入らない）。
+        $ids = Person::whereIn('id', $rows->pluck('staff_id')->unique()->all())
+            ->where('role', 'employee')
+            ->get(['id', 'department'])
+            ->filter(fn (Person $p) => Departments::group($p->department) === $scopeDept)
+            ->pluck('id')
+            ->flip();
+
+        return $rows->filter(fn ($a) => isset($ids[$a->staff_id]))->count();
+    }
+
+    /**
+     * 期間キー → 1年前の同じ期間のキー（2026-09 → 2025-09／2026-Q3 → 2025-Q3／2026 → 2025）。
+     * ⚠ 頭の4桁（年）から1を引くだけ。月・四半期の部分はそのまま持ち越す。
+     */
+    private function lastYearKey(string $key, string $span): string
+    {
+        if (preg_match('/^(\d{4})(.*)$/', $key, $m) !== 1) {
+            return '';
+        }
+
+        return ((int) $m[1] - 1) . $m[2];
+    }
+
+    /**
+     * 昨対比の1項目分（前年の数・増減・増減率）。画面はこれをそのまま出すだけにする。
+     *
+     * ⚠ pct（増減率）は前年が0件のときは出せない（0で割れない）＝null にして、
+     *   画面では「前年0件」と出す。0件から1件を「+100%」と書くと意味が違ってしまう。
+     *
+     * @return array{has:bool, prev?:int, diff?:int, pct?:?int}
+     */
+    private function yoy(int $now, int $prev, bool $hasData): array
+    {
+        if (! $hasData) {
+            return ['has' => false];
+        }
+
+        return [
+            'has'  => true,
+            'prev' => $prev,
+            'diff' => $now - $prev,
+            'pct'  => $prev > 0 ? (int) round(($now - $prev) / $prev * 100) : null,
         ];
     }
 
@@ -544,11 +695,8 @@ class StatsController extends Controller
         return '東京';   // 未設定は東京扱い（現状は全件 office あり）
     }
 
-    /** オンライン案件かどうか（実施形態に「オンライン」を含む）。 */
-    private function isOnline(?string $format): bool
-    {
-        return str_contains((string) $format, 'オンライン');
-    }
+    // ⚠ 「リアル／オンライン」のイベント数は 2026-09-09 に画面から外した（上長要望＝規模で見る）。
+    //   社員別の「リアルD／オンラインD」は今までどおり残しているので、その判定は projMeta の中にある。
 
     /** 日付 → 期間キー（span 別）。month=YYYY-MM／quarter=YYYY-Qn／year=YYYY。 */
     private function periodKey(Carbon $d, string $span): string

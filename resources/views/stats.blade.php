@@ -42,7 +42,8 @@
   .st-controls .now { font-size: 15px; font-weight: 800; color: var(--ink); }
 
   /* KPIカード（大きな数字） */
-  .st-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  /* 5枚（合計・小型・中型・大型・のべ出勤数）。2026-09-09 に「リアル／オンライン」から入れ替え。 */
+  .st-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
   .st-kpi {
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
     box-shadow: 0 1px 2px rgba(60,45,30,.06);
@@ -50,10 +51,18 @@
   .st-kpi .k-label { font-size: 12px; color: #8a7a66; font-weight: 700; }
   .st-kpi .k-num { font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1.1; margin-top: 4px; }
   .st-kpi .k-num small { font-size: 14px; font-weight: 700; color: #a89680; margin-left: 3px; }
-  .st-kpi.accent-real   { border-top: 3px solid #2f6fb3; }
-  .st-kpi.accent-online { border-top: 3px solid #1f9d74; }
   .st-kpi.accent-total  { border-top: 3px solid #d9822b; }
   .st-kpi.accent-att    { border-top: 3px solid #7a52c9; }
+  /* 規模＝小さいほど淡く、大きいほど濃い青（並びで大きさが分かるように） */
+  .st-kpi.accent-s1     { border-top: 3px solid #8fb8dd; }
+  .st-kpi.accent-s2     { border-top: 3px solid #5590c4; }
+  .st-kpi.accent-s3     { border-top: 3px solid #2f6fb3; }
+  /* 昨対比（前年同期との比較）。増＝緑／減＝赤／同じ・データなし＝灰 */
+  .k-yoy { font-size: 11.5px; font-weight: 700; margin-top: 5px; color: #a08a73; }
+  .k-yoy .up   { color: #2f7a4d; }
+  .k-yoy .down { color: #b5432f; }
+  .k-yoy .flat { color: #8a7a66; }
+  .k-yoy .prev { color: #a08a73; font-weight: 600; }
 
   /* パネル（見出し付きの箱） */
   .st-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 16px; }
@@ -201,25 +210,44 @@
   </p>
 @endif
 
-{{-- KPI：イベント数（合計・リアル・オンライン）と のべ出勤数 --}}
+{{-- KPI：イベント数（合計・小型・中型・大型）と のべ出勤数。それぞれの下に昨対比を添える。
+     ⚠ 2026-09-09 上長要望で「リアル／オンライン」から「小型・中型・大型」に入れ替えた。
+       （社員別の「リアルD／オンラインD」の列は今までどおり残している）
+     ⚠ 規模の並び・空欄の扱いは App\Support\ProjectScale が正本。画面で数え直さない。 --}}
 <div class="st-kpis">
   <div class="st-kpi accent-total">
     <div class="k-label">イベント数（合計）</div>
     <div class="k-num">{{ $totalEvents }}<small>件</small></div>
+    @include('partials.yoy', ['y' => $yoyTotal])
   </div>
-  <div class="st-kpi accent-real">
-    <div class="k-label">リアル</div>
-    <div class="k-num">{{ $realEvents }}<small>件</small></div>
-  </div>
-  <div class="st-kpi accent-online">
-    <div class="k-label">オンライン</div>
-    <div class="k-num">{{ $onlineEvents }}<small>件</small></div>
-  </div>
+  @foreach ($byScale as $s)
+    <div class="st-kpi accent-s{{ $loop->iteration }}">
+      <div class="k-label">{{ $s['scale'] }}</div>
+      <div class="k-num">{{ $s['count'] }}<small>件</small></div>
+      @include('partials.yoy', ['y' => $s['yoy']])
+    </div>
+  @endforeach
   <div class="st-kpi accent-att">
     <div class="k-label">のべ出勤数（{{ $scopeDept !== '' ? $scopeDept : '全員' }}）</div>
     <div class="k-num">{{ $totalAttendance }}<small>回</small></div>
+    @include('partials.yoy', ['y' => $yoyAttendance, 'unit' => '回'])
   </div>
 </div>
+
+{{-- 昨対比が「いつと比べているか」と、規模が空の案件をどう数えているかを必ず出す。
+     ⚠ 黙って混ぜると、小型が多いのか入力漏れが多いのか分からなくなる（大事）。 --}}
+<p class="st-note" style="margin-top:-8px; margin-bottom:16px;">
+  昨対比＝
+  @if ($lastYear['hasData'])
+    <b>{{ $lastYear['label'] }}</b>（1年前の同じ期間）と比べています。
+  @else
+    <b>{{ $lastYear['label'] }}</b>（1年前の同じ期間）の案件が ECS に入っていないため、比べられません。
+  @endif
+  @if ($scaleUnsetCount > 0)
+    ／⚠ このうち <b>{{ $scaleUnsetCount }}件</b>は「案件規模」が未入力です（いまは<b>{{ $scaleUnsetGoesTo }}</b>に数えています）。
+    案件登録の画面で規模を入れると、正しい規模に移ります。
+  @endif
+</p>
 
 {{-- 数えなかった案件の注記（先-2）。社内の数え方＝体験会・EXPOはイベント数に入れない。
      「案件はあるのに件数が少ない」理由がこの画面で分かるようにする。 --}}
@@ -255,15 +283,19 @@
   </div>
   @endif
 
-  {{-- 規模別イベント数（大型／中型／小型） --}}
+  {{-- 規模別イベント数（小型／中型／大型）＋昨対比 --}}
   <div class="st-panel">
-    <h3>規模別 イベント数</h3>
+    <h3>規模別 イベント数（昨対比つき）</h3>
     @foreach ($byScale as $s)
       <div class="st-row {{ $s['count'] === 0 ? 'zero' : '' }}">
         <span class="r-name">{{ $s['scale'] }}</span>
         <span class="r-num">{{ $s['count'] }}<small>件</small></span>
       </div>
+      @include('partials.yoy', ['y' => $s['yoy']])
     @endforeach
+    @if ($scaleUnsetCount > 0)
+      <p class="st-note">※ うち <b>{{ $scaleUnsetCount }}件</b>は案件規模が未入力（いまは「{{ $scaleUnsetGoesTo }}」に数えています）。</p>
+    @endif
   </div>
 </div>
 
