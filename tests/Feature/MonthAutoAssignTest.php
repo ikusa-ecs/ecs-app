@@ -46,7 +46,7 @@ class MonthAutoAssignTest extends TestCase
     public function test_plan_fills_a_short_project(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
         ]);
         $a = PersonFactory::new()->staff()->create(['name' => 'あ子', 'office' => '東京']);
@@ -67,7 +67,7 @@ class MonthAutoAssignTest extends TestCase
     public function test_ng_staff_is_not_picked(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
         $ng = PersonFactory::new()->staff()->create(['name' => 'NG子', 'office' => '東京']);
@@ -82,7 +82,7 @@ class MonthAutoAssignTest extends TestCase
     public function test_no_double_booking_on_the_same_day(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->count(2)->create([
+        ProjectFactory::new()->published()->count(2)->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
         $only = PersonFactory::new()->staff()->create(['name' => '一人だけ', 'office' => '東京']);
@@ -98,7 +98,7 @@ class MonthAutoAssignTest extends TestCase
     public function test_settled_project_is_skipped(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 3,
             'staff_published' => true, 'is_recruiting' => false, 'office' => '東京',
         ]);
@@ -110,11 +110,54 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame(0, $plan['totals']['projects']);
     }
 
+    /**
+     * ⚠ **まだスタッフに公開していない案件は埋めない**（2026-09-09 baba要望）。
+     *
+     * 公開していない＝まだ募集を出していない＝エントリー（手を挙げた人）が集まっていない。
+     * そこを機械が先に埋めると、本人が知らないうちに予定を押さえたことになり、
+     * 公開したときには枠が埋まっていて、希望を出す意味が無くなる。
+     */
+    public function test_unpublished_project_is_left_alone(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        ProjectFactory::new()->create([   // ⚠ published() を付けない＝未公開のまま
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
+            'project_name' => 'まだ公開していない案件',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['name' => '空いてる子', 'office' => '東京']);
+        $this->wish($s, $day);
+
+        $engine = new MonthAutoAssign($day->format('Y-m'));
+        $plan = $engine->plan();
+
+        $this->assertSame(0, $plan['totals']['projects'], '未公開の案件を下見に出してしまっている');
+        $this->assertSame(0, $plan['totals']['added']);
+
+        // ⚠ 黙って外さない＝「なぜ下見に出ないのか」が画面で分かるようにしている。
+        $names = collect($engine->unpublishedProjects())->pluck('name')->all();
+        $this->assertContains('まだ公開していない案件', $names);
+    }
+
+    /** 公開すれば、これまでどおり対象になる（公開が唯一の入口）。 */
+    public function test_published_project_is_filled_again(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
+        ]);
+        $s = PersonFactory::new()->staff()->create(['office' => '東京']);
+        $this->wish($s, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+
+        $this->assertSame(1, $plan['totals']['added']);
+    }
+
     /** ⚠ 運営人数が未入力（0）の案件は対象外（何人必要か決まっていない）。 */
     public function test_project_without_required_count_is_skipped(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 0, 'office' => '東京',
         ]);
         $s = PersonFactory::new()->staff()->create(['office' => '東京']);
@@ -135,11 +178,11 @@ class MonthAutoAssignTest extends TestCase
         $day1 = $month->copy()->addDays(10);   // 候補が多い日
         $day2 = $month->copy()->addDays(20);   // 候補が1人だけの日
 
-        $easy = ProjectFactory::new()->create([
+        $easy = ProjectFactory::new()->published()->create([
             'start_date' => $day1->format('Y-m-d'), 'required_count' => 1,
             'project_name' => 'ゆとりのある案件', 'office' => '東京',
         ]);
-        $tight = ProjectFactory::new()->create([
+        $tight = ProjectFactory::new()->published()->create([
             'start_date' => $day2->format('Y-m-d'), 'required_count' => 1,
             'project_name' => 'きびしい案件', 'office' => '東京',
         ]);
@@ -164,7 +207,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
         $s = PersonFactory::new()->staff()->create(['office' => '東京']);
@@ -189,7 +232,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
         ]);
         PersonFactory::new()->staff()->count(2)->create(['office' => '東京'])
@@ -242,11 +285,11 @@ class MonthAutoAssignTest extends TestCase
         $month = Carbon::today()->startOfMonth();
         $day1 = $month->copy()->addDays(10);
         $day2 = $month->copy()->addDays(11);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day1->format('Y-m-d'), 'required_count' => 1,
             'project_name' => '外す日の案件', 'office' => '東京',
         ]);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day2->format('Y-m-d'), 'required_count' => 1,
             'project_name' => '残す日の案件', 'office' => '東京',
         ]);
@@ -268,7 +311,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $month = Carbon::today()->startOfMonth();
         $day = $month->copy()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
 
@@ -283,7 +326,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
         $s = PersonFactory::new()->staff()->create(['office' => '東京']);
@@ -305,11 +348,11 @@ class MonthAutoAssignTest extends TestCase
     {
         $me = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京']);
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $skip = ProjectFactory::new()->create([
+        $skip = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
             'project_name' => '外す案件', 'office' => '東京',
         ]);
-        $keep = ProjectFactory::new()->create([
+        $keep = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
             'project_name' => '残す案件', 'office' => '東京',
         ]);
@@ -335,7 +378,7 @@ class MonthAutoAssignTest extends TestCase
     public function test_candidate_projects_include_skipped_ones(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
 
@@ -356,11 +399,11 @@ class MonthAutoAssignTest extends TestCase
         $day1 = $month->copy()->addDays(20);   // 候補が多い日（あとで埋まる）
         $day2 = $month->copy()->addDays(10);   // 候補が1人だけの日（先に埋まる）
 
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day1->format('Y-m-d'), 'required_count' => 1,
             'project_name' => 'ゆとり', 'office' => '東京',
         ]);
-        ProjectFactory::new()->create([
+        ProjectFactory::new()->published()->create([
             'start_date' => $day2->format('Y-m-d'), 'required_count' => 1,
             'project_name' => 'きびしい', 'office' => '東京',
         ]);
@@ -398,7 +441,7 @@ class MonthAutoAssignTest extends TestCase
         $day = $month->copy()->addDays(10);
 
         // 同じ日に案件を3件つくる＝〇1日ぶんが「3枠」と数えられる。
-        $ps = ProjectFactory::new()->count(3)->create([
+        $ps = ProjectFactory::new()->published()->count(3)->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京',
         ]);
         $s = PersonFactory::new()->staff()->create(['name' => '数え方さん', 'office' => '東京']);
@@ -459,7 +502,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['D' => 1, 'MC' => 1]);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2,
             'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
         ]);
@@ -489,7 +532,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['MC' => 1]);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
             'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
         ]);
@@ -520,7 +563,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['MC' => 1, 'OP' => 1]);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2,
             'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
         ]);
@@ -554,7 +597,7 @@ class MonthAutoAssignTest extends TestCase
     public function test_without_a_template_the_role_is_left_blank(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
             'content_ids' => [], 'scale' => null, 'office' => '東京',
         ]);
@@ -574,7 +617,7 @@ class MonthAutoAssignTest extends TestCase
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['MC' => 1]);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
             'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
         ]);

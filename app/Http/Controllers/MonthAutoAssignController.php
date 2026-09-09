@@ -55,6 +55,9 @@ class MonthAutoAssignController extends Controller
             //   黙って外すと「なぜ下見に出ないのか」が分からないので、必ず画面に出して戻せるようにする。
             'handMade' => $engine->handMadeProjects(),
             'includeHandMade' => $includeHandMade,
+            // ⚠ まだスタッフに公開していない案件＝自動アサインの対象外（2026-09-09 baba要望）。
+            //   黙って外すと「なぜ下見に出ないのか」が分からないので、必ず画面に理由つきで出す。
+            'unpublished' => $engine->unpublishedProjects(),
             'period' => $period,
             'periodLabel' => Carbon::createFromFormat('Y-m-d', $period.'-01')->format('Y年n月'),
             'prevPeriod' => Carbon::createFromFormat('Y-m-d', $period.'-01')->subMonth()->format('Y-m'),

@@ -60,7 +60,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_hand_made_provisional_row_is_untouched(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 3, 'office' => '東京',
         ]);
 
@@ -103,7 +103,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['MC' => 1, 'FC' => 1]);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2,
             'content_ids' => ['CT-TEST'], 'scale' => '中型', 'office' => '東京',
         ]);
@@ -138,11 +138,11 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_project_with_hand_made_staff_is_skipped(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $mine = ProjectFactory::new()->create([
+        $mine = ProjectFactory::new()->published()->create([
             'project_name' => '手で組んだ案件', 'start_date' => $day->format('Y-m-d'),
             'required_count' => 3, 'office' => '東京',
         ]);
-        $other = ProjectFactory::new()->create([
+        $other = ProjectFactory::new()->published()->create([
             'project_name' => 'まだ手つかずの案件', 'start_date' => $day->format('Y-m-d'),
             'required_count' => 1, 'office' => '東京',
         ]);
@@ -175,7 +175,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_hand_made_project_can_be_opted_back_in(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
         ]);
         $hand = PersonFactory::new()->staff()->create(['name' => '手で入れた人', 'office' => '東京']);
@@ -200,7 +200,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_preview_shows_why_the_project_was_skipped(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'project_name' => '手で組んだ案件', 'start_date' => $day->format('Y-m-d'),
             'required_count' => 3, 'office' => '東京',
         ]);
@@ -230,7 +230,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_director_only_project_is_still_filled(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
         ]);
         // 社員をDとして入れてある（D決め画面で決めたもの）。
@@ -257,7 +257,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_undo_never_removes_hand_made_rows(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
         ]);
 
@@ -292,7 +292,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
     public function test_undo_keeps_rows_edited_by_hand_afterwards(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
-        $p = ProjectFactory::new()->create([
+        $p = ProjectFactory::new()->published()->create([
             'start_date' => $day->format('Y-m-d'), 'required_count' => 2, 'office' => '東京',
         ]);
         foreach (['あ子', 'い子'] as $n) {

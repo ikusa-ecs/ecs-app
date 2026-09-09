@@ -834,6 +834,17 @@
   function autoAssign(id, silent){
     const c = cases.find(x => x.id === id);
     if (!c) return null;
+    // ⚠ まだスタッフに公開していない案件は自動で埋めない（2026-09-09 baba要望）。
+    //   公開していない＝募集を出していない＝エントリー（手を挙げた人）が集まっていないため、
+    //   機械が先に埋めると、本人が知らないうちに予定を押さえたことになる。
+    //   判定は canAuto の1か所（ボタンの出し分け・まとめて自動アサインと同じものを使う）。
+    if (!canAuto(c)) {
+      if (silent) return { name: c.name, picked: 0, need: c.need, total: filledOf(c), skipped: true };
+      alert('「' + c.name + '」はまだスタッフに公開していません。' + String.fromCharCode(10)
+        + '公開していない案件は、自動アサインでは埋めません（エントリーがまだ集まっていないためです）。' + String.fromCharCode(10)
+        + '→「📣 公開する」を押してから、もう一度お試しください。');
+      return null;
+    }
     if (filledOf(c) >= c.need) {
       if (silent) return { name: c.name, picked: 0, need: c.need, total: filledOf(c), skipped: true };
       alert('この案件はすでに必要人数を満たしています。'); return null;
@@ -1764,10 +1775,11 @@
     const toFix = dayCases.filter(c => (c.stat || c.state) !== 'fix');
     const toPub = dayCases.filter(c => (c.stat || c.state) === 'fix' && !bPubOn(c));
     // まだ人数が足りていない案件（確定・公開ずみで締めたものは除く）＝まとめて自動アサインの対象。
-    const toAuto = dayCases.filter(c => !bSettled(c) && filledOf(c) < c.need);
+    // ⚠ 公開していない案件は入れない（canAuto が正本・2026-09-09 baba要望）。
+    const toAuto = dayCases.filter(c => canAuto(c) && filledOf(c) < c.need);
     let html = '';
     if (toAuto.length) {
-      html += `<button class="day-bulk auto" onclick="bulkAutoDay(${off})" title="この日の「まだ人数が足りない」案件に、まとめて自動アサインします（希望を出している人から、同じ日にかぶらないように「仮」で入れます）">⚡ この日の${toAuto.length}件を自動アサイン</button>`;
+      html += `<button class="day-bulk auto" onclick="bulkAutoDay(${off})" title="この日の「まだ人数が足りない・スタッフに公開ずみ」の案件に、まとめて自動アサインします（希望を出している人から、同じ日にかぶらないように「仮」で入れます）。公開していない案件は埋めません">⚡ この日の${toAuto.length}件を自動アサイン</button>`;
     }
     if (toFix.length) {
       html += `<button class="day-bulk" onclick="bulkFixDay(${off})" title="この日の「未着手・調整中」の案件を、まとめて確定にします（メンバーも全員「確定」になります）">✓ この日の${toFix.length}件を確定にする</button>`;
@@ -1801,6 +1813,15 @@
   // ⚠ カードの充足バーと同じ判定。まとめて自動アサインのときも、ここは触らない
   //   （足りていると決めた案件に、あとから勝手に人を足さないため）。
   function bSettled(c){ return bPubOn(c) && !bRecruit(c); }
+
+  // 自動アサインしてよい案件か（2026-09-09 baba要望「スタッフに公開してない案件は埋めないでそのままに」）。
+  // ⚠ 公開していない＝まだ募集を出していない＝**エントリー（手を挙げた人）が集まっていない**。
+  //   そこを機械が先に埋めると、本人が知らないうちに予定を押さえたことになり、
+  //   公開したときには枠が埋まっていて、希望を出す意味が無くなる。
+  // ⚠ 判定はこの1か所だけ。ボタンの出し分け・1件ずつ・この日をまとめて、の3か所で同じものを使う
+  //   （書き写すと片方だけ直して「押せるのに何も起きない」ことになる）。
+  // ⚠ サーバー側（月まとめ自動アサイン＝App\Support\MonthAutoAssign）も同じ決まりにそろえている。
+  function canAuto(c){ return bPubOn(c) && !bSettled(c); }
 
   // カードに出す「いまスタッフからどう見えているか」の印。公開していない案件には出さない。
   // ⚠ 募集を締めた案件には何も出さない（2026-09-01 スタッフからのご意見）。
@@ -1844,11 +1865,12 @@
   // ⚠ 確定・公開ずみの案件には触らない（決まったものを後から動かさない）。
   // ⚠ お知らせは最後に1回だけ。案件ごとに出すと、件数ぶん「OK」を押すことになる。
   function bulkAutoDay(off){
-    const list = cases.filter(c => c.off === off && !bSettled(c) && filledOf(c) < c.need);
-    if (!list.length) { alert('この日に自動アサインできる案件はありません（すでに必要人数を満たしているか、確定・公開ずみです）。'); return; }
+    // ⚠ 公開していない案件は入れない（canAuto が正本・2026-09-09 baba要望）。
+    const list = cases.filter(c => c.off === off && canAuto(c) && filledOf(c) < c.need);
+    if (!list.length) { alert('この日に自動アサインできる案件はありません。\n（すでに必要人数を満たしている／募集を締めた／まだスタッフに公開していない、のいずれかです）'); return; }
     if (!confirm('この日の ' + list.length + '件に、まとめて自動アサインします。\n' + bulkNames(list)
       + '\n\n希望を出している人の中から、同じ日にかぶらないように「仮」で入れます。'
-      + '\n（確定・公開ずみの案件には触りません。あとから手動で直せます）\n\nよろしいですか？')) return;
+      + '\n（まだスタッフに公開していない案件と、募集を締めた案件には触りません。あとから手動で直せます）\n\nよろしいですか？')) return;
 
     const results = [];
     list.forEach(c => { const r = autoAssign(c.id, true); if (r) results.push(r); });
@@ -2216,7 +2238,7 @@
         <span class="sb ${stat}" title="案件の進み具合">${stateLabel[stat] || ''}</span>${recruitBadge(c)}
         <div class="cc-actions">
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
-          ${(filled < c.need && !settled) ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
+          ${(filled < c.need && canAuto(c)) ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
           ${stateBtn}
           ${detailBtnHtml(c)}
           <a class="open-btn" href="/project-assign?project=${c.id}">アサイン画面 →</a>

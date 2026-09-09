@@ -366,12 +366,12 @@ class MonthAutoAssign
             ->all();
     }
 
-    /** その月の「まだ足りない案件」。$applySkip=false なら外した日・案件を無視する。 */
-    private function targetProjects(bool $applySkip = true): Collection
+    /**
+     * その月の案件（拠点で絞ったもの）。中止・開催日なしは除く。
+     * ⚠ 対象を決める入口はここ1つ。別の場所で月や拠点の絞り方を書き直さないこと。
+     */
+    private function monthProjects(): Collection
     {
-        // ⚠ 手で入っている案件（人が組み始めた案件）は外す。1回だけ引いて使い回す。
-        $hand = $applySkip ? $this->handMadeStaff() : [];
-
         return OfficeScope::applyToProjects(Project::query(), $this->office)
             ->notCancelled()
             ->whereNotNull('start_date')
@@ -380,7 +380,42 @@ class MonthAutoAssign
                 $this->monthEnd->format('Y-m-d').' 23:59:59',
             ])
             ->orderBy('start_date')
-            ->get()
+            ->get();
+    }
+
+    /**
+     * **まだスタッフに公開していないので、自動アサインの対象にしない案件**（2026-09-09 baba要望）。
+     *
+     * ⚠ 黙って外すと「なぜこの案件が下見に出てこないのか」が分からなくなる。
+     *   handMadeProjects と同じく、必ず画面に理由つきで出す。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function unpublishedProjects(): array
+    {
+        return $this->monthProjects()
+            ->filter(fn (Project $p) => ! $p->staff_published
+                && ! in_array($p->status, ['下書き', '完了'], true)
+                && $p->is_archived !== true)
+            ->map(fn (Project $p) => [
+                'id' => $p->id,
+                'name' => $p->project_name,
+                'client' => $p->client ?? '',
+                'date' => $p->start_date->format('Y-m-d'),
+                'need' => $this->needOf($p),
+            ])
+            ->sortBy('date')
+            ->values()
+            ->all();
+    }
+
+    /** その月の「まだ足りない案件」。$applySkip=false なら外した日・案件を無視する。 */
+    private function targetProjects(bool $applySkip = true): Collection
+    {
+        // ⚠ 手で入っている案件（人が組み始めた案件）は外す。1回だけ引いて使い回す。
+        $hand = $applySkip ? $this->handMadeStaff() : [];
+
+        return $this->monthProjects()
             ->filter(function (Project $p) use ($applySkip, $hand) {
                 // ⚠ 「この日はアサインしない」「この案件は入れない」で外したもの（2026-09-07 baba要望）。
                 if ($applySkip && (
@@ -399,9 +434,17 @@ class MonthAutoAssign
                 if (in_array($p->status, ['下書き', '完了'], true) || $p->is_archived === true) {
                     return false;
                 }
+                // ⚠ **スタッフに公開していない案件は埋めない**（2026-09-09 baba要望）。
+                //    公開していない＝まだ募集を出していない＝**エントリー（手を挙げた人）が集まっていない**。
+                //    そこへ機械が人を入れると、本人が知らないうちに予定を押さえたことになり、
+                //    公開したときには枠が埋まっていて希望を出す意味が無くなる。
+                //    ⇒ 公開ボードで「公開する」を押した案件だけを自動アサインの対象にする。
+                if (! $p->staff_published) {
+                    return false;
+                }
                 // ⚠ 「🔒 この人数で足りている」で締めた案件（公開ずみ・募集オフ）には触らない。
                 //    足りていると人が決めたものに、あとから機械が足さない。
-                if ($p->staff_published && ! $p->is_recruiting) {
+                if (! $p->is_recruiting) {
                     return false;
                 }
 

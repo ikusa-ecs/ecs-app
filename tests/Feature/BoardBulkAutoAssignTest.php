@@ -48,13 +48,23 @@ class BoardBulkAutoAssignTest extends TestCase
         );
     }
 
-    /** ⚠ 締めた案件（🔒 この人数で足りている）には触らないこと。 */
-    public function test_it_skips_settled_projects(): void
+    /**
+     * ⚠ 締めた案件（🔒 この人数で足りている）と、**まだスタッフに公開していない案件**には触らないこと。
+     *   公開していない案件を埋めない、は 2026-09-09 baba要望
+     *   （公開＝募集を出す、なので、公開前はエントリーがまだ集まっていない）。
+     * ⚠ 判定は canAuto の1か所にまとめている。ボタンの出し分け・1件ずつ・まとめて、で同じものを使う。
+     */
+    public function test_it_skips_settled_and_unpublished_projects(): void
     {
         $blade = $this->boardBlade();
 
         $this->assertStringContainsString('function bSettled(c){', $blade);
-        $this->assertStringContainsString('c.off === off && !bSettled(c) && filledOf(c) < c.need', $blade);
+        $this->assertStringContainsString('function canAuto(c){ return bPubOn(c) && !bSettled(c); }', $blade);
+        $this->assertStringContainsString('c.off === off && canAuto(c) && filledOf(c) < c.need', $blade);
+        // 1件ずつの入口（⚡ボタン）でも同じ判定を通していること。
+        $this->assertStringContainsString('if (!canAuto(c)) {', $blade);
+        // ボタンそのものも、公開していない案件では出さない。
+        $this->assertStringContainsString('${(filled < c.need && canAuto(c)) ?', $blade);
     }
 
     /** 1件ずつの自動アサインは、これまでどおりお知らせを出すこと（silent は一括のときだけ）。 */

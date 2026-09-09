@@ -182,6 +182,23 @@
       @endforeach
     </div>
   @endif
+  {{-- ⚠ まだスタッフに公開していない案件は自動で埋めない（2026-09-09 baba要望）。
+       公開していない＝まだ募集を出していない＝エントリー（手を挙げた人）が集まっていないため。
+       黙って外すと「なぜ下見に出ないのか」が分からないので、ここに理由つきで出す。 --}}
+  @if (count($unpublished) > 0)
+    <span class="s-label" style="margin-top:12px;">
+      🔒 <b>まだスタッフに公開していない案件（自動では埋めません）</b>
+      … 公開すると募集が出て、スタッフのエントリーが集まります。<b>公開ボードで「公開する」を押すと</b>、この一覧から下見に移ります。
+    </span>
+    <div class="s-days">
+      @foreach ($unpublished as $up)
+        @php($ud = \Illuminate\Support\Carbon::parse($up['date']))
+        <span class="s-day s-proj off" title="{{ $up['client'] }}">
+          <span class="dt">{{ $ud->format('n/j') }}</span>{{ $up['name'] }}<span class="cn">必{{ $up['need'] }}</span>
+        </span>
+      @endforeach
+    </div>
+  @endif
   @if (count($skipDays) > 0 || count($skipProjects) > 0 || count($includeHandMade) > 0)
     <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => $officeScope])) }}">チェックを全部外す（日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} 除外中）</a>
   @endif
