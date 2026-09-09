@@ -85,6 +85,47 @@ class StaffProjectNewsTest extends TestCase
         $this->assertCount(0, $changes, '社内の数字を出してしまっている');
     }
 
+
+    /**
+     * ⚠ ケータリングは出さない（2026-09-09 baba「スタッフに関係ないからいらない」）。
+     *   お客様向けの手配なので、スタッフの動きは変わらない。
+     */
+    public function test_catering_is_not_shown(): void
+    {
+        $me = $this->staff();
+        $p = ProjectFactory::new()->published()->create([
+            'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'), 'office' => '東京',
+        ]);
+        Application::create(['project_id' => $p->id, 'staff_id' => $me->id, 'intent' => '希望']);
+        $this->history($p, 'catering', 'なし', 'あり');
+
+        $changes = collect(StaffProjectNews::forPerson($me))->where('action', 'updated');
+
+        $this->assertCount(0, $changes, 'ケータリングを出してしまっている');
+    }
+
+    /**
+     * 企業名（お客様）も渡すこと（2026-09-09 baba
+     * 「同じコンテンツが同日にあるかもしれないから企業名も入れてほしい」）。
+     */
+    public function test_it_carries_the_client_name(): void
+    {
+        $me = $this->staff();
+        $p = ProjectFactory::new()->published()->create([
+            'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
+            'project_name' => '謎解き', 'client' => '○○商事', 'office' => '東京',
+        ]);
+        Assignment::create([
+            'project_id' => $p->id, 'staff_id' => $me->id,
+            'date' => $p->start_date->format('Y-m-d'), 'role' => 'FC', 'status' => '確定',
+        ]);
+        $this->history($p, 'start_time', '9:00', '8:30');
+
+        $news = collect(StaffProjectNews::forPerson($me))->where('action', 'updated')->values();
+
+        $this->assertSame('○○商事', $news[0]['client']);
+    }
+
     /** ⚠ 公開していない・自分と関係ない案件の変更は出さない。 */
     public function test_it_hides_projects_the_staff_cannot_see(): void
     {
@@ -138,7 +179,7 @@ class StaffProjectNewsTest extends TestCase
         $me = $this->staff();
         $p = ProjectFactory::new()->published()->create([
             'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
-            'project_name' => '時間が変わった案件', 'office' => '東京',
+            'project_name' => '時間が変わった案件', 'client' => '○○商事', 'office' => '東京',
         ]);
         Assignment::create([
             'project_id' => $p->id, 'staff_id' => $me->id,
@@ -150,6 +191,11 @@ class StaffProjectNewsTest extends TestCase
             ->assertOk()
             ->assertSee('最近の変更')
             ->assertSee('時間が変わった案件')
-            ->assertSee('が変わりました', false);
+            ->assertSee('が変わりました', false)
+            // ⚠ 企業名も出す（同じ日に同じコンテンツが2件あっても見分けられるように）。
+            ->assertSee('○○商事')
+            // ⚠ 新しい募集は目立たせる（変更のお知らせに埋もれさせない）。
+            ->assertSee('🆕 新しい募集が出ました')
+            ->assertSee('class="news-new"', false);
     }
 }

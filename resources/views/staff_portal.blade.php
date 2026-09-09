@@ -112,6 +112,15 @@
     .news-what { color: var(--brand); font-weight: 700; }
     .news-diff { color: var(--muted); }
     .news-diff b { color: var(--ink); }
+    /* 企業名（お客様）。同じ日に同じコンテンツが2件あっても見分けられるように必ず出す。 */
+    .news-client { color: var(--muted); font-weight: 700; margin-right: 4px; }
+    /* 🆕 新しい募集＝行ごと目立たせる（2026-09-09 baba要望）。変更のお知らせに埋もれさせない。 */
+    .news-list li.is-new { background: var(--brand-soft); border-radius: 8px; padding: 8px 8px; }
+    .news-new {
+      font-size: 12px; font-weight: 800; color: #fff; background: var(--brand);
+      border-radius: 999px; padding: 2px 10px;
+    }
+    html[data-theme="dark"] .news-new { color: #1a1206; }
 
     .sec-title { font-size: 14px; font-weight: 700; margin: 4px 2px 8px; }
 
@@ -533,6 +542,112 @@
       .s-tabs button .lb-s { display: none; }
       .s-body { padding: 22px 24px 40px; }
     }
+
+    /* ===== 黒ベース（2026-09-09）=====
+       白い面と茶色の文字を、黒地でも読める色に置き換える。
+       ⚠ 色の意味（緑＝OK・エントリー中／赤＝NG・注意／橙＝締切／青＝確定）は変えない。
+       ⚠ 変数（--panel など）の定義は public/ecs/style.css にある。
+       ⚠ 黒のときのアクセントはまぶしいオレンジなので、オレンジで塗ったボタンの文字は
+          白ではなく濃い色にする（共通CSSの .btn.primary と同じ考え方）。 */
+    /* タブ */
+    html[data-theme="dark"] .s-tabs button { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .s-tabs button.active { color: #1a1206; }
+    /* 稼働希望の月切り替え */
+    html[data-theme="dark"] .pref-month-nav .pm-btn { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .pref-month-nav .pm-btn:hover { background: #2f353f; }
+    html[data-theme="dark"] .pref-month-nav .pm-btn.off { color: #6f7883; background: #20242b; border-color: #2f343d; }
+    html[data-theme="dark"] .pref-month-nav .pm-sel { background: #23272f; color: var(--ink); border-color: #3a414c; }
+    /* お知らせ */
+    html[data-theme="dark"] .notice { color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .notice b { color: #f7d79a; }
+    html[data-theme="dark"] .extra-notice { color: #f59a9a; border-color: #6b2f2f; }
+    html[data-theme="dark"] .extra-notice b { color: #f7b5b5; }
+    html[data-theme="dark"] .news-mine { color: #7ee2a8; }
+    /* 絞り込み */
+    html[data-theme="dark"] .job-filter input,
+    html[data-theme="dark"] .job-filter select { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .job-filter .jf-today { background: #262b33; }
+    html[data-theme="dark"] .job-toggles .jf-tg { background: #262b33; }
+    html[data-theme="dark"] .job-toggles .jf-tg.on { color: #1a1206; }
+    /* 募集案件の行 */
+    html[data-theme="dark"] .job-row { background: var(--panel); }
+    html[data-theme="dark"] .job-row.applied { background: #1b2a20; border-color: #2a5a38; }
+    html[data-theme="dark"] .job-row.extra { border-color: #6b2f2f; }
+    /* 募集の状態の色（リストのバッジとカレンダーのチップで共通。上の :root と同じ役割） */
+    html[data-theme="dark"] {
+      --job-applied-fg: #7ee2a8; --job-applied-bd: #2a5a38;
+      --job-closed-bg: #2b313a; --job-closed-fg: #b7bec8;
+    }
+    /* 実施形態のバッジ */
+    html[data-theme="dark"] .fbadge.fmt-real   { background: #16301f; color: #7ee2a8; }
+    html[data-theme="dark"] .fbadge.fmt-long   { background: #33280f; color: #f5c26b; }
+    html[data-theme="dark"] .fbadge.fmt-online { background: #14293a; color: #7cc4f0; }
+    html[data-theme="dark"] .fbadge.fmt-arena  { background: #241f3a; color: #b8a6f5; }
+    html[data-theme="dark"] .fbadge.fmt-other  { background: #12302c; color: #7ed8c6; }
+    html[data-theme="dark"] .fbadge.fmt-etc    { background: #2b313a; color: #b7bec8; }
+    /* 小さなタグ（追加・宿泊は元から濃い色なのでそのまま） */
+    html[data-theme="dark"] .tag-mini.yobi { color: #f5c26b; }
+    html[data-theme="dark"] .tag-mini.reha { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .tag-mini.size { background: #2b313a; color: #b7bec8; }
+    html[data-theme="dark"] .tag-mini.rep  { background: #2b313a; color: #b7bec8; }
+    /* 担当からの伝達・エラー表示 */
+    html[data-theme="dark"] .jr-note { color: #f5c26b; border-color: #5a4718; }
+    html[data-theme="dark"] .jr-error { background: #3a1c1c; border-color: #6b2f2f; color: #f59a9a; }
+    /* 締切・残り人数のチップ */
+    html[data-theme="dark"] .chip.deadline { color: #f5c26b; }
+    html[data-theme="dark"] .chip.slots    { color: #7ee2a8; }
+    html[data-theme="dark"] .chip.slots.few{ color: #f59a9a; }
+    html[data-theme="dark"] .chip.full     { background: #2b313a; color: #b7bec8; }
+    /* コメント欄・エントリーボタン */
+    html[data-theme="dark"] .cmt-toggle { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .cmt-toggle:hover { background: #2f353f; }
+    html[data-theme="dark"] .cmt-toggle.on { border-color: #5a4718; }
+    html[data-theme="dark"] .jr-cmt-ok { color: #7ee2a8; }
+    html[data-theme="dark"] .jr-cmt-hint { color: var(--muted); }
+    html[data-theme="dark"] .jr-comment { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .apply-btn-sm { color: #1a1206; }
+    html[data-theme="dark"] .apply-btn-sm.cancel { background: #262b33; color: var(--brand-dark); border-color: #3a414c; }
+    html[data-theme="dark"] .apply-btn-sm.disabled { background: #2b313a; color: #7d858f; }
+    html[data-theme="dark"] .apply-btn-sm.confirm { color: #fff; }
+    /* 稼働希望・募集カレンダー */
+    html[data-theme="dark"] .m-card { background: var(--panel); }
+    html[data-theme="dark"] .jv-tab { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .jv-tab.active { color: #1a1206; }
+    html[data-theme="dark"] .jc-nav { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .jc-nav:hover { background: #2f353f; }
+    html[data-theme="dark"] .jc-cell { background: var(--panel); }
+    html[data-theme="dark"] .jc-cell.empty { background: none; }
+    html[data-theme="dark"] .jc-job { background: #262b33; }
+    html[data-theme="dark"] .jc-job.confirmed { background: #14293a; color: #7cc4f0; border-color: #2c5070; }
+    html[data-theme="dark"] .jc-detail-close { background: #262b33; color: var(--ink); border-color: #3a414c; }
+    html[data-theme="dark"] .jc-detail-close:hover { background: #2f353f; }
+    /* 稼働希望のマス */
+    html[data-theme="dark"] .cell { background: var(--panel); }
+    html[data-theme="dark"] .cell.empty { background: none; }
+    html[data-theme="dark"] .cell.s-ok { border-color: #2a5a38; color: #7ee2a8; }
+    html[data-theme="dark"] .cell.s-ng { border-color: #6b2f2f; color: #f59a9a; }
+    html[data-theme="dark"] .cell.s-event { color: #1a1206; }
+    html[data-theme="dark"] .dot.ok { border-color: #2a5a38; }
+    html[data-theme="dark"] .dot.ng { border-color: #6b2f2f; }
+    /* 入力欄・保存ボタン */
+    html[data-theme="dark"] .field input,
+    html[data-theme="dark"] .field textarea,
+    html[data-theme="dark"] .field select { background: #23272f; color: var(--ink); }
+    html[data-theme="dark"] .submit-btn { color: #1a1206; }
+    html[data-theme="dark"] .saved-msg { color: #7ee2a8; }
+    /* 確定アサイン */
+    html[data-theme="dark"] .assign-item:hover { background: #262b33; }
+    html[data-theme="dark"] .assign-date { color: #1a1206; }
+    html[data-theme="dark"] .ad-box { background: #23272f; }
+    html[data-theme="dark"] .pastToggle { background: #262b33; }
+    html[data-theme="dark"] .pastToggle:hover { background: #2f353f; }
+    html[data-theme="dark"] .assign-item.past .assign-info .t { color: #8b93a0; }
+    /* 設定タブ */
+    html[data-theme="dark"] .lk-item { background: var(--panel); }
+    html[data-theme="dark"] .line-btn { background: #262b33; border-color: #3a414c; }
+    html[data-theme="dark"] .line-btn:active { background: #2f353f; }
+    html[data-theme="dark"] .line-btn.danger { border-color: #6b2f2f; }
+    html[data-theme="dark"] .switch .track { background: #3a414c; }
   </style>
   @endverbatim
 </head>
@@ -564,7 +679,7 @@
       <div class="tab-panel active" id="tab-jobs">
         {{-- 体験用アカウントのときの注意。応募・希望が保存されないので、押す前に分かるようにする。 --}}
         @if (!empty($mockOnly))
-          <div class="notice" style="background:#fdeaea;border-color:#f0b9b9;">
+          <div class="notice" style="background:var(--danger-soft);border-color:var(--danger);">
             ⚠ <b>これは体験用のアカウントです。</b>エントリー（応募）や稼働希望を押しても<b>保存されません</b>（見本）。
             実際に試すときは、発行されたスタッフのアカウントでログインしてください。
           </div>
@@ -589,12 +704,18 @@
             <summary>🔔 最近の変更（{{ count($news) }}件）<span class="news-hint">集合時間や会場が変わったとき・新しい募集が出たときに出ます</span></summary>
             <ul class="news-list">
               @foreach ($news as $n)
-                <li>
+                {{-- ⚠ 「新しい募集が出ました」は行ごと目立たせる（2026-09-09 baba要望）。
+                     変更のお知らせに埋もれると、いちばん見てほしいものが流れてしまう。 --}}
+                <li class="{{ $n['action'] === 'created' ? 'is-new' : '' }}">
                   <span class="news-at">{{ $n['at'] }}</span>
-                  <span class="news-name">{{ $n['name'] }}@if ($n['date'])（{{ \Illuminate\Support\Carbon::parse($n['date'])->format('n/j') }}）@endif</span>
+                  {{-- ⚠ 企業名（お客様）も出す（baba「同じコンテンツが同日にあるかもしれないから」）。
+                       案件名だけだと、同じ日に同じコンテンツが2件あると見分けられない。 --}}
+                  <span class="news-name">
+                    @if ($n['client'])<span class="news-client">{{ $n['client'] }}</span>@endif{{ $n['name'] }}@if ($n['date'])（{{ \Illuminate\Support\Carbon::parse($n['date'])->format('n/j') }}）@endif
+                  </span>
                   @if ($n['mine'])<span class="news-mine">あなたの案件</span>@endif
                   @if ($n['action'] === 'created')
-                    <span class="news-what">新しい募集が出ました</span>
+                    <span class="news-new">🆕 新しい募集が出ました</span>
                   @else
                     <span class="news-what">{{ $n['label'] }}が変わりました</span>
                     <span class="news-diff">{{ $n['from'] !== '' ? $n['from'] : '（空）' }} → <b>{{ $n['to'] !== '' ? $n['to'] : '（空）' }}</b></span>
@@ -711,7 +832,7 @@
             @endif
           </div>
           @if (!empty($prefMeta['isPast']))
-            <div class="notice" style="background:#fdeaea;border-color:#f0b9b9;">
+            <div class="notice" style="background:var(--danger-soft);border-color:var(--danger);">
               ⚠ これは<b>過ぎた月</b>です。入力しても募集には反映されません（見るだけにしてください）。
             </div>
           @endif
@@ -892,7 +1013,7 @@
               <textarea id="pfNote" rows="2" placeholder="例）運転練習中です。簡単な動画編集ができます。"></textarea>
             </div>
 
-            <div style="font-size:12.5px;line-height:1.7;color:var(--muted);background:#f8f3ea;border:1px dashed var(--line);border-radius:8px;padding:9px 12px;margin:4px 0 10px;">
+            <div style="font-size:12.5px;line-height:1.7;color:var(--muted);background:var(--brand-soft);border:1px dashed var(--line);border-radius:8px;padding:9px 12px;margin:4px 0 10px;">
               💡 ここに入力した内容は、メンバーを決めるときの<b>参考</b>にさせてもらうものです。できるだけ希望や得意を活かしたいと思っていますが、現場の状況やチームのバランスもあるため、<b>必ずしも好きなコンテンツや得意なポジションばかりにアサインされるわけではありません</b>。あらかじめご了承ください。
             </div>
             <button class="submit-btn" onclick="saveProfile()">この内容で保存する</button>
@@ -924,7 +1045,7 @@
                  ログアウトしてもおぼえたままにする方針なので、自分で切り離せる道をここに置く。
                  ⚠ マイページは社員用でスタッフには出ない。スタッフはここが唯一の解除口。 --}}
             @if (session('status') === 'device-forgotten')
-              <p style="background:#e7f6ec; color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:10px 13px; font-size:12.5px; margin:10px 0;">
+              <p style="background:var(--ok-soft); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:10px 13px; font-size:12.5px; margin:10px 0;">
                 この端末の記憶を解除しました。次にログインしたときは、確認コードの入力が必要になります。
               </p>
             @endif
