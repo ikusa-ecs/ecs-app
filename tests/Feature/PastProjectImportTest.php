@@ -1091,10 +1091,12 @@ class PastProjectImportTest extends TestCase
     /**
      * 「メンバー」は人ではなく「スタッフで埋める空き枠」＝人として取り込まない。
      *
-     * ⚠ 運営人数がシートに無いときの扱いは 2026-08-28 に変えた（baba要望）。
-     *   以前は「入っている人＋空き枠」で**黙って埋めて**いたが、シートに人数が書いてある案件と
-     *   書いていない案件が混ざったときに気づけなかったので、**埋めずに空のまま入れて、人に聞く**。
-     *   目安（入っている人＋空き枠）は取込画面に薄字で出す。
+     * ⚠ 運営人数がシートに無いときの扱いは2度変えている。
+     *   2026-08-28 … 「入っている人＋空き枠」で**黙って埋めるのをやめた**（人数が書いてある案件と
+     *                 書いていない案件が混ざったときに気づけなかったため）。目安は画面に薄字で出す。
+     *   2026-09-09 … 空のまま取り込んだときは、**参加人数とコンテンツから「仮」の人数を入れる**
+     *                 （baba決定＝案件のCSV取込と同じにする）。0のままだと「必要0名」になり、
+     *                 足りているように見えて自動アサインからも外れるため。⚠ 目安（並んでいる人数）では埋めない。
      */
     public function test_nagoya_member_slots_are_counted_not_imported_as_people(): void
     {
@@ -1111,8 +1113,10 @@ class PastProjectImportTest extends TestCase
         $p = Project::where('project_name', '水合戦')->firstOrFail();
         // 人として入るのは1人だけ（「メンバー」は入らない）。
         $this->assertSame(1, Assignment::where('project_id', $p->id)->count());
-        // ⚠ 運営人数は**空のまま**（勝手に埋めない）。取込画面で人に入れてもらう。
-        $this->assertNull($p->required_count, '運営人数を勝手に埋めてしまっている');
+        // ⚠ 運営人数は「仮」で入る（2026-09-09）。⚠ 目安の3名（1人＋空き枠2）ではなく、
+        //   コンテンツ・参加人数から出した数＝ここでは最少の5名。
+        $this->assertSame(5, $p->required_count, '空欄のときは仮の人数を入れること');
+        $this->assertTrue((bool) $p->count_tentative, '仮の人数は「仮」と分かるようにすること');
     }
 
     /**
@@ -1135,6 +1139,45 @@ class PastProjectImportTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame('', $row['count'], '運営人数を勝手に埋めてしまっている');
         $this->assertSame('3', $row['countGuess'], '目安（1人＋空き枠2）が出ていない');
+    }
+
+    /**
+     * 運営人数が空の行は「仮」の人数で入る（2026-09-09 baba決定＝案件のCSV取込と同じにする）。
+     *
+     * ⚠ 出し方の正本は App\Support\RequiredCountEstimate（中身は RequiredCountEstimateTest で見張っている）。
+     *   ここで確かめるのは「この取込がその正本を通っているか」と「仮の印が立つか」の2つ。
+     * ⚠ 黙って入れない＝取り込んだあとのメッセージに、どの案件に何名を入れたかを出す。
+     */
+    public function test_empty_headcount_is_filled_as_tentative(): void
+    {
+        $this->actingAsPerson($this->manager())
+            ->post('/past-import', ['csv' => $this->csv([$this->row([22 => '', 20 => '60'])])])
+            ->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+
+        // コンテンツの必要人数が未登録なので最少の5名。⚠ 0や空のままにしない。
+        $this->assertSame(5, $p->required_count);
+        $this->assertNull($p->required_count_min, '仮のときは「最少人数」を作らない');
+        $this->assertTrue((bool) $p->count_tentative, '「仮」と分かるようにすること');
+
+        $msg = (string) session('status');
+        $this->assertStringContainsString('運営人数が空だった1件は「仮」で入れました', $msg);
+        $this->assertStringContainsString('5名', $msg, '何名入れたかを知らせること');
+    }
+
+    /** ⚠ シートに書いてある人数は、そのまま入る（仮の印は立たない）。 */
+    public function test_written_headcount_is_not_marked_tentative(): void
+    {
+        $this->actingAsPerson($this->manager())
+            ->post('/past-import', ['csv' => $this->csv([$this->row([22 => '8'])])])
+            ->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '水合戦')->firstOrFail();
+
+        $this->assertSame(8, $p->required_count);
+        $this->assertFalse((bool) $p->count_tentative, '書いてある人数を「仮」にしてしまっている');
+        $this->assertStringNotContainsString('「仮」で入れました', (string) session('status'));
     }
 
     /** 名前の頭の「★」「☆」は目印なので、名簿と照合するときは無いものとして扱う。 */

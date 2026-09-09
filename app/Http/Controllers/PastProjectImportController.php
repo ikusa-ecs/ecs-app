@@ -15,6 +15,7 @@ use App\Support\MonthlySheetReader;
 use App\Support\OfficeScope;
 use App\Support\PersonLookup;
 use App\Support\ProjectImportColumns;
+use App\Support\RequiredCountEstimate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -493,6 +494,7 @@ class PastProjectImportController extends Controller
         $shared = 0;
         $skipped = 0;
         $cancelled = [];        // キャンセルの印が付いていて取り込まなかった案件（終わった案件のとき）
+        $estimated = [];        // 運営人数が空だったので「仮」で入れた案件（黙って入れない・2026-09-09）
         $errors = [];
         $missingNames = [];     // 名簿に無かった人
         $ambiguousNames = [];   // 同姓同名で決められなかった人
@@ -540,8 +542,15 @@ class PastProjectImportController extends Controller
                 ? $this->assignmentsFromColumns($get, $people, $missingNames, $ambiguousNames)
                 : $this->assignmentsFromPeople($entry['people'], $people, $missingNames, $ambiguousNames, $unknownRoles));
 
+            // 運営人数（空欄なら「仮」で置く・2026-09-09 baba決定＝案件のCSV取込と同じにする）。
+            // ⚠ 黙って入れない。どの案件に何名を、どう出したかを取込後のメッセージに出す。
+            $head = $this->countFor($get, $name, $info['count']);
+            if ($head['tentative']) {
+                $estimated[] = $entry['label']."（{$name}）：{$head['max']}名 ← {$head['reason']}";
+            }
+
             $attrs = $this->projectAttributes($get, $name, $date, $info['count'], $client, $meetTime,
-                $office, $mode, $assignments !== []);
+                $office, $mode, $assignments !== [], $head);
 
             // 同じ案件があるか。⚠ 探し方の正本は findExisting（下見とまったく同じものを使う）。
             //   「似ているだけ」の案件を上書きするかどうかは、下見で人が選んだ印（asNew）で決める。
@@ -634,7 +643,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled, $estimated))
             ->with('past_missing', array_keys($missingNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
@@ -737,6 +746,40 @@ class PastProjectImportController extends Controller
     }
 
     /**
+     * 運営人数を決める（最大・最少・仮かどうか）。
+     *
+     * 【2026-09-09 baba決定】シートの運営人数が空のときは、**案件のCSV取込とまったく同じやり方**で
+     * 「仮」の人数を入れる（それまでは空＝0のままだった）。
+     *
+     * 【なぜ】運営人数が0だと、アプリ中の「必要◯名／あと◯名」がぜんぶ0になり、
+     * **足りているように見えて**自動アサインの対象からも外れる。気づかないまま人が足りないのが一番こわい。
+     *
+     * ⚠ 出し方の正本は App\Support\RequiredCountEstimate（コンテンツの必要人数→参加人数から規模→最少5名）。
+     *   ここにも画面にも計算を書き写さない。
+     * ⚠ 「メンバー欄に並んでいる人数」では埋めない（2026-08-28 baba）。それは実際に入った人の数で、
+     *   必要人数ではない。書いてある案件と書いていない案件が混ざったときに気づけなくなる。
+     * ⚠ 入れた数は必ず「仮」（count_tentative）にする。セールスが入れた本当の数と見分けが付かなくなるため。
+     *
+     * @return array{max:?int, min:?int, tentative:bool, reason:string}
+     */
+    private function countFor(callable $get, string $name, string $count): array
+    {
+        $max = Headcount::parse($count)['max'];
+        if ($max !== null) {
+            return ['max' => $max, 'min' => Headcount::parse($count)['min'], 'tentative' => false, 'reason' => ''];
+        }
+
+        $guests = $this->digits($get('お客様人数'));
+        $est = RequiredCountEstimate::for(
+            $this->resolveContentIds($name),
+            $get('案件規模') ?: null,
+            $guests !== '' ? (int) $guests : null
+        );
+
+        return ['max' => $est['count'], 'min' => null, 'tentative' => true, 'reason' => $est['reason']];
+    }
+
+    /**
      * 1行 → projects に入れる値。
      *
      * 通常の取込と同じ読み替えを使う。「過去」と「これから」で変わるのは末尾の4つだけ
@@ -744,11 +787,13 @@ class PastProjectImportController extends Controller
      */
     private function projectAttributes(callable $get, string $name, string $date,
         string $count, ?string $client, ?string $meetTime, string $office,
-        string $mode = self::MODE_PAST, bool $hasPeople = false): array
+        string $mode = self::MODE_PAST, bool $hasPeople = false, ?array $estimate = null): array
     {
         $guests = $this->digits($get('お客様人数'));
         $teams = $this->digits($get('チーム数'));
         $future = $mode === self::MODE_FUTURE;
+        // 運営人数（空欄なら「仮」で置く）。⚠ 出し方は countFor の1か所（画面にも書き写さない）。
+        $head = $estimate ?? $this->countFor($get, $name, $count);
 
         return [
             'project_name' => $name,
@@ -787,8 +832,11 @@ class PastProjectImportController extends Controller
             'lodging' => $get('宿泊') ?: null,
             'assembly_type' => $get('集合形式') ?: null,
             // ⚠ 数字だけ抜き出すと「6〜8」が「68」になる。範囲の読み取りは Headcount が正本。
-            'required_count' => Headcount::parse($count)['max'],
-            'required_count_min' => Headcount::parse($count)['min'],
+            // ⚠ シートが空欄のときは「仮」の人数が入る（2026-09-09 baba決定。countFor を見ること）。
+            'required_count' => $head['max'],
+            'required_count_min' => $head['min'],
+            // 空欄から出した仮の人数か（案件一覧に「仮」と出る／あとで人が本当の数を入れる）。
+            'count_tentative' => $head['tentative'],
             'guest_count' => $guests !== '' ? (int) $guests : null,
             'team_count' => $teams !== '' ? (int) $teams : null,
             'is_repeat' => $get('リピート') === 'あり',
@@ -1142,7 +1190,7 @@ class PastProjectImportController extends Controller
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
         int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST, int $shared = 0,
-        array $cancelled = []): string
+        array $cancelled = [], array $estimated = []): string
     {
         $future = $mode === self::MODE_FUTURE;
         $msg = $isMonthly
@@ -1172,6 +1220,13 @@ class PastProjectImportController extends Controller
             $msg .= ' キャンセルの印が付いていた'.count($cancelled).'件は取り込みませんでした：'
                 .implode(' / ', $cancelled)
                 .'（実施していないため。入れたい場合は、シートのキャンセルの印を外してください）';
+        }
+
+        // ⚠ 仮で入れた人数は黙って入れない。どの案件に何名を、どう出したかを必ず出す
+        //   （2026-09-09 baba決定。あとから本当の数に直せるように「仮」と分かるようにしている）。
+        if ($estimated) {
+            $msg .= ' 運営人数が空だった'.count($estimated).'件は「仮」で入れました（案件一覧に「仮」と出ます。決まったら直してください）：'
+                .implode(' / ', $estimated);
         }
 
         if ($errors) {
