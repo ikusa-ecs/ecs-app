@@ -6,6 +6,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\StaffRelation;
 use App\Models\StaffRoleEligibility;
+use App\Support\RoleScale;
 use App\Support\AssignmentRole;
 use App\Support\Departments;
 use App\Support\ExperienceCount;
@@ -410,6 +411,8 @@ class PersonController extends Controller
                     // OPの区別（B案）：オンライン可／リアル可。null=未設定は false 扱いで渡す。
                     'opOnline' => (bool) $p->op_online,
                     'opReal' => (bool) $p->op_real,
+                    // MCとして入れる上限の規模（空＝制限なし）。名簿の詳細で社員が決める。
+                    'mcMaxScale' => (string) ($p->mc_max_scale ?? ''),
                     'ng' => $p->ngRelations->pluck('partner_name')->all(),
                     'dnote' => $p->planner_impression ?? '',
                     'traits' => [
@@ -456,6 +459,9 @@ class PersonController extends Controller
         return view('staff', [
             'people' => $people,
             'status' => $status,
+            // 「MCとして入れる上限の規模」の選択肢（2026-09-09 baba要望）。
+            // ⚠ 画面に規模名を書かない＝正本は App\Support\RoleScale。
+            'roleScaleOptions' => RoleScale::options(),
             // 経験回数（自動集計・2026-08-27 baba要望）。正本＝App\Support\ExperienceCount。
             // ⚠ 表に保存せず毎回数える（写しは必ず腐る）。一覧ぶんを1回のクエリでまとめて数える
             //   ＝1人ずつ引くと人数ぶんSQLが走る。
@@ -501,6 +507,8 @@ class PersonController extends Controller
             'managed_positions.*' => ['string'],
             'op_online' => ['sometimes', 'boolean'],  // OPオンライン可（B案）
             'op_real' => ['sometimes', 'boolean'],  // OPリアル(現地)可（B案）
+            // MCとして入れる上限の規模（2026-09-09 baba要望）。空＝制限なし。正本＝App\Support\RoleScale。
+            'mc_max_scale' => ['sometimes', 'nullable', 'string', 'max:10'],
             'ng' => ['nullable', 'string', 'max:2000'],
             'impression' => ['nullable', 'string', 'max:1000'],
             // 拠点（事務所）。2026-08-27 baba要望＝これまで画面から直せなかった。
@@ -603,6 +611,11 @@ class PersonController extends Controller
             }
             if ($request->has('op_real')) {
                 $person->op_real = $request->boolean('op_real');
+            }
+            // MCとして入れる、いちばん大きい規模（2026-09-09 baba要望）。送られてきたときだけ更新する。
+            // ⚠ 空＝制限なし（今までどおり）。値の決まりは App\Support\RoleScale が正本。
+            if ($request->has('mc_max_scale')) {
+                $person->mc_max_scale = RoleScale::normalize($data['mc_max_scale'] ?? null);
             }
             $person->save();
         });

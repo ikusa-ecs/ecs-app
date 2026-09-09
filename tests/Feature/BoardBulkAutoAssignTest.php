@@ -162,7 +162,8 @@ class BoardBulkAutoAssignTest extends TestCase
         $this->assertStringContainsString('template:(c.template || {})', $blade);
         // 枠づくりと「その役割ができるか」
         $this->assertStringContainsString('function openSlotsOf(c, room){', $blade);
-        $this->assertStringContainsString('function canDoRole(cand, role){', $blade);
+        // ⚠ 案件（c）も渡す＝MCの「どの規模までできるか」を見るため（2026-09-09）。
+        $this->assertStringContainsString('function canDoRole(cand, role, c){', $blade);
         // ⚠ 主ポジションをそのまま役割にしていないこと（ここに戻ると不具合が再発する）
         $this->assertStringNotContainsString('let rc = p.roleCode || ', $blade,
             '主ポジションをそのまま役割にしています。必要ポジションの枠から入れてください。');

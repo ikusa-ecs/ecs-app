@@ -20,6 +20,9 @@
   {{-- 拠点で絞って見るための選択肢と、自分の拠点（2026-08-25 baba要望）。
        ⚠ 拠点名をJSに書き足さない。正本は拠点マスタ（共通設定 → マスタ管理）。 --}}
   window.ECS_OFFICES = @json($offices ?? []);
+  {{-- 「MCとして入れる上限の規模」の選択肢（2026-09-09 baba要望）。
+       ⚠ 画面に規模名を書かない＝正本は App\Support\RoleScale。 --}}
+  window.ECS_ROLE_SCALES = @json($roleScaleOptions ?? []);
   window.ECS_MY_OFFICE = @json($myOffice ?? '');
   {{-- スキルの絞り込みの選択肢（2026-09-08 baba要望）。
        ⚠ 項目名・判定をここに書かない。正本は App\Support\SkillFilter（社員名簿と共通）。 --}}
@@ -524,6 +527,18 @@
               <label style="margin-right:10px;"><input type="checkbox" class="edit-op-online" ${p.opOnline?'checked':''}> オンライン可</label>
               <label><input type="checkbox" class="edit-op-real" ${p.opReal?'checked':''}> リアル(現地)可</label>
             </div>
+            <!-- MCとして入れる、いちばん大きい規模（2026-09-09 baba要望
+                 「このMCさんは最近MCオーディション合格したから少人数の案件でMCにしたい」）。
+                 ⚠ 選択肢はサーバーから受け取る（window.ECS_ROLE_SCALES）。ここに規模名を書かない。
+                 ⚠ 空＝すべての規模＝今までどおり。 -->
+            <div class="op-flavor" style="margin-top:6px; font-size:12.5px; color:var(--muted);">
+              <span style="margin-right:8px;" title="自動アサインのMC枠で、この規模までの案件に入れます。空欄なら制限なし。">MCの規模：</span>
+              <select class="edit-mc-scale" style="font-family:inherit; font-size:12.5px;">
+                ${Object.keys(window.ECS_ROLE_SCALES || {'':'すべての規模'}).map(k =>
+                  `<option value="${k}" ${((p.mcMaxScale||'') === k) ? 'selected' : ''}>${(window.ECS_ROLE_SCALES||{})[k] || k}</option>`
+                ).join('')}
+              </select>
+            </div>
 
             <h4 style="margin-top:16px;">区分</h4>
             <div class="trait">
@@ -833,6 +848,9 @@
     ['OP','MC','SP'].forEach(v => body.append('managed_positions[]', v));  // この画面が扱う可否はこの3つだけ
     body.append('op_online', opOnline ? '1' : '0');   // OPオンライン可（B案）
     body.append('op_real',   opReal ? '1' : '0');     // OPリアル(現地)可（B案）
+    // MCとして入れる上限の規模（2026-09-09）。欄が無いときは送らない＝勝手に空にしない。
+    const mcScaleEl = dr.querySelector('.edit-mc-scale');
+    if (mcScaleEl) body.append('mc_max_scale', mcScaleEl.value);
     if (exclusive) body.append('exclusive', '1');
     if (follow)    body.append('follow', '1');
     if (starter)   body.append('starter', '1');

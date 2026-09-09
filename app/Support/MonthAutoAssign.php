@@ -199,7 +199,7 @@ class MonthAutoAssign
                     // ⚠ 役割の決まった枠には「その役割ができる人」だけ。
                     //   できない人を入れると、当日その役割が回らない。
                     //   （FC・CK は「みんなできる」扱い＝正本は AssignmentRole::needsEligibility）
-                    if (! $this->canDo($s['person'], $role)) {
+                    if (! $this->canDo($s['person'], $role, $p)) {
                         continue;
                     }
                     $used[$sid] = true;
@@ -645,7 +645,7 @@ class MonthAutoAssign
      * ⚠ FC・CK は「みんなできる」扱い（2026-09-09 baba確定）。判定の正本＝AssignmentRole::needsEligibility。
      *   ここに役割名を直書きしないこと（日別ボードと食い違う）。
      */
-    private function canDo(Person $p, string $role): bool
+    private function canDo(Person $p, string $role, ?Project $project = null): bool
     {
         if (! AssignmentRole::needsEligibility($role)) {
             return true;
@@ -654,7 +654,18 @@ class MonthAutoAssign
             ? $p->roleEligibilities->pluck('position')->all()
             : [];
 
-        return in_array($role, $can, true);
+        if (! in_array($role, $can, true)) {
+            return false;
+        }
+
+        // ⚠ MC は「どの規模までできるか」も見る（2026-09-09 baba要望
+        //   「このMCさんは最近MCオーディション合格したから少人数の案件でMCにしたい」）。
+        //   判定の正本＝App\Support\RoleScale（空＝制限なし＝今までどおり）。
+        if ($role === AssignmentRole::MC && $project !== null) {
+            return RoleScale::allows($p->mc_max_scale, $project->scale);
+        }
+
+        return true;
     }
 
     /**

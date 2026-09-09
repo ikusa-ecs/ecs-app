@@ -93,6 +93,10 @@ class AssignBoardController extends Controller
             // 「登録が無くても、みんなできる」役割（2026-09-09 baba＝FC・CK）。自動アサインの判定に使う。
             // ⚠ 画面に役割名を直書きしない（正本＝AssignmentRole::ANYONE_CAN。月まとめ自動アサインも同じものを見る）。
             'anyoneRoles' => AssignmentRole::ANYONE_CAN,
+            // 規模の並び（小さい順）と、案件規模が空のときの数え方。MCの規模別の判定に使う。
+            // ⚠ 画面に規模名を書かない（正本＝RoleRequirementCsv::SCALES と ProjectScale）。
+            'scaleOrder' => \App\Support\RoleRequirementCsv::SCALES,
+            'scaleWhenBlank' => \App\Support\ProjectScale::UNSET_GOES_TO,
             'noteOptions' => $this->allNoteOptions(),          // 担当メモ入力の候補（軍師/サポ 等）
             'officeScope' => $office,                          // 今絞っている拠点（null＝全拠点）。注記に使う
             'usingDb' => Project::exists(),                    // DBに案件があるか（絞って0件でも見本に戻さない旗）
@@ -491,6 +495,8 @@ class AssignBoardController extends Controller
                         // ⚠ 社員は「基本イベントには出ない」ので、希望者カラムでは**たたんで**出す。
                         //   スタッフと混ざって並ぶと、声を掛ける相手を探すのに邪魔になる。
                         'emp' => (optional($person)->role === 'employee'),
+                        // MCとして入れる上限の規模（2026-09-09）。空＝制限なし。判定の正本＝App\Support\RoleScale。
+                        'mcMax' => (string) (optional($person)->mc_max_scale ?? ''),
                         // 本人が応募時に書いた一言。アサインする人に見えないと意味がないので渡す（2026-08-21 baba）。
                         'note' => (string) ($a->note ?? ''),
                     ];
@@ -574,6 +580,8 @@ class AssignBoardController extends Controller
                 //   正本＝App\Support\PositionTemplate（アサイン画面・月まとめと同じもの）。
                 //   ⚠ ここを渡し忘れると、また「MCが2人」「謎解きなのに軍師」が起きる。
                 'template' => PositionTemplate::of($p),
+                // 案件規模（MCの規模別の判定に使う。空のときの扱いは App\Support\ProjectScale が正本）。
+                'scale' => (string) ($p->scale ?? ''),
                 'archived' => false,
                 'draft' => false,
                 'assigned' => $assigned,
@@ -679,6 +687,8 @@ class AssignBoardController extends Controller
                 // 社員かどうか（2026-09-03 baba要望）。⚠ 社員の出勤可能日もこの同じ表
                 //   （shift_preferences）に入るので、印を付けないとスタッフと見分けられない。
                 'emp' => (optional($person)->role === 'employee'),
+                // MCとして入れる上限の規模（2026-09-09）。空＝制限なし。
+                'mcMax' => (string) (optional($person)->mc_max_scale ?? ''),
             ];
         }
 

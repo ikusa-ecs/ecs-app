@@ -689,6 +689,73 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame('', $picks[0]['role'], '役割は空（あとで人が決める）');
     }
 
+
+    /**
+     * ⚠ MC は「どの規模までできるか」も見る（2026-09-09 baba要望
+     * 「このMCさんは最近MCオーディション合格したから少人数の案件でMCにしたい」）。
+     *
+     * 空（未設定）＝制限なし＝今までどおり。値の決まりは App\Support\RoleScale が正本。
+     */
+    public function test_mc_scale_limits_who_can_take_the_mc_slot(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-BIG', '大型', ['MC' => 1]);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'content_ids' => ['CT-BIG'], 'scale' => '大型', 'office' => '東京',
+        ]);
+        // MC はできるが「小型まで」の人＝大型案件のMC枠には入れない。
+        $small = PersonFactory::new()->staff()->create([
+            'name' => '小型までのMC', 'office' => '東京', 'mc_max_scale' => '小型',
+        ]);
+        $this->canDo($small, ['MC']);
+        $this->wish($small, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+        $picks = collect($plan['projects'])->first()['picks'];
+
+        $this->assertCount(1, $picks, '人は入れる（担当は未定になる）');
+        $this->assertSame('', $picks[0]['role'], '大型のMC枠には入れないこと');
+    }
+
+    /** 「大型まで」の人は、大型案件のMC枠に入れる。 */
+    public function test_mc_scale_allows_the_bigger_ones(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-BIG2', '大型', ['MC' => 1]);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'content_ids' => ['CT-BIG2'], 'scale' => '大型', 'office' => '東京',
+        ]);
+        $big = PersonFactory::new()->staff()->create([
+            'name' => '大型OKのMC', 'office' => '東京', 'mc_max_scale' => '大型',
+        ]);
+        $this->canDo($big, ['MC']);
+        $this->wish($big, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+
+        $this->assertSame('MC', collect($plan['projects'])->first()['picks'][0]['role']);
+    }
+
+    /** 未設定（空）の人は、今までどおりどの規模のMCにも入れる。 */
+    public function test_mc_scale_is_optional(): void
+    {
+        $day = Carbon::today()->startOfMonth()->addDays(10);
+        $this->requireRoles('CT-BIG3', '大型', ['MC' => 1]);
+        ProjectFactory::new()->published()->create([
+            'start_date' => $day->format('Y-m-d'), 'required_count' => 1,
+            'content_ids' => ['CT-BIG3'], 'scale' => '大型', 'office' => '東京',
+        ]);
+        $any = PersonFactory::new()->staff()->create(['name' => '未設定のMC', 'office' => '東京']);
+        $this->canDo($any, ['MC']);
+        $this->wish($any, $day);
+
+        $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
+
+        $this->assertSame('MC', collect($plan['projects'])->first()['picks'][0]['role']);
+    }
+
     /**
      * 役割ができる人がいないときは、**担当を「未定」にして人だけ入れる**。
      *

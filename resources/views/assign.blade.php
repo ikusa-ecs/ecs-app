@@ -481,6 +481,10 @@
   {{-- 「登録が無くても、みんなできる」役割（2026-09-09 baba＝FC・CK）。
        ⚠ ここに役割名を書かない。正本は App\Support\AssignmentRole::ANYONE_CAN（月まとめ自動アサインも同じ）。 --}}
   window.ECS_ANYONE_ROLES = @json($anyoneRoles ?? []);
+  {{-- 規模の並び（小さい順）と、案件規模が空のときにどれとして数えるか。
+       ⚠ 画面に規模名を書かない。正本＝App\Support\RoleRequirementCsv::SCALES と App\Support\ProjectScale。 --}}
+  window.ECS_SCALE_ORDER = @json($scaleOrder ?? []);
+  window.ECS_SCALE_WHEN_BLANK = @json($scaleWhenBlank ?? '');
   // 担当メモ（軍師・サポ等）の入力候補。datalist に流し込む。
   window.ECS_NOTE_OPTIONS = @json($noteOptions ?? []);
   window.ECS_QUICK_URL = '/entries/assign';
@@ -657,7 +661,7 @@
     if (ECS_BOARD) {
       const byName = {};
       dayCases.forEach(c => (c.applicants || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), emp:!!a.emp, applied:[], cal:false, notes:{} });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), emp:!!a.emp, mcMax:(a.mcMax||''), applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;                 // id を取りこぼさない（DB保存に必要）
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
         if (a.roles && a.roles.length && !(e.roles||[]).length) e.roles = a.roles;
@@ -667,7 +671,7 @@
         if (a.note) e.notes[c.id] = a.note;             // 本人が応募時に書いた一言（案件ごと）
       }));
       ((window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[off]) || []).forEach(a => {
-        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), emp:!!a.emp, applied:[], cal:false, notes:{} });
+        const e = byName[a.name] || (byName[a.name] = { id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), emp:!!a.emp, mcMax:(a.mcMax||''), applied:[], cal:false, notes:{} });
         if (a.id && !e.id) e.id = a.id;
         if (a.roleCode && !e.roleCode) e.roleCode = a.roleCode;
         if (a.roles && a.roles.length && !(e.roles||[]).length) e.roles = a.roles;
@@ -825,11 +829,27 @@
   //   ⚠ 役割名をここに書かない。一覧は window.ECS_ANYONE_ROLES（正本＝App\Support\AssignmentRole::ANYONE_CAN）。
   //     書き写すと、月まとめ自動アサインと食い違って「日別では入るのに月まとめでは入らない」になる。
   // ⚠ できる役割の一覧が届いていない古いデータのときは、主ポジションで見る（何も入らないより良い）。
-  function canDoRole(cand, role){
+  function canDoRole(cand, role, c){
     if (role === '') return true;
     if ((window.ECS_ANYONE_ROLES || []).indexOf(role) >= 0) return true;
     const list = (cand.roles && cand.roles.length) ? cand.roles : (cand.roleCode ? [cand.roleCode] : []);
-    return list.indexOf(role) >= 0;
+    if (list.indexOf(role) < 0) return false;
+    // ⚠ MC は「どの規模までできるか」も見る（2026-09-09 baba要望
+    //   「このMCさんは最近MCオーディション合格したから少人数の案件でMCにしたい」）。
+    //   空＝制限なし＝今までどおり。⚠ 規模の並びをここに書かない（サーバーから受け取る）。
+    if (role === 'MC' && c && (cand.mcMax || '')) {
+      const order = window.ECS_SCALE_ORDER || [];
+      const need = order.indexOf(scaleOf(c));
+      const can  = order.indexOf(cand.mcMax);
+      if (need >= 0 && can >= 0 && need > can) return false;
+    }
+    return true;
+  }
+  // 案件の規模。⚠ 空のときの扱いはサーバー（App\Support\ProjectScale）と同じにそろえる。
+  function scaleOf(c){
+    const order = window.ECS_SCALE_ORDER || [];
+    const s = (c && c.scale) ? String(c.scale) : '';
+    return order.indexOf(s) >= 0 ? s : (window.ECS_SCALE_WHEN_BLANK || '');
   }
 
   /**
@@ -959,7 +979,7 @@
           const cand = pool[i];
           if (usedIds[cand.id]) continue;
           // ⚠ 役割の決まった枠には「その役割ができる人」だけ（FC・CK はみんなできる扱い）。
-          if (role !== '' && !canDoRole(cand, role)) continue;
+          if (role !== '' && !canDoRole(cand, role, c)) continue;
           usedIds[cand.id] = true;
           picked.push({ p: cand, role: role });
           return true;
