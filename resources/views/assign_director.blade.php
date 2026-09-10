@@ -797,13 +797,23 @@
       && isDayOff(e.id, y, m, d));
   }
 
+  // 案件カードの2行目（2026-09-10 baba要望）。
+  // ⚠ 案件名には**コンテンツ名がそのまま入っていることが多い**ので、そこにコンテンツを出すと
+  //    同じ言葉が2回並んで見える（「コンテンツが2回出ている」というご指摘の正体）。
+  //    そこで2行目は「🏢 企業名（お客様）」にする。企業名が無い案件だけコンテンツを出す。
+  // ⚠ 出し方を増やすときはこの1か所だけ直す（ふきだしと担当を決めるパネルで食い違わないように）。
+  function caseSub(c){
+    if (c.client) return '🏢' + c.client;
+    return c.content ? ('🎯' + c.content) : '';
+  }
+
   // ===== 件数ふきだし（その日の案件一覧）=====
   function dayTip(dcs){
     const rows = dcs.map(c => {
       const t = timeOf(c);
       const dTxt = c.dirId ? ('D: ' + empName(c.dirId)) : '<span style="color:#b45309">D未定</span>';
       const sTxt = (c.sdIds || []).length ? ('｜SD: ' + c.sdIds.map(empName).join('・')) : '';
-      const meta = ['🎯' + c.content, c.client, t].filter(Boolean).join(' / ');
+      const meta = [caseSub(c), t].filter(Boolean).join(' / ');
       // 案件名を押したら案件の詳細（編集画面）へ。見本データのときは飛べる先が無いのでそのまま（2026-08-21 baba）。
       const nameHtml = USING_DB
         ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く" style="color:inherit;">${c.name}</a>`
@@ -1058,7 +1068,7 @@
       const dTaken = c.dirId && !dOn;
       const sNames = (c.sdIds || []).filter(id => id !== PICK.empId).map(empName).join('・');
       return `<div class="dp-case">
-          <div class="dp-info"><div class="dp-nm">${c.scale==='大型'?'⭐':''}${c.name}</div><div class="dp-ct">🎯${c.content}</div></div>
+          <div class="dp-info"><div class="dp-nm">${c.scale==='大型'?'⭐':''}${c.name}</div><div class="dp-ct">${caseSub(c)}</div></div>
           <div class="dp-btns">
             <button class="dp-btn d ${dOn?'on':''} ${dTaken?'taken':''}" onclick="toggleRole('${c.id}','D')">D${dTaken?`<span class="who"> ${empName(c.dirId)}</span>`:''}</button>
             <button class="dp-btn sd ${sOn?'on':''}" onclick="toggleRole('${c.id}','SD')" title="SDは何人でも付けられます">SD${sNames?`<span class="who"> ${sNames}</span>`:''}</button>
