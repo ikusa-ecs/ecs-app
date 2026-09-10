@@ -12,6 +12,7 @@ use App\Models\ProjectDispatch;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
+use App\Support\EntryFeed;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
@@ -121,10 +122,23 @@ class AssignBoardController extends Controller
         return Carbon::today();
     }
 
-    /** エントリー一覧 /entries。案件＋応募者（applications）を DB から渡す。 */
+    /**
+     * エントリー一覧 /entries。案件＋応募者（applications）を DB から渡す。
+     *
+     * タブは4つ＝案件ごと／月ごと／空いている人／**新着（来た順）**。
+     * ⚠ 新着タブは 2026-09-10 に独立画面 `/entry-feed` から引っ越してきたもの
+     *   （サイドメニューが長くなったため・baba要望）。中身の正本＝`App\Support\EntryFeed`。
+     *   古いURLは `/entries?view=feed` へ転送している。
+     */
     public function entries(Request $request)
     {
         $office = OfficeScope::filter($request);
+
+        // 新着タブ（来た順）。絞り込みはURLで受け取る（days＝直近何日／extra＝追加案件のみ／new＝新人のみ）。
+        $feedDays = EntryFeed::normalizeDays($request->query('days', EntryFeed::DEFAULT_DAYS));
+        $feedOnlyExtra = $request->boolean('extra');
+        $feedOnlyNew = $request->boolean('new');
+        $feed = EntryFeed::build($office, $feedOnlyExtra, $feedOnlyNew, $feedDays);
 
         return view('entries', [
             'staffPool' => $this->staffPool($office),
@@ -134,6 +148,13 @@ class AssignBoardController extends Controller
             'wishCalendarDays' => self::WISH_CALENDAR_DAYS,
             'officeScope' => $office,
             'usingDb' => Project::exists(),
+            // 🆕 新着（来た順）タブ
+            'feedRows' => $feed['rows'],
+            'feedNewCount' => $feed['newCount'],
+            'feedTodoCount' => $feed['todoCount'],
+            'feedDays' => $feedDays,
+            'feedOnlyExtra' => $feedOnlyExtra,
+            'feedOnlyNew' => $feedOnlyNew,
         ]);
     }
 

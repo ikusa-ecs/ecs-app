@@ -499,6 +499,7 @@
         <button class="ent-tab active" id="tab-bycase"  onclick="switchView('bycase')">📋 案件ごと</button>
         <button class="ent-tab"        id="tab-bymonth" onclick="switchView('bymonth')">🗓 月ごと</button>
         <button class="ent-tab"        id="tab-wishcal" onclick="switchView('wishcal')">📅 空いている人</button>
+        <button class="ent-tab"        id="tab-feed"    onclick="switchView('feed')">🆕 新着（来た順）</button>
       </div>
 
       <!-- 絞り込み -->
@@ -556,6 +557,15 @@
 
       <!-- 空いている人（カレンダー） -->
       <div class="view" id="view-wishcal"></div>
+@endverbatim
+
+      {{-- 新着（来た順）。2026-09-10 に独立画面 `/entry-feed` からこのタブへ引っ越した。
+           ⚠ この中身はサーバーで作る（他の3つのタブは画面のJSが作る）。期間や絞り込みを押すと
+              `?view=feed` を付けて開き直す＝押した先でもこのタブのままになる。 --}}
+      <div class="view" id="view-feed">
+        @include('partials.entry_feed_panel')
+      </div>
+@verbatim
 
       <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
         ※ <b>アサイン済み</b>＝すでにその案件のメンバーに入れた人。<b>エントリー中</b>＝希望はくれたがまだ未割当の人。<br>
@@ -655,11 +665,20 @@
   let currentView = 'bycase';
   function switchView(v){
     currentView = v;
-    ['bycase', 'bymonth', 'wishcal'].forEach(k => {
+    ['bycase', 'bymonth', 'wishcal', 'feed'].forEach(k => {
       document.getElementById('tab-' + k).classList.toggle('active', v === k);
       document.getElementById('view-' + k).classList.toggle('active', v === k);
     });
-    render();
+    // 開いているタブをURLにも残す（2026-09-10）。
+    // ⚠ 新着タブの期間ボタンは「いまのURL＋days」で開き直すので、ここでURLを直しておかないと
+    //    タブを押しただけの状態から期間を押したときに「案件ごと」へ戻ってしまう。
+    try {
+      const u = new URL(window.location.href);
+      if (v === 'bycase') { u.searchParams.delete('view'); } else { u.searchParams.set('view', v); }
+      history.replaceState(null, '', u.toString());
+    } catch (e) {}
+    // 新着タブの中身はサーバーが作って置いてあるので、画面のJSで作り直す必要はない。
+    if (v !== 'feed') render();
   }
 
   function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -1266,6 +1285,13 @@
   document.getElementById('view-bymonth').addEventListener('click', onMatrixClick);
   render();
   applyFocus();
+
+  // URLで開くタブを指定できる（2026-09-10）。
+  // ⚠ `/entry-feed` を開いた人は `/entries?view=feed` に転送されてくる＝ここで新着タブを開く。
+  (function(){
+    const v = new URLSearchParams(location.search).get('view');
+    if (v && v !== 'bycase' && document.getElementById('tab-' + v)) switchView(v);
+  })();
 </script>
 @endverbatim
 @endpush

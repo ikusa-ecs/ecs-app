@@ -12,10 +12,14 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * エントリー新着（/entry-feed）。2026-08-21 baba要望。
+ * エントリー新着（来た順）。2026-08-21 baba要望。
  *
  * 「エントリー一覧」は案件ごとなので「いつ・誰から来たか」が追えなかった。
- * この画面は来た順（新しい順）に並べ、追加案件の反応と新人の応募先が分かるようにする。
+ * 来た順（新しい順）に並べ、追加案件の反応と新人の応募先が分かるようにする。
+ *
+ * ⚠ 2026-09-10：独立画面 `/entry-feed` から
+ *   **エントリー一覧（/entries）の「🆕 新着（来た順）」タブ**へ引っ越した（メニューが長くなったため）。
+ *   中身の正本＝`App\Support\EntryFeed`。古いURLは転送される（下の test_old_url_redirects）。
  */
 class EntryFeedTest extends TestCase
 {
@@ -51,7 +55,7 @@ class EntryFeedTest extends TestCase
         ]);
 
         $rows = collect(
-            $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk()->original->getData()['rows']
+            $this->actingAsPerson($this->emp())->get('/entries?view=feed')->assertOk()->original->getData()['feedRows']
         );
 
         $this->assertSame(['あとで応募した人', '先に応募した人'], $rows->pluck('staffName')->all());
@@ -70,12 +74,12 @@ class EntryFeedTest extends TestCase
         Application::create(['staff_id' => $rookie->id, 'project_id' => $p->id, 'intent' => '希望', 'applied_at' => now()]);
         Application::create(['staff_id' => $veteran->id, 'project_id' => $p->id, 'intent' => '希望', 'applied_at' => now()]);
 
-        $data = $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk()->original->getData();
-        $rows = collect($data['rows'])->keyBy('staffName');
+        $data = $this->actingAsPerson($this->emp())->get('/entries?view=feed')->assertOk()->original->getData();
+        $rows = collect($data['feedRows'])->keyBy('staffName');
 
         $this->assertTrue($rows['新人さん']['isNew']);
         $this->assertFalse($rows['ベテランさん']['isNew']);
-        $this->assertSame(1, $data['newCount']);
+        $this->assertSame(1, $data['feedNewCount']);
     }
 
     /** 「追加案件のみ」で絞れる。 */
@@ -88,7 +92,7 @@ class EntryFeedTest extends TestCase
         Application::create(['staff_id' => $staff->id, 'project_id' => $normal->id, 'intent' => '希望', 'applied_at' => now()]);
 
         $rows = collect(
-            $this->actingAsPerson($this->emp())->get('/entry-feed?extra=1')->assertOk()->original->getData()['rows']
+            $this->actingAsPerson($this->emp())->get('/entries?view=feed&extra=1')->assertOk()->original->getData()['feedRows']
         );
 
         $this->assertSame([$extra->id], $rows->pluck('projectId')->all());
@@ -101,18 +105,18 @@ class EntryFeedTest extends TestCase
         $p = $this->project();
         Application::create(['staff_id' => $staff->id, 'project_id' => $p->id, 'intent' => '希望', 'applied_at' => now()]);
 
-        $before = $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk()->original->getData();
-        $this->assertNull(collect($before['rows'])->first()['assignStatus']);
-        $this->assertSame(1, $before['todoCount']);
+        $before = $this->actingAsPerson($this->emp())->get('/entries?view=feed')->assertOk()->original->getData();
+        $this->assertNull(collect($before['feedRows'])->first()['assignStatus']);
+        $this->assertSame(1, $before['feedTodoCount']);
 
         Assignment::create([
             'project_id' => $p->id, 'staff_id' => $staff->id,
             'date' => $p->start_date->format('Y-m-d'), 'role' => 'OP', 'status' => '確定',
         ]);
 
-        $after = $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk()->original->getData();
-        $this->assertSame('確定', collect($after['rows'])->first()['assignStatus']);
-        $this->assertSame(0, $after['todoCount']);
+        $after = $this->actingAsPerson($this->emp())->get('/entries?view=feed')->assertOk()->original->getData();
+        $this->assertSame('確定', collect($after['feedRows'])->first()['assignStatus']);
+        $this->assertSame(0, $after['feedTodoCount']);
     }
 
     /** スタッフは入れない（社員以上の画面）。 */
@@ -120,7 +124,7 @@ class EntryFeedTest extends TestCase
     {
         $staff = PersonFactory::new()->staff()->create();
 
-        $this->actingAsPerson($staff)->get('/entry-feed')->assertRedirect('/staff-portal');
+        $this->actingAsPerson($staff)->get('/entries?view=feed')->assertRedirect('/staff-portal');
     }
     /**
      * その日の稼働希望（終日〇／NG）が分かること（2026-09-03 baba要望）。
@@ -153,8 +157,8 @@ class EntryFeedTest extends TestCase
             'date' => $day->format('Y-m-d'), 'availability' => 'NG',
         ]);
 
-        $res = $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk();
-        $rows = collect($res->original->getData()['rows'])->keyBy('staffName');
+        $res = $this->actingAsPerson($this->emp())->get('/entries?view=feed')->assertOk();
+        $rows = collect($res->original->getData()['feedRows'])->keyBy('staffName');
 
         $this->assertSame('ok', $rows['マルの人']['wish']);
         $this->assertSame('ng', $rows['エヌジーの人']['wish'], '手は挙げたのにNG、という食い違いに気づけません。');
@@ -181,10 +185,36 @@ class EntryFeedTest extends TestCase
         ]);
 
         $rows = collect(
-            $this->actingAsPerson($this->emp())->get('/entry-feed')->assertOk()->original->getData()['rows']
+            $this->actingAsPerson($this->emp())->get('/entries?view=feed')->assertOk()->original->getData()['feedRows']
         )->keyBy('staffName');
 
         $this->assertNull($rows['ベツノヒの人']['wish'], '別の日の希望を、案件の日のものとして出しています。');
     }
 
+    /**
+     * 古いURL（/entry-feed）を開いた人は、新しい場所（エントリー一覧の新着タブ）へ転送する。
+     * ⚠ ブックマークや前に配った案内から来る人がいるので、この転送を消さないこと。
+     *   絞り込み（期間・追加案件のみ・新人のみ・拠点）も落とさずに持っていく。
+     */
+    public function test_old_url_redirects_to_the_tab(): void
+    {
+        $this->actingAsPerson($this->emp())
+            ->get('/entry-feed')
+            ->assertRedirect('/entries?view=feed');
+
+        $this->actingAsPerson($this->emp())
+            ->get('/entry-feed?days=7&extra=1')
+            ->assertRedirect('/entries?view=feed&days=7&extra=1');
+    }
+
+    /** 4つのタブが並んでいること（新着がメニューから消えたので、ここが唯一の入口）。 */
+    public function test_the_entries_screen_has_four_tabs(): void
+    {
+        $this->actingAsPerson($this->emp())->get('/entries')
+            ->assertOk()
+            ->assertSee('📋 案件ごと')
+            ->assertSee('🗓 月ごと')
+            ->assertSee('📅 空いている人')
+            ->assertSee('🆕 新着（来た順）');
+    }
 }

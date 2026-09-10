@@ -34,7 +34,9 @@ class RawBladeNotPrintedTest extends TestCase
         return array_map(fn ($u) => [$u], [
             '/dashboard', '/projects', '/project-form', '/assign', '/assign-detail',
             '/assign-director', '/assign-publish', '/assign-sheet', '/assign-dashboard',
-            '/entries', '/entry-feed', '/pickup', '/project-assign', '/projects-agg',
+            // ⚠ 新着（来た順）は 2026-09-10 にエントリー一覧のタブへ引っ越した
+            //    （`/entry-feed` は転送になったので、ここでは新しいURLを見張る）。
+            '/entries', '/entries?view=feed', '/pickup', '/project-assign', '/projects-agg',
             '/employees', '/employee-availability', '/staff',
             '/settings', '/masters', '/imports', '/past-import', '/project-import',
             '/person-import', '/content-import', '/stats', '/paper-stock',
