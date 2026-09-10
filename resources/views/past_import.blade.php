@@ -262,6 +262,19 @@
       {{-- 表で直した内容（JSON）。CSVそのものはサーバーが読み直し、ここは「上書きする値」だけを送る
            ＝読み取りの決まりを画面側に増やさないため（2026-08-25）。 --}}
       <input type="hidden" name="edits" id="pjEdits" value="">
+      {{-- 受信箱の番号（毎朝スプレッドシートから届いたもの）。ふだんの取込では空。
+           ⚠ 下のJSは「そのまま出す」区画の中なので、画面の書き方（Blade）が展開されない。
+              だから値をここに入れてJSから読む。⚠ このコメントに命令名を書かないこと（画面が500になる）。 --}}
+      <input type="hidden" name="sync" id="pjSyncId" value="{{ $sync->id ?? '' }}">
+      @if ($sync)
+        <div class="pj-flash ok" style="margin-bottom:12px;">
+          <b>📥 受信箱から読み込みました。</b>
+          {{ $sync->period }} ぶん（{{ $sync->office }}）／読めた案件 {{ $sync->case_count }} 件
+          @if ($sync->book)<br><span class="muted" style="font-size:11.5px;">{{ $sync->book }}（タブ {{ $sync->tab }}）</span>@endif
+          @if ($sync->received_at)<br><span class="muted" style="font-size:11.5px;">最後に届いたのは {{ $sync->received_at->format('n月j日 H:i') }}
+            @if ($sync->applied_at)／最後に反映したのは {{ $sync->applied_at->format('n月j日 H:i') }}@else／<b>まだ一度も反映していません</b>@endif</span>@endif
+        </div>
+      @endif
       {{-- ⚠ どの拠点の案件として入れるか。他拠点のアサイン表を代わりに取り込むことがあるため、
            取り込んだ人の拠点で決め打ちにしない（2026-08-25 baba）。 --}}
       {{-- ⚠ この表は終わった案件か、これからの案件か。入り方（状態・公開・募集・アサイン）が
@@ -269,12 +282,12 @@
       <div style="margin-bottom:12px;">
         <div style="font-size:13px; margin-bottom:6px;"><b>この表は？</b></div>
         <label style="display:block; margin-bottom:4px; font-size:13.5px;">
-          <input type="radio" name="mode" value="{{ $modePast }}" checked onchange="pjModeChanged()">
+          <input type="radio" name="mode" value="{{ $modePast }}" @checked(! $sync) onchange="pjModeChanged()">
           <b>終わった案件（過去の実績）</b>
           <span class="muted" style="font-size:11.5px;">… 案件＝確定・公開済み・募集しない／アサイン＝確定</span>
         </label>
         <label style="display:block; font-size:13.5px;">
-          <input type="radio" name="mode" id="pjModeFuture" value="{{ $modeFuture }}" onchange="pjModeChanged()">
+          <input type="radio" name="mode" id="pjModeFuture" value="{{ $modeFuture }}" @checked((bool) $sync) onchange="pjModeChanged()">
           <b>これからの案件</b>
           <span class="muted" style="font-size:11.5px;">… 案件＝調整中・<b>未公開</b>・募集する／アサイン＝<b>仮</b></span>
         </label>
@@ -407,6 +420,16 @@
   // ⚠ 変化なしの案件は自動でチェックを外すので、人が入れ直したものを
   //   確かめ直しのたびに外してしまわないように、触ったかどうかを覚えておく。
   var pjSkipDecided = {};
+
+  /**
+   * 受信箱から開いたかどうか（毎朝スプレッドシートから届いたものを読むとき）。
+   * ⚠ このJSは verbatim の中なので Blade の書き方は展開されない（既知の罠）。
+   *   値は hidden の入力欄（#pjSyncId）に入れてあるので、そこから読む。
+   */
+  function pjSyncValue() {
+    var el = document.getElementById('pjSyncId');
+    return (el && el.value) ? el.value : '';
+  }
 
   function pjEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
@@ -744,6 +767,10 @@
 
   function pjSetSource(mode) {
     pjSource = mode;
+    // ⚠ 自分でファイルを選ぶ／貼り付けるほうに切り替えたら、受信箱の番号は外す。
+    //   残したままだと、選んだファイルではなく受信箱の中身を取り込んでしまう。
+    var sy = document.getElementById('pjSyncId');
+    if (sy) { sy.value = ''; }
     var isFile = (mode === 'file');
     document.getElementById('pjSrcFile').style.display = isFile ? '' : 'none';
     document.getElementById('pjSrcPaste').style.display = isFile ? 'none' : '';
@@ -766,6 +793,7 @@
 
   // いま選ばれている入れ方に中身があるか。
   function pjHasSource() {
+    if (pjSyncValue() !== '') { return true; }   // 受信箱から開いた＝中身はサーバーにある
     return (pjSource === 'file')
       ? !!document.getElementById('pjFile').files[0]
       : document.getElementById('pjPaste').value.trim() !== '';
@@ -813,7 +841,12 @@
     var form = document.getElementById('pjForm');
     var token = form.querySelector('input[name="_token"]').value;
     var fd = new FormData();
-    if (pjSource === 'file') {
+    var syncId = pjSyncValue();
+    if (syncId !== '') {
+      // 受信箱から … 中身はサーバーが持っているので、番号だけ送る
+      //（同じものを画面から送り直さない＝読み取りの決まりを1か所にするため）。
+      fd.append('sync', syncId);
+    } else if (pjSource === 'file') {
       fd.append('csv', document.getElementById('pjFile').files[0]);
     } else {
       // 貼り付けは「中身」と「何年何月ぶんか」を送る（日程に年が書かれていないため）。
@@ -954,6 +987,9 @@
       }
     });
   })();
+
+  // 受信箱から開いたときは、押さなくてもすぐ差分を出す（毎朝ひと目で見られるように）。
+  if (pjSyncValue() !== '') { pjPost(''); }
 </script>
 @endverbatim
 @endpush

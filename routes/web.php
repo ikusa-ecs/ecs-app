@@ -40,6 +40,7 @@ use App\Http\Controllers\ProjectHistoryController;
 use App\Http\Controllers\ProjectsAggController;
 use App\Http\Controllers\RoleRequirementImportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SheetSyncController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\ThemeController;
@@ -57,6 +58,15 @@ Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm
 Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->middleware('throttle:6,1')->name('password.email');
 Route::get('/reset-password', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
 Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1')->name('password.update');
+
+// ── アサイン表の自動受け取り（毎朝スプレッドシートから届く）──
+//   人ではなく機械（スプレッドシート側の仕掛け＝GAS）が叩くので、**ログインの門の外側**に置く。
+//   ⚠ 代わりの門＝合言葉（.env の ECS_SHEET_SYNC_TOKEN）。合言葉を決めていなければ
+//     入口そのものが閉じる（書き忘れが事故にならないように）。
+//   ⚠ できるのは「受信箱に置くこと」だけ。案件・アサインは書き換わらない
+//     （反映は人が「アサイン表の取込」の画面で押したときだけ）。
+//   ⚠ 総当たりを防ぐため、回数の上限をかける（1分に20回まで）。
+Route::post('/sheet-sync', [SheetSyncController::class, 'receive'])->middleware('throttle:20,1');
 
 // ── 2段階認証（メールでコード）の入力ページ ──
 //   auth は必要だが twofa/onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。
@@ -178,6 +188,10 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // 必要アサイン人数リストの取込（2026-09-07 baba要望）。それまで artisan コマンドしか入口が無く、
     // リストが更新されても小沼さんご自身では反映できなかった。
     // ⚠ 必ずプレビューを見せてから保存する（どのコンテンツの必要人数が入れ替わるかを見てから確定）。
+    // アサイン表の受信箱（毎朝届いた中身を見て、変わったところだけ反映する）。2026-09-10 baba要望。
+    // ⚠ 取込と同じ「管理者以上」。届いた中身をECSへ反映する入口なので、見るだけの人には出さない。
+    Route::get('/sheet-inbox', [SheetSyncController::class, 'inbox'])->middleware('tier:manager');
+
     Route::get('/role-requirement-import', [RoleRequirementImportController::class, 'show'])->middleware('tier:manager');
     Route::post('/role-requirement-import/preview', [RoleRequirementImportController::class, 'preview'])->middleware('tier:manager');
     Route::post('/role-requirement-import', [RoleRequirementImportController::class, 'import'])->middleware('tier:manager');

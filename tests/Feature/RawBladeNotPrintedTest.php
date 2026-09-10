@@ -42,6 +42,7 @@ class RawBladeNotPrintedTest extends TestCase
             '/person-import', '/content-import', '/stats', '/paper-stock',
             '/finance-list', '/mypage', '/mypage-finance', '/project-history',
             '/account-new', '/admin-console', '/guide', '/guide-staff', '/assign-wishlist',
+            '/sheet-inbox',
         ]);
     }
 

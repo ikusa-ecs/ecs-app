@@ -49,6 +49,15 @@
       <a class="btn primary" href="/project-import">開く</a>
     </div>
 
+    {{-- アサイン表の受信箱（2026-09-10 baba要望）。毎朝ひとりでに届いたぶんを見る入口。
+         ⚠ 左メニューは増やさない（近いものは1つの画面にまとめる方針・2026-09-10 baba）。 --}}
+    <div class="im-card">
+      <div class="im-icon">📥</div>
+      <h2>アサイン表の受信箱（毎朝届く）</h2>
+      <p><b>毎朝ひとりでに届いた</b>アサイン表を月ごとに並べます。<b>まだ反映していない月・反映後にシートが変わった月</b>に印が付くので、<b>変わったところだけ</b>確かめて取り込めます。届いただけではECSは変わりません。</p>
+      <a class="btn primary" href="/sheet-inbox">開く</a>
+    </div>
+
     <div class="im-card">
       <div class="im-icon">🗂</div>
       <h2>アサイン表の取込（アサイン込み）</h2>

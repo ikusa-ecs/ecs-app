@@ -29,6 +29,13 @@ return Application::configure(basePath: dirname(__DIR__))
         //   エラーも出ないので気づけない。貼り付け欄は元の文字のまま受け取る。
         $middleware->trimStrings(except: ['paste', 'pasted']);
 
+        // ⚠ アサイン表の自動受け取り（POST /sheet-sync）だけは、合言葉での確認に切り替える。
+        //   理由＝叩くのは人のブラウザではなく**スプレッドシート側の仕掛け（GAS）**なので、
+        //   画面から渡される「使い捨ての札（CSRFトークン）」を持っていない。
+        //   代わりの門＝.env の ECS_SHEET_SYNC_TOKEN と一致するかどうか（SheetSyncController で確認）。
+        //   ⚠ ここに他のURLを足さないこと。足した分だけ、外から叩ける入口が増える。
+        $middleware->validateCsrfTokens(except: ['sheet-sync']);
+
         // 入社年月日は画面では「年・月・日の3つのプルダウン」で入れる（2026-09-03）。
         // 届いた3つを、これまでどおりの hire_date（Y-m-d）1本に組み立て直す。
         // ⚠ 入れられる画面が4つあるので、組み立てはここ1か所に集める（各画面に書き写すと食い違う）。

@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Project;
 use App\Models\ProjectShare;
+use App\Models\SheetSync;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\ClientName;
@@ -59,8 +60,8 @@ class PastProjectImportController extends Controller
 
     public const MODE_FUTURE = 'これから';
 
-    /** 取込画面。 */
-    public function show()
+    /** 取込画面。?sync=番号 が付いていれば、受信箱に届いた中身を読んで開く。 */
+    public function show(Request $request)
     {
         // CSVを選んだときの下見（誰が入る／名簿に無い）はサーバーの preview がまとめて返す
         // ＝読み取りの決まりを1か所にするため。画面へ渡すのは「どの拠点の案件として入れるか」だけ。
@@ -72,7 +73,24 @@ class PastProjectImportController extends Controller
             // 終わった案件か、これからの案件か（既定＝今までどおり「過去」）。
             'modePast' => self::MODE_PAST,
             'modeFuture' => self::MODE_FUTURE,
+            // 受信箱から開いたとき（毎朝スプレッドシートから届いたもの）。null＝ふだんの取込画面。
+            // ⚠ 受信箱は「今月以降」のシートなので、既定を**これからの案件**にする。
+            //   過去あつかいで入れると、確定・公開済みになってスタッフ全員に見えてしまう。
+            'sync' => $this->syncFromRequest($request),
         ]);
+    }
+
+    /**
+     * 受信箱から読むときの1件（?sync=番号／POSTの sync=番号）。
+     *
+     * ⚠ 見つからない番号は「無かったこと」にする（null）。エラーにすると、
+     *   古いURLを開いただけで取込画面そのものが使えなくなる。
+     */
+    private function syncFromRequest(Request $request): ?SheetSync
+    {
+        $id = (int) $request->input('sync', 0);
+
+        return $id > 0 ? SheetSync::find($id) : null;
     }
 
     /**
@@ -101,7 +119,13 @@ class PastProjectImportController extends Controller
     {
         $fail = fn (string $message) => [
             'error' => $message, 'isMonthly' => false, 'period' => null, 'entries' => [], 'unmapped' => [],
+            'sync' => null,
         ];
+
+        // ③受信箱から … 毎朝スプレッドシートから届いたもの（2026-09-10 baba要望）。
+        // ⚠ ファイルを選ぶ・貼り付けるのと**まったく同じ道**を通す＝読み取りの決まりを増やさない。
+        //   届いた中身は「行×列」の形でそのまま持ってあるので、CSVを読んだ結果と同じ形になる。
+        $sync = $this->syncFromRequest($request);
 
         // 入れ方は2通り（2026-08-27 baba要望）。
         //   ①ファイルを選ぶ … スプレッドシートからCSVで落としたもの
@@ -114,7 +138,9 @@ class PastProjectImportController extends Controller
         $pasted = (string) $request->input('paste', '');
         $isPaste = trim($pasted) !== '' && $request->file('csv') === null;
 
-        if ($isPaste) {
+        if ($sync !== null) {
+            $rows = $sync->rows;
+        } elseif ($isPaste) {
             // 貼り付けはタブ区切り。セルの中に改行やカンマが入っていても壊れない。
             $rows = CsvText::rowsPasted($pasted);
         } else {
@@ -139,9 +165,14 @@ class PastProjectImportController extends Controller
         //   貼り付け … 名前が無いので、画面で選んでもらう
         $period = null;
         if ($isMonthly) {
-            $period = $isPaste
-                ? MonthlySheetReader::periodFromFilename((string) $request->input('period'))
-                : MonthlySheetReader::periodFromFilename($request->file('csv')->getClientOriginalName());
+            if ($sync !== null) {
+                // 受信箱 … 届いたときにタブ名（202610 など）から決めた年月を持っている。
+                $period = MonthlySheetReader::periodFromFilename((string) $sync->period);
+            } else {
+                $period = $isPaste
+                    ? MonthlySheetReader::periodFromFilename((string) $request->input('period'))
+                    : MonthlySheetReader::periodFromFilename($request->file('csv')->getClientOriginalName());
+            }
         }
 
         if ($isMonthly && $period === null) {
@@ -189,6 +220,7 @@ class PastProjectImportController extends Controller
 
         return [
             'error' => null, 'isMonthly' => $isMonthly, 'period' => $period,
+            'sync' => $sync,
             'entries' => $entries, 'unmapped' => $unmapped,
         ];
     }
@@ -364,9 +396,11 @@ class PastProjectImportController extends Controller
     public function preview(Request $request)
     {
         $request->validate([
-            // ファイルを選ぶか、貼り付けるかのどちらか（2026-08-27 baba要望）。
-            'csv' => ['required_without:paste', 'file', 'mimes:csv,txt'],
-            'paste' => ['required_without:csv', 'nullable', 'string'],
+            // 入れ方は3通り＝ファイルを選ぶ／貼り付ける／受信箱から（2026-09-10 で3つ目を追加）。
+            'csv' => ['required_without_all:paste,sync', 'file', 'mimes:csv,txt'],
+            'paste' => ['required_without_all:csv,sync', 'nullable', 'string'],
+            // 受信箱の番号（毎朝スプレッドシートから届いたもの）。
+            'sync' => ['nullable', 'integer'],
             // 貼り付けのときだけ要る「何年何月ぶんか」（例 2026-09）。
             'period' => ['nullable', 'string'],
             // 画面の表で直した内容（JSON）。直していなければ空。
@@ -481,9 +515,11 @@ class PastProjectImportController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            // ファイルを選ぶか、貼り付けるかのどちらか（2026-08-27 baba要望）。
-            'csv' => ['required_without:paste', 'file', 'mimes:csv,txt'],
-            'paste' => ['required_without:csv', 'nullable', 'string'],
+            // 入れ方は3通り＝ファイルを選ぶ／貼り付ける／受信箱から（2026-09-10 で3つ目を追加）。
+            'csv' => ['required_without_all:paste,sync', 'file', 'mimes:csv,txt'],
+            'paste' => ['required_without_all:csv,sync', 'nullable', 'string'],
+            // 受信箱の番号（毎朝スプレッドシートから届いたもの）。
+            'sync' => ['nullable', 'integer'],
             // 貼り付けのときだけ要る「何年何月ぶんか」（例 2026-09）。
             'period' => ['nullable', 'string'],
             // どの拠点の案件として入れるか（画面で選ぶ）。未指定は自分の拠点。
@@ -667,6 +703,17 @@ class PastProjectImportController extends Controller
                     $assignCount++;
                 }
             });
+        }
+
+        // 受信箱から取り込んだときは「いつ反映したか」を残す（2026-09-10）。
+        // ⚠ これが「どこまで反映したか」の記録になる。受信箱の一覧では、これと
+        //   「シートの中身が変わった日時」を比べて、見るべき月に印を付ける
+        //   （見方の正本＝App\Models\SheetSync::needsAttention）。
+        if ($read['sync'] !== null) {
+            $read['sync']->forceFill([
+                'applied_at' => Carbon::now(),
+                'applied_by' => Auth::id(),
+            ])->save();
         }
 
         return redirect('/past-import')
