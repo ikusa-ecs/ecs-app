@@ -691,6 +691,10 @@
       // ⚠ 「案件の進み具合(stat)」と「募集中か(pubOn)」は別のこと。
       //   ここで詰め替えを忘れると、ボタンの出し分けが効かなくなる。
       stat:c.stat, pubOn:c.pubOn,
+      // ⚠ 「🔒 この人数で足りている」で募集を締めたか（2026-09-10 修正）。
+      //   ここで詰め替えを忘れていたため、**締めても画面を開き直すと「募集中 あと◯名」に戻って見えた**
+      //   （保存はできていた。bRecruit() が「無ければ募集中」とみなすため）。
+      recruit:c.recruit,
       yomi:c.yomi,   // 確度（Aヨミ/Bヨミ/Cヨミ）。詰め替え忘れるとカードに出ない。
       needStaff:c.needStaff,   // スタッフ画面で使っている必要人数（未入力なら既定）。締切の判定に使う。
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
