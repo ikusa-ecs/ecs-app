@@ -84,6 +84,13 @@
   .pj-dup-ask  { background: #fdf3e2; border: 1px solid #ecd9b6; border-radius: 6px; padding: 5px 6px; }
   .pj-dup-note { font-size: 11px; line-height: 1.5; color: #8a5a10; margin-bottom: 4px; }
   .pj-dup-ask select { width: 100%; font-size: 11.5px; padding: 3px 4px; font-family: inherit; }
+  /* ECSとどう違うか（2026-09-10）。変化なしは目立たせない＝変わったものだけ目に入るように。 */
+  .pj-diff-new    { font-size: 11.5px; font-weight: 700; color: #2c6ca0; }
+  .pj-diff-same   { font-size: 11.5px; color: #9a8f80; }
+  .pj-diff-changed { font-size: 11.5px; font-weight: 700; color: #8a5a10;
+    background: #fdf3e2; border: 1px solid #ecd9b6; border-radius: 6px; padding: 5px 6px; }
+  .pj-diff-list { margin: 4px 0 0; padding-left: 16px; font-weight: 400; line-height: 1.6; }
+  .pj-diff-list li { margin: 0; }
 
   /* =========================================================================
      黒ベース（ダークモード）用の色の上書き。
@@ -132,6 +139,9 @@
   html[data-theme="dark"] .pj-dup-new { color: var(--muted); }
   html[data-theme="dark"] .pj-dup-ask { background: var(--warn-soft); border-color: var(--warn-line); }
   html[data-theme="dark"] .pj-dup-note { color: var(--warn-ink); }
+  html[data-theme="dark"] .pj-diff-new { color: var(--info-ink); }
+  html[data-theme="dark"] .pj-diff-same { color: var(--muted); }
+  html[data-theme="dark"] .pj-diff-changed { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
 </style>
 @endpush
 
@@ -342,6 +352,8 @@
     <div class="pj-summary">
       読み込み：<b id="pjTotal">0</b> 件 ／ <span class="ok">OK <b id="pjOk">0</b></span> ／ <span class="ng">エラー <b id="pjNg">0</b></span>
       ／ 取り込まない <b id="pjSkip">0</b> 件 ／ アサインに入る人：<b id="pjPeople">0</b> 名
+      <br>ECSとの違い：🆕 新しい案件 <b id="pjDiffNew">0</b> 件 ／ ✏️ 変わる案件 <b id="pjDiffChanged">0</b> 件
+      ／ ✅ 変化なし <b id="pjDiffSame">0</b> 件
     </div>
     <div id="pjWarn"></div>
     <p class="pj-lead" style="margin:0 2px 8px;">
@@ -357,7 +369,7 @@
             <th>件</th><th>取込</th><th>判定</th>
             <th class="pj-col-date">日程</th><th class="pj-col-name">コンテンツ</th>
             <th class="pj-col-client">顧客名</th><th class="pj-col-count">運営人数</th>
-            <th class="pj-col-dup">すでにある案件</th>
+            <th class="pj-col-dup">ECSとどう違うか</th>
             <th>入る人</th><th>理由・注意</th>
           </tr>
         </thead>
@@ -391,6 +403,11 @@
   //   元の値を使った案内が出せなくなるため。
   var pjEdits = {};
 
+  // 「取込」のチェックを人が自分で触った案件（鍵＝CSVの何件目か）。
+  // ⚠ 変化なしの案件は自動でチェックを外すので、人が入れ直したものを
+  //   確かめ直しのたびに外してしまわないように、触ったかどうかを覚えておく。
+  var pjSkipDecided = {};
+
   function pjEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
@@ -420,9 +437,26 @@
     }
 
     var rows = data.rows || [];
-    var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0, cxlCount = 0;
+
+    // ECSと中身が同じ案件は、はじめから「取り込まない」にしておく（2026-09-10 baba要望）。
+    // ⚠ なぜ＝毎日読み込む使い方をするので、変わったものだけが目に入るようにするため。
+    //    そのまま取り込むと、中身は同じでもアサインを消して入れ直すので
+    //    「誰がいつ確定したか」の記録だけが毎日書き換わってしまう。
+    // ⚠ 人がチェックを触った案件は、その判断を勝手に戻さない（pjSkipDecided に覚える）。
     rows.forEach(function (r) {
-      if (r.skip) { skipCount++; return; }   // 取り込まない件は数に入れない
+      var same = r.diff && r.diff.kind === 'same';
+      r._skip = !!r.skip || (same && !pjSkipDecided[r.index]);
+    });
+
+    var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0, cxlCount = 0;
+    var newCount = 0, chgCount = 0, sameCount = 0;
+    rows.forEach(function (r) {
+      // ECSとの違いは、取り込む／取り込まないに関わらず数える（今の食い違いを知るため）。
+      var kind = (r.diff && r.diff.kind) || 'new';
+      if (!r.cancelled && !(r.errors && r.errors.length)) {
+        if (kind === 'same') { sameCount++; } else if (kind === 'changed') { chgCount++; } else { newCount++; }
+      }
+      if (r._skip) { skipCount++; return; }   // 取り込まない件は数に入れない
       // キャンセルの印が付いた終わった案件は取り込まない（2026-09-01 baba要望）。
       // ⚠ 判定はサーバー（下見と取込で同じもの）が付けた印を使う。ここで判定し直さない。
       if (r.cancelled) { cxlCount++; return; }
@@ -434,8 +468,28 @@
     document.getElementById('pjNg').textContent = ngCount;
     document.getElementById('pjSkip').textContent = skipCount;
     document.getElementById('pjPeople').textContent = peopleCount;
+    document.getElementById('pjDiffNew').textContent = newCount;
+    document.getElementById('pjDiffChanged').textContent = chgCount;
+    document.getElementById('pjDiffSame').textContent = sameCount;
 
     var w = '';
+    // ECSとの違いを、いちばん上に出す（2026-09-10 baba要望＝二重管理の解消）。
+    // ⚠ 数え直しはしない。サーバー（SheetDiff）が付けた印をそのまま数えたもの。
+    if (rows.length > 0) {
+      if (newCount === 0 && chgCount === 0) {
+        w += '<div class="pj-flash ok"><b>✅ ECSはこのシートと同じ中身です。</b>'
+          + '取り込む必要はありません（変化なし ' + sameCount + '件）。</div>';
+      } else {
+        w += '<div class="pj-flash warn"><b>ECSに反映されていない案件が ' + (newCount + chgCount) + '件あります。</b>'
+          + '<br>🆕 新しい案件 <b>' + newCount + '件</b>'
+          + '／✏️ 中身が変わる案件 <b>' + chgCount + '件</b>'
+          + (sameCount > 0
+            ? '<br>✅ 変化のない ' + sameCount + '件は、はじめから<b>「取込」のチェックを外して</b>あります'
+              + '（そのまま取り込んでも中身は変わらないため）。取り込みたいときはチェックを入れてください。'
+            : '')
+          + '</div>';
+      }
+    }
     if (data.isMonthly) {
       w += '<div class="pj-flash">月ごとのアサイン表（1案件＝横1ブロック）として読みました。'
         + '日程の年は、ファイル名の「202701」のような数字から補っています。</div>';
@@ -482,18 +536,18 @@
       if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
       if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
       if (r.cancelled) { notes.unshift('キャンセルの印が付いているので取り込みません'); }
-      var cls = (r.skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
+      var cls = (r._skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
       return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '">'
         + '<td>' + pjEsc(r.label) + '</td>'
         + '<td style="text-align:center;">'
           + '<input type="checkbox" data-f="skip" onchange="pjToggleSkip(this)"'
-          + ' title="チェックを外すと、この案件は取り込みません"' + (r.skip ? '' : ' checked') + '></td>'
-        + '<td>' + (r.skip ? '—' : (r.cancelled ? 'キャンセル' : (ok ? 'OK' : 'エラー'))) + '</td>'
+          + ' title="チェックを外すと、この案件は取り込みません"' + (r._skip ? '' : ' checked') + '></td>'
+        + '<td>' + (r._skip ? '—' : (r.cancelled ? 'キャンセル' : (ok ? 'OK' : 'エラー'))) + '</td>'
         + '<td>' + pjInput('date', r.date, 'date') + '</td>'
         + '<td>' + pjInput('name', r.name, 'text') + '</td>'
         + '<td>' + pjInput('client', r.client, 'text') + '</td>'
         + '<td>' + pjCountInput(r) + '</td>'
-        + '<td>' + pjDupCell(r) + '</td>'
+        + '<td>' + pjDiffCell(r) + '</td>'
         + '<td>' + pjEsc(r.people) + ' 名</td>'
         + '<td class="' + (ok ? 'pj-miss' : 'pj-reason') + '">' + pjEsc(notes.join(' / ')) + '</td>'
         + '</tr>';
@@ -552,11 +606,10 @@
   //     シートで時間や人数を直して取り込み直すと同じ案件が増えていた（babaの報告）。
   function pjDupCell(r) {
     var d = r.dup || {};
-    if (d.kind === 'same') {
-      return '<span class="pj-dup-same" title="開催日・コンテンツ・顧客名・集合時間まで同じ案件です">上書き</span>';
-    }
+    // 新規・上書きの言葉は「ECSとどう違うか」（pjDiffCell）が出すので、ここは
+    // **人に選んでもらうときだけ**中身を返す（同じことを2か所に書かない）。
     if (d.kind !== 'similar') {
-      return '<span class="pj-dup-new">新規</span>';
+      return '';
     }
     var more = (d.count > 1) ? ('<div class="pj-dup-note">似た案件が' + d.count + '件あります</div>') : '';
     return '<div class="pj-dup-ask">'
@@ -568,10 +621,53 @@
       + '</select></div>';
   }
 
+  /**
+   * 取り込むとECSの中身がどう変わるか（2026-09-10 baba要望）。
+   *
+   * 【なぜ要るか】ECSとアサイン表の二重管理をしていて、どこまで反映したか分からなかった。
+   *   「上書き」と出ていても、中身がECSと同じなのか違うのかが分からなかったため。
+   *
+   * ⚠ 判定はサーバーが1か所でやっている（差分＝App\Support\SheetDiff／
+   *   似た案件＝findExisting）。ここでは出すだけ・判定し直さない。
+   */
+  function pjDiffCell(r) {
+    var d = r.diff || {};
+    var head;
+    if (d.kind === 'same') {
+      head = '<div class="pj-diff-same" title="取り込んでもECSの中身は変わりません">✅ 変化なし</div>';
+    } else if (d.kind === 'changed') {
+      head = '<div class="pj-diff-changed">✏️ 変わります' + pjDiffList(d) + '</div>';
+    } else {
+      head = '<div class="pj-diff-new">🆕 新しい案件</div>';
+    }
+
+    // 似た案件があるときは、この下に「同じ案件か別の案件か」の選択が続く。
+    return head + pjDupCell(r);
+  }
+
+  // 変わる項目・人の一覧。多いときは4件だけ出して残りは件数にする（表がのびないように）。
+  function pjDiffList(d) {
+    var items = (d.changes || []).map(function (c) {
+      return '<li>' + pjEsc(c.label) + '：' + pjEsc(c.was) + ' → <b>' + pjEsc(c.now) + '</b></li>';
+    });
+    var p = d.people || {};
+    (p.add || []).forEach(function (n) { items.push('<li>人が増える：<b>' + pjEsc(n) + '</b></li>'); });
+    (p.remove || []).forEach(function (n) { items.push('<li>人が外れる：<b>' + pjEsc(n) + '</b></li>'); });
+    (p.role || []).forEach(function (n) { items.push('<li>ポジション変更：<b>' + pjEsc(n) + '</b></li>'); });
+    if (!items.length) { return ''; }
+
+    var rest = items.length - 4;
+    return '<ul class="pj-diff-list">' + items.slice(0, 4).join('')
+      + (rest > 0 ? '<li>ほか ' + rest + '件</li>' : '') + '</ul>';
+  }
+
   // 「取込」のチェックを外した行は、その場で灰色にする（判定のやり直しを待たずに分かるように）。
   function pjToggleSkip(el) {
     var tr = el.closest('tr');
     if (!tr) return;
+    // 人が自分で決めた案件は、確かめ直しても勝手に戻さない
+    //（変化なしの自動チェック外しが、人の判断を上書きしないように）。
+    pjSkipDecided[tr.dataset.index] = true;
     tr.classList.toggle('row-skip', !el.checked);
   }
 
@@ -663,6 +759,7 @@
     }
     // 入れ方を変えたら、前の読み込み結果と直しは持ち越さない。
     pjEdits = {};
+    pjSkipDecided = {};
     document.getElementById('pjEdits').value = '';
     document.getElementById('pjResult').style.display = 'none';
   }
@@ -692,6 +789,7 @@
   function pjPasteRead() {
     if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }
     pjEdits = {};
+    pjSkipDecided = {};
     document.getElementById('pjEdits').value = '';
     pjPost('');
   }
@@ -700,6 +798,7 @@
     if (!file) return;
     // 別のファイルを選び直したら、前のファイルへの直しは持ち越さない。
     pjEdits = {};
+    pjSkipDecided = {};
     document.getElementById('pjEdits').value = '';
     document.getElementById('pjFileName').textContent = '選んだファイル：' + file.name;
     pjPost('');

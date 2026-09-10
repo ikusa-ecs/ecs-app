@@ -16,6 +16,7 @@ use App\Support\OfficeScope;
 use App\Support\PersonLookup;
 use App\Support\ProjectImportColumns;
 use App\Support\RequiredCountEstimate;
+use App\Support\SheetDiff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -376,6 +377,10 @@ class PastProjectImportController extends Controller
         // ⚠ 下見と取込で判定を必ずそろえる（片方だけ直すと「入るはずが入らない」になる）。
         //   終わった案件のときだけ、キャンセルの印が付いたものを取り込まない。
         $mode = $this->targetMode($request);
+        // 差分を出すために「入れる中身」を作るので、拠点も取込と同じ決め方で持つ。
+        // ⚠ 登録拠点そのものは差分にしない（シートに書かれていない＝画面で選ぶ値なので、
+        //   混ぜると毎回「変わります」と出て本当の差分が埋もれる。正本＝SheetDiff）。
+        $office = $this->targetOffice($request);
 
         $read = $this->readCsv($request);
         if ($read['error'] !== null) {
@@ -411,6 +416,26 @@ class PastProjectImportController extends Controller
                 $unknownRoles[$r] = true;
             }
 
+            // すでに入っている案件をさがすのは、この1回だけ（重なりの表示と差分の両方で使う）。
+            $found = $info['errors']
+                ? ['exact' => null, 'similar' => null, 'similarCount' => 0]
+                : $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null);
+
+            // 取込を押したら「ECSの中身が実際にどう変わるか」（2026-09-10 baba要望）。
+            //
+            // 【なぜ要るか】ECSとアサイン表の二重管理をしていて、どこまで反映したかが分からない。
+            //   「上書き」と出ていても、中身がECSと同じなのか違うのかはこれまで分からなかった。
+            //
+            // ⚠ 入れる中身を作るのは**取込とまったく同じ projectAttributes**。
+            //   画面用にここで作り直さない（作り直すと「変化なし」と出たのに書き換わる事故になる）。
+            $diff = ['kind' => 'new', 'changes' => [], 'people' => ['add' => [], 'remove' => [], 'role' => []]];
+            if (! $info['errors']) {
+                $attrs = $this->projectAttributes($get, $info['name'], (string) $info['date'], $info['count'],
+                    $info['client'], $info['meetTime'] ?? null, $office, $mode, $assignments !== [],
+                    $this->countFor($get, $info['name'], $info['count']));
+                $diff = SheetDiff::forCase($attrs, SheetDiff::target($found, $edit), $assignments, $info['date']);
+            }
+
             $rows[] = [
                 // 何件目か＝画面で直した内容を、取り込みのときに同じ案件へ当てるための鍵。
                 'index' => $i,
@@ -421,7 +446,9 @@ class PastProjectImportController extends Controller
                 'cancelled' => $mode !== self::MODE_FUTURE && $get('キャンセル') !== '',
                 // すでに入っている案件との重なり（2026-09-01 baba要望）。
                 // ⚠ 判定は findExisting の1か所（下見と取込で同じ）。画面で判定し直さない。
-                'dup' => $this->dupInfo($info, $get, $edit),
+                'dup' => $this->dupInfo($info, $found, $edit),
+                // 取込で書き換わる項目・人（new＝新規／changed＝変わる／same＝変化なし）。
+                'diff' => $diff,
                 'label' => $entry['label'],
                 'date' => $info['date'],
                 'name' => $info['name'],
@@ -555,10 +582,10 @@ class PastProjectImportController extends Controller
             // 同じ案件があるか。⚠ 探し方の正本は findExisting（下見とまったく同じものを使う）。
             //   「似ているだけ」の案件を上書きするかどうかは、下見で人が選んだ印（asNew）で決める。
             $found = $this->findExisting($date, $name, $client, $meetTime);
-            $existing = $found['exact'];
-            if (! $existing && ! ($edit['asNew'] ?? false)) {
-                $existing = $found['similar'];
-            }
+            // ⚠ どの案件に上書きするかの決め方は SheetDiff::target の1か所にまとめてある。
+            //   下見（差分の表示）と取込がここで食い違うと、「変化なし」と出した案件を
+            //   別の案件に上書きする、という最悪の事故になる。
+            $existing = SheetDiff::target($found, $edit);
 
             // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
             $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
@@ -1111,14 +1138,13 @@ class PastProjectImportController extends Controller
      * @return array{kind:string, asNew:bool, was:string, now:string, count:int}
      *   kind: ''＝新しい案件／'same'＝完全に同じ（黙って上書き）／'similar'＝似ている（人に聞く）
      */
-    private function dupInfo(array $info, callable $get, array $edit): array
+    private function dupInfo(array $info, array $found, array $edit): array
     {
         $none = ['kind' => '', 'asNew' => false, 'was' => '', 'now' => '', 'count' => 0];
         if ($info['errors']) {
             return $none;   // そもそも入れられない行は聞かない
         }
 
-        $found = $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null);
         if ($found['exact']) {
             return ['kind' => 'same', 'asNew' => false, 'was' => '', 'now' => '', 'count' => 0];
         }
