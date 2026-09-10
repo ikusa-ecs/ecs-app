@@ -177,7 +177,10 @@ class ProjectHistoryTest extends TestCase
         $this->actingAsPerson($employee)->get('/project-form?project=' . urlencode($project->id))->assertOk();
     }
 
-    /** 管理者は全拠点の履歴を見られる。 */
+    /**
+     * 管理者は全拠点の履歴を見られる。
+     * ⚠ 2026-09-10 から**はじめは自分の拠点**なので、全拠点は `office=all` を付けて開く。
+     */
     public function test_manager_sees_all_offices(): void
     {
         $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
@@ -186,7 +189,7 @@ class ProjectHistoryTest extends TestCase
         $this->actingAsPerson($manager);
         $other->update(['note' => '大阪のメモ']);
 
-        $res = $this->actingAsPerson($manager)->get('/project-history?period=all');
+        $res = $this->actingAsPerson($manager)->get('/project-history?period=all&office=all');
 
         $res->assertOk();
         $res->assertSee('大阪の案件');

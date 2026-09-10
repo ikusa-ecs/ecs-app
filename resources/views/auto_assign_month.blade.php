@@ -167,10 +167,10 @@
 
 {{-- 月の切替。⚠ 拠点も落とさない（落とすと全社に戻って驚く）。 --}}
 <div class="am-month">
-  <a href="?{{ http_build_query(array_filter(['period' => $prevPeriod, 'office' => $officeScope])) }}" title="前の月へ">◀</a>
+  <a href="?{{ http_build_query(array_filter(['period' => $prevPeriod, 'office' => \App\Support\OfficeScope::param($officeScope)])) }}" title="前の月へ">◀</a>
   <span class="lbl">{{ $periodLabel }}</span>
-  <a href="?{{ http_build_query(array_filter(['period' => $nextPeriod, 'office' => $officeScope])) }}" title="次の月へ">▶</a>
-  <a class="{{ $isThisMonth ? 'on' : '' }}" href="?{{ http_build_query(array_filter(['office' => $officeScope])) }}" title="今月に戻す">今月</a>
+  <a href="?{{ http_build_query(array_filter(['period' => $nextPeriod, 'office' => \App\Support\OfficeScope::param($officeScope)])) }}" title="次の月へ">▶</a>
+  <a class="{{ $isThisMonth ? 'on' : '' }}" href="?{{ http_build_query(array_filter(['office' => \App\Support\OfficeScope::param($officeScope)])) }}" title="今月に戻す">今月</a>
 </div>
 
 @include('partials.office_switch')
@@ -194,7 +194,8 @@
 @if (count($candidateDays) > 0)
 <form method="GET" action="/auto-assign-month" class="am-skip" id="skipForm">
   <input type="hidden" name="period" value="{{ $period }}">
-  @if ($officeScope)<input type="hidden" name="office" value="{{ $officeScope }}">@endif
+  {{-- ⚠ 全拠点（all）のときも必ず持っていく。省くと「はじめは自拠点」に戻ってしまう。 --}}
+  <input type="hidden" name="office" value="{{ \App\Support\OfficeScope::param($officeScope) }}">
   <span class="s-label">この日はアサインしない（チェックした日は自動で入れません）：</span>
   <div class="s-days">
     @foreach ($candidateDays as $day => $cnt)
@@ -260,7 +261,7 @@
     </div>
   @endif
   @if (count($skipDays) > 0 || count($skipProjects) > 0 || count($includeHandMade) > 0)
-    <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => $officeScope])) }}">チェックを全部外す（日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} 除外中）</a>
+    <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => \App\Support\OfficeScope::param($officeScope)])) }}">チェックを全部外す（日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} 除外中）</a>
   @endif
 </form>
 @endif
@@ -285,7 +286,8 @@
         onsubmit="return confirm('{{ $periodLabel }}の {{ $plan['totals']['projects'] }}件に、{{ $plan['totals']['added'] }}名を「仮」で入れます。よろしいですか？（あとから「この回を取り消す」で戻せます）');">
     @csrf
     <input type="hidden" name="period" value="{{ $period }}">
-    <input type="hidden" name="office" value="{{ $officeScope }}">
+    {{-- ⚠ 下見と実行で拠点がズレると「見たものと違うものが入る」ので、必ず同じ値を送る。 --}}
+    <input type="hidden" name="office" value="{{ \App\Support\OfficeScope::param($officeScope) }}">
     {{-- ⚠ 除外した日は実行にも必ず持っていく。ここを忘れると
          「チェックしたのに入ってしまった」になる。 --}}
     @foreach ($skipDays as $d)

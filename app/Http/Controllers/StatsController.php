@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\EventCount;
 use App\Support\HireDate;
+use App\Support\OfficeScope;
 use App\Support\ProjectScale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -203,11 +204,18 @@ class StatsController extends Controller
         // 選んだ期間の案件だけに絞る。
         $inPeriod = $projects->filter(fn (Project $p) => $this->periodKey($p->start_date, $span) === $selected)->values();
 
-        // 表示範囲＝全拠点（既定）／特定の拠点。拠点を選んだら、その拠点のイベントだけに絞る＝
+        // 表示範囲＝自分の拠点（既定）／ほかの拠点／全拠点。拠点を選んだら、その拠点のイベントだけに絞る＝
         // 以降の集計（イベント数・規模・他拠点・出勤・部署・社員・スタッフ）すべてがその拠点の情報になる（baba 2026-07-27）。
+        // ⚠ 2026-09-10 baba要望＝**はじめは自分の拠点**（以前は全拠点だった）。全拠点は ?office=all。
+        //   ⚠ 誰が何を見られるかは変えていない（この画面は前から、全拠点も他拠点も選べる）。
         $scopeOffice = (string) $request->query('office', '');
-        if (! in_array($scopeOffice, self::OFFICE_ORDER, true)) {
-            $scopeOffice = '';   // 全拠点
+        if ($scopeOffice === OfficeScope::ALL) {
+            $scopeOffice = '';   // 全拠点をわざわざ選んだとき
+        } elseif (! in_array($scopeOffice, self::OFFICE_ORDER, true)) {
+            // 未指定・知らない拠点 → 自分の拠点。拠点マスタに無い名前のときだけ全拠点にする
+            // （どの数字も出ない画面になって「壊れた」と見えるのを防ぐため）。
+            $mine = OfficeScope::mine();
+            $scopeOffice = in_array($mine, self::OFFICE_ORDER, true) ? $mine : '';
         }
 
         // 所属（イベプラ／セールス／クリエイティブ／その他）で絞る（FB No.10・baba 2026-09-03）。
@@ -464,7 +472,9 @@ class StatsController extends Controller
         });
 
         // いまの条件ひとそろい（画面のリンクとCSVで同じものを使う）。
-        $query = ['span' => $span, 'period' => $selected, 'office' => $scopeOffice,
+        // ⚠ 拠点は必ずURLに載せる（全拠点＝空文字ではなく 'all'）。空にすると、期間や所属を
+        //   押し直しただけで「はじめは自分の拠点」に戻ってしまう。
+        $query = ['span' => $span, 'period' => $selected, 'office' => $scopeOffice === '' ? OfficeScope::ALL : $scopeOffice,
             'dept' => $deptCode, 'sort' => $sort];
 
         return [
@@ -487,8 +497,9 @@ class StatsController extends Controller
             'links'           => [
                 'span'   => collect(['month', 'quarter', 'year'])
                     ->mapWithKeys(fn ($s) => [$s => $this->statsLink($query, ['span' => $s, 'period' => ''])])->all(),
+                // キー ''＝「全拠点」のボタン。URLには 'all' で載せる（上の ⚠ と同じ理由）。
                 'office' => collect([''])->merge(self::OFFICE_ORDER)
-                    ->mapWithKeys(fn ($o) => [$o => $this->statsLink($query, ['office' => $o])])->all(),
+                    ->mapWithKeys(fn ($o) => [$o => $this->statsLink($query, ['office' => $o === '' ? OfficeScope::ALL : $o])])->all(),
                 'dept'   => collect([''])->merge(array_keys($deptOptions))
                     ->mapWithKeys(fn ($d) => [$d => $this->statsLink($query, ['dept' => $d])])->all(),
                 'sort'   => collect(['hire', 'count'])

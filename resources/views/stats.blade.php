@@ -230,7 +230,8 @@
 {{-- 選んだ粒度の中で、どの期間かを選ぶ。選ぶとGETで開き直す（拠点・所属・並び順も引き継ぐ）。 --}}
 <form method="GET" action="/stats" class="st-controls" id="stForm">
   <input type="hidden" name="span" value="{{ $span }}">
-  <input type="hidden" name="office" value="{{ $scopeOffice }}">
+  {{-- ⚠ 全拠点は空文字でなく 'all'。空にすると期間を選び直しただけで自拠点に戻ってしまう。 --}}
+  <input type="hidden" name="office" value="{{ $query['office'] }}">
   <input type="hidden" name="dept" value="{{ $deptCode }}">
   <input type="hidden" name="sort" value="{{ $sort }}">
   <span class="lbl">

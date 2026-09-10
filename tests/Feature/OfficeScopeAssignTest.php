@@ -83,17 +83,26 @@ class OfficeScopeAssignTest extends TestCase
         $this->assertNotContains($osakaOther->id, $ids, '関係のない他拠点の人は出さない');
     }
 
-    /** 管理者は既定で全拠点。?office= を付けたときだけ1拠点に絞られる。 */
-    public function test_manager_sees_all_offices_and_can_switch(): void
+    /**
+     * 管理者は**はじめは自分の拠点**（2026-09-10 baba要望）。
+     * `?office=all` で全拠点、`?office=拠点名` でその拠点。
+     */
+    public function test_manager_starts_at_own_office_and_can_switch(): void
     {
         $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
         $tokyoProject = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-09-05']);
         $osakaProject = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => '2026-09-06']);
 
-        $all = $this->actingAsPerson($manager)->get('/assign-director')
+        $start = $this->actingAsPerson($manager)->get('/assign-director')
             ->assertOk()
             ->original->getData();
-        $this->assertNull($all['officeScope'], '拠点未選択＝全拠点');
+        $this->assertSame('東京', $start['officeScope'], '何も選んでいなければ自分の拠点');
+        $this->assertSame([$tokyoProject->id], collect($start['cases'])->pluck('id')->all());
+
+        $all = $this->actingAsPerson($manager)->get('/assign-director?office=all')
+            ->assertOk()
+            ->original->getData();
+        $this->assertNull($all['officeScope'], 'office=all＝全拠点');
         $this->assertEqualsCanonicalizing(
             [$tokyoProject->id, $osakaProject->id],
             collect($all['cases'])->pluck('id')->all()

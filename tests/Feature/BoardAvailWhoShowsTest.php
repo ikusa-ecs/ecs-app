@@ -102,12 +102,15 @@ class BoardAvailWhoShowsTest extends TestCase
         $this->assertStringContainsString('ほかの拠点のため ${hiddenN}名を出していません', $html, '隠した理由の表示が消えています。');
     }
 
-    /** 全拠点で見る人（管理者以上）には、他拠点の人も出る。 */
+    /**
+     * 全拠点で見る人（管理者以上）には、他拠点の人も出る。
+     * ⚠ 2026-09-10 から**はじめは自分の拠点**なので、全拠点は `?office=all` を付けて開く。
+     */
     public function test_an_admin_sees_every_office(): void
     {
         $this->wants('S-OSA', 'オオサカ四郎', '大阪');
 
-        $html = $this->actingAsPerson($this->viewer('admin'))->get('/assign')->assertOk()->getContent();
+        $html = $this->actingAsPerson($this->viewer('admin'))->get('/assign?office=all')->assertOk()->getContent();
 
         $this->assertStringContainsString('S-OSA', $html, '全拠点で見ているのに他拠点の人が出ていません。');
     }

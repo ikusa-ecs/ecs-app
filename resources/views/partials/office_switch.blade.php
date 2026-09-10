@@ -1,6 +1,8 @@
 {{-- 拠点の表示切替スイッチ（全拠点運用・設計書19.2）。
      管理者・Administrator にだけ表示。一般社員・スタッフには出さない（自拠点固定）。
-     選んだ拠点は ?office= を付けて開き直し、サーバー側で案件を絞る。 --}}
+     選んだ拠点は ?office= を付けて開き直し、サーバー側で案件を絞る。
+     ⚠ 2026-09-10 baba要望＝**はじめは自分の拠点**が選ばれている（以前は全拠点だった）。
+        「全拠点」を見たいときは ?office=all（OfficeScope::ALL）。 --}}
 @php
     $__osCanSwitch = \App\Support\OfficeScope::canSeeAll();
     // osNoAll＝「全拠点」を出さない画面（公開ボードのように、まとめて操作すると事故になるもの）。
@@ -39,8 +41,9 @@
     <span style="font-size:11.5px;color:var(--muted,#8a7a6b);">（この画面は<b>1拠点ずつ</b>。まとめて公開する事故を防ぐため「全拠点」はありません）</span>
   @endif
   @unless ($__osNoAll)
-    <a class="os-chip {{ $__osSelected === '' ? 'active' : '' }}"
-       href="{{ request()->fullUrlWithQuery(['office' => '']) }}">全拠点</a>
+    {{-- ⚠ 「全拠点」は ?office=all。空文字にすると、月を動かすリンクなどで消えて自拠点に戻ってしまう。 --}}
+    <a class="os-chip {{ $__osSelected === \App\Support\OfficeScope::ALL ? 'active' : '' }}"
+       href="{{ request()->fullUrlWithQuery(['office' => \App\Support\OfficeScope::ALL]) }}">全拠点</a>
   @endunless
   @foreach ($__osOptions as $__of)
     <a class="os-chip {{ $__osSelected === $__of ? 'active' : '' }}"

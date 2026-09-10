@@ -79,10 +79,10 @@
          「今月は誰が多いか」が読めなかった（D決めの担当バランスは月単位なので数も合わなかった）。 --}}
     <div class="month-nav">
       {{-- ⚠ 月を動かしても、選んでいる拠点と所属を落とさないこと（落とすと全社に戻って驚く）。 --}}
-      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $prevPeriod, 'office' => $officeScope, 'dept' => $deptCode])) }}" title="前の月へ">◀</a>
+      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $prevPeriod, 'office' => \App\Support\OfficeScope::param($officeScope), 'dept' => $deptCode])) }}" title="前の月へ">◀</a>
       <span class="mon" id="monLabel">{{ $periodLabel }}</span>
-      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $nextPeriod, 'office' => $officeScope, 'dept' => $deptCode])) }}" title="次の月へ">▶</a>
-      <a class="mon-btn wide" href="?{{ http_build_query(array_filter(['office' => $officeScope, 'dept' => $deptCode])) }}" title="今月に戻す">今月</a>
+      <a class="mon-btn" href="?{{ http_build_query(array_filter(['ym' => $nextPeriod, 'office' => \App\Support\OfficeScope::param($officeScope), 'dept' => $deptCode])) }}" title="次の月へ">▶</a>
+      <a class="mon-btn wide" href="?{{ http_build_query(array_filter(['office' => \App\Support\OfficeScope::param($officeScope), 'dept' => $deptCode])) }}" title="今月に戻す">今月</a>
     </div>
     <div class="spacer"></div>
     <span class="live off" id="live"><span class="dot"></span><span id="liveText">案件一覧と未接続</span></span>

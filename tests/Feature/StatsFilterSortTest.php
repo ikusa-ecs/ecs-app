@@ -75,7 +75,9 @@ class StatsFilterSortTest extends TestCase
     {
         [$me] = $this->seedMembers();
 
-        $html = $this->actingAsPerson($me)->get('/stats')->assertOk()->getContent();
+        // ⚠ 拠点を選ぶと社員別が「部署ごとのカード」に分かれる（2026-09-10 から既定は自拠点）。
+        //    ここで見たいのは並び順だけなので、全社を1枚で見る `office=all` で開く。
+        $html = $this->actingAsPerson($me)->get('/stats?office=all')->assertOk()->getContent();
 
         $senior = strpos($html, 'センパイ太郎');
         $junior = strpos($html, 'コウハイ次郎');
@@ -91,7 +93,7 @@ class StatsFilterSortTest extends TestCase
     {
         [$me] = $this->seedMembers();
 
-        $html = $this->actingAsPerson($me)->get('/stats?sort=count')->assertOk()->getContent();
+        $html = $this->actingAsPerson($me)->get('/stats?sort=count&office=all')->assertOk()->getContent();
 
         $this->assertLessThan(strpos($html, 'ミテイ三郎'), strpos($html, 'コウハイ次郎'), '出勤3回の人が2回の人より上');
         $this->assertLessThan(strpos($html, 'センパイ太郎'), strpos($html, 'ミテイ三郎'), '出勤2回の人が1回の人より上');

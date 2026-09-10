@@ -80,7 +80,9 @@ class MonthAutoAssignController extends Controller
     /** 計画どおりに保存する（すべて「仮」）。 */
     public function run(Request $request)
     {
-        $office = OfficeScope::filter($request);
+        // ⚠ 実行はPOST＝拠点はURLでなくフォームから届く。`filter()` はURLしか見ないので、
+        //   ここで受け取らないと「下見は名古屋・実行は別の拠点」になる。
+        $office = OfficeScope::fromValue($request->input('office'));
         $period = $this->targetPeriod($request);
 
         // ⚠ プレビューのあとに誰かが手で入れているかもしれないので、**作り直してから**保存する
@@ -137,7 +139,7 @@ class MonthAutoAssignController extends Controller
             $run->update(['added' => $added]);
         });
 
-        return redirect('/auto-assign-month?'.http_build_query(array_filter(['period' => $period, 'office' => $office])))
+        return redirect('/auto-assign-month?'.http_build_query(array_filter(['period' => $period, 'office' => OfficeScope::param($office)])))
             ->with('status', $added > 0
                 ? "自動アサインしました。{$added}名を「仮」で入れました。内容を確かめて、必要なところは手で直してください。"
                 : '入れられる人がいませんでした。稼働希望が出ているか確かめてください。');
@@ -179,7 +181,7 @@ class MonthAutoAssignController extends Controller
         }
 
         return redirect('/auto-assign-month?'.http_build_query(array_filter([
-            'period' => $run->period, 'office' => $run->office,
+            'period' => $run->period, 'office' => OfficeScope::param($run->office),
         ])))->with('status', $msg);
     }
 

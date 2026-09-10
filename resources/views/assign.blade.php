@@ -1946,8 +1946,14 @@
   function ymd(d){ const m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+m+'-'+day; }
 
   // 基準日を変えてボードを開き直す（空文字＝今日に戻る）。focus 等の他パラメータは引き継がない。
+  // ⚠ 「表示する拠点」だけは引き継ぐ（2026-09-10）。落とすと、日付を動かしただけで
+  //    選んでいた拠点が自分の拠点に戻ってしまう。
   function jumpToDate(v){
-    location.href = (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? ('/assign?from=' + v) : '/assign';
+    const office = new URLSearchParams(location.search).get('office');
+    const q = [];
+    if (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) { q.push('from=' + encodeURIComponent(v)); }
+    if (office) { q.push('office=' + encodeURIComponent(office)); }
+    location.href = q.length ? ('/assign?' + q.join('&')) : '/assign';
   }
   // 今の基準日から n 日ずらして開き直す（◀▶ボタン用）。
   function shiftAnchor(n){

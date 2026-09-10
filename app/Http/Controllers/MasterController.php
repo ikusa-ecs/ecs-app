@@ -25,11 +25,16 @@ class MasterController extends Controller
         // 並びは「並び順（▲▼で決めたもの）→ ID」。拠点と同じ考え方。
         $contents = Content::orderBy('sort_order')->orderBy('id')->get();
 
-        // 「拠点ごとの選択肢」で編集中の拠点（既定＝拠点マスタの先頭＝ふつうは東京）。
+        // 「拠点ごとの選択肢」で編集中の拠点。
+        // ⚠ 2026-09-10 baba要望＝**はじめは自分の拠点**（以前は拠点マスタの先頭＝いつも東京だった）。
+        //   自分の拠点が拠点マスタに無いときだけ、先頭の拠点にする。
         $offices = \App\Support\OfficeScope::options();
         $optionOffice = (string) $request->query('office', '');
         if (! in_array($optionOffice, $offices, true)) {
-            $optionOffice = $offices[0] ?? \App\Support\OfficeScope::DEFAULT_OFFICE;
+            $mine = \App\Support\OfficeScope::mine();
+            $optionOffice = in_array($mine, $offices, true)
+                ? $mine
+                : ($offices[0] ?? \App\Support\OfficeScope::DEFAULT_OFFICE);
         }
         $optionTexts = [];
         foreach (array_keys(\App\Support\OfficeOptions::KINDS) as $kind) {

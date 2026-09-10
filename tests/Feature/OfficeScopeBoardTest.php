@@ -58,16 +58,24 @@ class OfficeScopeBoardTest extends TestCase
         }
     }
 
-    /** 管理者は既定で全拠点。?office= を付けたときだけ絞られる（日別ボード）。 */
+    /**
+     * 管理者は**はじめは自分の拠点**（2026-09-10 baba要望）。
+     * `?office=all` で全拠点、`?office=拠点名` でその拠点（日別ボード）。
+     */
     public function test_board_screens_let_manager_switch_office(): void
     {
         $manager = PersonFactory::new()->manager()->create(['office' => '東京']);
         $tokyo = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
         $osaka = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon(4)]);
 
-        $all = $this->actingAsPerson($manager)->get('/assign')
+        $start = $this->actingAsPerson($manager)->get('/assign')
             ->assertOk()->original->getData();
-        $this->assertNull($all['officeScope']);
+        $this->assertSame('東京', $start['officeScope'], '何も選んでいなければ自分の拠点');
+        $this->assertSame([$tokyo->id], collect($start['boardCases'])->pluck('id')->all());
+
+        $all = $this->actingAsPerson($manager)->get('/assign?office=all')
+            ->assertOk()->original->getData();
+        $this->assertNull($all['officeScope'], 'office=all＝全拠点');
         $this->assertEqualsCanonicalizing(
             [$tokyo->id, $osaka->id],
             collect($all['boardCases'])->pluck('id')->all()
