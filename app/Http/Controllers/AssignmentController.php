@@ -17,6 +17,7 @@ use App\Support\AssignmentStamp;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ProjectSeries;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -143,8 +144,17 @@ class AssignmentController extends Controller
         // NGペア同席の判定に使う「この案件にすでに入っている人の氏名」。
         $memberNames = Person::whereIn('id', array_keys($existing))->pluck('name')->all();
 
+        // 連日イベント（同じ案件を何日かに分けて開催）の「ほかの日」にエントリーしている人。
+        // 2026-09-15 baba「複数出れる方を優先します」（FBシート No.16）。
+        // ⚠ まとまりの見分け方の正本＝App\Support\ProjectSeries。ここで数え直さない。
+        $siblingIds = ProjectSeries::siblingIds($project);
+        $seriesEntryIds = $siblingIds
+            ? Application::whereIn('project_id', $siblingIds)->pluck('staff_id')->unique()->all()
+            : [];
+
         $scorer = (new AssignmentScorer(
-            $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP
+            $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP,
+            $seriesEntryIds
         ))->setProjectMemberNames($memberNames);
 
         // ── 候補スタッフを拠点で絞る（全拠点運用・2026-08-05 baba確定＝アサイン画面は第1弾）──

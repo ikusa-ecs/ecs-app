@@ -12,6 +12,7 @@ use App\Support\StaffProjectNews;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
+use App\Support\ProjectSeries;
 use App\Support\ProfileOptions;
 use App\Support\ProjectFormats;
 use App\Support\RecruitStatus;
@@ -633,7 +634,12 @@ class StaffPortalController extends Controller
         // ⚠ 以前は全国共通だったため、東京の締切が東北のスタッフにも出ていた（2026-08-25 baba）。
         $bulkDeadline = OfficeSettings::get(OfficeSettings::DEADLINE, $office);
 
-        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps) {
+        // 連日イベント（同じ案件を何日かに分けて開催）のまとまり。2026-09-15・FBシート No.16。
+        // ⚠ 画面に出ている案件だけで数えない（groupFor が取り直す）。
+        //   拠点や公開の絞り込みで隠れた日が抜けると「全3日なのに全2日」と出る。
+        $seriesGroups = ProjectSeries::groupFor($projects);
+
+        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups) {
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
@@ -667,6 +673,9 @@ class StaffPortalController extends Controller
                 'lodging' => $p->lodging ?? '無',
                 'dayType' => $p->date_type ?? '本番',
                 'parentId' => $p->parent_project_id,
+                // 連日イベント（⑦日目／全⑦日）。1日だけの案件は null。
+                // 数え方の正本＝App\Support\ProjectSeries（画面で数え直さない）。
+                'series' => ProjectSeries::positionOf($p, $seriesGroups),
                 'off' => $off,
                 // 募集人数は本来セールスが案件登録で入れる項目。まだ未定（空欄・0）のときは
                 // 画面が「満員」に見えてエントリーできなくなるので、既定 5名 として見せる（2026-08-20 baba）。

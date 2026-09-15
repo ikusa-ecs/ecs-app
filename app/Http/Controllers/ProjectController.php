@@ -726,6 +726,14 @@ class ProjectController extends Controller
             Project::create($attributes);
             $label = $publish ? '「募集中」で' : '下書きとして';
             $message = "案件「{$projectName}」を{$label}保存しました。（ID: {$id}）";
+
+            // 連日イベント＝2日目からの日程ぶんも、同じ内容で作って**同じイベントとして結ぶ**
+            // （2026-09-15・FBシート No.16）。結び方は既存の parent_project_id と同じ
+            // ＝まとまりの正本は App\Support\ProjectSeries。
+            $extra = $this->createSeriesDays($request, $id, $attributes);
+            if ($extra > 0) {
+                $message .= " 連日イベントとして、ほかに {$extra} 日ぶんの案件も作りました（全".($extra + 1).'日）。';
+            }
         }
 
         // 他の拠点にお願いする（ヘルプ／巻き取り）。2026-08-28 baba要望。
@@ -1283,6 +1291,57 @@ class ProjectController extends Controller
             ->max() ?? 0;
 
         return $prefix.str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * 連日イベント（同じ案件を複数日で開催）の「2日目から」を作る。2026-09-15・FBシート No.16。
+     *
+     * 【なぜ要るか】これまでは同じ内容を1日ずつ登録し直すしかなく、
+     * さらに「この3件は同じイベントです」という結び付きがどこにも残らなかった。
+     *
+     * 【決まり】
+     *  ・1日目＝上で保存した案件。2日目からをここで作り、`parent_project_id` に1日目を入れて結ぶ。
+     *    ⚠ 新しい列は作っていない。まとまりの見分け方の正本＝App\Support\ProjectSeries。
+     *  ・日程種別はすべて「本番」（予備日・リハ日・前日設営とは別もの）。
+     *  ・中身は1日目と同じ。**開催日と運営シートURLだけ**を入れ替える
+     *    （運営シートは日ごとに別のものを貼るため、コピーすると取り違える）。
+     *  ・公開は1日ずつ担当が行う＝作った時点では全部 非公開。
+     *  ・⚠ 読めない日付・1日目と同じ日・重複した日は黙って飛ばす（変な案件を増やさない）。
+     *
+     * @param  array<string, mixed>  $attributes  1日目の中身
+     * @return int 作った日数
+     */
+    private function createSeriesDays(Request $request, string $firstId, array $attributes): int
+    {
+        if (! $request->has('has_series')) {
+            return 0;
+        }
+
+        $first = (string) ($attributes['start_date'] ?? '');
+        $seen = [$first => true];
+        $made = 0;
+
+        foreach ((array) $request->input('series_dates', []) as $raw) {
+            $date = trim((string) $raw);
+            if ($date === '' || ! $this->isRealDate($date) || isset($seen[$date])) {
+                continue;
+            }
+            $seen[$date] = true;
+
+            $day = $attributes;
+            $day['id'] = $this->nextProjectId($date);
+            $day['start_date'] = $date;
+            $day['date_type'] = '本番';
+            $day['parent_project_id'] = $firstId;
+            $day['staff_published'] = false;
+            // 運営シートは日ごとに別物。コピーすると1日目のシートを見て作業してしまう。
+            $day['ops_sheet_url'] = null;
+
+            Project::create($day);
+            $made++;
+        }
+
+        return $made;
     }
 
     /** 名前 → people のID（社員・スタッフ問わず先頭一致1件）。無ければ null。 */

@@ -216,6 +216,10 @@
     /* 中間：予備日・リハ */
     .tag-mini.yobi { background: var(--warn-soft);   color: #b45309; }
     .tag-mini.reha { background: #ece3d4;            color: #7a6a58; }
+    .tag-mini.setup { background: #dcfce7;           color: #166534; } /* 前日設営（2026-09-15） */
+    /* 連日イベントの「◯日目／全◯日」（2026-09-15）。
+       ⚠ 目立たせる＝「今日だけの仕事」と思って応募されるのを防ぐため。 */
+    .tag-mini.series { background: #1d4e89;          color: #fff; }
     /* 控えめ（参考情報）：大型・リピート */
     .tag-mini.size { background: #ece3d4;            color: #7a6a58; }
     .tag-mini.rep  { background: #f1ece2;            color: #8a7a66; }
@@ -596,6 +600,8 @@
     /* 小さなタグ（追加・宿泊は元から濃い色なのでそのまま） */
     html[data-theme="dark"] .tag-mini.yobi { color: var(--warn-ink); }
     html[data-theme="dark"] .tag-mini.reha { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .tag-mini.setup { background: var(--ok-soft); color: var(--ok-ink); }
+    html[data-theme="dark"] .tag-mini.series { background: var(--info-soft); color: var(--info-ink); }
     html[data-theme="dark"] .tag-mini.size { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .tag-mini.rep  { background: var(--chip-bg); color: var(--chip-ink); }
     /* 担当からの伝達・エラー表示 */
@@ -1258,6 +1264,9 @@
         id:c.id, content:c.content, client:c.client, place:c.place, meetPlace:c.meetPlace,
         area:c.area, format:c.fmt, fmtText:c.fmtText, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
+        // 連日イベント（◯日目／全◯日）。1日だけの案件は null。
+        // ⚠ ここで詰め替え忘れると、サーバーが送っていても画面に出ない。
+        series:c.series || null,
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
         // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
@@ -1399,7 +1408,11 @@
         let tags = '';
         if (j.extra)                tags += '<span class="tag-mini add">追加</span>';
         if (j.dayType === '予備日')  tags += '<span class="tag-mini yobi">予備日</span>';
-        else if (j.dayType === 'リハ') tags += '<span class="tag-mini reha">リハ</span>';
+        else if (j.dayType === 'リハ' || j.dayType === 'リハ日') tags += '<span class="tag-mini reha">リハ</span>';
+        else if (j.dayType === '前日設営') tags += '<span class="tag-mini setup">前日設営</span>';
+        // 連日イベントの印（2026-09-15・FBシート No.16）。
+        if (j.series) tags += '<span class="tag-mini series" title="連日イベントです。複数の日に出られる方を優先します。">'
+                            + j.series.idx + '日目／全' + j.series.total + '日</span>';
         tags += `<span class="fbadge ${fb.c}">${fb.t}</span>`;
         if (j.size === '大型')      tags += '<span class="tag-mini size">大型</span>';
         if (j.repeat)               tags += '<span class="tag-mini rep">リピート</span>';
@@ -1460,6 +1473,8 @@
           </div>
           ${String(j.staffNotes || '').trim() !== ''
             ? `<div class="jr-note"><span class="ic">📣</span><span>${escLines(j.staffNotes)}</span></div>` : ''}
+          ${j.series
+            ? `<div class="jr-note"><span class="ic">🗓</span><span><b>連日イベントです</b>（${escAttr(j.series.dates.join('・'))} の全${j.series.total}日。これは${j.series.idx}日目）。<br><b>複数の日に出られる方を優先します。</b>出られる日はそれぞれエントリーしてください。</span></div>` : ''}
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
           ${j.saveError ? `<div class="jr-error">⚠ ${escAttr(j.saveError)}</div>` : ''}
           <div class="jr-foot">

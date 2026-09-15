@@ -724,6 +724,32 @@
             </div>
           </div>
 
+          <!-- 連日イベント（2026-09-15・FBシート No.16 桑江さん）。
+               同じ案件を何日かに分けて開催するとき、ここで日程をまとめて足すと
+               1件ずつ登録し直さなくてよい。足した日程は自動で「同じイベント」として結ばれ、
+               スタッフ画面に「◯日目／全◯日」と出る。
+               ⚠ 上の「予備日・リハ日・前日設営」とは別もの。あちらは本番に付属する日、
+                  こちらは**本番そのものが複数日**という意味。
+               ⚠ ここは「そのまま出す区間」の中なので、Blade のコメント記号は使えない。 -->
+          <div class="form-row full non-arena" id="seriesRow">
+            <label>連日イベント</label>
+            <div class="check-row">
+              <input type="checkbox" id="hasSeries" name="has_series" onchange="toggleSeries()">
+              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント）</label>
+            </div>
+            <div class="sub-msg" id="seriesMsg">チェックしない場合、この案件は <b>1日だけ</b> の開催として登録されます。</div>
+
+            <div class="expand-box" id="seriesBox">
+              <div class="hint" style="margin-bottom:8px;">
+                上の「開催日」が<b>1日目</b>です。2日目からの日程をここに足してください。<br>
+                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（人数・コンテンツなどの中身は同じ内容で入ります）。<br>
+                ※ スタッフ画面には「◯日目／全◯日」と出て、<b>複数の日に出られる方を優先します</b>と案内します。
+              </div>
+              <div id="seriesDates"></div>
+              <button type="button" class="btn ghost sm" onclick="addSeriesDate()">＋ 日程を足す</button>
+            </div>
+          </div>
+
           <!-- 9. 運営場所 -->
           <div class="form-row full non-arena">
             <label>運営場所</label>
@@ -1117,7 +1143,56 @@
     const on = document.getElementById('hasSub').checked;
     document.getElementById('subBox').classList.toggle('open', on);
     document.getElementById('subMsg').style.display = on ? 'none' : '';
+    // ⚠ 連日イベントとは同時に使えない（2026-09-15）。あちらは本番そのものが複数日。
+    if (on) {
+      const ser = document.getElementById('hasSeries');
+      if (ser && ser.checked) { ser.checked = false; toggleSeries(); }
+    }
     onMultiChange(); // 日程種別チェックでも「次の日程を追加」ボタンの表示を更新
+  }
+
+  // ===== 連日イベント（2026-09-15・FBシート No.16）=====
+  // ⚠ 上の「予備日・リハ日・前日設営」とは同時に使えない（あちらは本番に付属する日、
+  //   こちらは本番そのものが複数日）。両方チェックされたら、あとから押したほうを残す。
+  function toggleSeries() {
+    const on = document.getElementById('hasSeries').checked;
+    document.getElementById('seriesBox').classList.toggle('open', on);
+    document.getElementById('seriesMsg').style.display = on ? 'none' : '';
+    if (on) {
+      const sub = document.getElementById('hasSub');
+      if (sub && sub.checked) { sub.checked = false; toggleSub(); }
+      if (!document.querySelector('#seriesDates input')) addSeriesDate();
+    }
+  }
+  // 2日目からの日程を1行足す。行は何行でも足せる（送るときは series_dates[] の配列）。
+  function addSeriesDate() {
+    const box = document.getElementById('seriesDates');
+    if (!box) return;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+    const n = box.children.length + 2;   // 1日目は上の「開催日」なので2から数える
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:12.5px; color:#6b5544; min-width:4.5em;';
+    label.textContent = n + '日目';
+    const input = document.createElement('input');
+    input.type = 'date';
+    input.name = 'series_dates[]';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn ghost sm';
+    del.textContent = '消す';
+    del.onclick = function () { row.remove(); renumberSeries(); };
+    row.appendChild(label); row.appendChild(input); row.appendChild(del);
+    box.appendChild(row);
+  }
+  // 行を消したあと「◯日目」を振り直す（消した行の番号が飛んだままだと分かりにくい）。
+  function renumberSeries() {
+    const box = document.getElementById('seriesDates');
+    if (!box) return;
+    Array.prototype.forEach.call(box.children, function (row, i) {
+      const sp = row.querySelector('span');
+      if (sp) sp.textContent = (i + 2) + '日目';
+    });
   }
 
   // ===== 前泊の集合時間：前泊ありのときだけ出す（2026-09-15・FBシート No.14）=====

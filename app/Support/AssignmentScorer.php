@@ -46,6 +46,15 @@ class AssignmentScorer
     /** @var array<int,string> この案件にすでに入っているスタッフの氏名一覧（NGペア判定用） */
     private array $projectMemberNames = [];
 
+    /**
+     * @var array<int,string> 連日イベントの「ほかの日」にもエントリーしている staff_id
+     *
+     * ⚠ 2026-09-15 baba「連携してスタッフの画面には同じ案件で複数出れる方を優先します」。
+     *   連日イベントは、日ごとに人が入れ替わるほど引き継ぎが増えて事故が起きやすい。
+     *   まとまりの見分け方の正本＝App\Support\ProjectSeries。
+     */
+    private array $seriesEntryIds = [];
+
     /** この案件が「朝案件」か（集合が早い）。寝坊傾向の減点に使う。 */
     private bool $isMorning;
 
@@ -58,7 +67,11 @@ class AssignmentScorer
         array $repeatStaffIds = [],
         array $projectContentNames = [],
         private int $monthCap = 20,
+        array $seriesEntryIds = [],
     ) {
+        // 連日イベント（同じ案件の別の日）にもエントリーしている人の staff_id。
+        // 2026-09-15 baba「複数出れる方を優先します」（FBシート No.16）。
+        $this->seriesEntryIds = array_values($seriesEntryIds);
         $this->wish = $wish;
         $this->sameDay = $sameDay;
         $this->monthCount = $monthCount;
@@ -118,6 +131,15 @@ class AssignmentScorer
                 $score += 15;
                 $reasons[] = '自社専属';
             }
+        }
+
+        // 連日イベントで、ほかの日にもエントリーしている＝通しで入れる人を優先する
+        // （2026-09-15 baba「複数出れる方を優先します」）。
+        // ⚠ 点は「本人が希望」と同じくらい重くする。日ごとに人が入れ替わると、
+        //   毎朝の説明と引き継ぎがやり直しになり、現場の事故が増えるため。
+        if (in_array($id, $this->seriesEntryIds, true)) {
+            $score += 30;
+            $reasons[] = '連日イベントの他の日にもエントリー';
         }
 
         // ── 第2優先：コンテンツ・メンバーとの相性 ───────────────────
