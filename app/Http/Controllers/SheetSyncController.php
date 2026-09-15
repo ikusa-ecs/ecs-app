@@ -6,8 +6,10 @@ use App\Models\SheetSync;
 use App\Support\MonthlySheetReader;
 use App\Support\OfficeScope;
 use App\Support\SheetSyncNotice;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * アサイン表の自動受け取り（2026-09-10 baba要望）。
@@ -73,7 +75,7 @@ class SheetSyncController extends Controller
             return $this->handleReport($request);
         }
 
-        $data = $request->validate([
+        $data = $this->check($request, [
             'book' => ['nullable', 'string', 'max:200'],
             'tab' => ['required', 'string', 'max:40'],
             'office' => ['nullable', 'string', 'max:20'],
@@ -154,6 +156,36 @@ class SheetSyncController extends Controller
     }
 
     /**
+     * 入力の確かめ。⚠ **必ずJSONで返す**（2026-09-15 に直した）。
+     *
+     * 【なぜ自前でやるか】
+     * `$request->validate()` は、入力が合わないと**画面に戻そうとして転送する**。
+     * この入口は機械（GAS）しか叩かないので、転送された先がログイン画面になり、
+     * GASには「HTMLが返ってきた」としか分からなかった（2026-09-15 に実際に踏んだ。
+     * ログに `<!DOCTYPE html>… ECS ログイン` と出て、何が悪いのか分からなかった）。
+     *
+     * ⚠ 機械用の入口は、失敗しても必ず機械が読める形で返すこと。
+     *
+     * @param  array<string, mixed>  $rules
+     * @return array<string, mixed>
+     */
+    private function check(Request $request, array $rules): array
+    {
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            throw new HttpResponseException(response()->json([
+                'ok' => false,
+                'message' => '送られてきた中身が合いません：'
+                    .implode(' / ', $validator->errors()->all()),
+                'errors' => $validator->errors()->toArray(),
+            ], 422));
+        }
+
+        return $validator->validated();
+    }
+
+    /**
      * 毎朝の「まとめ報告」をチャットワークへ1通流す（2026-09-15 baba要望）。
      *
      * 【なぜ月ごとではないか】
@@ -165,7 +197,7 @@ class SheetSyncController extends Controller
      */
     private function handleReport(Request $request)
     {
-        $data = $request->validate([
+        $data = $this->check($request, [
             'office' => ['nullable', 'string', 'max:20'],
             'sent' => ['nullable', 'integer', 'min:0', 'max:999'],
             'changed' => ['nullable', 'integer', 'min:0', 'max:999'],

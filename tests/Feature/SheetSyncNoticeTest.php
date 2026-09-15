@@ -141,6 +141,26 @@ class SheetSyncNoticeTest extends TestCase
         Http::assertNothingSent();
     }
 
+    /**
+     * ⚠ 入力が合わないときも、**必ずJSONで返す**（HTMLの画面を返さない）。
+     *
+     * 2026-09-15 に実際に踏んだ：GASのログに `<!DOCTYPE html>… ECS ログイン` と出て、
+     * 何が悪いのか分からなかった。`$request->validate()` が「画面に戻そうとして転送する」ため。
+     * 機械しか叩かない入口なので、失敗しても機械が読める形で返すこと。
+     */
+    public function test_入力が合わなくてもJSONで返す(): void
+    {
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+
+        // rows が無い（受け取りのつもりで中身が足りない）。
+        $res = $this->post('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609']);
+
+        $res->assertStatus(422);
+        $this->assertStringStartsNotWith('<', (string) $res->getContent(), 'HTMLが返っています');
+        $res->assertJsonPath('ok', false);
+        $this->assertStringContainsString('中身が合いません', (string) $res->json('message'));
+    }
+
     /** 知らせに失敗しても、GAS側は止めない（受け取りは済んでいるため）。 */
     public function test_知らせに失敗しても200を返す(): void
     {
