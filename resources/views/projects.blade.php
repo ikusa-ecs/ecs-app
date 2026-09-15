@@ -1683,7 +1683,9 @@
   // 表とカレンダーの両方が使う。だから絞り込みはどちらの表示でも同じように効く。
   let currentView = 'list';   // 'list'＝表 ／ 'cal'＝カレンダー（既定は今までどおり表）
   let matchedNow  = [];       // 絞り込みを通った案件（applyFilter が毎回入れ替える）
-  const CAL_DOW   = ['月','火','水','木','金','土','日'];
+  // 曜日の文字（0=日 … 6=土）。並べる順は本人の設定＝ECS_WEEK_ORDER() が決める。
+  // ⚠ 2026-09-15 まではここに月曜はじまりで固定して書いていた（画面ごとに並びが違う原因）。
+  const CAL_DOW   = ['日','月','火','水','木','金','土'];
   const calCursor = new Date(todayY, todayM - 1, 1);   // カレンダーで見ている月の1日
 
   function switchView(view) {
@@ -1716,10 +1718,10 @@
     // 曜日の見出しは最初の1回だけ作る
     const dowEl = document.getElementById('calDow');
     if (dowEl && !dowEl.childNodes.length) {
-      CAL_DOW.forEach((d, i) => {
+      ECS_WEEK_ORDER().forEach((dw) => {
         const c = document.createElement('div');
-        c.className = 'cal-dow' + (i === 5 ? ' sat' : '') + (i === 6 ? ' sun' : '');
-        c.textContent = d;
+        c.className = 'cal-dow' + (dw === 6 ? ' sat' : '') + (dw === 0 ? ' sun' : '');
+        c.textContent = CAL_DOW[dw];
         dowEl.appendChild(c);
       });
     }
@@ -1734,7 +1736,7 @@
       monthCount++;
     });
 
-    const lead = (new Date(y, m, 1).getDay() + 6) % 7;   // 月曜始まりにするための先頭の空きマス
+    const lead = ECS_WEEK_LEAD(new Date(y, m, 1).getDay());   // 先頭の空きマス（週のはじまりは本人の設定）
     const days = new Date(y, m + 1, 0).getDate();        // その月の日数
     grid.innerHTML = '';
     for (let i = 0; i < lead; i++) {

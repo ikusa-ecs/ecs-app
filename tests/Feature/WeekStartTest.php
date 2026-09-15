@@ -83,14 +83,46 @@ class WeekStartTest extends TestCase
      * 画面が「自分で並べ替えを計算していない」こと。
      * ⚠ ここが崩れると、片方の画面だけ直して並びが食い違う（今回の発端がそれ）。
      */
+    /**
+     * カレンダーを出す画面ぜんぶ（2026-09-15 baba「出勤可能日以外も連動してほしい」）。
+     * ⚠ カレンダーを出す画面を足したら、ここにも1行足す。
+     */
+    private const CALENDAR_VIEWS = [
+        'employee_availability',  // 社員の出勤可能日
+        'mypage',                 // マイページのカレンダー
+        'staff_portal',           // スタッフ画面の稼働希望・確定アサイン
+        'dashboard',              // ダッシュボードのカレンダー
+        'projects',               // 案件一覧のカレンダー
+        'entries',                // エントリー一覧の希望カレンダー
+        'assign_director',        // D決めのカレンダー
+    ];
+
     public function test_画面は共通の部品だけを使う(): void
     {
-        foreach (['employee_availability', 'mypage', 'staff_portal'] as $view) {
+        foreach (self::CALENDAR_VIEWS as $view) {
             $blade = file_get_contents(resource_path("views/{$view}.blade.php"));
             $this->assertStringContainsString('ECS_WEEK_LEAD(', $blade,
                 "{$view} が週のはじまりの共通部品を使っていません");
+
+            // ⚠ 画面ごとに曜日をずらす計算を書き戻していないこと。
+            //   これをやると、また画面ごとに並びが食い違う（それが今回の発端）。
+            $this->assertStringNotContainsString('.getDay() + 6) % 7', $blade,
+                "{$view} に並べ替えの計算が直に書き戻されています");
             $this->assertStringNotContainsString('(firstDow + 6) % 7', $blade,
                 "{$view} に並べ替えの計算が直に書き戻されています");
+        }
+    }
+
+    /** ⚠ 曜日の見出しを「月火水木金土日」と直書きしていないこと（並びが固定されるため）。 */
+    public function test_曜日の見出しを直書きしていない(): void
+    {
+        foreach (self::CALENDAR_VIEWS as $view) {
+            $blade = file_get_contents(resource_path("views/{$view}.blade.php"));
+
+            $this->assertStringNotContainsString("['月','火','水','木','金','土','日']", $blade,
+                "{$view} に月曜はじまりの曜日見出しが直書きされています");
+            $this->assertStringNotContainsString('<div>月</div><div>火</div>', $blade,
+                "{$view} に月曜はじまりの曜日見出しが直書きされています");
         }
     }
 

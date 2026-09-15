@@ -126,7 +126,9 @@
         <div class="stat">
           <div class="label">今週の現場</div>
           <div class="value ok" id="kpiThisWeek">–</div>
-          <div class="sub" id="kpiThisWeekSub">今週（月〜日）に開催</div>
+          <!-- ⚠ ここはJSで日付の範囲に書き換わる（週のはじまりが本人の設定で変わるため）。
+               この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
+          <div class="sub" id="kpiThisWeekSub">今週に開催</div>
         </div>
         <div class="stat">
           <div class="label">今月の大型案件</div>
@@ -208,11 +210,13 @@
   var today = new Date(); today.setHours(0,0,0,0);
   var y = today.getFullYear(), m = today.getMonth();
 
-  // 今週（月曜〜日曜）の範囲
+  // 今週の範囲。⚠ 週のはじまりは**本人の設定**（2026-09-15 baba「連動してほしい」）。
+  //   日曜はじまりの人は 日〜土、月曜はじまりの人は 月〜日 で数える。
+  //   カレンダーの並びと数え方がズレると、「今週◯件」と見えている週が画面と違う。
   var weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // 月曜
+  weekStart.setDate(today.getDate() - ECS_WEEK_LEAD(today.getDay()));
   var weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6); // 日曜
+  weekEnd.setDate(weekStart.getDate() + 6);
 
   // 集計対象＝過去・下書きを除いた案件
   var cases = (window.ECS_CASES || []).filter(function(c){ return !c.archived && !c.draft; });
@@ -244,16 +248,19 @@
 
 /* ===== 危険日カレンダー ===== */
 (function(){
-  var DOW = ['月','火','水','木','金','土','日'];
+  // 曜日の文字（0=日 … 6=土）。並べる順は本人の設定＝ECS_WEEK_ORDER() が決める。
+  // ⚠ 2026-09-15 まではここに「月火水木金土日」と月曜はじまりで固定して書いていた。
+  //   画面ごとに並びが違う原因になるので、順番はここで決めない。
+  var DOW = ['日','月','火','水','木','金','土'];
   var today = new Date(); today.setHours(0,0,0,0);
   var cursor = new Date(today.getFullYear(), today.getMonth(), 1);
 
   // 曜日見出し（一度だけ）
   var dowEl = document.getElementById('calDow');
-  DOW.forEach(function(d, i){
+  ECS_WEEK_ORDER().forEach(function(dw){
     var c = document.createElement('div');
-    c.className = 'cal-dow' + (i===5?' sat':'') + (i===6?' sun':'');
-    c.textContent = d;
+    c.className = 'cal-dow' + (dw===6?' sat':'') + (dw===0?' sun':'');
+    c.textContent = DOW[dw];
     dowEl.appendChild(c);
   });
 
@@ -338,7 +345,7 @@
 
     var map = casesByDay(y, m);
     var firstDow = new Date(y, m, 1).getDay();           // 0=日
-    var lead = (firstDow + 6) % 7;                         // 月曜始まりの先頭空白
+    var lead = ECS_WEEK_LEAD(firstDow);                  // 先頭の空白（週のはじまりは本人の設定）
     var daysInMonth = new Date(y, m+1, 0).getDate();
 
     var grid = document.getElementById('calGrid');

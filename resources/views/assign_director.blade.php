@@ -555,9 +555,10 @@
       <div class="dir-layout">
         <!-- カレンダー -->
         <div class="cal">
-          <div class="cal-dow">
-            <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div>
-          </div>
+          <!-- 曜日の見出しは JavaScript で作る（並びが本人の設定＝日曜はじまり／月曜はじまりで変わるため）。
+               ⚠ 2026-09-15 まで「月火水木金土日」と直書きしていた＝ほかの画面と並びが食い違っていた。
+               ⚠ この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
+          <div class="cal-dow" id="calDow"></div>
           <div class="cal-grid" id="calGrid"></div>
         </div>
 
@@ -826,11 +827,25 @@
 
   // ===== カレンダー描画 =====
   const grid = document.getElementById('calGrid');
+
+  // 曜日の見出し（1回だけ作る）。並びは本人の設定（日曜はじまり／月曜はじまり）。
+  (function(){
+    const dowEl = document.getElementById('calDow');
+    if (!dowEl || dowEl.childNodes.length) return;
+    ECS_WEEK_ORDER().forEach(function(dw){
+      const c = document.createElement('div');
+      c.className = (dw === 0 ? 'sun' : (dw === 6 ? 'sat' : ''));
+      c.textContent = '日月火水木金土'[dw];
+      dowEl.appendChild(c);
+    });
+  })();
+
   function render(){
     const showAll = document.getElementById('showAllEmp').checked;
 
     const first = new Date(TARGET.y, TARGET.m, 1);
-    const startDow = (first.getDay() + 6) % 7;                 // 月曜=0
+    // 先頭の空きマスの数（週のはじまりは本人の設定）。
+    const startDow = ECS_WEEK_LEAD(first.getDay());
     const gridStart = new Date(TARGET.y, TARGET.m, 1 - startDow);
     const last = new Date(TARGET.y, TARGET.m + 1, 0);
     // ⚠ 月の最後の週のあとに、**もう1週間ぶん**出す（2026-09-02 baba要望）。

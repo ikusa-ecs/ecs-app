@@ -885,6 +885,15 @@
     return targetCases().filter(c => !c.archived && isoOf(caseDate(c.off)) === iso);
   }
 
+  // 曜日の見出し。並びは本人の設定（日曜はじまり／月曜はじまり）。
+  // ⚠ 2026-09-15 まで「日月火水木金土」と直書きしていた＝ほかの画面と並びが食い違っていた。
+  function wishDowHead(){
+    return ECS_WEEK_ORDER().map(function(dw){
+      const cls = 'wc-dow' + (dw === 0 ? ' wc-sun' : (dw === 6 ? ' wc-sat' : ''));
+      return '<div class="' + cls + '">' + '日月火水木金土'[dw] + '</div>';
+    }).join('');
+  }
+
   function renderWishCal(){
     const box = document.getElementById('view-wishcal');
     if (!box) return;
@@ -896,7 +905,9 @@
     const todayIso = wishIso(new Date());
 
     let cells = '';
-    for (let i = 0; i < first.getDay(); i++) cells += '<div class="wc-cell wc-blank"></div>';
+    // 先頭の空きマス（週のはじまりは本人の設定）。
+    const lead = ECS_WEEK_LEAD(first.getDay());
+    for (let i = 0; i < lead; i++) cells += '<div class="wc-cell wc-blank"></div>';
     for (let d = 1; d <= last.getDate(); d++) {
       const date = new Date(y, mo, d);
       const iso = wishIso(date);
@@ -936,8 +947,7 @@
         </span>
       </div>
       <div class="wc-grid">
-        <div class="wc-dow wc-sun">日</div><div class="wc-dow">月</div><div class="wc-dow">火</div><div class="wc-dow">水</div>
-        <div class="wc-dow">木</div><div class="wc-dow">金</div><div class="wc-dow wc-sat">土</div>
+        ${wishDowHead()}
         ${cells}
       </div>
       ${total ? '' : '<div class="empty-note">この先の稼働希望がまだ登録されていません。スタッフの方が「稼働希望」を出すと、ここに名前が並びます。</div>'}`;
