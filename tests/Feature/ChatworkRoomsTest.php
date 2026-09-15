@@ -103,6 +103,30 @@ class ChatworkRoomsTest extends TestCase
         $this->assertSame('111', ChatworkRooms::for(ChatworkRooms::SHEET_SYNC));
     }
 
+    /**
+     * ⚠ 何も決めていなければ空を返す（送らない）。
+     *
+     * 2026-09-15 に実際に踏んだ：config に古い部屋番号が既定値として書いてあり、
+     * 「テスト送信完了」と出るのに**誰も入っていない部屋**に届いていた。
+     * 送れたのに届かないのがいちばん困るので、決めていなければ送らない。
+     */
+    public function test_何も決めていなければ空を返す(): void
+    {
+        config(['services.chatwork.room' => '', 'services.chatwork.test_room' => '']);
+
+        $this->assertSame('', ChatworkRooms::for(ChatworkRooms::SHEET_SYNC));
+        $this->assertSame('', ChatworkRooms::for(ChatworkRooms::TEST));
+    }
+
+    /** ⚠ config に古い部屋番号を既定値として書き戻さないこと。 */
+    public function test_設定ファイルに部屋番号を書き戻していない(): void
+    {
+        $conf = file_get_contents(config_path('services.php'));
+
+        $this->assertStringNotContainsString('320609834', $conf);
+        $this->assertStringNotContainsString('412985590', $conf);
+    }
+
     public function test_設定画面から保存できる(): void
     {
         $me = $this->admin();

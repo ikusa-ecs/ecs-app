@@ -142,8 +142,13 @@ final class SheetSyncNotice
         }
 
         // 送り先の部屋は知らせごとに変えられる（2026-09-15 baba要望）。正本＝App\Support\ChatworkRooms。
+        // ⚠ 決まっていなければ送らない。黙って既定の部屋へ投げない
+        //   （誰も見ていない部屋に届いて「送れたのに気づけない」が実際に起きた）。
         $room = ChatworkRooms::for(ChatworkRooms::SHEET_SYNC);
         if ($room === '') {
+            Log::warning('アサイン表の知らせを送れませんでした：送り先の部屋が未設定です。'
+                .'共通設定 →「チャットワークの送り先」で決めてください。');
+
             return false;
         }
 
