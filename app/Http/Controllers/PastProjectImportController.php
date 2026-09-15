@@ -196,6 +196,9 @@ class PastProjectImportController extends Controller
                     'people' => $case['people'],
                     // 「メンバー」と書いてあるだけの空き枠の数（運営人数が空のときに使う）。
                     'slots' => $case['slots'] ?? 0,
+                    // ブロックの左端の列（0はじまり）。ECSの案件IDをアサイン表へ
+                    // 書き戻すときの目印（2026-09-15 baba要望）。取り込みには使わない。
+                    'col' => $case['col'] ?? null,
                 ];
             }
             $unmapped = $read['unknownLabels'];
@@ -561,6 +564,10 @@ class PastProjectImportController extends Controller
         $errors = [];
         $missingNames = [];     // 名簿に無かった人
         $ambiguousNames = [];   // 同姓同名で決められなかった人
+        // 「シートの何列目の案件が、ECSのどのIDになったか」（2026-09-15 baba要望）。
+        // ⚠ これをアサイン表へ書き戻すと、次の朝からは同じ案件だと機械が確実に分かる
+        //   （いまは日付・コンテンツ・お客様名で当てているので、書き直されるとズレる）。
+        $idsByColumn = [];
 
         foreach ($entries as $i => $entry) {
             $edit = $edits[$i] ?? [];
@@ -631,8 +638,13 @@ class PastProjectImportController extends Controller
 
             $isFuture = $mode === self::MODE_FUTURE;
 
+            // ECSの案件IDをアサイン表へ書き戻すための目印（2026-09-15 baba要望）。
+            // 「どの列の案件が、ECSのどのIDになったか」をここで拾って、あとで受信箱に残す。
+            $seriesCol = $entry['col'] ?? null;
+
             DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus, $isFuture,
-                $crossKind, $shareOffice, $office, &$created, &$updated, &$assignCount, &$shared) {
+                $crossKind, $shareOffice, $office, $seriesCol, &$created, &$updated, &$assignCount, &$shared,
+                &$idsByColumn) {
                 if ($existing) {
                     // ⚠ 公開の状態（staff_published）は、読み込み直しでは触らない（2026-08-28 baba報告）。
                     //   スタッフを1人足すためにアサイン表を読み込み直しただけで**公開が取り消され**、
@@ -653,6 +665,13 @@ class PastProjectImportController extends Controller
                 } else {
                     $project = Project::create($attrs + ['id' => $this->nextProjectId($date)]);
                     $created++;
+                }
+
+                // どの列の案件が、ECSのどのIDになったか（アサイン表への書き戻し用）。
+                // ⚠ 取り込んだ結果そのものを残す＝あとで探し直さない。
+                //   探し直すと「似ている別の案件」のIDを書き戻してしまうことがある。
+                if ($seriesCol !== null) {
+                    $idsByColumn[(int) $seriesCol] = $project->id;
                 }
 
                 // 巻き取り・ヘルプを「拠点間の関わり」として記録する（2026-08-28 baba要望）。
@@ -713,6 +732,11 @@ class PastProjectImportController extends Controller
             $read['sync']->forceFill([
                 'applied_at' => Carbon::now(),
                 'applied_by' => Auth::id(),
+                // ECSの案件IDをアサイン表へ書き戻すための対応表（2026-09-15 baba要望）。
+                // 「シートの何列目 → ECSのID」。毎朝GASが受け取って、アサイン表の
+                // **100行目**（表の下の空いているところ）に書き込む。
+                // ⚠ 行を増やさない＝既存のレイアウトを壊さない、という baba の指定。
+                'project_ids' => $idsByColumn ?: null,
             ])->save();
         }
 

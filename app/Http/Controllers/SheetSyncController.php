@@ -33,6 +33,15 @@ use Illuminate\Support\Carbon;
 class SheetSyncController extends Controller
 {
     /**
+     * ECSの案件IDをアサイン表の何行目に書き戻すか（1はじまり・2026-09-15 baba指定）。
+     *
+     * ⚠ **行を増やさない。** アサイン表は行の位置でレイアウトが決まっているので、
+     *   途中に挿し込むと全部ずれる。100行目より下は今も空いているので、そこを使う。
+     * ⚠ 変えるときはここだけ直す（GASの手順書にもこの数字を書いてある）。
+     */
+    public const ID_ROW = 100;
+
+    /**
      * 毎朝スプレッドシートから届く入口（ログインの外側）。
      *
      * 送ってもらう形（JSON）：
@@ -124,6 +133,12 @@ class SheetSyncController extends Controller
             'cases' => $sync->case_count,
             // 前回と中身が違ったか（GAS側のログに出す用）。
             'changed' => $changed,
+            // ECSの案件IDの対応表（2026-09-15 baba要望）。{ "列番号(0はじまり)": "P-2026-0012" }。
+            // GASはこれを受け取って、アサイン表の**100行目**の同じ列に書き込む。
+            // ⚠ まだ一度も取り込んでいない月は空。取り込んだあと、次の朝から入る。
+            // ⚠ 行を増やさない（100行目より下は空いている、という baba の指定）。
+            'projectIds' => (object) ($sync->project_ids ?? []),
+            'idRow' => self::ID_ROW,
             'message' => $changed
                 ? '受け取りました（前回と中身が変わっています）。'
                 : '受け取りました（前回と同じ中身です）。',
