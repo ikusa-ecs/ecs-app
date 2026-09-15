@@ -16,12 +16,21 @@ Artisan::command('reminder:count-deadline {mode=dry}', function (string $mode) {
     $this->info(($r['title'] ?? '') . ' / 対象' . ($r['hit'] ?? 0) . '件');
 })->purpose('人数確定リマインドを実行（dry=件数確認 / test / live）');
 
-// 人数確定リマインド：平日の毎朝9時に本番送信（GAS版と同じ運用）。
-// ⚠ 実際に動くのは、常時稼働するサーバーで `php artisan schedule:work`（またはcron）が
-//    走っているときだけ。ローカルの `php artisan serve` だけでは自動送信されない（＝デプロイ後に有効化）。
-Schedule::call(function () {
-    (new CountDeadlineReminderService())->run('live');
-})->weekdays()->at('09:00')->timezone('Asia/Tokyo')->name('count-deadline-reminder');
+// 人数確定リマインド：⛔ **自動送信はしない**（2026-09-15 baba「一旦やめたい」）。
+//
+// ⚠ もともと平日の毎朝9時に本番送信する設定だった（GAS版と同じ運用のつもりで入れた）。
+//   ところが本番にチャットワークのトークンが入っていなかったため、**一度も飛んでいなかった**。
+//   2026-09-15 にトークンを入れた時点で、翌朝いきなり**41件ぶん**のメッセージと
+//   Dへのタスクが飛ぶ状態になっていたので、自動をやめて**画面から押したときだけ**にした。
+//
+// 送るときは 左メニュー「人数確定リマインド」→「② テスト送信」で中身を確かめてから
+// 「③ 本番送信」。⚠ 送信済みのものは二度送らない仕組みがあるので、押しすぎても重複しない。
+//
+// ⚠ 自動に戻すときは、下の3行のコメントを外すだけ。ただし戻す前に必ず
+//   「② テスト送信」で件数と中身を確かめること（いきなり全員に飛ぶ）。
+// Schedule::call(function () {
+//     (new CountDeadlineReminderService())->run('live');
+// })->weekdays()->at('09:00')->timezone('Asia/Tokyo')->name('count-deadline-reminder');
 
 // ──────────────────────────────────────────────────────────────────────
 // アサイン表の自動取り込みの見張り（2026-09-15 baba要望）。
