@@ -369,11 +369,19 @@ class ProjectController extends Controller
             ->when($projectId, fn ($q) => $q->where('id', '!=', $projectId))
             ->orderBy('start_date')
             ->get()
-            ->map(fn (Project $p) => [
-                'id' => $p->id,
-                'label' => trim(($p->project_name ?: '（名称未定）')
-                    .($p->start_date ? '（'.$p->start_date->format('n/j').'）' : '')),
-            ])
+            ->map(function (Project $p) {
+                // ⚠ 企業名（お客様）も出す（2026-09-15・FBシート No.13 桑江さん）。
+                //   案件名にはコンテンツ名が入っていることが多く、同じ日に同じコンテンツの案件が
+                //   並ぶと、名前と日付だけではどれに紐づけるのか見分けられなかった。
+                $client = trim((string) ($p->client ?? ''));
+
+                return [
+                    'id' => $p->id,
+                    'label' => trim(($p->project_name ?: '（名称未定）')
+                        .($client !== '' ? '／'.$client : '')
+                        .($p->start_date ? '（'.$p->start_date->format('n/j').'）' : '')),
+                ];
+            })
             ->values();
 
         // 営業担当プルダウン用：社員（role=employee）の名前一覧。
@@ -580,10 +588,16 @@ class ProjectController extends Controller
         // 案件ID：編集なら既存IDを維持（変えると他の記録と紐づかなくなる）。新規は発番。
         $id = $editing ? $editing->id : $this->nextProjectId($request->input('start_date'));
 
-        // 日程種別：予備日・リハのチェックがあればその種別。無ければ「本番」。
-        $dateType = $request->has('has_sub')
-            ? ($request->input('date_type_sub') ?: '本番')
-            : '本番';
+        // 日程種別：チェックがあればその種別。無ければ「本番」。
+        // ⚠ 知らない文字はそのまま入れない（入ると集計・バッジの分岐からこぼれて、
+        //   どの画面にも出てこない案件ができる）。選べる種別はここが正本。
+        //   2026-09-15 に「前日設営」を追加（FBシート No.13 桑江さん）。
+        $subTypes = ['予備日', 'リハ日', '前日設営'];
+        $dateType = '本番';
+        if ($request->has('has_sub')) {
+            $picked = (string) $request->input('date_type_sub');
+            $dateType = in_array($picked, $subTypes, true) ? $picked : '本番';
+        }
 
         // status の決め方。新規＝確定で「未着手」/下書きで「下書き」。
         // 編集＝確定は下書きのときだけ「未着手」に進める（進行中の状態は壊さない）。下書き保存は「下書き」へ。
@@ -661,6 +675,8 @@ class ProjectController extends Controller
             'location' => $request->input('location'),
             'is_outdoor' => $request->filled('outdoor') ? ($request->input('outdoor') === '屋外') : null,
             'lodging' => $request->input('lodging'),
+            // 前泊の集合時間（2026-09-15・FBシート No.14）。⚠ 当日の集合時間（start_time）とは別もの。
+            'stay_pre_meet_time' => $request->input('stay_pre_meet_time') ?: null,
             // イベント数として数えるか（先-2）。auto＝null／yes＝true／no＝false。
             // 数え方の正本は App\Support\EventCount（自動のルールもそこに置く）。
             'count_as_event' => match ((string) $request->input('count_as_event', 'auto')) {

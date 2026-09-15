@@ -37,6 +37,8 @@ class ProjectFieldLabels
         'sales_owners'       => '営業担当',
         'office'             => '登録拠点',
         'lodging'            => '宿泊',
+        // 前の日に集まって移動するときの集合時間（2026-09-15）。当日の集合時間とは別もの。
+        'stay_pre_meet_time' => '前泊の集合時間',
         // ── 形態・取引先 ──
         'format'             => '実施形態',
         'online_tool'        => 'オンラインツール',

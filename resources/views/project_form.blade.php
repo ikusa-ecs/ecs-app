@@ -457,7 +457,7 @@
           <div class="form-row non-arena">
             <label>宿泊<span class="req-mark yellow">必須</span></label>
             <!-- 初期は「無」。宿泊ありは少数のため、毎回選び直さなくてよいように（2026-08-21 baba）。 -->
-            <select name="lodging" data-need="later">
+            <select name="lodging" id="lodgingSel" data-need="later" onchange="toggleStayPre()">
               <option value="">未定</option>
               <option selected>無</option>
               <option>前泊有</option>
@@ -465,6 +465,17 @@
               <option>後泊あり</option>
               <option>前後泊あり</option>
             </select>
+          </div>
+
+          <!-- 前泊の集合時間（2026-09-15・FBシート No.14）。
+               ⚠ 当日の集合時間とは別もの。前泊ありを選んだときだけ出す
+                  （前泊なしの案件に空欄が並ぶと、入れ忘れなのか不要なのか分からなくなるため）。
+               ⚠ ここは「そのまま出す区間」の中なので、Blade のコメント記号は使えない。 -->
+          <div class="form-row non-arena" id="stayPreRow" style="display:none;">
+            <label>前泊の集合時間</label>
+            <input type="text" name="stay_pre_meet_time" id="stayPreMeetTime"
+                   placeholder="例）前日 18:00　／　前日 東京駅 17:30">
+            <div class="hint">※ <b>前の日</b>に集まる時間です。当日の集合時間は下の「当日の時間」で入れてください。</div>
           </div>
 
           <!-- 4. 案件名（コンテンツ） -->
@@ -685,7 +696,7 @@
             <label>日程種別</label>
             <div class="check-row">
               <input type="checkbox" id="hasSub" name="has_sub" onchange="toggleSub()">
-              <label for="hasSub">予備日・リハ日として登録する（本番案件に紐づけます）</label>
+              <label for="hasSub">予備日・リハ日・前日設営として登録する（本番案件に紐づけます）</label>
             </div>
             <div class="sub-msg" id="subMsg">チェックしない場合、この案件は <b>「本番」</b> として登録されます。</div>
 
@@ -693,9 +704,13 @@
               <div class="form-grid">
                 <div class="form-row">
                   <label>種別</label>
+                  <!-- ⚠ 「前日設営」を足した（2026-09-15・FBシート No.13 桑江さん）。
+                       本番の前の日に会場を作りに行く日。人は出るが「回数」には数えない
+                       ＝予備日・リハ日と同じ扱いになる。 -->
                   <select name="date_type_sub" id="dateTypeSub">
                     <option>予備日</option>
                     <option>リハ日</option>
+                    <option>前日設営</option>
                   </select>
                 </div>
                 <div class="form-row">
@@ -705,7 +720,7 @@
                   </select>
                 </div>
               </div>
-              <div class="hint">※ 予備日・リハ日は「回数」には数えませんが、連勤チェックには含めます（設計書 11章F）。チェックすると、保存後に同じ内容で次の日程を追加できます。</div>
+              <div class="hint">※ 予備日・リハ日・前日設営は「回数」には数えませんが、連勤チェックには含めます（設計書 11章F）。チェックすると、保存後に同じ内容で次の日程を追加できます。</div>
             </div>
           </div>
 
@@ -1103,6 +1118,15 @@
     document.getElementById('subBox').classList.toggle('open', on);
     document.getElementById('subMsg').style.display = on ? 'none' : '';
     onMultiChange(); // 日程種別チェックでも「次の日程を追加」ボタンの表示を更新
+  }
+
+  // ===== 前泊の集合時間：前泊ありのときだけ出す（2026-09-15・FBシート No.14）=====
+  // ⚠ 隠しても入力した値は消さない（選び直したときに書き直さなくてよいように）。
+  function toggleStayPre() {
+    const sel = document.getElementById('lodgingSel');
+    const row = document.getElementById('stayPreRow');
+    if (!sel || !row) return;
+    row.style.display = (sel.value || '').indexOf('前泊') >= 0 ? '' : 'none';
   }
 
   // ===== 確度（ヨミ）：確定以外なら見込み時期欄を開く =====
@@ -1758,6 +1782,10 @@
     setByName('event_start_time', E.event_start_time);
     setByName('event_end_time', E.event_end_time);
     setByName('lodging', E.lodging);
+    // 前泊の集合時間（2026-09-15）。⚠ 値を入れたあとに toggleStayPre() を呼ぶ＝
+    //   宿泊を選び直さなくても、開いた時点で欄が出ているようにする。
+    setByName('stay_pre_meet_time', E.stay_pre_meet_time);
+    toggleStayPre();
     setByName('operation_place', E.operation_place);
     setByName('staff_role', E.staff_role);
     setByName('assembly_type', E.assembly_type);

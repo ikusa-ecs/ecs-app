@@ -667,15 +667,18 @@
     const grid = document.getElementById('calGrid');
     grid.innerHTML = '';
     // 曜日見出し（月曜始まり）
-    ['月','火','水','木','金','土','日'].forEach((w,i)=>{
+    // 週のはじまりは**本人の設定**（2026-09-15）。以前はこの画面だけ月曜はじまりに固定だった。
+    //   ⚠ 並べ替えの計算は ECS_WEEK_ORDER と ECS_WEEK_LEAD の2つだけを使う
+    //     （画面ごとに曜日をずらす計算を書くと、片方だけ直して食い違う）。
+    ECS_WEEK_ORDER().forEach(function(dw){
       const h = document.createElement('div');
-      h.className = 'dow' + (i===5?' sat':'') + (i===6?' sun':'');
-      h.textContent = w;
+      h.className = 'dow' + (dw===6?' sat':'') + (dw===0?' sun':'');
+      h.textContent = '日月火水木金土'[dw];
       grid.appendChild(h);
     });
-    // 月初の空きセル（月曜始まり）
+    // 月初の空きセル
     const firstDow = new Date(y, m-1, 1).getDay(); // 0=日..6=土
-    const lead = (firstDow + 6) % 7;               // 月曜始まりの先頭空き数
+    const lead = ECS_WEEK_LEAD(firstDow);
     for (let i=0;i<lead;i++){
       const e = document.createElement('div'); e.className='cell empty'; grid.appendChild(e);
     }

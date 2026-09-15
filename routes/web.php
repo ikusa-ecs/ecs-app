@@ -44,6 +44,7 @@ use App\Http\Controllers\SheetSyncController;
 use App\Http\Controllers\StaffPortalController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\WeekStartController;
 use Illuminate\Support\Facades\Route;
 
 // ── ログイン（Laravel Fortify を利用・照合先は people 名簿）──
@@ -110,6 +111,10 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // 画面の色（テーマ）を本人が選ぶ（2026-09-09 baba要望）。社員もスタッフも使う。
     // ⚠ 変えられるのは自分のぶんだけ（人のIDを受け取らない）。選択肢の正本＝App\Support\Themes。
     Route::post('/theme', [ThemeController::class, 'save'])->name('theme.save');
+
+    // カレンダーの「週のはじまり」を本人が選ぶ（2026-09-15 baba要望）。画面の色と同じ作り。
+    // ⚠ 選択肢の正本＝App\Support\WeekStart。並べ替えの計算も必ずそこを通す。
+    Route::post('/week-start', [WeekStartController::class, 'save'])->name('week-start.save');
 
     // 本人のパスワード変更（初回ログイン後などに自分で変える）。
     Route::get('/password', [PasswordController::class, 'edit']);

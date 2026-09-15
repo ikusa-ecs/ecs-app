@@ -19,6 +19,11 @@
     } catch (e) {}
   </script>
   <title>ECS @yield('title')</title>
+  {{-- カレンダーの「週のはじまり」（2026-09-15 baba要望）。'sun'＝日曜はじまり／'mon'＝月曜はじまり。
+       ⚠ カレンダーを描く画面は、必ずこの値を見る（画面ごとに固定で書かない）。
+         もとは画面ごとにバラバラで、社員の出勤可能日だけ月曜はじまりだった。 --}}
+  <script>window.ECS_WEEK_START = @json(\App\Support\WeekStart::current());</script>
+  @include('partials.week_start_js')
   {{-- 共通CSS。末尾の ?v= はファイルの更新日時。中身を直すたびに数字が変わるので、
        スマホやPCが古いCSSを覚えたまま「直したのに変わらない」となるのを防ぐ。 --}}
   <link rel="stylesheet" href="/ecs/style.css?v={{ \App\Support\Asset::ver('ecs/style.css') }}">

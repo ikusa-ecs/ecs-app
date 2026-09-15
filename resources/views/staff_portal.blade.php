@@ -7,6 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ECS スタッフ画面（エントリー・希望・アサイン／スマホ・PC両対応）</title>
   <link rel="stylesheet" href="/ecs/style.css?v={{ \App\Support\Asset::ver('ecs/style.css') }}">
+  {{-- カレンダーの「週のはじまり」（2026-09-15 baba要望）。社員側の骨組みと同じものを入れる
+       （この画面は layouts.app を使わない独立ページなので、ここにも書く必要がある）。 --}}
+  <script>window.ECS_WEEK_START = @json(\App\Support\WeekStart::current());</script>
+  @include('partials.week_start_js')
   @verbatim
   <style>
     /* ===== スタッフ用ポータル（スマホ・PC両対応＝レスポンシブ） ===== */
@@ -861,7 +865,7 @@
             <button type="button" class="jc-nav" onclick="shiftJobMonth(1)" title="次の月へ">›</button>
           </div>
           <div class="cal-grid" id="jobCalGrid">
-            <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
+            @foreach (\App\Support\WeekStart::order() as $__dw)<div class="dow{{ $__dw === 0 ? ' sun' : ($__dw === 6 ? ' sat' : '') }}">{{ ['日','月','火','水','木','金','土'][$__dw] }}</div>@endforeach
           </div>
           {{-- 色の意味は画面にも出す。文章だけで説明すると、色を変えたときに食い違うため。
                ⚠ 見本のチップは本物と同じ class を使う＝色が変わればここも自動でそろう。 --}}
@@ -930,7 +934,7 @@
             <p class="sub">日付をタップ（クリック）するたびに「終日〇 → NG → 未定」と切り替わります。「終日〇」はその日は一日じゅう稼働できる（どの案件にも入れる）という意味です。「★エントリー中」はエントリーした案件がある日、「イベント」は確定アサインが入っている日です（どちらもタップでは変えられません）。</p>
             <div class="cal-head"><div class="mon">{{ $prefMeta['year'] }}年 {{ $prefMeta['month'] }}月</div></div>
             <div class="cal-grid" id="calGrid">
-              <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
+              @foreach (\App\Support\WeekStart::order() as $__dw)<div class="dow{{ $__dw === 0 ? ' sun' : ($__dw === 6 ? ' sat' : '') }}">{{ ['日','月','火','水','木','金','土'][$__dw] }}</div>@endforeach
               {{-- 1日までの空きマスは対象月の曜日から作る（以前は「7/1は火曜」で2つ固定だった） --}}
             </div>
             <div class="legend">
@@ -1165,6 +1169,27 @@
                 </label>
               @endforeach
               <button class="line-btn" type="submit" style="width:100%;">この色にする</button>
+            </form>
+          </div>
+
+          {{-- カレンダーの「週のはじまり」（2026-09-15 baba要望）。画面の色と同じ作り。
+               ⚠ 選択肢も説明も App\Support\WeekStart が正本。 --}}
+          <div class="m-card">
+            <h3>カレンダーの並び</h3>
+            <p class="sub">稼働希望カレンダーを「日曜から」始めるか「月曜から」始めるかを選べます。</p>
+            <form method="POST" action="{{ route('week-start.save') }}" style="margin:0;">
+              @csrf
+              @foreach (\App\Support\WeekStart::OPTIONS as $value => $label)
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:8px 2px; cursor:pointer;">
+                  <input type="radio" name="week_start" value="{{ $value }}"
+                         {{ \App\Support\WeekStart::of(Auth::user()) === $value ? 'checked' : '' }}>
+                  <span>
+                    <b>{{ $label }}</b><br>
+                    <span class="sub" style="margin:0;">{{ \App\Support\WeekStart::NOTES[$value] ?? '' }}</span>
+                  </span>
+                </label>
+              @endforeach
+              <button class="line-btn" type="submit" style="width:100%;">この並びにする</button>
             </form>
           </div>
 
@@ -1603,8 +1628,9 @@
 
       const first = new Date(y, m, 1);
       const days = new Date(y, m + 1, 0).getDate();
-      // 1日までの空きマス（日曜始まり＝稼働希望のカレンダーと同じ並び）。
-      for (let i = 0; i < first.getDay(); i++) {
+      // 1日までの空きマス。週のはじまりは**本人の設定**（2026-09-15）。
+      const _lead = ECS_WEEK_LEAD(first.getDay());
+      for (let i = 0; i < _lead; i++) {
         const e = document.createElement('div');
         e.className = 'jc-cell empty';
         grid.appendChild(e);
@@ -2009,6 +2035,9 @@
       add('会場', j.place);
       add('屋内 / 屋外', j.outdoor ? '屋外' : '');
       add('宿泊', (j.lodging && j.lodging !== '無') ? j.lodging : '');
+      // 前泊の集合時間（2026-09-15・FBシート No.14）。⚠ 上の「集合〜解散」は当日の時間。
+      //   前の日に集まる案件は、その時間をここに出す（これまではチャットで別に伝えていた）。
+      add('前泊の集合時間', j.stayPreMeet);
       // スタッフに伝えること＝集合場所の詳細・服装・持ち物・注意事項をまとめた1欄
       // （2026-08-21 baba。書く側が備考のように自由に書けるようにしたため）。
       // 空欄でも「特になし」と出す＝聞き忘れに見えないようにする。
@@ -2135,7 +2164,7 @@
       cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>';
     }
     // 1日の前の空きマス（曜日合わせ）を対象月から作る。
-    for (let i = 0; i < PREF_FIRST_DOW; i++) {
+    for (let i = 0; i < ECS_WEEK_LEAD(PREF_FIRST_DOW); i++) {
       const pad = document.createElement('div');
       pad.className = 'cell empty';
       grid.appendChild(pad);

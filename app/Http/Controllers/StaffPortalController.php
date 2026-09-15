@@ -140,6 +140,9 @@ class StaffPortalController extends Controller
                     'evEnd' => $p->event_end_time ?? '',
                     'evTbd' => (bool) $p->event_time_tbd,   // 本番時間未定（案件登録のチェック）
                     'lodging' => $p->lodging ?? '',
+                    // 前泊の集合時間（2026-09-15・FBシート No.14）。
+                    // ⚠ 当日の集合時間とは別もの。前の日に集まる時間。
+                    'stayPreMeet' => (string) ($p->stay_pre_meet_time ?? ''),
                     'outdoor' => (bool) $p->is_outdoor,
                     // 当日必要な情報（案件登録・公開ボードのどちらからでも入れられる）
                     'meetDetail' => (string) ($p->assembly_detail ?? ''),

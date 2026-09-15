@@ -52,6 +52,7 @@
     .mtag.stay { background: #fdecd8; color: #b4530a; }  /* 前泊 */
     .mtag.yobi { background: #e5e7eb; color: #374151; }  /* 予備日 */
     .mtag.reha { background: #e0e7ff; color: #3730a3; }  /* リハ */
+    .mtag.setup { background: #dcfce7; color: #166534; } /* 前日設営（2026-09-15） */
 
     /* 密度アップ（1画面に多く表示）：表の余白と見出し周りを詰める */
     .mp-wrap .tbl th, .mp-wrap .tbl td { padding: 5px 8px; font-size: 12.5px; }
@@ -597,6 +598,34 @@
         </div>
       </div>
 
+      {{-- カレンダーの「週のはじまり」＝人ごとに選べる（2026-09-15 baba要望）。
+           画面の色と同じ作り（ふつうのフォームで送る＝押した瞬間に保存される）。
+           ⚠ 選択肢も説明も App\Support\WeekStart が正本。ここに書き写さない。 --}}
+      <div class="panel mp-wrap" style="margin-top:12px;">
+        <div class="panel-head"><h2>カレンダーの並び</h2></div>
+        <p class="sec-count">カレンダーを「日曜から」始めるか「月曜から」始めるかを選べます（あなたの画面だけ変わります）。</p>
+        <form method="POST" action="{{ route('week-start.save') }}" style="padding:10px 14px 14px;">
+          @csrf
+          @foreach (\App\Support\WeekStart::OPTIONS as $value => $label)
+            <label style="display:flex; align-items:flex-start; gap:8px; padding:7px 0; cursor:pointer;">
+              <input type="radio" name="week_start" value="{{ $value }}"
+                     {{ \App\Support\WeekStart::of($me) === $value ? 'checked' : '' }}>
+              <span>
+                <b>{{ $label }}</b><br>
+                <span class="muted" style="font-size:11.5px;">{{ \App\Support\WeekStart::NOTES[$value] ?? '' }}</span>
+              </span>
+            </label>
+          @endforeach
+          <button type="submit" class="btn primary" style="margin-top:8px;">この並びにする</button>
+        </form>
+        <div style="padding:0 14px 14px;">
+          <p class="muted" style="font-size:11.5px; margin:0;">
+            ※ 効くのは<b>マイページのカレンダー・社員の出勤可能日・スタッフ画面の稼働希望</b>です。<br>
+            ※ これまで画面によって並びが違っていました（社員の出勤可能日だけ月曜はじまり）。ここで1つにそろえられます。
+          </p>
+        </div>
+      </div>
+
       @if (session('status'))
         <div class="panel mp-wrap" style="margin-top:12px; background:#e7f6ec; color:#166534; border-color:#b7e0c2; font-size:13px; padding:12px 14px;">
           {{ session('status') }}
@@ -870,8 +899,16 @@
   function caseTags(c) {
     let t = '';
     if (c.scale === '大型') t += '<span class="mtag big">大型</span>';
-    if (c.dateType === '予備日') t += '<span class="mtag yobi">予備日</span>';
-    else if (c.dateType === 'リハ') t += '<span class="mtag reha">リハ</span>';
+    // ⚠ 2026-09-15 に直した：以前は 'リハ' と比べていたが、保存される値は 'リハ日' なので
+    //   リハの印が一度も出ていなかった。本番以外はそのまま印を出す形にして、
+    //   種別を増やしてもここを直さなくてよいようにした（前日設営を足したため）。
+    const dt = (c.dateType || '本番');
+    if (dt !== '本番') {
+      const cls = dt.indexOf('予備') >= 0 ? 'yobi'
+                : dt.indexOf('リハ') >= 0 ? 'reha'
+                : dt.indexOf('設営') >= 0 ? 'setup' : 'yobi';
+      t += '<span class="mtag ' + cls + '">' + dt + '</span>';
+    }
     return t;
   }
   // 宿泊バッジ＝会社名の横に出す。前泊有／後泊あり／一部前泊有／前後泊あり など「無」以外はそのまま表示。
@@ -1041,13 +1078,14 @@
     document.getElementById('asgCalEmpty').style.display = hasAny ? 'none' : 'block';
 
     let html = '';
-    // 曜日見出し（日曜始まり）
-    WK.forEach((w, i) => {
-      html += '<div class="dow' + (i === 6 ? ' sat' : '') + (i === 0 ? ' sun' : '') + '">' + w + '</div>';
+    // 曜日見出し。週のはじまりは**本人の設定**（2026-09-15）。
+    ECS_WEEK_ORDER().forEach(function(dw){
+      html += '<div class="dow' + (dw === 6 ? ' sat' : '') + (dw === 0 ? ' sun' : '') + '">' + WK[dw] + '</div>';
     });
-    // 月初の空きセル（日曜始まり）
+    // 月初の空きセル
     const firstDow = new Date(y, m - 1, 1).getDay(); // 0=日..6=土
-    for (let i = 0; i < firstDow; i++) html += '<div class="mp-cell empty"></div>';
+    const lead = ECS_WEEK_LEAD(firstDow);
+    for (let i = 0; i < lead; i++) html += '<div class="mp-cell empty"></div>';
 
     const days = new Date(y, m, 0).getDate();
     for (let d = 1; d <= days; d++) {
