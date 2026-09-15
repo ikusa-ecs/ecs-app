@@ -6,6 +6,8 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
+use App\Support\OfficeScope;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -23,8 +25,12 @@ use Illuminate\Support\Facades\DB;
  */
 class AssignDashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        // 拠点で絞る（2026-09-15 baba要望＝この画面だけ拠点の切替が無かった）。
+        // 既定＝自分の拠点。管理者以上は画面上のボタンで切り替えられる。正本＝App\Support\OfficeScope。
+        $office = OfficeScope::filter($request);
+
         $today = Carbon::today();
         // 対象月＝今日の当月（当月の1日〜末日）。period は '2026-07' の形の月キー。
         $period = $today->format('Y-m');
@@ -42,7 +48,10 @@ class AssignDashboardController extends Controller
         $projectType = Project::pluck('date_type', 'id');
 
         // ── アサインが必要な案件（未着手・調整中・これから先の開催）──────────────
-        $needProjects = Project::whereIn('status', ['未着手', '調整中'])->notCancelled()
+        $needProjects = OfficeScope::applyToProjects(
+            Project::whereIn('status', ['未着手', '調整中'])->notCancelled(),
+            $office
+        )
             ->whereNotNull('start_date')
             ->whereDate('start_date', '>=', $today)
             ->orderBy('start_date')
@@ -76,7 +85,10 @@ class AssignDashboardController extends Controller
 
         // ── 数値サマリ：募集中の案件 ──────────────────────────────────────
         // 募集中＝スタッフに公開中（staff_published=ON）。うち「未確定」＝決定人数<必要人数。
-        $published = Project::where('staff_published', true)->notCancelled()->get();
+        $published = OfficeScope::applyToProjects(
+            Project::where('staff_published', true)->notCancelled(),
+            $office
+        )->get();
         $recruitCount = $published->count();
         $recruitUndecided = $published->filter(function (Project $p) use ($filledByProject) {
             $need = (int) $p->required_count;
@@ -89,7 +101,10 @@ class AssignDashboardController extends Controller
         // 今週開催で status=確定 の案件数。サブの「のべ◯名」＝その案件群の非キャンセルのアサイン延べ行数。
         $weekStart = $today->copy()->startOfWeek();
         $weekEnd = $today->copy()->endOfWeek();
-        $weekConfirmed = Project::where('status', '確定')->notCancelled()
+        $weekConfirmed = OfficeScope::applyToProjects(
+            Project::where('status', '確定')->notCancelled(),
+            $office
+        )
             ->whereBetween('start_date', [$weekStart, $weekEnd])
             ->get();
         $weekConfirmedCount = $weekConfirmed->count();
@@ -107,7 +122,7 @@ class AssignDashboardController extends Controller
         $rates = [];
         $zeroPrefCount = 0;
         $alerts = [];
-        foreach (Person::staff()->get() as $p) {
+        foreach (OfficeScope::applyToPeople(Person::staff(), $office)->get() as $p) {
             $want = $prefByStaff->get($p->id, collect())->count();
             if ($want === 0) {
                 $zeroPrefCount++;
@@ -143,7 +158,14 @@ class AssignDashboardController extends Controller
         usort($alerts, fn ($a, $b) => $a['rate'] <=> $b['rate']);
 
         // ── 直近の確定アサイン（確定したものを案件ごとにまとめ、確定日時の新しい順）──────
-        $confirmedByProject = Assignment::where('status', '確定')->get()
+        // ⚠ 拠点で絞るときは「その拠点の案件のアサイン」だけを見る。
+        $officeProjectIds = $office
+            ? OfficeScope::applyToProjects(Project::query(), $office)->pluck('id')->all()
+            : null;
+
+        $confirmedByProject = Assignment::where('status', '確定')
+            ->when($officeProjectIds !== null, fn ($q) => $q->whereIn('project_id', $officeProjectIds))
+            ->get()
             ->groupBy('project_id')
             ->map(fn ($rows) => [
                 'project_id'  => $rows->first()->project_id,
@@ -171,6 +193,13 @@ class AssignDashboardController extends Controller
         // ── 気にかけたい人（稼働状況の「気にかけたい人」カードをここへ移動）──────────
         // 指標は稼働状況（StaffStatusController::buildStatus）と同じ単一ソースを使い、画面間でブレさせない。
         $statusList = app(StaffStatusController::class)->buildStatus();
+        // ⚠ 拠点で絞る。buildStatus は全社ぶんを作るので、ここで自分の拠点だけ残す。
+        //   拠点が空の人は東京あつかい（OfficeScope::applyToPeople と同じ考え方）。
+        if ($office) {
+            $statusList = $statusList->filter(
+                fn ($s) => (trim((string) ($s['office'] ?? '')) ?: OfficeScope::DEFAULT_OFFICE) === $office
+            )->values();
+        }
         $pickRate = fn ($s) => $s['applied'] > 0 ? (int) round($s['picked'] / $s['applied'] * 100) : null;
 
         $careZero = $statusList->filter(fn ($s) => $s['zeroPref'])->pluck('name')->all();
@@ -199,6 +228,10 @@ class AssignDashboardController extends Controller
             'careLowRate'      => $careLowRate,
             'carePick'         => $carePick,
             'careGobusata'     => $careGobusata,
+            'officeScope'      => $office,
+            // CSVにも同じ拠点を持ち回る（画面と中身がズレないように）。
+            'csvUrl'           => '/assign-dashboard/export.csv'
+                .($request->filled('office') ? '?office='.urlencode((string) $request->query('office')) : ''),
         ]);
     }
 
@@ -209,8 +242,11 @@ class AssignDashboardController extends Controller
      * 列＝開催日／案件名／クライアント／必要人数／確定数／不足数（必要−確定）。
      * Excelでの文字化けを防ぐため UTF-8 BOM を先頭に付ける。
      */
-    public function exportCsv()
+    public function exportCsv(Request $request)
     {
+        // ⚠ 画面と同じ拠点で絞る。ここを忘れると「東京で見ていたのに全拠点のCSVが落ちる」。
+        $office = OfficeScope::filter($request);
+
         $today = Carbon::today();
 
         // index() と同じ「決まっている人数」（キャンセル以外の実人数）を案件IDごとに集計。
@@ -220,7 +256,10 @@ class AssignDashboardController extends Controller
             ->pluck('cnt', 'project_id');
 
         // index() と同じ対象・並び（未着手・調整中／これから先／開催日順）。
-        $needProjects = Project::whereIn('status', ['未着手', '調整中'])->notCancelled()
+        $needProjects = OfficeScope::applyToProjects(
+            Project::whereIn('status', ['未着手', '調整中'])->notCancelled(),
+            $office
+        )
             ->whereNotNull('start_date')
             ->whereDate('start_date', '>=', $today)
             ->orderBy('start_date')

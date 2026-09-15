@@ -75,31 +75,51 @@ class ExperienceScreenTest extends TestCase
             ->assertSee('id="tblPeople"', false);
     }
 
-    /** ⚠ 拠点で絞るための選択肢と、自分の拠点が渡っている（baba要件）。 */
-    public function test_office_filter_is_available(): void
+    /**
+     * ⚠ 拠点はサーバー側で絞る（2026-09-15 baba要望）。
+     *   それまでは画面のJSだけのプルダウンだったので、①URLに残らない（人に送れない）
+     *   ②権限に関係なく「すべての拠点」が選べた、の2点でほかの画面と食い違っていた。
+     *   はじめは自分の拠点＝ほかの画面と同じ（2026-09-10 の決まり）。
+     */
+    public function test_office_filter_is_server_side(): void
     {
         $admin = $this->admin();
 
         $this->actingAsPerson($admin)->get('/experience')
             ->assertOk()
-            ->assertViewHas('offices', fn ($o) => in_array('東京', $o, true))
-            ->assertViewHas('myOffice', '東京');
+            ->assertViewHas('officeScope', '東京')
+            ->assertSee('表示する拠点');
+
+        // 「全拠点」は ?office=all（空文字にしない＝リンクで消えるため）。
+        $this->actingAsPerson($admin)->get('/experience?office=all')
+            ->assertOk()
+            ->assertViewHas('officeScope', null);
     }
 
-    /** 拠点は人ごとに渡す（画面で絞れるように）。空の人は「東京」あつかい。 */
-    public function test_each_person_carries_an_office(): void
+    /** ほかの拠点の人は、その拠点を選んだとき（または全拠点）だけ出る。空の人は「東京」あつかい。 */
+    public function test_people_are_filtered_by_office(): void
     {
         $admin = $this->admin();
         $this->person('S-102', '名古屋の人', '名古屋');
         $this->person('S-103', '拠点未設定', '');
 
+        // 既定＝自分の拠点（東京）。名古屋の人は出ない／拠点が空の人は東京あつかいで出る。
         $this->actingAsPerson($admin)->get('/experience')
             ->assertOk()
             ->assertViewHas('people', function ($people) {
                 $byId = collect($people)->keyBy('id');
 
-                return $byId['S-102']['office'] === '名古屋'
-                    && $byId['S-103']['office'] === '東京';
+                return ! isset($byId['S-102']) && ($byId['S-103']['office'] ?? null) === '東京';
+            });
+
+        // 全拠点にすると両方出る。
+        $this->actingAsPerson($admin)->get('/experience?office=all')
+            ->assertOk()
+            ->assertViewHas('people', function ($people) {
+                $byId = collect($people)->keyBy('id');
+
+                return ($byId['S-102']['office'] ?? null) === '名古屋'
+                    && ($byId['S-103']['office'] ?? null) === '東京';
             });
     }
 

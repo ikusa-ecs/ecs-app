@@ -708,7 +708,10 @@
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
       // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
       //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
-      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), note:a.note })),
+      //   ⚠ 2026-09-15 追記＝**emp（社員か）と mcMax（MCで入れる上限の規模）も必ず持ってくる**。
+      //     落とすと、①社員を自動アサインから外す決まり（2026-09-09 ea4991e）が応募者にだけ効かず
+      //     社員が現場に入ってしまう ②MCの規模の上限も応募者だけ素通りする。
+      applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), note:a.note, emp:a.emp, mcMax:a.mcMax })),
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。

@@ -130,6 +130,19 @@
   対象にするコンテンツは <a href="/masters#contents">マスタ管理</a> の「紙」で切り替えます。チーム数が未入力の案件は、お客様人数÷{{ $teamSize }}で推定します。
 </div>
 
+{{-- 拠点の切替（2026-09-15 baba要望）。この画面だけ切替が無かった。 --}}
+@include('partials.office_switch')
+
+@unless ($showStockCols)
+  {{-- ⚠ 紙そのものは拠点で分けて管理していない（入庫数はコンテンツごとに1つだけ）。
+       「東京の在庫」という数字は存在しないので、拠点を選んでいるあいだは出さない。 --}}
+  <div class="ps-intro" style="border-left:4px solid var(--brand);">
+    いまは <b>{{ $officeScope }}</b> の案件だけで数えています（必要数・消費数・月別・明細）。<br>
+    <b>入庫数・在庫数・過不足は出していません。</b>紙は拠点で分けて持っていない（入庫数はコンテンツごとに1つ）ので、
+    拠点ごとの在庫という数字が存在しないためです。<b>在庫を見る・入庫数を直すときは、上の「全拠点」を選んでください。</b>
+  </div>
+@endunless
+
 {{-- ── 在庫表（入庫数は手入力） ── --}}
 <div class="ps-card">
   <h3>在庫一覧（コンテンツ＝印刷物ごと）</h3>
@@ -149,10 +162,9 @@
           <tr>
             <th class="l">コンテンツ（印刷物）</th>
             <th>必要数(今後)</th>
-            <th>入庫数(手入力)</th>
+            @if ($showStockCols)<th>入庫数(手入力)</th>@endif
             <th>消費数(自動)</th>
-            <th>在庫数</th>
-            <th>過不足</th>
+            @if ($showStockCols)<th>在庫数</th><th>過不足</th>@endif
           </tr>
         </thead>
         <tbody>
@@ -160,13 +172,15 @@
             <tr>
               <td class="l">{{ $r['name'] }}@if($r['perTeam'] > 1)<span class="est">（{{ $r['perTeam'] }}枚/組）</span>@endif</td>
               <td>{{ $r['future'] }}</td>
-              <td><input class="ps-recv" type="number" name="received[{{ $r['id'] }}]" value="{{ $r['received'] }}" min="0" max="99999"></td>
+              @if ($showStockCols)<td><input class="ps-recv" type="number" name="received[{{ $r['id'] }}]" value="{{ $r['received'] }}" min="0" max="99999"></td>@endif
               <td>{{ $r['past'] }}</td>
-              <td>{{ $r['zaiko'] }}</td>
-              <td class="{{ $r['excess'] < 0 ? 'short' : 'ok' }}">
-                {{ $r['excess'] >= 0 ? '+' . $r['excess'] : $r['excess'] }}
-                @if($r['excess'] < 0)（{{ $r['short'] }}枚不足）@endif
-              </td>
+              @if ($showStockCols)
+                <td>{{ $r['zaiko'] }}</td>
+                <td class="{{ $r['excess'] < 0 ? 'short' : 'ok' }}">
+                  {{ $r['excess'] >= 0 ? '+' . $r['excess'] : $r['excess'] }}
+                  @if($r['excess'] < 0)（{{ $r['short'] }}枚不足）@endif
+                </td>
+              @endif
             </tr>
           @endforeach
         </tbody>
@@ -174,19 +188,23 @@
           <tr>
             <td class="l">合計</td>
             <td>{{ $totals['future'] }}</td>
-            <td>{{ $totals['received'] }}</td>
+            @if ($showStockCols)<td>{{ $totals['received'] }}</td>@endif
             <td>{{ $totals['past'] }}</td>
-            <td>{{ $totals['zaiko'] }}</td>
-            <td class="{{ $totals['shortage'] > 0 ? 'short' : 'ok' }}">
-              @if($totals['shortage'] > 0)不足 {{ $totals['shortage'] }}枚 @else 不足なし @endif
-            </td>
+            @if ($showStockCols)
+              <td>{{ $totals['zaiko'] }}</td>
+              <td class="{{ $totals['shortage'] > 0 ? 'short' : 'ok' }}">
+                @if($totals['shortage'] > 0)不足 {{ $totals['shortage'] }}枚 @else 不足なし @endif
+              </td>
+            @endif
           </tr>
         </tfoot>
       </table>
       </div>
-      <div class="ps-actions">
-        <button type="submit" class="ps-btn">入庫数を保存</button>
-      </div>
+      @if ($showStockCols)
+        <div class="ps-actions">
+          <button type="submit" class="ps-btn">入庫数を保存</button>
+        </div>
+      @endif
       <p class="ps-note">
         ※「過不足」が赤字（マイナス）なら、その枚数だけ追加印刷が必要です。<br>
         ※ 印刷物はコンテンツごとに別物のため、コンテンツをまたいだ合計（在庫の総枚数）には意味がありません。合計行は目安です。

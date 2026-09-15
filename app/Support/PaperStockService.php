@@ -38,7 +38,7 @@ class PaperStockService
      *   totals: array<string, int>,
      * }
      */
-    public function compute(): array
+    public function compute(?string $office = null): array
     {
         $today = Carbon::today();
 
@@ -60,7 +60,12 @@ class PaperStockService
             $stock[$cid] = ['future' => 0, 'past' => 0];
         }
 
-        $projects = Project::orderBy('start_date')->get();
+        // ⚠ 拠点で絞れるのは「案件から数える数字」だけ（必要数・消費数・明細）。
+        //   入庫数は content_paper_stocks に**コンテンツごとに1行**しか持っておらず、
+        //   紙そのものを拠点で分けて管理していないため、入庫・在庫は常に全社の数字になる。
+        //   （画面側で、拠点を選んでいるときは在庫の列を出さないようにしてある）
+        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->orderBy('start_date')->get();
         foreach ($projects as $p) {
             if ($p->status === '下書き') {
                 continue;   // 下書きは実在しない案件なので数えない

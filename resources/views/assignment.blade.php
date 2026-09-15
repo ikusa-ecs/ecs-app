@@ -298,7 +298,7 @@
       <div class="asg-bar">
         {{-- 範囲で入っているときは「6〜8名」と出す。数え合わせは多いほう（data-need）で行う。 --}}
         <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名</span></span>
-        <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="onlyAvail" checked onchange="filterStaff()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> この日 希望・稼働可 の人だけ</label>
+        <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="onlyAvail" checked onchange="filterStaff()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> エントリー・この日 希望/稼働可 の人だけ</label>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="sortByScore" checked onchange="sortRows()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> おすすめ順に並べる</label>
         <button type="button" class="btn primary" id="autoPlaceBtn" onclick="autoPlace()" title="空いている必要人数ぶん、おすすめ上位を自動でチェックします（保存はしません）">✨ おすすめを自動で仮置き</button>
         <div class="spacer"></div>
@@ -374,6 +374,11 @@
         </div>
       </div>
 
+      {{-- 拠点の切替（2026-09-15 baba要望）。⚠ この画面は「案件」ではなく**候補スタッフ**を絞る。
+           これが無いと、他拠点の案件を開いたときに自分の拠点のスタッフしか出ず、
+           手でURLに ?office=all と書かないと切り替えられなかった。 --}}
+      @include('partials.office_switch')
+
       @if ($officeScope)
         {{-- 拠点で絞っているときだけ出す注記（管理者が全拠点表示のときは出さない） --}}
         <p class="asg-legend" style="background:#fbf6ef;">
@@ -406,7 +411,7 @@
               @php($ex = $existing[$s['id']] ?? null)
               @php($w = $s['wish'] ?? null)
               @php($isAvail = in_array($w, ['希望', '稼働可'], true))
-              <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-pos="{{ implode('|', $s['posCodes']) }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-entry="{{ !empty($s['entry']) ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
+              <tr class="staff-row @if ($s['blocked']) blocked @endif" data-name="{{ $s['name'] }}" data-score="{{ $s['score'] }}" data-pos="{{ implode('|', $s['posCodes']) }}" data-ng="{{ implode('|', $s['ng']) }}" data-avail="{{ $isAvail ? '1' : '0' }}" data-entry="{{ !empty($s['entry']) ? '1' : '0' }}" data-eligible="{{ !empty($s['eligible']) ? '1' : '0' }}" data-assigned="{{ $ex ? '1' : '0' }}">
                 <td class="chk">
                   {{-- 足した直後の人は、はじめからチェックを入れておく（保存で消えないように）。 --}}
                   <input type="checkbox" name="staff_ids[]" value="{{ $s['id'] }}" {{ ($ex || $s['id'] === $addedId) ? 'checked' : '' }} onchange="updateCount()">
@@ -492,7 +497,7 @@
         @foreach ($noteOptions as $opt)<option value="{{ $opt }}">@endforeach
       </datalist>
 
-      <p id="noAvail" class="muted" style="display:none; font-size:12.5px; margin-top:8px;">この日に「希望・稼働可」の人がまだいません。上の「この日 希望・稼働可 の人だけ」のチェックを外すと、名簿の全員から選べます。</p>
+      <p id="noAvail" class="muted" style="display:none; font-size:12.5px; margin-top:8px;">この案件にエントリーした人も、この日を「希望・稼働可」にした人もまだいません。上の「エントリー・この日 希望/稼働可 の人だけ」のチェックを外すと、名簿の全員から選べます。</p>
       <div id="autoNote" class="alert ok" style="display:none; margin-top:10px;"><span class="ico">✨</span><div></div></div>
 
       <div class="save-bar">
@@ -594,8 +599,12 @@
     document.querySelectorAll('.staff-row').forEach(tr => {
       const nameOk = !q || (tr.dataset.name || '').includes(q);
       if (nameOk) nameHits++;
+      // ⚠ 2026-09-15（FBシート No.17）＝**エントリーした人も残す**。
+      //   以前は稼働可カレンダーしか見ていなかったので、「エントリーする」を押した人でも
+      //   カレンダーを入れていなければ候補から消えていた（＝応募が見えない）。
+      //   判定は data-eligible の1つだけ（正本はサーバーの AssignmentController）。
       // 「希望者だけ」表示でも、すでにアサイン済みの人は隠さない（外す判断ができるように）
-      const availOk = !availOnly || tr.dataset.avail === '1' || tr.dataset.assigned === '1';
+      const availOk = !availOnly || tr.dataset.eligible === '1' || tr.dataset.assigned === '1';
       const show = nameOk && availOk;
       tr.style.display = show ? '' : 'none';
       if (show) visible++;
@@ -685,8 +694,13 @@
   // すでに手で選んだ人は消さず、足りないぶんだけ足す（除外＝NG該当は対象外）。保存はしない。
   function autoPlace() {
     // おすすめ順（点数の高い順）・除外を外した候補リスト
+    // ⚠ 2026-09-15（FBシート No.18）＝**エントリーした人・この日を希望/稼働可にした人だけ**が対象。
+    //   以前は名簿の全員（絞り込みで隠れている行もふくむ）から選んでいたので、
+    //   応募もしていない・その日に出られると言ってもいない人が仮置きされていた。
+    //   月まとめ自動アサインの candidatesFor() と同じ考え方。
     const rows = Array.from(document.querySelectorAll('tr.staff-row'))
       .filter(tr => !tr.classList.contains('blocked'))
+      .filter(tr => tr.dataset.eligible === '1' || tr.dataset.assigned === '1')
       .sort((a, b) => parseFloat(b.dataset.score || '0') - parseFloat(a.dataset.score || '0'));
     // すでにチェック済みの人は「使用済み」として扱う（上書きしない）
     const used = new Set();
@@ -738,11 +752,15 @@
     const note = document.getElementById('autoNote');
     if (note) {
       note.style.display = '';
+      // ⚠ 0名のときは理由を分けて出す（2026-09-15）。
+      //   「候補がいない」のか「枠がもう埋まっている」のかで、次にやることが違うため。
       const msg = placed > 0
         ? ('おすすめ上位を自動で仮置きしました（' + placed + '名を追加）。内容を確認して、下の「保存」で確定してください。')
-        : ((slots.length || !isNaN(NEED))
-            ? '追加できる空き枠がありませんでした（必要人数はすでに埋まっています）。'
-            : 'この案件は必要人数もポジション枠も未設定のため、自動で仮置きできませんでした。');
+        : (rows.length === 0
+            ? 'この案件にエントリーした人も、この日を「希望・稼働可」にした人もいないため、自動では入れられませんでした。名簿から直接選ぶことはできます。'
+            : ((slots.length || !isNaN(NEED))
+                ? '追加できる空き枠がありませんでした（必要人数はすでに埋まっています）。'
+                : 'この案件は必要人数もポジション枠も未設定のため、自動で仮置きできませんでした。'));
       const body = note.querySelector('div');
       if (body) body.textContent = msg;
     }

@@ -125,16 +125,21 @@
       {{-- 月の切替（2026-09-07 baba要望）。それまでは当月に固定で、
            来月の希望をまとめて見ることができなかった。 --}}
       <div class="wl-month">
-        <a class="wl-mon-btn" href="?period={{ $prevPeriod }}" title="前の月へ">◀</a>
+        {{-- ⚠ URLはコントローラで作って渡す（拠点 ?office= を持ち回るため）。 --}}
+        <a class="wl-mon-btn" href="{{ $urlPrev }}" title="前の月へ">◀</a>
         <span class="wl-mon">{{ $periodLabel }}</span>
-        <a class="wl-mon-btn" href="?period={{ $nextPeriod }}" title="次の月へ">▶</a>
-        <a class="wl-mon-btn wide {{ $isThisMonth ? 'on' : '' }}" href="?" title="今月に戻す">今月</a>
+        <a class="wl-mon-btn" href="{{ $urlNext }}" title="次の月へ">▶</a>
+        <a class="wl-mon-btn wide {{ $isThisMonth ? 'on' : '' }}" href="{{ $urlThisMonth }}" title="今月に戻す">今月</a>
       </div>
+
+      {{-- 拠点の切替（2026-09-15 baba要望）。この画面だけ切替が無かった。 --}}
+      @include('partials.office_switch')
       <div class="sub">稼働希望（〇）を出した人と、案件にエントリーしてくれた人の一覧です。希望数・実アサイン数・その割合、できるポジションを確認できます。（数値はすべて本物の希望・エントリー・アサインから計算しています。対象月＝<b>{{ $periodLabel }}</b>）<br>
         ◀ ▶ で月を変えられます。<b>その月に〇もエントリーも出していない人は出ません。</b></div>
       @if (count($people) === 0)
         <div class="wl-empty">
-          <b>{{ $periodLabel }}は、まだ誰も稼働希望（〇）もエントリーも出していません。</b><br>
+          <b>{{ $periodLabel }}@if ($officeScope)の{{ $officeScope }}では@else は@endif、まだ誰も稼働希望（〇）もエントリーも出していません。</b><br>
+          @if ($officeScope)ほかの拠点も見るときは、上の「表示する拠点」で切り替えてください。<br>@endif
           月を間違えていないか、◀ ▶ で確かめてください。スタッフが「稼働希望」を保存するか、案件にエントリーすると、ここに並びます。
         </div>
       @endif

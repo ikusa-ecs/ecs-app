@@ -35,6 +35,9 @@
         ここで全体の状況をつかんでから、<b>「日別ボード」</b>で実際の割り当て作業に進みます。
       </div>
 
+      {{-- 拠点の切替（2026-09-15 baba要望）。この画面だけ切替が無かった。 --}}
+      @include('partials.office_switch')
+
       <h2 style="margin:4px 0 4px; font-size:18px;">アサイン担当の状況</h2>
       <p class="muted" style="font-size:12px; margin:0 0 14px;">アサインを進めるための担当者向けの情報です（全社員向けの情報はダッシュボードにあります）。稼働率の対象月は {{ now()->format('Y年n月') }}です。
         <a class="btn sm" href="/assign" style="margin-left:8px;">▦ 日別ボードで割り当てる →</a>
@@ -145,7 +148,8 @@
         <div class="panel-head">
           <h2>直近の確定アサイン</h2>
           <div class="spacer"></div>
-          <a class="btn sm" href="/assign-dashboard/export.csv" title="「アサインが必要な案件」の一覧をCSVでダウンロードします">⬇ CSV出力</a>
+          {{-- ⚠ URLはコントローラで作って渡す（拠点を持ち回るため。画面で組み立てない）。 --}}
+          <a class="btn sm" href="{{ $csvUrl }}" title="「アサインが必要な案件」の一覧をCSVでダウンロードします（いま表示している拠点のぶん）">⬇ CSV出力</a>
         </div>
         @if (count($recentConfirmed))
         <table class="tbl">

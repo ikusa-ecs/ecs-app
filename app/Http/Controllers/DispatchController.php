@@ -116,15 +116,27 @@ class DispatchController extends Controller
         //   @php ブロックや href の中のインライン @if は、展開されずに文字がそのまま出ることがあり、
         //   その画面のJavaScriptが丸ごと死ぬ（この画面でも一度踏んだ）。
         $live = $rows->where('status', '!=', DispatchStatus::CANCELLED);
-        $q = $status !== '' ? '?status='.urlencode($status) : '';
+
+        // 期間の切替リンク。⚠ 拠点（?office=）を必ず持ち回る。
+        //   落とすと「全拠点で見ていたのに、期間を変えただけで自分の拠点に戻る」（2026-09-15 に直した）。
+        $keep = [];
+        if ($status !== '') {
+            $keep['status'] = $status;
+        }
+        if ($request->filled('office')) {
+            $keep['office'] = (string) $request->query('office');
+        }
+        $qs = fn (array $extra = []) => ($p = http_build_query($keep + $extra)) ? '?'.$p : '';
 
         return view('dispatch_list', [
             'sumRows' => $live->count(),
             'sumPeople' => $live->sum('count'),
             'sumProjects' => $live->pluck('projectId')->unique()->count(),
             'sumAsked' => $rows->where('status', DispatchStatus::ASKED)->count(),
-            'urlFuture' => '/dispatch-list'.$q,
-            'urlPast' => '/dispatch-list?past=1'.($status !== '' ? '&status='.urlencode($status) : ''),
+            'urlFuture' => '/dispatch-list'.$qs(),
+            'urlPast' => '/dispatch-list'.$qs(['past' => 1]),
+            // 状態の絞り込みフォームから拠点が落ちないように、そのまま送り返す値。
+            'officeParam' => $request->filled('office') ? (string) $request->query('office') : '',
             'rows' => $rows,
             'officeScope' => $office,
             'withPast' => $withPast,

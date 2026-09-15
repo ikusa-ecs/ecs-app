@@ -192,6 +192,14 @@ class AssignmentController extends Controller
                     // この案件にエントリーしたか（＋本人の一言）。
                     'entry' => array_key_exists($p->id, $entries),
                     'entryNote' => (string) ($entries[$p->id] ?? ''),
+                    // ⚠ この案件に「入れてよい候補」か（2026-09-15・FBシート No.17/18）。
+                    //   ＝エントリーした人 または その日を希望・稼働可にした人。
+                    //   月まとめ自動アサインの candidatesFor() と同じ考え方にそろえてある。
+                    //   絞り込みのチェックボックスも、✨自動で仮置きも、**この1つの印だけ**を見る。
+                    //   （以前は絞り込みが稼働可しか見ておらずエントリーした人が消え、
+                    //     自動で仮置きは隠れている行まで拾って、応募も稼働可でもない人を入れていた）
+                    'eligible' => array_key_exists($p->id, $entries)
+                        || in_array($wish[$p->id] ?? null, ['希望', '稼働可'], true),
                     'score' => $eval['score'],
                     'reasons' => $eval['reasons'],
                     'warnings' => $eval['warnings'],

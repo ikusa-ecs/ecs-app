@@ -664,7 +664,14 @@ class AssignBoardController extends Controller
 
         $end = $anchor->copy()->addDays(self::BOARD_DAYS);
 
-        $prefs = ShiftPreference::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
+        // ⚠ shift_preferences.date は「2026-09-13 00:00:00」の形（時刻つき）で入っている。
+        //   終わりを '2026-09-13' のまま渡すと、その日は 00:00:00 より後がすべて範囲外になり、
+        //   **ボードの最終日の「〇」が丸ごと落ちる**（本人は入力したのに希望者に出ない）。
+        //   ShiftWish と同じく 00:00:00〜23:59:59 で挟む（2026-09-15 に直した）。
+        $prefs = ShiftPreference::whereBetween('date', [
+            $anchor->format('Y-m-d').' 00:00:00',
+            $end->format('Y-m-d').' 23:59:59',
+        ])
             ->whereIn('availability', ['稼働可', '希望'])
             ->get(['staff_id', 'date']);
 

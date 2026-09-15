@@ -110,10 +110,19 @@
         <button class="ex-tab" data-pane="role" onclick="exTab('role')">🎬 ポジションから探す</button>
       </div>
 
+@endverbatim
+      {{-- 拠点の切替（2026-09-15 baba要望）。
+           ⚠ 以前はこの下の絞り込み欄に画面だけのプルダウンがあったが、
+              ①URLに残らないので人に送れない ②権限に関係なく「すべて」が選べた、
+              の2点でほかの画面と食い違っていた。いまはサーバーで絞る（正本＝OfficeScope）。
+           ⚠ ここは @ verbatim（そのまま出す区間）の外に出してある。中に書くと
+              「＠include(」が文字のまま画面に出て、この画面のJSが丸ごと死ぬ。 --}}
+      @include('partials.office_switch')
+@verbatim
+
       <!-- 共通の絞り込み -->
       <div class="ex-card">
         <div class="ex-filters">
-          <select id="fOffice" onchange="exRender()"></select>
           <select id="fKind" onchange="exRender()">
             <option value="">区分：すべて</option>
             <option value="employee">社員だけ</option>
@@ -123,8 +132,9 @@
           <label><input type="checkbox" id="fGone" onchange="exRender()"> 退職・停止の人も出す</label>
           <span class="ex-hint" id="fHint"></span>
           <span class="ex-dl" style="margin-left:auto;">
-            <a href="/experience/export.csv">⬇ コンテンツ別CSV</a> ／
-            <a href="/experience/export.csv?type=role">⬇ ポジション別CSV</a>
+            {{-- ⚠ URLはコントローラで作って渡す（拠点を持ち回るため）。 --}}
+            <a href="{{ $csvContent }}">⬇ コンテンツ別CSV</a> ／
+            <a href="{{ $csvRole }}">⬇ ポジション別CSV</a>
           </span>
         </div>
       </div>
@@ -171,9 +181,8 @@
   window.ECS_EXPERIENCE = @json($experience ?? []);
   window.ECS_CONTENTS   = @json($contentOptions ?? []);
   window.ECS_ROLES      = @json($roleOptions ?? []);
-  {{-- 拠点で絞るための選択肢と、自分の拠点。⚠ 拠点名をJSに書き足さない（正本は拠点マスタ）。 --}}
-  window.ECS_OFFICES    = @json($offices ?? []);
-  window.ECS_MY_OFFICE  = @json($myOffice ?? '');
+  {{-- いま絞っている拠点（null＝全拠点）。切替は画面上の「表示する拠点」＝サーバー側で絞る。 --}}
+  window.ECS_OFFICE_SCOPE = @json($officeScope ?? '');
 </script>
 @verbatim
 <script>
@@ -189,16 +198,9 @@
   }
 
   // ===== 選択肢を作る =====
-  // ⚠ 拠点は拠点マスタから作る（画面に拠点名を直書きしない）。はじめは自分の拠点。
-  //   「すべての拠点」も残す＝他拠点へヘルプに行く／来てもらう運用があるので隠さない。
+  // ⚠ 拠点はここで作らない（2026-09-15）。画面の上の「表示する拠点」で切り替え、
+  //   サーバー側（OfficeScope）で絞ってから渡ってくる。
   function buildFilters(){
-    const mine = (window.ECS_MY_OFFICE || '').trim();
-    let html = '<option value="">拠点：すべて</option>';
-    (window.ECS_OFFICES || []).forEach(function(o){
-      html += '<option value="' + esc(o) + '"' + (o === mine ? ' selected' : '') + '>' + esc(o) + '</option>';
-    });
-    document.getElementById('fOffice').innerHTML = html;
-
     let ch = '';
     (window.ECS_CONTENTS || []).forEach(function(c, i){
       ch += '<option value="' + esc(c) + '"' + (i === 0 ? ' selected' : '') + '>' + esc(c) + '</option>';
@@ -214,13 +216,12 @@
 
   // ===== 絞り込み =====
   function filtered(){
-    const office = document.getElementById('fOffice').value;
     const kind   = document.getElementById('fKind').value;
     const kw     = document.getElementById('fKw').value.trim();
     const gone   = document.getElementById('fGone').checked;
 
     return PEOPLE.filter(function(p){
-      if (office && p.office !== office) return false;
+      // ⚠ 拠点はサーバー側で絞り済み（ここでは見ない）。
       if (kind && p.role !== kind) return false;
       if (!gone && !p.active) return false;
       if (kw && p.name.indexOf(kw) < 0 && p.id.indexOf(kw) < 0 && (p.kana || '').indexOf(kw) < 0) return false;
@@ -228,7 +229,8 @@
     });
   }
   function hint(list){
-    const office = document.getElementById('fOffice').value;
+    // 拠点はサーバー側で絞ってから渡ってくる（画面上の「表示する拠点」で切り替える）。
+    const office = (window.ECS_OFFICE_SCOPE || '').trim();
     document.getElementById('fHint').innerHTML = list.length + '名を表示中'
       + (office ? '（<b>' + esc(office) + '</b>の人だけ）' : '（すべての拠点）');
   }

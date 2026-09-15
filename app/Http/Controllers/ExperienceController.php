@@ -6,6 +6,7 @@ use App\Models\Person;
 use App\Support\AssignmentRole;
 use App\Support\ExperienceCount;
 use App\Support\OfficeScope;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -25,9 +26,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ExperienceController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        [$people, $experience] = $this->collect();
+        // 拠点で絞る（2026-09-15 baba要望）。
+        // ⚠ それまでは画面のJSだけで絞っていたので、①URLに残らない（人に送れない）
+        //   ②一般社員・スタッフでも「すべての拠点」が選べてしまう、の2つが他の画面と食い違っていた。
+        //   いまは他の画面と同じ App\Support\OfficeScope が正本。
+        $office = OfficeScope::filter($request);
+        [$people, $experience] = $this->collect($office);
 
         return view('experience', [
             'people' => $people,
@@ -36,11 +42,20 @@ class ExperienceController extends Controller
             // ＝誰もやっていないコンテンツを選んで「0件」を見せない。
             'contentOptions' => $this->contentsIn($experience),
             'roleOptions' => $this->rolesIn($experience),
-            // 拠点で絞るための選択肢。既定は自分の拠点。
-            // ⚠ 拠点名は画面に書かない。正本は拠点マスタ（共通設定 → マスタ管理）。
-            'offices' => OfficeScope::options(),
-            'myOffice' => OfficeScope::filterSingle(request()),
+            'officeScope' => $office,
+            // CSVにも同じ拠点を持ち回る（画面と中身がズレないように）。
+            'csvContent' => '/experience/export.csv'.$this->officeQuery($request),
+            'csvRole' => '/experience/export.csv?type=role'
+                .($request->filled('office') ? '&office='.urlencode((string) $request->query('office')) : ''),
         ]);
+    }
+
+    /** ?office= があればそのままクエリ文字にする（無ければ空）。 */
+    private function officeQuery(Request $request): string
+    {
+        return $request->filled('office')
+            ? '?office='.urlencode((string) $request->query('office'))
+            : '';
     }
 
     /**
@@ -49,10 +64,11 @@ class ExperienceController extends Controller
      *
      * ⚠ 画面と同じ数え方にするため、数えるのは必ず ExperienceCount を通す。
      */
-    public function exportCsv(): StreamedResponse
+    public function exportCsv(Request $request): StreamedResponse
     {
-        $byRole = request()->query('type') === 'role';
-        [$people, $experience] = $this->collect();
+        $byRole = $request->query('type') === 'role';
+        // ⚠ 画面と同じ拠点で絞る（忘れると「東京で見ていたのに全拠点のCSVが落ちる」）。
+        [$people, $experience] = $this->collect(OfficeScope::filter($request));
 
         $head = $byRole
             ? ['拠点', '区分', '番号', '氏名', 'ポジション', '回数', '最後にやった日']
@@ -102,11 +118,11 @@ class ExperienceController extends Controller
      *
      * @return array{0: Collection, 1: array}
      */
-    private function collect(): array
+    private function collect(?string $office = null): array
     {
         // 社員もスタッフも同じ土俵で見る（同じ現場に出るため）。
         // 退職・停止の人も残す＝過去に誰がやったかを追えるように。画面側で切り替えられる。
-        $people = Person::query()
+        $people = OfficeScope::applyToPeople(Person::query(), $office)
             ->orderBy('name')
             ->get(['id', 'name', 'name_kana', 'role', 'office', 'active'])
             ->map(fn (Person $p) => [

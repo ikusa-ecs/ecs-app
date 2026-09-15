@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\StaffRoleEligibility;
+use App\Support\OfficeScope;
 use App\Support\WishCount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -62,7 +63,10 @@ class AssignWishlistController extends Controller
         $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
         $posByStaff = StaffRoleEligibility::all()->groupBy('staff_id');
 
-        $people = Person::staff()->get()->map(function (Person $p) use (
+        // 拠点で絞る（2026-09-15 baba要望＝この画面だけ切替が無かった）。既定＝自分の拠点。
+        $office = OfficeScope::filter($request);
+
+        $people = OfficeScope::applyToPeople(Person::staff(), $office)->get()->map(function (Person $p) use (
             $monthStart, $monthEnd, $projectType, $assignsByStaff, $posByStaff, $wishCount
         ) {
             $mine = $wishCount[$p->id] ?? null;
@@ -119,6 +123,11 @@ class AssignWishlistController extends Controller
             'prevPeriod' => $month->copy()->subMonth()->format('Y-m'),
             'nextPeriod' => $month->copy()->addMonth()->format('Y-m'),
             'isThisMonth' => $period === Carbon::today()->format('Y-m'),
+            'officeScope' => $office,
+            // ⚠ 月を動かすリンクに拠点を持ち回る。落とすと「全拠点で見ていたのに月を変えたら自拠点に戻る」。
+            'urlPrev' => $request->fullUrlWithQuery(['period' => $month->copy()->subMonth()->format('Y-m')]),
+            'urlNext' => $request->fullUrlWithQuery(['period' => $month->copy()->addMonth()->format('Y-m')]),
+            'urlThisMonth' => $request->fullUrlWithQuery(['period' => Carbon::today()->format('Y-m')]),
         ]);
     }
 

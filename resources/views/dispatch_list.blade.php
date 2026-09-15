@@ -87,7 +87,16 @@
     @endif
   </p>
 
+  @include('partials.office_switch')
+
   <form method="GET" action="/dispatch-list" class="dl-bar">
+    {{-- ⚠ 拠点をここで持ち回らないと、状態を変えただけで自分の拠点に戻ってしまう。 --}}
+    @if ($officeParam !== '')
+      <input type="hidden" name="office" value="{{ $officeParam }}">
+    @endif
+    @if ($withPast)
+      <input type="hidden" name="past" value="1">
+    @endif
     <span class="lbl">状態：</span>
     <select name="status" onchange="this.form.submit()">
       <option value="">すべて</option>
