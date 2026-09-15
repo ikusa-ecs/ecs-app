@@ -536,6 +536,9 @@
        ⚠ 保存された写しではなく、画面を開くたびに assignments から数え直したもの。
           希望を出したあとに決まった案件も、次に開けば自動で出る。 --}}
   window.ECS_ASSIGNED = @json($assigned ?? []);
+  // 祝日。サーバーで年ごとに計算したもの（正本＝App\Support\JapaneseHolidays）。
+  // キーは "Y-M-D"（ゼロ埋めなし）＝下の keyOf と同じ形。値は祝日名。
+  window.ECS_HOLIDAYS = @json($holidays ?? []);
   window.ECS_SAVE_URL  = '/employee-availability/save';
   window.ECS_CSRF      = '{{ csrf_token() }}';
 </script>
@@ -545,13 +548,12 @@
   let cursor = new Date();
   cursor = new Date(cursor.getFullYear(), cursor.getMonth(), 1); // その月の1日に固定
 
-  // ===== サンプルの祝日・長期休暇（モック用の見本） =====
-  // 祝日は "M/D" で指定（(例)は年によって動く祝日の見本）
-  const HOLIDAYS = {
-    '1/1':'祝','1/13':'祝','2/11':'祝','2/23':'祝','3/20':'祝',
-    '4/29':'祝','5/3':'祝','5/4':'祝','5/5':'祝','7/21':'祝',
-    '8/11':'祝','9/15':'祝','9/23':'祝','10/13':'祝','11/3':'祝','11/23':'祝'
-  };
+  // ===== 祝日・長期休暇 =====
+  // ⚠ 祝日はサーバーで年ごとに計算したものを使う（正本＝App\Support\JapaneseHolidays）。
+  //   2026-09-15 まではここに "9/15・9/23・10/13" と月日をべた書きしていたが、これは2025年の日付で、
+  //   第◯月曜の祝日（成人・海・敬老・スポーツ）と春分・秋分は毎年動くので必ずズレる。
+  //   キーは "Y-M-D"（ゼロ埋めなし）＝ keyOf と同じ形。値は祝日名（ふきだしに出す）。
+  const HOLIDAYS = window.ECS_HOLIDAYS || {};
   function isObon(m,d){ return m===8 && d>=13 && d<=16; }      // お盆
   function isNewYear(m,d){ return (m===12 && d>=29) || (m===1 && d<=3); } // 年末年始
 
@@ -596,7 +598,8 @@
     const w = new Date(y, m-1, d).getDay(); // 0=日..6=土
     if (isObon(m,d))    return { input:true, badge:'お盆' };
     if (isNewYear(m,d)) return { input:true, badge:'正月' };
-    if (HOLIDAYS[m+'/'+d]) return { input:true, badge:'祝' };
+    const holiName = HOLIDAYS[y+'-'+m+'-'+d];
+    if (holiName) return { input:true, badge:'祝', holi:holiName };
     if (w===0 || w===6) return { input:true };   // 土日
     return { input:false };                       // 平日
   }
@@ -687,6 +690,7 @@
         + '<div class="chips"></div>'
         + '<button type="button" class="memobtn" title="この日のメモを書く">✎</button>';
       if (kind.big) cell.title = bigTitle(kind.big);
+      else if (kind.holi) cell.title = kind.holi; // 祝日の名前（例＝敬老の日）
       const k = keyOf(y,m,d);
       if (kind.input){
         applyEvent(cell, myState[k]);
@@ -1066,7 +1070,7 @@
       if (kind.input){
         const w = ['日','月','火','水','木','金','土'][new Date(y,m-1,d).getDay()];
         // 大型案件はお客様の会社名も見出しに出す（2026-08-28 baba要望）。
-        cols.push({ d, w, badge:kind.badge, big: kind.big || null });
+        cols.push({ d, w, badge:kind.badge, big: kind.big || null, holi: kind.holi || '' });
       }
     }
     const tbl = document.getElementById('ovTbl');
@@ -1097,7 +1101,8 @@
       const bigTxt = c.big
         ? '<span class="bigclient" title="' + ovEsc(bigTitle(c.big)) + '">' + ovEsc(bigNames(c.big)) + '</span>'
         : '';
-      head += '<th class="' + cls + '">' + c.d + '<br><small>(' + c.w + ')' + (c.badge?'<br>'+c.badge:'') + '</small>'
+      head += '<th class="' + cls + '"' + (c.holi ? ' title="' + ovEsc(c.holi) + '"' : '') + '>'
+            + c.d + '<br><small>(' + c.w + ')' + (c.badge?'<br>'+c.badge:'') + '</small>'
             + bigTxt + '</th>';
     });
     head += '<th class="offcol">平日の希望休</th><th class="memocol">備考</th></tr></thead>';

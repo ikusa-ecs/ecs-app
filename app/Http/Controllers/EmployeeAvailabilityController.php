@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Person;
 use App\Models\ShiftPreference;
 use App\Support\ConfirmedSchedule;
+use App\Support\JapaneseHolidays;
 use App\Support\OfficeScope;
 use App\Support\Departments;
 use App\Support\PersonalCases;
@@ -148,6 +149,10 @@ class EmployeeAvailabilityController extends Controller
             // ⚠ 保存しない＝開くたびに数え直す。希望を出したあとに決まった案件も、
             //   次に開けば自動で出る（希望を出す時点では案件があるか分からないため）。
             'assigned' => ConfirmedSchedule::forPeople($employees->pluck('id')->all()),
+            // 祝日（2026-09-15）。⚠ 以前は画面に「9/15・9/23」のように月日をべた書きしていたため
+            //   2025年の日付のままズレていた。ハッピーマンデーと春分・秋分は年で動くので必ず計算する。
+            //   正本＝App\Support\JapaneseHolidays。キーは画面の keyOf と同じ "Y-M-D"。
+            'holidays' => JapaneseHolidays::forDisplay(Carbon::today()),
         ]);
     }
 
