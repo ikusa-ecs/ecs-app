@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
+use App\Support\ChatworkRooms;
 use App\Support\DangerDays;
 use App\Support\OfficeScope;
 use App\Support\StaffLinks;
@@ -151,6 +152,24 @@ class SettingsController extends Controller
                 ? DangerDays::saveAllOffices($data['dates'])
                 : DangerDays::saveOffice($data['dates'], $this->targetOffice($request)),
         ]);
+    }
+
+    /**
+     * チャットワークの送り先（知らせごとの部屋）を保存する。2026-09-15 baba要望。
+     *
+     * ⚠ **部屋IDは鍵ではない**ので、.env ではなく設定画面で変えられるようにしている
+     *   （送り先は運用で変わるもの。変えるたびにエンジニア依頼にしない）。
+     * ⚠ ふつうのフォームで受ける（この画面のほかの設定はAJAXだが、ここは押した瞬間に
+     *   保存されて結果が画面に出るほうが分かりやすいため）。
+     */
+    public function saveChatworkRooms(Request $request)
+    {
+        $rooms = $request->input('rooms', []);
+        $rejected = ChatworkRooms::save(is_array($rooms) ? $rooms : []);
+
+        return back()
+            ->with('chatwork_rooms_status', 'チャットワークの送り先を保存しました。')
+            ->with('chatwork_rooms_rejected', $rejected);
     }
 
     /**

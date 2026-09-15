@@ -129,7 +129,8 @@ class FinanceReminderService
         $modeLabel = $dryRun ? '件数確認' : ($isTest ? 'テスト送信' : '本番送信');
 
         $token = config('services.chatwork.token');
-        $room = $isTest ? config('services.chatwork.test_room') : config('services.chatwork.room');
+        // 送り先の部屋は知らせごとに変えられる（2026-09-15 baba要望）。正本＝App\Support\ChatworkRooms。
+        $room = ChatworkRooms::for($isTest ? ChatworkRooms::TEST : ChatworkRooms::FINANCE);
 
         if (! $dryRun && (empty($token) || empty($room))) {
             return [
@@ -137,7 +138,9 @@ class FinanceReminderService
                 'mode' => $mode,
                 'modeLabel' => $modeLabel,
                 'title' => '⚠️ 未設定',
-                'text' => 'APIトークンまたはルームIDが未設定です。.env の CHATWORK_TOKEN / CHATWORK_ROOM_ID を設定してください。',
+                'text' => 'APIトークンまたは送り先の部屋が未設定です。'
+                    .'トークンは .env の CHATWORK_TOKEN（エンジニア依頼）、'
+                    .'部屋は 共通設定 →「チャットワークの送り先」で設定できます。',
                 'cases' => [],
                 'unknownNames' => [],
             ];

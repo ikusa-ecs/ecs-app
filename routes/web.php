@@ -366,6 +366,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);
     // 危険日（手動指定）を settings に保存。ダッシュボードの危険日カレンダーに反映される。
     Route::post('/settings/danger-dates', [SettingsController::class, 'saveDangerDates']);
+    // チャットワークの送り先（知らせごとの部屋）を settings に保存。2026-09-15 baba要望。
+    // ⚠ 部屋IDは鍵ではないので画面から変えられる（トークンだけ .env）。正本＝App\Support\ChatworkRooms。
+    Route::post('/settings/chatwork-rooms', [SettingsController::class, 'saveChatworkRooms']);
     // スタッフ画面の便利リンク集（Notion・アンケートフォーム等）を settings に保存。
     Route::post('/settings/staff-links', [SettingsController::class, 'saveStaffLinks']);
 

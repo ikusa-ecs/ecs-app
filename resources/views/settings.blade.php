@@ -274,6 +274,57 @@
       </div>
 
       <!-- ② 通知設定は「個人ごとの設定」なので マイページ へ移動（2026-07-01 baba） -->
+@endverbatim
+
+      {{-- チャットワークの送り先（2026-09-15 baba要望「それぞれ贈る場所が違うから設定できるようにしてほしい」）。
+           ⚠ ふつうのフォームで送る（JavaScriptを使わない）＝押した瞬間に保存され、結果が画面に出る。
+           ⚠ 選択肢も既定値も App\Support\ChatworkRooms が正本。ここに部屋番号を書かない。
+           ⚠ この欄は「そのまま出す区間」の外に置くこと（中に入れると差し込みの記号がそのまま出る）。 --}}
+      <div class="panel settings-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>チャットワークの送り先</h2></div>
+        <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
+          知らせごとに、送る部屋を分けられます。<b>空のままにすると「共通」の部屋へ送ります。</b><br>
+          部屋の番号は、チャットワークでその部屋を開いたときのURLの <b>rid</b> のうしろの数字です
+          （例：<code>https://www.chatwork.com/#!rid320609834</code> → <b>320609834</b>）。
+          <b>URLを丸ごと貼っても大丈夫です。</b>
+        </p>
+
+        @if (session('chatwork_rooms_status'))
+          <div class="flash" style="margin:8px 0;">{{ session('chatwork_rooms_status') }}</div>
+        @endif
+        @foreach (session('chatwork_rooms_rejected', []) as $__msg)
+          <div class="flash" style="margin:8px 0; background:#fdecec; color:#b91c1c; border-color:#f3c0c0;">{{ $__msg }}</div>
+        @endforeach
+
+        <form method="POST" action="/settings/chatwork-rooms">
+          @csrf
+          @foreach (\App\Support\ChatworkRooms::KINDS as $__kind => $__info)
+            <div class="set-row">
+              <div>
+                <span class="set-label">{{ $__info[0] }}</span>
+                <span class="set-note">{{ $__info[1] }}</span>
+              </div>
+              <div class="set-control">
+                <input type="text" name="rooms[{{ $__kind }}]" inputmode="numeric"
+                       value="{{ \App\Support\ChatworkRooms::stored($__kind) }}"
+                       placeholder="{{ \App\Support\ChatworkRooms::for($__kind) ?: '未設定' }}"
+                       style="width:200px; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font-size:13px; font-family:inherit;">
+              </div>
+            </div>
+          @endforeach
+          <div style="padding:10px 0 2px;">
+            <button type="submit" class="btn primary">この送り先にする</button>
+          </div>
+        </form>
+
+        <p class="muted" style="font-size:11.5px; margin:8px 0 0; line-height:1.7;">
+          ※ 薄い文字で出ている番号は「いま実際に送っている先」です（空欄なら、そこへ送ります）。<br>
+          ※ <b>知らせを送るには、別途チャットワークのトークンが必要です</b>（.env の CHATWORK_TOKEN・エンジニア依頼）。
+          トークンが無いあいだは、ここを設定しても送信されません。
+        </p>
+      </div>
+
+@verbatim
 
       <!-- ③ マスタ管理 -->
       <div class="panel settings-wrap" style="margin-top:20px;">

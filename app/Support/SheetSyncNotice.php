@@ -141,7 +141,8 @@ final class SheetSyncNotice
             return false;   // 設定していない環境（手元のPCなど）では何もしない
         }
 
-        $room = (string) config('services.chatwork.room');
+        // 送り先の部屋は知らせごとに変えられる（2026-09-15 baba要望）。正本＝App\Support\ChatworkRooms。
+        $room = ChatworkRooms::for(ChatworkRooms::SHEET_SYNC);
         if ($room === '') {
             return false;
         }
