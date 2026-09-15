@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\CountDeadlineReminderService;
+use App\Support\SheetSyncNotice;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -21,3 +22,35 @@ Artisan::command('reminder:count-deadline {mode=dry}', function (string $mode) {
 Schedule::call(function () {
     (new CountDeadlineReminderService())->run('live');
 })->weekdays()->at('09:00')->timezone('Asia/Tokyo')->name('count-deadline-reminder');
+
+// ──────────────────────────────────────────────────────────────────────
+// アサイン表の自動取り込みの見張り（2026-09-15 baba要望）。
+//
+// ⚠ **これが本命。** 毎朝の取り込みは GAS（スプレッドシート側の仕掛け）が動かしていて、
+//   GASが止まっても失敗の知らせは「作った人の個人メール」にしか届かない。
+//   ＝作った人が休み・異動・退職すると、**誰も気づかないまま止まり続ける**。
+//   届いたときの報告（POST /sheet-sync の kind=report）だけでは、
+//   GASが丸ごと止まった日は「何も来ない」だけなので気づけない。
+//   そこで ECS 側から「今朝のぶんが届いていない」を見張って、チャットワークに出す。
+//
+// ⚠ 平日だけ見る（土日はアサイン表を触らないので、毎週2回の空振りを出さない）。
+// ⚠ 実際に動くのは、サーバーで `php artisan schedule:work`（またはcron）が
+//    走っているときだけ。ローカルの `php artisan serve` では動かない。
+// 手動でも試せる： php artisan sheet-sync:watch
+Artisan::command('sheet-sync:watch', function () {
+    if (SheetSyncNotice::receivedToday()) {
+        $this->info('今朝のアサイン表は届いています。');
+
+        return;
+    }
+
+    $sent = SheetSyncNotice::missingWarning(SheetSyncNotice::lastReceivedAt());
+    $this->warn('今朝のアサイン表が届いていません。'
+        .($sent ? 'チャットワークに知らせました。' : 'チャットワークの設定が無いので知らせていません。'));
+})->purpose('今朝アサイン表が届いたかを見て、届いていなければチャットワークに知らせる');
+
+Schedule::call(function () {
+    if (! SheetSyncNotice::receivedToday()) {
+        SheetSyncNotice::missingWarning(SheetSyncNotice::lastReceivedAt());
+    }
+})->weekdays()->at(SheetSyncNotice::EXPECTED_BY)->timezone('Asia/Tokyo')->name('sheet-sync-watch');

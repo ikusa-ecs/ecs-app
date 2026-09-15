@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SheetSync;
 use App\Support\MonthlySheetReader;
 use App\Support\OfficeScope;
+use App\Support\SheetSyncNotice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -63,6 +64,13 @@ class SheetSyncController extends Controller
         $given = (string) ($request->input('token') ?? $request->header('X-ECS-Token', ''));
         if (! hash_equals($expected, $given)) {
             return response()->json(['ok' => false, 'message' => '合言葉が違います。'], 403);
+        }
+
+        // 毎朝の「まとめ報告」（2026-09-15 baba要望）。GASが全部送り終わったあとに1回だけ叩く。
+        // ⚠ **わざとURLを増やしていない。** CSRFの除外は bootstrap/app.php に1つ（sheet-sync）だけ、
+        //   という決まりを守るため。入口が増えるほど、守り忘れる場所が増える。
+        if ($request->input('kind') === 'report') {
+            return $this->handleReport($request);
         }
 
         $data = $request->validate([
@@ -142,6 +150,47 @@ class SheetSyncController extends Controller
             'message' => $changed
                 ? '受け取りました（前回と中身が変わっています）。'
                 : '受け取りました（前回と同じ中身です）。',
+        ]);
+    }
+
+    /**
+     * 毎朝の「まとめ報告」をチャットワークへ1通流す（2026-09-15 baba要望）。
+     *
+     * 【なぜ月ごとではないか】
+     * 届くのは今月〜2027年6月ぶん＝10か月ぶん。月ごとに知らせると毎朝10通になって、
+     * 誰も読まなくなる。GAS側で数えてから、**1日1通**にまとめる。
+     *
+     * ⚠ 知らせに失敗しても 200 を返す（GAS側を止めない）。
+     *   受け取りそのものは済んでいるので、チャットに出ないだけの話にする。
+     */
+    private function handleReport(Request $request)
+    {
+        $data = $request->validate([
+            'office' => ['nullable', 'string', 'max:20'],
+            'sent' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'changed' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'changedPeriods' => ['nullable', 'array', 'max:50'],
+            'changedPeriods.*' => ['string', 'max:20'],
+            'wrote' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'errors' => ['nullable', 'array', 'max:50'],
+            'errors.*' => ['string', 'max:300'],
+        ]);
+
+        $posted = SheetSyncNotice::morningReport([
+            'office' => trim((string) ($data['office'] ?? '')) ?: '東京',
+            'sent' => (int) ($data['sent'] ?? 0),
+            'changed' => (int) ($data['changed'] ?? 0),
+            'changedPeriods' => array_values($data['changedPeriods'] ?? []),
+            'wrote' => (int) ($data['wrote'] ?? 0),
+            'errors' => array_values($data['errors'] ?? []),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'posted' => $posted,
+            'message' => $posted
+                ? 'チャットワークに知らせました。'
+                : 'チャットワークの設定が無いので、知らせは送っていません（受け取りは済んでいます）。',
         ]);
     }
 
