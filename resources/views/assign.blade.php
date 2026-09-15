@@ -1157,12 +1157,10 @@
       }
       // ⚠ 先に「役割の決まった枠」を回す。順番を変えると、MCができる人が
       //   未定の枠に取られてMCが埋まらなくなる。
-      let unfilled = 0;
-      slots.forEach(role => { if (!fillOneSlot(role)) unfilled++; });
-      // ⚠ 役割が埋まらなかったぶんは「未定」で埋める（2026-09-09 baba「未定で埋めてOK」）。
-      //   埋めないと、候補が残っているのに人数が足りないまま終わる。
-      //   担当は未定＝間違った役割を機械が付けることにはならない（あとで人が決める）。
-      for (let i = 0; i < unfilled; i++) { if (!fillOneSlot('')) break; }
+      slots.forEach(role => { fillOneSlot(role); });
+      // ⚠ 2026-09-15 baba「自動アサインの空き枠は空き枠でいい」。
+      //   役割ができる人がいない枠は、人を入れずに空けたままにする（月まとめの自動アサインと同じ）。
+      //   人だけ入れると「埋まっている」と見えて、アサイン担当が見落とすため。
       if (c.state === 'todo') c.state = 'adj';
       if ((c.stat || c.state) === 'todo') c.stat = 'adj';
       picked.forEach(sel => {

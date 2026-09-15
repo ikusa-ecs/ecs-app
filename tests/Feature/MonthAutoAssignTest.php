@@ -182,11 +182,12 @@ class MonthAutoAssignTest extends TestCase
     }
 
     /**
-     * ⚠ 役割の埋まらない枠は「未定」で埋める（2026-09-09 baba「未定で埋めてOK」）。
-     *   埋めないと、候補が残っているのに人数が足りないまま終わる。
-     *   担当は未定＝間違った役割を機械が付けることにはならない（あとで人が決める）。
+     * ⚠ 役割の埋まらない枠は**空けたまま**にする（2026-09-15 baba「空き枠は空き枠でいい」）。
+     *   2026-09-09 は「担当を未定にして人だけ入れる」動きにしていたが、やめた。
+     *   理由＝その役割ができる人がいないのに人だけ入ると、アサイン担当が
+     *   「埋まっている」と思って見落とす。空いていれば一目で分かる。
      */
-    public function test_unfillable_role_slots_are_filled_as_undecided(): void
+    public function test_unfillable_role_slots_are_left_empty(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         \App\Models\ContentRoleRequirement::create([
@@ -202,8 +203,8 @@ class MonthAutoAssignTest extends TestCase
 
         $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
 
-        $this->assertSame(1, $plan['totals']['added'], '枠が埋まらないままで終わっている');
-        $this->assertSame('', $plan['projects'][0]['picks'][0]['role'], '担当は未定で入れること');
+        $this->assertSame(0, $plan['totals']['added'], 'MCができないのに人を入れてしまっている');
+        $this->assertSame([], $plan['projects'][0]['picks'] ?? [], '空き枠は空けたままにすること');
     }
 
     /** ⚠ 役割つきの枠を先に埋める（未定を先に埋めると、MCができる人が取られてMCが埋まらない）。 */
@@ -714,8 +715,8 @@ class MonthAutoAssignTest extends TestCase
         $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
         $picks = collect($plan['projects'])->first()['picks'];
 
-        $this->assertCount(1, $picks, '人は入れる（担当は未定になる）');
-        $this->assertSame('', $picks[0]['role'], '大型のMC枠には入れないこと');
+        // 2026-09-15 baba「空き枠は空き枠でいい」＝入れられないなら人も入れない。
+        $this->assertSame([], $picks ?? [], '大型のMC枠には入れないこと（空き枠のまま）');
     }
 
     /** 「大型まで」の人は、大型案件のMC枠に入れる。 */
@@ -757,15 +758,15 @@ class MonthAutoAssignTest extends TestCase
     }
 
     /**
-     * 役割ができる人がいないときは、**担当を「未定」にして人だけ入れる**。
+     * 役割ができる人がいないときは、**その枠を空けたままにする**。
      *
-     * ⚠ 2026-09-09 に決まりが変わった（baba「未定で埋めてOK」）。
-     *   それまでは枠を空けたままにしていたが、
-     *   **候補が残っているのに人数が足りないまま終わる**ので、日別ボードでも月まとめでも
-     *   「まだスタッフがいるのにアサインできない」が起きていた。
-     * ⚠ 入れるのは「未定」＝間違った役割を機械が付けることにはならない（担当はあとで人が決める）。
+     * ⚠ 決まりが2回変わっている。
+     *   〜2026-09-08 … 空けたまま
+     *   2026-09-09 … 担当を「未定」にして人だけ入れる（候補が残るのが気になったため）
+     *   2026-09-15 … **空けたままに戻した**（baba「自動アサインの空き枠は空き枠でいい」）。
+     *   人だけ入れると「埋まっている」ように見えて、アサイン担当が見落とすため。
      */
-    public function test_unfillable_slot_is_filled_with_an_undecided_role(): void
+    public function test_unfillable_slot_is_left_empty(): void
     {
         $day = Carbon::today()->startOfMonth()->addDays(10);
         $this->requireRoles('CT-TEST', '中型', ['MC' => 1]);
@@ -780,7 +781,6 @@ class MonthAutoAssignTest extends TestCase
         $plan = (new MonthAutoAssign($day->format('Y-m')))->plan();
         $row = collect($plan['projects'])->firstWhere('id', $p->id);
 
-        $this->assertCount(1, $row['picks'], '候補がいるのに空けたままにしている');
-        $this->assertSame('', $row['picks'][0]['role'], '担当は未定で入れること');
+        $this->assertSame([], $row['picks'] ?? [], 'MCができない人を入れてしまっている（空き枠は空けたまま）');
     }
 }

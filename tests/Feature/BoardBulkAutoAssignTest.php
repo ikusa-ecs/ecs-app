@@ -92,7 +92,8 @@ class BoardBulkAutoAssignTest extends TestCase
      *   ① FC・CK は「みんなできる」＝一覧は window.ECS_ANYONE_ROLES から受け取る
      *      （画面に役割名を書き写すと、月まとめと食い違って
      *        「日別では入るのに月まとめでは入らない」になる）
-     *   ② 役割が埋まらない枠は「未定」で埋める（候補が残っているのに人数が足りない、を無くす）
+     *   ② 役割が埋まらない枠は**空けたまま**にする（2026-09-15 baba「空き枠は空き枠でいい」）
+     *      ＝人だけ入れると「埋まっている」ように見えて見落とすため。
      */
     public function test_it_shares_the_role_rules_with_the_month_engine(): void
     {
@@ -102,8 +103,9 @@ class BoardBulkAutoAssignTest extends TestCase
             'FC・CKを「みんなできる」とする一覧を画面が受け取っていません');
         $this->assertStringContainsString("if ((window.ECS_ANYONE_ROLES || []).indexOf(role) >= 0) return true;", $blade);
         $this->assertStringContainsString('function fillOneSlot(role){', $blade);
-        $this->assertStringContainsString("for (let i = 0; i < unfilled; i++) { if (!fillOneSlot('')) break; }", $blade,
-            '役割が埋まらない枠を「未定」で埋める仕掛けが消えています');
+        $this->assertStringContainsString('slots.forEach(role => { fillOneSlot(role); });', $blade);
+        $this->assertStringNotContainsString("fillOneSlot('')", $blade,
+            '役割が埋まらない枠に人だけ入れる仕掛けが残っています（2026-09-15 に「空き枠は空き枠でいい」に変更）');
     }
 
     /** 1件ずつの自動アサインは、これまでどおりお知らせを出すこと（silent は一括のときだけ）。 */
