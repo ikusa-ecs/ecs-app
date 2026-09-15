@@ -17,6 +17,7 @@ use App\Support\OfficeScope;
 use App\Support\PersonLookup;
 use App\Support\ProjectImportColumns;
 use App\Support\RequiredCountEstimate;
+use App\Support\ScheduleMark;
 use App\Support\SheetDiff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -568,6 +569,8 @@ class PastProjectImportController extends Controller
         // ⚠ これをアサイン表へ書き戻すと、次の朝からは同じ案件だと機械が確実に分かる
         //   （いまは日付・コンテンツ・お客様名で当てているので、書き直されるとズレる）。
         $idsByColumn = [];
+        // リハ・予備日・前日設営のうち、これから本番を探す案件のID。
+        $needParent = [];
 
         foreach ($entries as $i => $entry) {
             $edit = $edits[$i] ?? [];
@@ -644,7 +647,7 @@ class PastProjectImportController extends Controller
 
             DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus, $isFuture,
                 $crossKind, $shareOffice, $office, $seriesCol, &$created, &$updated, &$assignCount, &$shared,
-                &$idsByColumn) {
+                &$idsByColumn, &$needParent) {
                 if ($existing) {
                     // ⚠ 公開の状態（staff_published）は、読み込み直しでは触らない（2026-08-28 baba報告）。
                     //   スタッフを1人足すためにアサイン表を読み込み直しただけで**公開が取り消され**、
@@ -672,6 +675,12 @@ class PastProjectImportController extends Controller
                 //   探し直すと「似ている別の案件」のIDを書き戻してしまうことがある。
                 if ($seriesCol !== null) {
                     $idsByColumn[(int) $seriesCol] = $project->id;
+                }
+
+                // リハ・予備日・前日設営は、全部入れ終わってから本番に紐づける（下のまとめ処理）。
+                // ⚠ ここで探さない。リハが本番より先に並んでいると、その時点ではまだ本番が無い。
+                if (($project->date_type ?? '本番') !== '本番' && empty($project->parent_project_id)) {
+                    $needParent[] = $project->id;
                 }
 
                 // 巻き取り・ヘルプを「拠点間の関わり」として記録する（2026-08-28 baba要望）。
@@ -724,6 +733,42 @@ class PastProjectImportController extends Controller
             });
         }
 
+        // リハ・予備日・前日設営を「紐づく本番」につなぐ（2026-09-15 baba要望）。
+        // ⚠ **全部入れ終わってからまとめて探す。**
+        //   リハが本番より先に並んでいると、その時点ではまだ本番が入っていないため。
+        // ⚠ **1件に決められないものは紐づけない。**黙って正しくない本番にぶら下げると、
+        //   誰も気づけない。決められなかったものは一覧にして知らせる。
+        $linked = 0;
+        $unlinked = [];
+        foreach (array_unique($needParent) as $childId) {
+            $child = Project::find($childId);
+            if (! $child || ! empty($child->parent_project_id)) {
+                continue;
+            }
+
+            $parent = ScheduleMark::findParent(
+                (string) $child->project_name,
+                $child->client,
+                (string) ($child->office ?? ''),
+                optional($child->start_date)->format('Y-m-d') ?? '',
+                $child->id
+            );
+
+            $label = ($child->start_date ? $child->start_date->format('n/j') : '日付なし')
+                .'『'.($child->project_name ?: '（名称未定）').'』'
+                .'（'.($child->date_type ?: '本番').'）';
+
+            if ($parent === null) {
+                $unlinked[] = $label;
+
+                continue;
+            }
+
+            $child->parent_project_id = $parent->id;
+            $child->save();
+            $linked++;
+        }
+
         // 受信箱から取り込んだときは「いつ反映したか」を残す（2026-09-10）。
         // ⚠ これが「どこまで反映したか」の記録になる。受信箱の一覧では、これと
         //   「シートの中身が変わった日時」を比べて、見るべき月に印を付ける
@@ -741,7 +786,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled, $estimated))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled, $estimated, $linked, $unlinked))
             ->with('past_missing', array_keys($missingNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
@@ -890,6 +935,18 @@ class PastProjectImportController extends Controller
         $guests = $this->digits($get('お客様人数'));
         $teams = $this->digits($get('チーム数'));
         $future = $mode === self::MODE_FUTURE;
+
+        // コンテンツ名に「リハ」などの印が付いていたら、日程種別として読み取る
+        // （2026-09-15 baba「リハはコンテンツ名にリハって書いてあることが多い」）。
+        // ⚠ 月ごとのアサイン表には「日程種別」の欄が無いので、ここでしか分からない。
+        // ⚠ 印を外した名前を使う。外さないと
+        //   ①コンテンツ台帳に「綱引き大会(リハ)」という新しいコンテンツが増える
+        //   ②本番と名前が違うので紐づけられない。
+        // 正本＝App\Support\ScheduleMark。
+        $mark = ScheduleMark::detect($name);
+        if ($mark !== null) {
+            $name = $mark['clean'];
+        }
         // 運営人数（空欄なら「仮」で置く）。⚠ 出し方は countFor の1か所（画面にも書き写さない）。
         $head = $estimate ?? $this->countFor($get, $name, $count);
 
@@ -910,7 +967,10 @@ class PastProjectImportController extends Controller
             // ⚠ 募集ONだけではスタッフに見えない（公開ボードで公開して初めて出る）。
             'is_recruiting' => $future && $get('スタッフ募集') !== '募集しない',
             'is_multi' => $get('複数案件') === 'あり',
-            'date_type' => $get('日程種別') ?: '本番',
+            // 日程種別＝シートに欄があればそれ、無ければコンテンツ名の印から読む、どちらも無ければ本番。
+            // ⚠ 紐づく本番（parent_project_id）はここでは決めない。取り込みが全部終わってから
+            //   まとめて探す（リハが本番より先に並んでいると、その時点ではまだ本番が無いため）。
+            'date_type' => $get('日程種別') ?: ($mark['kind'] ?? '本番'),
             'sales_owners' => $get('営業担当') ? [$get('営業担当')] : null,
             'format' => $get('実施形態') ?: null,
             'online_tool' => $get('オンラインツール') ?: null,
@@ -1287,7 +1347,7 @@ class PastProjectImportController extends Controller
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
         int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST, int $shared = 0,
-        array $cancelled = [], array $estimated = []): string
+        array $cancelled = [], array $estimated = [], int $linked = 0, array $unlinked = []): string
     {
         $future = $mode === self::MODE_FUTURE;
         $msg = $isMonthly
@@ -1309,6 +1369,19 @@ class PastProjectImportController extends Controller
 
         if ($skipped > 0) {
             $msg .= " 「取り込まない」に印を付けた{$skipped}件は入れていません。";
+        }
+
+        // リハ・予備日・前日設営の紐づけ（2026-09-15）。
+        // ⚠ できたものも、できなかったものも必ず出す（黙って紐づけない・黙って放置しない）。
+        if ($linked > 0) {
+            $msg .= " リハ・予備日・前日設営の{$linked}件を、紐づく本番につなぎました。";
+        }
+        if ($unlinked) {
+            $msg .= ' ⚠ 次の'.count($unlinked).'件は、紐づく本番を決められなかったので**つないでいません**'
+                .'（本番が見つからないか、同じような本番が複数あります）。'
+                .'案件の編集画面で「紐づく本番案件」を選んでください：'
+                .implode(' / ', array_slice($unlinked, 0, 10))
+                .(count($unlinked) > 10 ? ' ほか'.(count($unlinked) - 10).'件' : '').'。';
         }
 
         // ⚠ キャンセルは黙って捨てない。何件・どれを飛ばしたかを必ず出す
