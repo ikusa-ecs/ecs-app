@@ -14,6 +14,7 @@ use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AvailabilityImportController;
 use App\Http\Controllers\CountDeadlineReminderController;
+use App\Http\Controllers\DangerDayFeedController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\EmployeeAvailabilityController;
@@ -68,6 +69,13 @@ Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middl
 //     （反映は人が「アサイン表の取込」の画面で押したときだけ）。
 //   ⚠ 総当たりを防ぐため、回数の上限をかける（1分に20回まで）。
 Route::post('/sheet-sync', [SheetSyncController::class, 'receive'])->middleware('throttle:20,1');
+
+// ── 危険日の一覧を機械（GAS）に渡す口（2026-09-16 baba要望）──
+//   GASがこれを読んで、イベプラのGoogleカレンダーに「危険日」の予定を入れる。
+//   ⚠ 門はアサイン表と**同じ合言葉**（ECS_SHEET_SYNC_TOKEN）。決めていなければ閉じたまま。
+//   ⚠ **GET＝見るだけ**。ECSは何も書き換えないし、カレンダーにも触らない
+//     （Googleの鍵はECSに持たせない。GASは onuma@ikusa.co.jp 自身として動くので鍵が要らない）。
+Route::get('/danger-days', [DangerDayFeedController::class, 'index'])->middleware('throttle:20,1');
 
 // ── 2段階認証（メールでコード）の入力ページ ──
 //   auth は必要だが twofa/onboarded は付けない（ここへ戻し続ける無限ループを防ぐ）。
@@ -366,6 +374,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/settings/mtg-dates', [SettingsController::class, 'saveMtgDates']);
     // 危険日（手動指定）を settings に保存。ダッシュボードの危険日カレンダーに反映される。
     Route::post('/settings/danger-dates', [SettingsController::class, 'saveDangerDates']);
+    // 危険日をイベプラのカレンダーに入れるときの文面（タイトル・説明）を保存。2026-09-16 baba要望。
+    Route::post('/settings/danger-calendar', [SettingsController::class, 'saveDangerCalendar']);
     // チャットワークの送り先（知らせごとの部屋）を settings に保存。2026-09-15 baba要望。
     // ⚠ 部屋IDは鍵ではないので画面から変えられる（トークンだけ .env）。正本＝App\Support\ChatworkRooms。
     Route::post('/settings/chatwork-rooms', [SettingsController::class, 'saveChatworkRooms']);

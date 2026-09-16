@@ -360,6 +360,48 @@
         </p>
       </div>
 
+      {{-- 危険日をカレンダーに入れるときの文面（2026-09-16 baba要望）。
+           ⚠ 実際にカレンダーへ入れるのはGAS。ECSは「どの日か」と「何と書くか」を渡すだけ。
+           ⚠ 文面をGASの中に書かない＝直すたびにGASを開くことになるため、ここ（画面）を正本にする。
+           ⚠ この欄は「そのまま出す区間」の外に置くこと。
+           ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
+      <div class="panel settings-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>危険日をカレンダーに入れるときの文面</h2></div>
+        <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
+          危険日ができたら、<b>イベプラのGoogleカレンダーに予定を入れて先に枠を押さえます</b>
+          （{{ $dangerCalStart }}〜{{ $dangerCalEnd }}・土日も入れます）。そのときの<b>タイトルと説明</b>をここで決めます。<br>
+          予定の説明のいちばん下には、<b>危険日と判定した理由</b>と、ECSが入れた予定だという<b>目印</b>が自動で付きます。
+        </p>
+
+        @if (session('danger_cal_status'))
+          <div class="flash" style="margin:8px 0;">{{ session('danger_cal_status') }}</div>
+        @endif
+
+        <form method="POST" action="/settings/danger-calendar">
+          @csrf
+          <label style="display:block; font-size:12.5px; margin:6px 0 4px;"><b>予定のタイトル</b></label>
+          <input type="text" name="title" maxlength="{{ $dangerCalTitleMax }}" value="{{ $dangerCalTitle }}"
+                 style="width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid var(--line);
+                        border-radius:8px; font-size:13px; font-family:inherit;
+                        background:var(--panel); color:var(--ink);">
+          <label style="display:block; font-size:12.5px; margin:12px 0 4px;"><b>予定の説明</b></label>
+          <textarea name="body" rows="6" maxlength="{{ $dangerCalBodyMax }}"
+                    style="width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid var(--line);
+                           border-radius:8px; font-size:13px; line-height:1.8; font-family:inherit;
+                           background:var(--panel); color:var(--ink); resize:vertical;">{{ $dangerCalBody }}</textarea>
+          <div style="padding:10px 0 2px;">
+            <button type="submit" class="btn primary">この文面にする</button>
+          </div>
+        </form>
+
+        <p class="muted" style="font-size:11.5px; margin:8px 0 0; line-height:1.7;">
+          ※ タイトルを空にすると「{{ $dangerCalTitleDefault }}」に戻ります（名前のない予定を作らないためです）。<br>
+          ※ ⚠ <b>目印の行は消さないでください。</b>この目印が付いた予定だけを、危険日でなくなったときにECSが消します。
+          目印が無い予定（自分で入れた予定）には触りません。<br>
+          ※ 入れるのは<b>{{ $dangerCalMonths }}か月先まで</b>／対象は<b>自動で赤くなる危険日と、上で手で足した危険日の両方</b>です。
+        </p>
+      </div>
+
 @verbatim
 
       <!-- ③ マスタ管理 -->

@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
 use App\Support\ChatworkRooms;
+use App\Support\DangerCalendar;
 use App\Support\DangerDays;
 use App\Support\LineGroupText;
 use App\Support\OfficeScope;
@@ -81,7 +82,33 @@ class SettingsController extends Controller
             // ⚠ 正本＝App\Support\LineGroupText。画面に文面を書かない。
             'lineNotice' => LineGroupText::notice(),
             'lineNoticeMax' => LineGroupText::NOTICE_MAX,
+            // 危険日をカレンダーに入れるときの文面（2026-09-16 baba要望）。
+            // ⚠ 正本＝App\Support\DangerCalendar。画面に文面や時間を直書きしない。
+            'dangerCalTitle' => DangerCalendar::title(),
+            'dangerCalBody' => DangerCalendar::bodyText(),
+            'dangerCalTitleDefault' => DangerCalendar::TITLE_DEFAULT,
+            'dangerCalTitleMax' => DangerCalendar::TITLE_MAX,
+            'dangerCalBodyMax' => DangerCalendar::BODY_MAX,
+            'dangerCalStart' => DangerCalendar::START_TIME,
+            'dangerCalEnd' => DangerCalendar::END_TIME,
+            'dangerCalMonths' => DangerCalendar::MONTHS_AHEAD,
         ]);
+    }
+
+    /**
+     * 危険日をカレンダーに入れるときの文面を保存する（POST /settings/danger-calendar）。
+     *
+     * 実際にカレンダーへ入れるのはGAS。ECSは文面を渡すだけなので、ここを直せば
+     * **次にGASが動いたときから**新しい文面になる（すでに入っている予定も書き直される）。
+     *
+     * ⚠ タイトルは空にできない（名前のない予定を作らないため）。空で送られたら初期値に戻る。
+     */
+    public function saveDangerCalendar(Request $request)
+    {
+        DangerCalendar::saveTitle((string) $request->input('title', ''));
+        DangerCalendar::saveBody((string) $request->input('body', ''));
+
+        return back()->with('danger_cal_status', '危険日の予定の文面を保存しました。');
     }
 
     /**
