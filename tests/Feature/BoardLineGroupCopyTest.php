@@ -149,7 +149,30 @@ class BoardLineGroupCopyTest extends TestCase
         $this->assertStringNotContainsString('※前泊や同日案件がないか', $text, '古い定型文が残っています');
     }
 
-    /** ⑥ 共通設定の画面に、いまの定型文が出ている。 */
+    /**
+     * ⑥ 画面（JS）がLINEの文章を「詰め替えて」いること。
+     *
+     * ⚠ 2026-09-16 の不具合はここだった。サーバーは lineIcon/lineName/lineText を渡していたのに、
+     *   日別ボードのJSがカードを作り直すときに**写し忘れて**いたため、
+     *   「📱 LINE」のパネルは開くのに**枠の中が空**だった（baba報告「肝心の文字が表示されてない」）。
+     *   ⚠ この画面はサーバーから来たカードを作り直すつくりなので、
+     *     コントローラに足しただけでは画面に出ない。この見張りを消さないこと。
+     */
+    public function test_the_board_view_keeps_the_line_fields_in_its_mapping(): void
+    {
+        $html = $this->actingAsPerson($this->manager())->get('/assign')->assertOk()->getContent();
+
+        foreach (['lineIcon:c.lineIcon', 'lineName:c.lineName', 'lineText:c.lineText',
+            'lineMade:c.lineMade', 'lineSent:c.lineSent', 'lineDouble:c.lineDouble'] as $needle) {
+            $this->assertStringContainsString(
+                $needle,
+                $html,
+                "画面の詰め替えから {$needle} が消えると、「📱 LINE」の枠が空になります"
+            );
+        }
+    }
+
+    /** ⑦ 共通設定の画面に、いまの定型文が出ている。 */
     public function test_the_settings_screen_shows_the_notice(): void
     {
         $me = PersonFactory::new()->admin()->create(['office' => '東京']);

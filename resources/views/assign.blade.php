@@ -743,6 +743,13 @@
       //   詰め替えを忘れると、また「MCが2人」「謎解きなのに軍師」に戻る。
       template:(c.template || {}),
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
+      // LINEグループを作るときの文章と準備チェック（2026-09-16）。
+      // ⚠ ここで詰め替えを忘れると、「📱 LINE」のパネルは開くのに**枠の中が空**になる
+      //   （2026-09-16 baba報告「ボタンはあるけど肝心の文字が表示されてない」＝まさにこれ）。
+      //   この画面は**サーバーから来たカードを作り直している**ので、
+      //   サーバー側（AssignBoardController）に足しただけでは画面に出ない。
+      lineIcon:c.lineIcon, lineName:c.lineName, lineText:c.lineText,
+      lineMade:c.lineMade, lineSent:c.lineSent, lineDouble:c.lineDouble,
       // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
       //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
       //   ⚠ 2026-09-15 追記＝**emp（社員か）と mcMax（MCで入れる上限の規模）も必ず持ってくる**。
@@ -2405,6 +2412,15 @@
   // パネルの中身。開いていないカードでは何も出さない（画面が重くなるため）。
   function lineBoxHtml(c){
     if (!lineOpen.has(c.id)) return '';
+
+    // ⚠ 文章が空＝サーバーから来ていない。黙って空の枠を出すと原因が分からないので理由を出す
+    //   （2026-09-16 の「枠は開くのに中身が空」を二度と無言にしない）。
+    if (!c.lineText) {
+      return `<div class="line-box"><div class="lb-lead">
+        この案件の文章を作れませんでした。見本データを表示しているか、画面が古いままの可能性があります。
+        <b>いちど再読み込み（F5）してください。</b>それでも出ないときは知らせてください。
+        </div></div>`;
+    }
 
     const items = [
       ['icon', c.lineIcon || '', '① アイコン用（3行）',
