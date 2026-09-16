@@ -779,3 +779,39 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .hist-body { font-size: 13px; }
   .hist-arrow { margin: 0 4px; }
 }
+
+/* ===== 派遣依頼の行（2026-09-16 baba要望）==========================
+   「派遣で入力したのにメンバーに出ていない」＝派遣を読んでいたのが日別ボードだけだったため。
+   アサイン表・案件別アサイン・ピックアップにも同じ見た目で出す。
+
+   ⚠ 色は3つのテーマぜんぶに値がある名前だけを使う（--accent2-ink/--accent2-soft 等）。
+     直接 #6d28d9 と書くと、黒ベースで沈んで読めなくなる。
+   ⚠ 見た目の正本はここ1か所。画面ごとにCSSを書き足さない
+     （同じ派遣なのに画面によって色が違う、が起きる）。
+   ⚠ 「派」の印＝人（スタッフ・社員）の行と見分けるため。名簿には入らない人たち。 */
+.ecs-dsp { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.ecs-dsp-row {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  font-size: 12px; line-height: 1.6;
+}
+/* キャンセル＝消さずに薄く残す（頼んだ事実が消えると経緯が追えない） */
+.ecs-dsp-row.off { opacity: .55; text-decoration: line-through; }
+.ecs-dsp-mark {
+  flex: none; width: 18px; text-align: center; border-radius: 4px;
+  background: var(--accent2-soft); color: var(--accent2-ink);
+  font-size: 11px; font-weight: 700;
+}
+.ecs-dsp-agency { color: var(--accent2-ink); font-weight: 700; }
+.ecs-dsp-count {
+  border-radius: 4px; padding: 0 5px; font-size: 11px;
+  background: var(--accent2-soft); color: var(--accent2-ink);
+}
+.ecs-dsp-role { color: var(--muted); font-size: 11px; }
+/* 状況＝依頼中／確定／キャンセル。言葉の正本は App\Support\DispatchStatus。 */
+.ecs-dsp-st {
+  border-radius: 999px; padding: 0 7px; font-size: 11px; font-weight: 700;
+  border: 1px solid transparent;
+}
+.ecs-dsp-st.asked { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
+.ecs-dsp-st.fixed { background: var(--ok-soft); color: var(--ok-ink); border-color: var(--ok-line); }
+.ecs-dsp-st.cancelled { background: var(--chip-bg); color: var(--chip-ink); border-color: var(--line); }

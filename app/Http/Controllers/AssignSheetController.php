@@ -9,6 +9,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\AssignmentRole;
+use App\Support\DispatchRows;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
@@ -120,6 +121,11 @@ class AssignSheetController extends Controller
 
         $membersByProject = $assignments->groupBy('project_id');
 
+        // 派遣依頼（2026-09-16）。メンバー欄の下に「派遣会社＋人数＋状況（依頼中など）」を出す。
+        // ⚠ 名簿（people）には入らない人たちなので、assignments からは絶対に出てこない。
+        //   読み方と見せ方の正本＝App\Support\DispatchRows。
+        $dispatchesByProject = DispatchRows::forProjects($projectIds);
+
         // この月の案件の「拠点間共有」（ヘルプ/巻き取り）をまとめて引く。案件ごとにまとめる。
         $sharesByProject = $projectIds->isEmpty()
             ? collect()
@@ -141,7 +147,7 @@ class AssignSheetController extends Controller
                 ->get(['content_id', 'scale', 'position', 'count', 'note', 'patrol'])
                 ->groupBy('content_id');
 
-        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
+        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $dispatchesByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。
             $members = ($membersByProject->get($p->id) ?? collect())
                 ->map(function ($a) use ($people) {
@@ -255,6 +261,8 @@ class AssignSheetController extends Controller
                 'need_i'      => (int) ($p->required_count ?? 0),
                 'filled'      => $members->count(),
                 'members'     => $members->all(),
+                // 派遣（2026-09-16）。メンバーとは別の行で出す＝人ではなく「会社への依頼」だから。
+                'dispatches'  => $dispatchesByProject[$p->id] ?? [],
             ];
         })->values();
 

@@ -12,6 +12,7 @@ use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentScorer;
 use App\Support\CrossOfficeHelp;
+use App\Support\DispatchRows;
 use App\Support\PositionTemplate;
 use App\Support\AssignmentStamp;
 use App\Support\Headcount;
@@ -268,6 +269,10 @@ class AssignmentController extends Controller
             // 足した直後は、その人にチェックを入れた状態で開く
             // （足しただけで保存を押すと消えてしまうため）。
             'addedId' => (string) request()->query('added', ''),
+            // 派遣依頼（2026-09-16 baba要望）。この画面は名簿から人を選ぶ画面なので、
+            // 派遣は下の一覧には出てこない＝「何名は派遣で埋めたか」が分からなかった。
+            // ⚠ ここは見るだけ。頼む・直すのは日別ボードの「＋派遣」と「派遣一覧」。
+            'dispatches' => DispatchRows::forProject($project->id),
         ]);
     }
 

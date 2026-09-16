@@ -501,6 +501,26 @@
   function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
 
+  // 派遣依頼の行（2026-09-16 baba要望「派遣で入力したら派遣会社と今の状況を出してほしい」）。
+  // ⚠ 派遣の方は名簿（people）に入らない＝メンバー（assignments）には絶対に出てこない。
+  //   ここに出さないと「派遣で埋めたのに、まだ足りないように見える」。
+  // ⚠ 文字（説明・状況）はサーバーで作ったものをそのまま使う＝正本は App\Support\DispatchRows。
+  //   見た目は public/ecs/style.css の .ecs-dsp-*（派遣を出す4画面で同じ）。
+  // ⚠ ここは見るだけ。直す・消すのは「派遣一覧」から（押し間違いで記録が消えないように）。
+  function dispatchHtml(c){
+    const list = (c.dispatches || []);
+    if (!list.length) return '';
+    return '<div class="ecs-dsp">' + list.map(function (d) {
+      return '<div class="ecs-dsp-row ' + (d.cancelled ? 'off' : '') + '" title="' + escAttr(d.tip || '') + '">'
+        + '<span class="ecs-dsp-mark">派</span>'
+        + '<span class="ecs-dsp-agency">' + esc(d.agency) + '</span>'
+        + '<span class="ecs-dsp-count">派遣 ' + esc(d.count) + '名</span>'
+        + (d.role ? '<span class="ecs-dsp-role">' + esc(d.role) + '</span>' : '')
+        + '<span class="ecs-dsp-st ' + esc(d.cls || 'asked') + '">' + esc(d.status) + '</span>'
+        + '</div>';
+    }).join('') + '</div>';
+  }
+
   // 役割セレクト（window.ECS_ROLE_OPTIONS からoption生成・初期選択=roleCode）
   function roleSelectHtml(caseId, m){
     const opts = Object.entries(window.ECS_ROLE_OPTIONS || {}).map(([code, label]) =>
@@ -761,6 +781,7 @@
           </div>
           <div class="pk-block-h">メンバー（アサイン済み） <span class="cnt ${short ? 'short' : ''}">${roster.length} / 必要 ${c.need}名</span></div>
           ${memHtml}
+          ${dispatchHtml(c)}
           <div class="pk-block-h">希望者（未割当・エントリー中） <span class="cnt">${wishers.length}名</span></div>
           ${wishHtml}
           <div class="pk-save-row">

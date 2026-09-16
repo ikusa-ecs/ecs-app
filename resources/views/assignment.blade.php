@@ -280,6 +280,17 @@
         </div>
         {{-- 案件の備考：担当が見落とすと事故るので必ず出す。この帯からその場で直せる（2026-08-21 baba） --}}
         <div class="pnote-slot" data-id="{{ $project->id }}" data-note="{{ $project->note }}"></div>
+
+        {{-- 派遣依頼（2026-09-16 baba要望）。
+             ⚠ 派遣の方は名簿（people）に入らないので、下のスタッフ一覧には出てこない。
+             ここに出さないと「何名を派遣で埋めたか」が分からず、必要人数を二重に埋めてしまう。
+             ⚠ 頼む・直すのは日別ボードの「＋派遣」と「派遣一覧」。ここは見るだけ。 --}}
+        @if (! empty($dispatches))
+          <div class="meta">
+            <span>派遣：</span>
+            @include('partials.dispatch_rows', ['dispatches' => $dispatches])
+          </div>
+        @endif
       </div>
     </div>
   </div>

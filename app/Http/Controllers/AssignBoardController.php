@@ -8,10 +8,10 @@ use App\Models\Content;
 use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
-use App\Models\ProjectDispatch;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
+use App\Support\DispatchRows;
 use App\Support\EntryFeed;
 use App\Support\LineGroupText;
 use App\Support\OfficeScope;
@@ -439,10 +439,9 @@ class AssignBoardController extends Controller
 
         // 派遣依頼（2026-09-03）。⚠ それまで「＋派遣」は画面の中だけで、読み込み直すと消えていた。
         //   一覧は /dispatch-list。ここではメンバー欄に出すために読む。
-        $dispatchesByProject = ProjectDispatch::whereIn('project_id', $projectIds)
-            ->orderBy('id')
-            ->get()
-            ->groupBy('project_id');
+        // ⚠ 2026-09-16、読み方と見せ方を App\Support\DispatchRows に集めた
+        //   （アサイン表・案件別アサイン・ピックアップにも同じものを出すため）。
+        $dispatchesByProject = DispatchRows::forProjects($projectIds);
 
         // 関係する人（名前・区分・できる役割）をまとめて引く。
         $people = $this->peopleWithPos(
@@ -625,14 +624,7 @@ class AssignBoardController extends Controller
                 'applicants' => $applicants,   // 希望者カラムの元（応募者）
                 // 派遣依頼（2026-09-03）。メンバー欄に紫で出す。キャンセルも印つきで残す
                 // （頼んだ事実が消えると経緯が追えない）。一覧は /dispatch-list。
-                'dispatches' => ($dispatchesByProject->get($p->id) ?? collect())->map(fn ($d) => [
-                    'id' => $d->id,
-                    'agency' => $d->agency,
-                    'count' => $d->count,
-                    'role' => (string) ($d->role ?? ''),
-                    'status' => $d->status,
-                    'note' => (string) ($d->note ?? ''),
-                ])->values()->all(),
+                'dispatches' => $dispatchesByProject[$p->id] ?? [],
             ];
         })->values();
     }
@@ -1019,7 +1011,12 @@ class AssignBoardController extends Controller
 
         $contentNames = Content::pluck('content_name', 'id');
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $entryNoteByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames) {
+        // 派遣依頼（2026-09-16）。⚠ 派遣の方は名簿に入らないので assignments には出てこない
+        //   ＝この画面にも出ておらず「派遣で埋めたのにメンバーが足りない」に見えていた。
+        //   読み方と見せ方の正本＝App\Support\DispatchRows。
+        $dispatchesByProject = DispatchRows::forProjects($projectIds);
+
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $entryNoteByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames, $dispatchesByProject) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $applicantIds = $appsByProject->get($p->id, []);
             $entryNotes = $entryNoteByProject->get($p->id, []);
@@ -1089,6 +1086,9 @@ class AssignBoardController extends Controller
                 'draft' => false,
                 'entrants' => $entrants,
                 'members' => $members,
+                // 派遣（2026-09-16）。メンバー欄の下に「派遣会社＋人数＋状況」を出す。
+                // ⚠ この画面の保存は「いま画面にいるメンバーで上書き」だが、派遣は別の表なので巻き込まれない。
+                'dispatches' => $dispatchesByProject[$p->id] ?? [],
             ];
         })->values();
     }

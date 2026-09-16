@@ -1491,17 +1491,16 @@
     const list = (c.dispatches || []);
     if (!list.length) return '';
     return list.map(d => {
-      const cancelled = d.status === 'キャンセル';
-      const tip = d.agency + '（' + d.count + '名'
-        + (d.role ? '・' + d.role : '') + '・' + d.status + '）'
-        + (d.note ? '／' + d.note : '')
-        + '　※直す・消すのは「派遣一覧」から';
+      // ⚠ 「キャンセルか」「状況の色」「説明の文」は**サーバーで作ったものをそのまま使う**
+      //   （2026-09-16。正本＝App\Support\DispatchRows）。
+      //   画面ごとに組み立て直すと、アサイン表とここで言葉や色が食い違う。
+      const cancelled = !!d.cancelled;
       return `<div class="mem-row hk-row${cancelled ? ' off' : ''}">`
         + `<span class="m-no">派</span>`
-        + `<span class="m-name haken" title="${escAttr(tip)}">${escHtml(d.agency)}</span>`
+        + `<span class="m-name haken" title="${escAttr(d.tip || '')}">${escHtml(d.agency)}</span>`
         + `<span class="m-type haken">派遣 ${d.count}名</span>`
         + (d.role ? `<span class="m-pos">${escHtml(d.role)}</span>` : '')
-        + `<span class="hk-st ${d.status === '確定' ? 'fixed' : (cancelled ? 'cancelled' : 'asked')}">${escHtml(d.status)}</span>`
+        + `<span class="hk-st ${d.cls || 'asked'}">${escHtml(d.status)}</span>`
         + `</div>`;
     }).join('');
   }

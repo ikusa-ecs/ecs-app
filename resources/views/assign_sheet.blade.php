@@ -586,8 +586,13 @@
               @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
             </div>
           @empty
-            <div class="mempty">まだアサインされていません</div>
+            @if (empty($c['dispatches']))
+              <div class="mempty">まだアサインされていません</div>
+            @endif
           @endforelse
+          {{-- 派遣依頼（2026-09-16 baba要望）。人ではないのでメンバー行とは分けて下に出す。
+               見た目・中身の正本＝partials/dispatch_rows（4画面で同じ）。 --}}
+          @include('partials.dispatch_rows', ['dispatches' => $c['dispatches']])
         </div>
 
       </div>
