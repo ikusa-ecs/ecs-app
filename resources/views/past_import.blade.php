@@ -200,6 +200,27 @@
     </div>
   @endif
 
+  {{-- コンテンツ台帳に無かった名前。過去の取込では台帳に足さないので、必ず一覧で知らせる
+       （2026-09-16 baba決定。昔の表記ゆれで台帳が使いものにならなくなるのを防ぐため）。 --}}
+  @if (session('past_new_contents') && count(session('past_new_contents')))
+    <div class="pj-flash warn">
+      <b>ℹ 次のコンテンツ名は、コンテンツ台帳にありませんでした。</b><br>
+      案件は<b>入っています</b>。ただし台帳には<b>足していません</b>ので、
+      その案件のコンテンツは<b>「単発」</b>あつかいになり、<b>コンテンツ別の集計には入りません</b>。<br>
+      台帳に入れたいものがあれば <a href="/masters">マスタ管理 → コンテンツ</a> で足してから、
+      <b>同じアサイン表をもう一度取り込む</b>とつながります（案件は上書きされ、二重にはなりません）。<br>
+      <span class="muted" style="font-size:11.5px;">
+        ※ 昔のアサイン表は表記がゆれていることがあります（全角と半角・略称など）。
+        台帳にある名前と<b>1文字でも違うと別のもの</b>として扱われるので、台帳側の名前に合わせて直すのが確実です。
+      </span>
+      <ul class="pj-names">
+        @foreach (session('past_new_contents') as $n)
+          <li>{{ $n }}</li>
+        @endforeach
+      </ul>
+    </div>
+  @endif
+
   <div class="pj-card">
     <h2>この画面は何をするもの？</h2>
     <p class="pj-lead">
@@ -282,12 +303,15 @@
       <div style="margin-bottom:12px;">
         <div style="font-size:13px; margin-bottom:6px;"><b>この表は？</b></div>
         <label style="display:block; margin-bottom:4px; font-size:13.5px;">
-          <input type="radio" name="mode" value="{{ $modePast }}" @checked(! $sync) onchange="pjModeChanged()">
+          {{-- ⚠ 受信箱から開いたときは、そのシートの月で既定を決める（2026-09-16 baba要望）。
+               先月以前＝実績なので「終わった案件」。今月以降＝これからの案件。
+               2023年からの過去のアサイン表も受信箱に届くようになったため。 --}}
+          <input type="radio" name="mode" value="{{ $modePast }}" @checked(! $sync || ($syncIsPast ?? false)) onchange="pjModeChanged()">
           <b>終わった案件（過去の実績）</b>
           <span class="muted" style="font-size:11.5px;">… 案件＝確定・公開済み・募集しない／アサイン＝確定</span>
         </label>
         <label style="display:block; font-size:13.5px;">
-          <input type="radio" name="mode" id="pjModeFuture" value="{{ $modeFuture }}" @checked((bool) $sync) onchange="pjModeChanged()">
+          <input type="radio" name="mode" id="pjModeFuture" value="{{ $modeFuture }}" @checked($sync && ! ($syncIsPast ?? false)) onchange="pjModeChanged()">
           <b>これからの案件</b>
           <span class="muted" style="font-size:11.5px;">… 案件＝調整中・<b>未公開</b>・募集する／アサイン＝<b>仮</b></span>
         </label>

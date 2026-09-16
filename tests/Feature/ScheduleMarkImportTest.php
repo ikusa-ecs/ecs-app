@@ -126,7 +126,12 @@ class ScheduleMarkImportTest extends TestCase
         $this->assertSame($honban->id, $riha->parent_project_id, '本番につながっていない');
     }
 
-    /** ⚠ コンテンツ台帳に「綱引き大会(リハ)」を増やさない（これが起きていた）。 */
+    /**
+     * ⚠ コンテンツ台帳に「綱引き大会(リハ)」を増やさない（これが起きていた）。
+     *
+     * ⚠ 台帳に足すのは「これからの案件」のときだけ（2026-09-16 baba決定）。
+     *   過去の取込は台帳を増やさないので、ここは「これから」で確かめる。
+     */
     public function test_コンテンツ台帳に印つきの名前を増やさない(): void
     {
         $me = $this->manager();
@@ -137,11 +142,46 @@ class ScheduleMarkImportTest extends TestCase
                 ['綱引き大会(リハ)', $day->format('Y-m-d'), '株式会社テスト', '5'],
             ]),
             'office' => '東京',
+            'mode' => 'これから',
         ])->assertRedirect('/past-import');
 
         $names = Content::pluck('content_name')->all();
         $this->assertNotContains('綱引き大会(リハ)', $names, 'リハつきの名前が台帳に増えている');
         $this->assertContains('綱引き大会', $names);
+    }
+
+    /**
+     * ⚠ 過去の取込は、コンテンツ台帳を増やさない（2026-09-16 baba決定）。
+     *
+     * なぜ＝2023年からのアサイン表には昔の表記ゆれがそのまま入っていて、
+     * 足すと台帳が使いものにならなくなる。案件には名前が文字として残り、
+     * 台帳に無かった名前は取込のあと一覧で知らせる（黙って落とさない）。
+     */
+    public function test_過去の取込はコンテンツ台帳を増やさない(): void
+    {
+        $me = $this->manager();
+        $day = Carbon::today()->subDays(30);
+
+        $res = $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->csv([
+                ['まだ台帳に無いコンテンツ', $day->format('Y-m-d'), '株式会社テスト', '5'],
+            ]),
+            'office' => '東京',
+        ])->assertRedirect('/past-import');
+
+        $this->assertNotContains(
+            'まだ台帳に無いコンテンツ',
+            Content::pluck('content_name')->all(),
+            '過去の取込で台帳が増えている'
+        );
+
+        // 案件そのものは入っていて、名前は文字として残る。
+        $p = Project::where('project_name', 'まだ台帳に無いコンテンツ')->first();
+        $this->assertNotNull($p, '案件が入っていない');
+        $this->assertSame([], $p->content_ids ?? [], '台帳につながっている');
+
+        // 台帳に無かった名前は画面で知らせる。
+        $res->assertSessionHas('past_new_contents', fn ($names) => in_array('まだ台帳に無いコンテンツ', $names, true));
     }
 
     /** ⚠ 本番が見つからないときは紐づけず、一覧で知らせる（勘でつながない）。 */

@@ -57,6 +57,14 @@ class PastProjectImportController extends Controller
      *
      * ⚠ CSVの読み取りは1か所のまま。切り替わるのは「入れるときの値」だけ。
      */
+    /**
+     * 取込中に見つかった「コンテンツ台帳に無い名前」（過去の取込のとき）。
+     * キー＝名前で重ねて持つ＝同じ名前が何件あっても一覧には1回だけ出す。
+     *
+     * @var array<string, true>
+     */
+    private array $newContentNames = [];
+
     public const MODE_PAST = '過去';
 
     public const MODE_FUTURE = 'これから';
@@ -64,6 +72,9 @@ class PastProjectImportController extends Controller
     /** 取込画面。?sync=番号 が付いていれば、受信箱に届いた中身を読んで開く。 */
     public function show(Request $request)
     {
+        // 受信箱から開いたとき（毎朝スプレッドシートから届いたもの）。null＝ふだんの取込画面。
+        $sync = $this->syncFromRequest($request);
+
         // CSVを選んだときの下見（誰が入る／名簿に無い）はサーバーの preview がまとめて返す
         // ＝読み取りの決まりを1か所にするため。画面へ渡すのは「どの拠点の案件として入れるか」だけ。
         return view('past_import', [
@@ -74,10 +85,14 @@ class PastProjectImportController extends Controller
             // 終わった案件か、これからの案件か（既定＝今までどおり「過去」）。
             'modePast' => self::MODE_PAST,
             'modeFuture' => self::MODE_FUTURE,
-            // 受信箱から開いたとき（毎朝スプレッドシートから届いたもの）。null＝ふだんの取込画面。
-            // ⚠ 受信箱は「今月以降」のシートなので、既定を**これからの案件**にする。
+            // ⚠ 受信箱の「今月以降」のシートは、既定を**これからの案件**にする。
             //   過去あつかいで入れると、確定・公開済みになってスタッフ全員に見えてしまう。
-            'sync' => $this->syncFromRequest($request),
+            'sync' => $sync,
+            // ⚠ ただし**先月以前のシート**は実績なので、既定を「過去」にする（2026-09-16 baba要望）。
+            //   2023年からのアサイン表をまとめて取り込むため、受信箱にも過去の月が並ぶようになった。
+            //   ここを直さないと、20ファイルぶん毎回「過去」を選び直すことになり、
+            //   1回でも選び忘れると**終わった案件がスタッフに「これからの募集」として見えてしまう**。
+            'syncIsPast' => $sync !== null && (string) $sync->period < Carbon::now()->format('Y-m'),
         ]);
     }
 
@@ -788,6 +803,8 @@ class PastProjectImportController extends Controller
         return redirect('/past-import')
             ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled, $estimated, $linked, $unlinked))
             ->with('past_missing', array_keys($missingNames))
+            // 台帳に無かったコンテンツ名（過去の取込のみ。足していないので必ず知らせる）。
+            ->with('past_new_contents', array_keys($this->newContentNames))
             ->with('past_ambiguous', array_keys($ambiguousNames))
             ->with('past_unknown_roles', array_values(array_unique($unknownRoles)));
     }
@@ -957,7 +974,8 @@ class PastProjectImportController extends Controller
             // ⚠ 他拠点のアサイン表を代わりに取り込むことがあるので、取り込んだ人の拠点で
             //   決め打ちにしない（東北の案件が東京の案件として入ってしまう・2026-08-25 baba）。
             'office' => $office,
-            'content_ids' => $this->resolveContentIds($name),
+            // ⚠ 台帳に足すのは「これからの案件」のときだけ（過去は足さない・2026-09-16 baba決定）。
+            'content_ids' => $this->resolveContentIds($name, $future),
             'content_names' => [$name],
             'category' => $get('区分') ?: null,
             'yomi' => $get('確度') ?: '確定',
@@ -1204,8 +1222,21 @@ class PastProjectImportController extends Controller
         return in_array($value, ['済', '○', '◯', '✓', '有', 'あり', 'はい', '1', 'yes', 'OK'], true);
     }
 
-    /** コンテンツ名 → content_ids（台帳に無ければ発番して追加）。 */
-    private function resolveContentIds(string $name): array
+    /**
+     * コンテンツ名 → content_ids。
+     *
+     * ⚠ **過去の取込では、台帳に無い名前を台帳に足さない**（2026-09-16 baba決定）。
+     *   理由＝2023年からのアサイン表には昔の表記ゆれ（全角/半角・「(リハ)」付き・略称）が
+     *   そのまま入っていて、足すとコンテンツ台帳が使いものにならなくなる。
+     *   足さなかった名前は案件に文字として残り（content_names）、画面では「単発」と出る。
+     *   取込のあとに一覧で知らせるので、必要なものだけ手で台帳に足して入れ直せる。
+     *
+     * ⚠ **これからの案件（毎朝の受信箱）は今までどおり台帳に足す。**
+     *   こちらは「これから動く新しいコンテンツ」なので、台帳に無いほうが困る。
+     *
+     * @param  bool  $createMissing  台帳に無い名前を台帳に足すか（過去＝false／これから＝true）
+     */
+    private function resolveContentIds(string $name, bool $createMissing = true): array
     {
         $name = trim($name);
         if ($name === '') {
@@ -1215,6 +1246,13 @@ class PastProjectImportController extends Controller
         $existing = Content::where('content_name', $name)->first();
         if ($existing) {
             return [$existing->id];
+        }
+
+        if (! $createMissing) {
+            // 足さない。あとで「台帳に無かった名前」として画面に出す（黙って落とさない）。
+            $this->newContentNames[$name] = true;
+
+            return [];
         }
 
         $maxNum = (int) (Content::where('id', 'like', 'CT-%')->get()
