@@ -412,7 +412,13 @@ class AssignBoardController extends Controller
     {
         // ボード対象＝完了/下書きでなく、開催日があり、基準日〜BOARD_DAYS日先の案件。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」（案件一覧と同じ）。
-        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+        // ⚠ ただし**ほかの拠点に巻き取られた案件は出さない**（2026-09-16 baba要望）。
+        //   巻き取り＝相手の拠点が運営する＝こちらは人を入れないので、並んでいると邪魔になる。
+        //   ⚠ 消すのはこの画面（と公開ボード）だけ。案件一覧には残す＝「解除」の入口が要るため。
+        $projects = OfficeScope::hideTakenOver(
+            OfficeScope::applyToProjects(Project::query(), $office),
+            $office
+        )
             ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()

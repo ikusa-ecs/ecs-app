@@ -35,7 +35,13 @@ class AssignPublishController extends Controller
         // 「全拠点」は選べない。一般社員はこれまでどおり自拠点固定。
         $office = OfficeScope::filterSingle($request);
 
-        $cases = OfficeScope::applyToProjects(Project::query(), $office)
+        // ⚠ **ほかの拠点に巻き取られた案件は出さない**（2026-09-16 baba要望）。
+        //   巻き取り＝相手の拠点が運営する＝こちらのスタッフに募集を出してはいけない。
+        //   ⚠ 消すのはこの画面と日別ボードだけ。案件一覧には残す＝「解除」の入口が要るため。
+        $cases = OfficeScope::hideTakenOver(
+            OfficeScope::applyToProjects(Project::query(), $office),
+            $office
+        )
             ->notCancelled()   // キャンセルになった案件は公開の対象にしない（2026-08-26）
             ->orderBy('start_date')->get()->map(function (Project $p) use ($today) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
