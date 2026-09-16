@@ -241,12 +241,16 @@
     .emp-chip .e-role { font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 5px; background: #e3edf7; color: #2c6ca0; flex-shrink: 0; }
     .emp-chip .e-multi { font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 5px; background: #ece3d4; color: #7a6a58; flex-shrink: 0; }
     .emp-chip .e-newbie { font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 5px; background: #efe6f6; color: #6d28d9; flex-shrink: 0; }
-    /* 名前の文字色＝部署（背景＝担当状況、文字色＝部署、で役割を分ける） */
-    .emp-chip.dep-plan     .e-nm { color: #c2410c; }   /* イベプラ＝オレンジ */
-    .emp-chip.dep-sales    .e-nm { color: #4338ca; }   /* セールス＝藍 */
-    .emp-chip.dep-creative .e-nm { color: #16a34a; }   /* クリエイティブ＝緑 */
-    .emp-chip.dep-other    .e-nm { color: #6e5b49; }   /* その他＝茶（3つ以外をまとめた色） */
-    .emp-chip.dep-none     .e-nm { color: #a3968a; }   /* 所属が未設定 */
+    /* 名前の文字色＝部署（背景＝担当状況、文字色＝部署、で役割を分ける）
+       ⚠ カレンダーの社員チップ・「📊 担当バランス」の表・凡例の3か所で同じ色を使う
+         （2026-09-16・FBシート No.20）。別々に書くと「同じ人なのに場所で色が違う」になるので、
+         `dep-◯◯` を付けた要素の中の `.e-nm` を色づける、という1つの決まりにしてある。
+         色を足す・変えるときは、この5行と下の dark の5行だけを直す。 */
+    .dep-plan     .e-nm { color: var(--dirlg-orange); }   /* イベプラ＝オレンジ */
+    .dep-sales    .e-nm { color: var(--dirlg-indigo); }   /* セールス＝藍 */
+    .dep-creative .e-nm { color: var(--dirlg-cre); }      /* クリエイティブ＝緑 */
+    .dep-other    .e-nm { color: var(--dirlg-brown2); }   /* その他＝茶（3つ以外をまとめた色） */
+    .dep-none     .e-nm { color: var(--dirlg-none); }     /* 所属が未設定 */
 
     /* 凡例バー（色とマークの意味を常時表示） */
     .dir-legend {
@@ -272,6 +276,9 @@
       border-radius: 12px; box-shadow: 0 12px 34px rgba(60,40,20,.24); padding: 11px 12px; font-size: 12px;
     }
     .dpick-pop h4 { margin: 0 0 8px; font-size: 13px; }
+    /* 押す直前に「この人の所属」が見えるようにする（2026-09-16・FBシート No.20）。
+       ⚠ 名前の文字色は上の dep-◯◯ と同じ決まり。ここに色を書かない。 */
+    .dpick-pop h4 .dp-dept { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: var(--chip-bg); color: var(--chip-ink); margin-left: 5px; }
     .dpick-pop .dp-case { display: flex; align-items: center; gap: 7px; padding: 6px 0; border-bottom: 1px solid var(--line); }
     .dpick-pop .dp-case:last-of-type { border-bottom: none; }
     .dpick-pop .dp-info { flex: 1; min-width: 0; }
@@ -297,13 +304,13 @@
       --dirlg-green: #15803d; --dirlg-blue: #2c6ca0; --dirlg-gray: #9c8f80;
       --dirlg-gold: #92600a; --dirlg-brown: #7a6a58; --dirlg-purple: #6d28d9;
       --dirlg-orange: #c2410c; --dirlg-indigo: #4338ca; --dirlg-cre: #16a34a;
-      --dirlg-brown2: #6e5b49; --dirlg-red: #b91c1c;
+      --dirlg-brown2: #6e5b49; --dirlg-red: #b91c1c; --dirlg-none: #a3968a;
     }
     html[data-theme="dark"] {
       --dirlg-green: var(--ok-ink); --dirlg-blue: var(--info-ink); --dirlg-gray: #9aa2ad;
       --dirlg-gold: var(--warn-ink); --dirlg-brown: var(--chip-ink); --dirlg-purple: #b8a6f5;
       --dirlg-orange: #f0913c; --dirlg-indigo: #9db0f5; --dirlg-cre: var(--ok-ink);
-      --dirlg-brown2: #c3b3a0; --dirlg-red: var(--danger-ink);
+      --dirlg-brown2: #c3b3a0; --dirlg-red: var(--danger-ink); --dirlg-none: var(--muted);
     }
     /* 使い方バナー・上部の操作バー */
     html[data-theme="dark"] .help-note { color: var(--warn-ink); border-color: var(--warn-line); }
@@ -366,11 +373,8 @@
     html[data-theme="dark"] .emp-chip .e-role   { background: var(--info-soft); color: var(--info-ink); }
     html[data-theme="dark"] .emp-chip .e-multi  { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .emp-chip .e-newbie { background: var(--accent2-soft); color: #b8a6f5; }
-    html[data-theme="dark"] .emp-chip.dep-plan     .e-nm { color: var(--dirlg-orange); }
-    html[data-theme="dark"] .emp-chip.dep-sales    .e-nm { color: var(--dirlg-indigo); }
-    html[data-theme="dark"] .emp-chip.dep-creative .e-nm { color: var(--dirlg-cre); }
-    html[data-theme="dark"] .emp-chip.dep-other    .e-nm { color: var(--dirlg-brown2); }
-    html[data-theme="dark"] .emp-chip.dep-none     .e-nm { color: var(--muted); }
+    /* 部署の文字色は --dirlg-◯◯ を見るので、黒地用の上書きは要らない
+       （値は上の html[data-theme="dark"] の入れ物で差し替わる・2026-09-16）。 */
     /* 凡例バー */
     html[data-theme="dark"] .dir-legend .lg-dot.green { background: var(--ok-ink); }
     html[data-theme="dark"] .dir-legend .lg-dot.blue  { background: var(--info-ink); }
@@ -588,6 +592,7 @@
             この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:var(--dirlg-red);font-weight:700;">赤字</span>＝偏りに注意。<br>
             <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
             ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
+            ※ <b>名前の文字色＝所属</b>です（<span class="dep-plan"><b class="e-nm">イベプラ</b></span>／<span class="dep-sales"><b class="e-nm">セールス</b></span>／<span class="dep-creative"><b class="e-nm">クリエイティブ</b></span>／<span class="dep-other"><b class="e-nm">その他</b></span>）。カレンダーの名前と同じ色です。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
           </p>
         </div>
@@ -1091,7 +1096,11 @@
           </div>
         </div>`;
     }).join('') : '<div class="dp-empty">この日に案件はありません</div>';
-    el.innerHTML = `<h4>${emp ? emp.name : PICK.empId} を担当に</h4>`
+    // 担当に入れる直前の見出し。名前の色＝所属＋所属名の札を出す（2026-09-16・FBシート No.20）。
+    // ⚠ 「間違えてセールスの人をアサインしそうになった」ので、押す直前にも分かるようにしてある。
+    const pickDep = 'dep-' + ((emp && emp.deptCode) || 'none');
+    const pickDepTag = (emp && emp.department) ? `<span class="dp-dept">${emp.department}</span>` : '';
+    el.innerHTML = `<h4 class="${pickDep}"><span class="e-nm">${emp ? emp.name : PICK.empId}</span> を担当に${pickDepTag}</h4>`
       + personNoteHtml(PICK.empId, PICK.realKey)
       + rows
       + (mine >= 2 ? `<div class="dp-warn">⚠ この日 ${mine} 件の掛け持ちです</div>` : '')
@@ -1116,7 +1125,10 @@
   // ⚠ 大型SDは、Dに入っている人の行にだけ出る（SDだけの人は並べない）。
   function computeAgg(){
     const map = {};
-    function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), d:0, total:0, bigD:0, bigSD:0 }; return map[id]; }
+    // 部署のコード（plan/sales/creative/other・未設定は none）＝名前の文字色に使う。
+    // ⚠ ここに部署名を書かない。色分けのコードはサーバー（App\Support\Departments）が付ける。
+    function deptOf(id){ return (empById[id] && empById[id].deptCode) || 'none'; }
+    function ensure(id){ if (!map[id]) map[id] = { id, name: empName(id), dept: deptOf(id), d:0, total:0, bigD:0, bigSD:0 }; return map[id]; }
 
     // ⚠ 行に出すのは**社員だけ**（2026-09-01 baba）。FCに入っているスタッフを混ぜない
     //   ＝Dの偏りを見る表なので、名簿の人が全員並ぶと読み取れなくなる。
@@ -1161,9 +1173,11 @@
     rows.forEach(r => {
       const most = r.d === maxD && r.d > 0;
       const tr = document.createElement('tr');
-      if (most) tr.className = 'most';
+      // ⚠ 部署のクラスは必ず付ける（most と両方）。片方で上書きすると色が消える。
+      //   名前の文字色＝部署＝カレンダーの社員チップと同じ色（2026-09-16・FBシート No.20）。
+      tr.className = (most ? 'most ' : '') + 'dep-' + r.dept;
       tr.innerHTML = `
-        <td class="nm">${r.name}
+        <td class="nm"><span class="e-nm">${r.name}</span>
           <div class="agg-bar"><i style="width:${Math.round(r.d / maxD * 100)}%;"></i></div>
         </td>
         <td class="num dcnt">${r.d}</td>
