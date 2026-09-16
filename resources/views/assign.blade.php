@@ -534,6 +534,43 @@
     /* 凡例の色見本（上の色分けと同じ色にそろえる） */
     html[data-theme="orange"] .legend .sw.a { background: #fef2f2; }
     html[data-theme="orange"] .legend .sw.only { background: #f3f4f6; }
+
+    /* ===== LINEグループを作るときのコピー（2026-09-16 baba要望）=====
+       ⚠ 色は必ず変数で書く（面=--panel／文字=--ink）。
+          直に色を書くと、画面の色を切り替えたときにここだけ取り残される。 */
+    .line-box {
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--panel); padding: 10px 12px; margin: 8px 0 4px;
+    }
+    .line-box .lb-lead { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.6; }
+    .line-box .lb-item { margin-bottom: 10px; }
+    .line-box .lb-h {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 4px;
+    }
+    .line-box .lb-hint { font-weight: 400; font-size: 11.5px; color: var(--muted); }
+    .line-box textarea {
+      width: 100%; box-sizing: border-box; resize: vertical;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink);
+      padding: 7px 9px; font-size: 12.5px; line-height: 1.7; font-family: inherit;
+    }
+    .line-copy {
+      border: 1px solid var(--brand); background: var(--brand-fill); color: #fff;
+      border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .line-copy:hover { filter: brightness(1.07); }
+    /* 準備チェック（LINE作成／概要送付／ダブチェ）。保存先は案件一覧とまったく同じ列。 */
+    .line-checks {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      border-top: 1px dashed var(--line); padding-top: 9px; margin-top: 2px;
+    }
+    .line-checks .lc { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+    .line-checks .lc-note { font-size: 11.5px; color: var(--muted); }
+    /* カード上の「📱 LINE」ボタン。作成ずみのときだけ色を変えて、押さなくても分かるようにする。 */
+    /* ⚠ 名前を .line-btn にしないこと。他の画面（マイページ・共通設定）では
+       .line-btn は「枠線のふつうのボタン」という別の意味で使っている。 */
+    .linegrp-btn.done { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok-ink); }
   </style>
 @endverbatim
 @endpush
@@ -2320,6 +2357,124 @@
       .catch(e => alert('募集を再開できませんでした（' + e + '）。もう一度お試しください。'));
   }
 
+  // ===== LINEグループを作るときのコピー（2026-09-16 baba要望）=====
+  //
+  // 【なぜここ（日別ボード）なのか】
+  // LINEの概要には「ポジションごとに何人いるか」を書く。案件一覧では誰がアサインされているか
+  // 分からないので、メンバーが見えているこの画面に置いた（2026-09-16 baba）。
+  //
+  // ⚠ 文章はサーバーが作ったものをそのまま出す（c.lineIcon / c.lineName / c.lineText）。
+  //   ここで組み立て直さない＝正本は App\Support\LineGroupText の1か所。
+  // ⚠ 「@」のあとの名前は出していない。LINEのメンションは手で打たないと有効にならず、
+  //   さらに打ちながら「その人がグループに入っているか」を確かめる作業も兼ねているため。
+
+  // どのカードのパネルを開いているか（render() で作り直しても開いたままにする）。
+  const lineOpen = new Set();
+
+  function toggleLine(id){
+    if (lineOpen.has(id)) lineOpen.delete(id); else lineOpen.add(id);
+    render();
+  }
+
+  // 枠の中身をクリップボードへ写す。
+  // ⚠ navigator.clipboard は https か 127.0.0.1 でしか使えないので、古いやり方を控えに用意する。
+  //   どちらも駄目なときは黙って終わらせず、手でコピーしてもらうよう伝える。
+  function copyLineBox(btn, boxId){
+    const el = document.getElementById(boxId);
+    if (!el) return;
+    const label = btn.textContent;
+    const done = function(){
+      btn.textContent = '✓ コピーしました';
+      setTimeout(function(){ btn.textContent = label; }, 1600);
+    };
+    const fallback = function(){
+      try {
+        el.focus();
+        el.select();
+        if (document.execCommand('copy')) { done(); return; }
+      } catch (e) { /* 下のお知らせへ */ }
+      alert('コピーできませんでした。枠の中を選んで、手でコピーしてください。');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.value).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  // パネルの中身。開いていないカードでは何も出さない（画面が重くなるため）。
+  function lineBoxHtml(c){
+    if (!lineOpen.has(c.id)) return '';
+
+    const items = [
+      ['icon', c.lineIcon || '', '① アイコン用（3行）',
+       'LINEの「テキストプロフィールを作成」に貼ります。文字数がきついので、ここだけ会社名の「様」を外しています。', 3],
+      ['name', c.lineName || '', '② グループ名',
+       'グループ名に貼ります。会社名には「様」が付きます。', 1],
+      ['text', c.lineText || '', '③ 概要文',
+       'グループに投稿する文章です。「@」のあとの名前は手で打ってください（手打ちでないとメンションになりません）。', 18],
+    ];
+
+    const boxes = items.map(function(it){
+      const key = it[0], val = it[1], head = it[2], hint = it[3], rows = it[4];
+      const boxId = 'lb-' + key + '-' + c.id;
+      return `<div class="lb-item">
+          <div class="lb-h">${head}
+            <button class="line-copy" onclick="copyLineBox(this,'${boxId}')">コピー</button>
+            <span class="lb-hint">${escHtml(hint)}</span>
+          </div>
+          <textarea id="${boxId}" rows="${rows}" spellcheck="false">${escHtml(val)}</textarea>
+        </div>`;
+    }).join('');
+
+    const checks = [
+      ['lineMade', 'prep_line_created', 'LINE作成'],
+      ['lineSent', 'prep_line_sent', 'LINE概要送付'],
+      ['lineDouble', 'prep_line_double_check', 'LINEダブチェ'],
+    ].map(function(t){
+      const key = t[0], field = t[1], label = t[2];
+      return `<label class="lc"><input type="checkbox" ${c[key] ? 'checked' : ''}
+        onchange="saveLineCheck('${c.id}','${key}','${field}',this.checked,this)"> ${label}</label>`;
+    }).join('');
+
+    return `<div class="line-box">
+        <div class="lb-lead">LINEグループを作るときに貼る文章です。<b>枠の中は直してからコピーできます</b>（直した内容は案件には保存されません）。</div>
+        ${boxes}
+        <div class="line-checks">${checks}
+          <span class="lc-note">案件一覧の同じチェックと中身は1つです（どちらで押しても同じ）。</span>
+        </div>
+      </div>`;
+  }
+
+  // 準備チェックの保存。
+  // ⚠ 保存先は案件一覧とまったく同じ（POST /projects/cells → projects の同じ列）。
+  //   画面ごとに別の場所へ保存すると「片方は押されているのに片方は押されていない」になる。
+  // ⚠ 保存に失敗したらチェックを元に戻して知らせる＝押したつもりで残っていない、を防ぐ。
+  function saveLineCheck(id, key, field, on, el){
+    const c = cases.find(x => x.id === id);
+    if (!c) return;
+    c[key] = on;
+    // ボタンの色（作成ずみの印）をその場で合わせる。開いたパネルは閉じない。
+    const btn = document.getElementById('linegrp-btn-' + id);
+    if (btn && key === 'lineMade') btn.className = 'edit-btn linegrp-btn' + (on ? ' done' : '');
+    if (!USING_DB) return;
+
+    const body = { id: id };
+    body[field] = on;
+    fetch('/projects/cells', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .catch(e => {
+        c[key] = !on;
+        if (el) el.checked = !on;
+        if (btn && key === 'lineMade') btn.className = 'edit-btn linegrp-btn' + (c.lineMade ? ' done' : '');
+        alert('チェックを保存できませんでした（' + e + '）。もう一度押してください。');
+      });
+  }
+
   function buildCard(c, dayCases, dupNames, amap){
     dupNames = dupNames || new Set();
     amap = amap || {};
@@ -2534,6 +2689,8 @@
         <span class="sb ${stat}" title="案件の進み具合">${stateLabel[stat] || ''}</span>${recruitBadge(c)}
         <div class="cc-actions">
           <button class="edit-btn ${editMode ? 'on' : ''}" onclick="toggleEdit('${c.id}')">✎ ${editMode ? '編集を終える' : '手動編集'}</button>
+          <button id="linegrp-btn-${c.id}" class="edit-btn linegrp-btn${c.lineMade ? ' done' : ''}" onclick="toggleLine('${c.id}')"
+                  title="LINEグループのアイコン・グループ名・概要文をまとめて出します。コピーして貼るだけで作れます。">📱 LINE${c.lineMade ? ' ✓' : ''}</button>
           ${(filled < c.need && canAuto(c)) ? `<button class="auto-btn" onclick="autoAssign('${c.id}')">⚡ 自動アサイン</button>` : ''}
           ${stateBtn}
           ${detailBtnHtml(c)}
@@ -2541,6 +2698,7 @@
         </div>
       </div>
       ${noteHtml}
+      ${lineBoxHtml(c)}
       ${tagHtml ? `<div class="cc-tags">${tagHtml}</div>` : ''}
       <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${fmtBadgeHtml(c)}${posHtml}</div>
       <div class="cc-fill">

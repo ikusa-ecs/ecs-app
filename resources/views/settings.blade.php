@@ -324,6 +324,42 @@
         </p>
       </div>
 
+      {{-- LINEの概要に付ける定型文（2026-09-16 baba要望）。
+           ⚠ アサインボード（日別）の「📱 LINE」で出る概要文の、いちばん下に付く文章。
+           ⚠ URLが変わるのでDBに持たせる（コードを直さなくても自分で変えられるように）。
+           ⚠ ふつうのフォームで送る（JavaScriptを使わない）＝押した瞬間に保存され、結果が画面に出る。
+           ⚠ この欄は「そのまま出す区間」の外に置くこと（中に入れると差し込みの記号がそのまま出る）。
+           ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。書くと、そこから先が画面に出なくなる。 --}}
+      <div class="panel settings-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>LINEの概要に付ける定型文</h2></div>
+        <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
+          <b>アサインボード（日別）の「📱 LINE」</b>で出る概要文の、いちばん下に付く文章です。
+          動画チェックのフォルダ・レクチャー要否のスプレッドシート・レクチャーフォームなど、
+          <b>毎回同じことを書いている部分</b>をここに入れておきます。<b>URLが変わったらここを直すだけ</b>でOKです。<br>
+          空にすると、概要文には何も付きません。
+        </p>
+
+        @if (session('line_notice_status'))
+          <div class="flash" style="margin:8px 0;">{{ session('line_notice_status') }}</div>
+        @endif
+
+        <form method="POST" action="/settings/line-notice">
+          @csrf
+          <textarea name="notice" rows="14" maxlength="{{ $lineNoticeMax }}"
+                    style="width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid var(--line);
+                           border-radius:8px; font-size:13px; line-height:1.8; font-family:inherit;
+                           background:var(--panel); color:var(--ink); resize:vertical;">{{ $lineNotice }}</textarea>
+          <div style="padding:10px 0 2px;">
+            <button type="submit" class="btn primary">この文章にする</button>
+          </div>
+        </form>
+
+        <p class="muted" style="font-size:11.5px; margin:8px 0 0; line-height:1.7;">
+          ※ {{ number_format($lineNoticeMax) }}文字までです。<br>
+          ※ 上の日程・コンテンツ・集合時間・ポジションなどは<b>案件ごとに自動で入ります</b>ので、ここには書かないでください。
+        </p>
+      </div>
+
 @verbatim
 
       <!-- ③ マスタ管理 -->

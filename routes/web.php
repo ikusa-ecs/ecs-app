@@ -371,6 +371,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/settings/chatwork-rooms', [SettingsController::class, 'saveChatworkRooms']);
     // スタッフ画面の便利リンク集（Notion・アンケートフォーム等）を settings に保存。
     Route::post('/settings/staff-links', [SettingsController::class, 'saveStaffLinks']);
+    // LINEの概要に付ける定型文を settings に保存。2026-09-16 baba要望。
+    // ⚠ 正本＝App\Support\LineGroupText（アサインボードの「📱 LINE」が読む）。
+    Route::post('/settings/line-notice', [SettingsController::class, 'saveLineNotice']);
 
     // マスタ管理（コンテンツ・拠点＝追加/編集/削除、ポジション＝表示のみ）。
     Route::get('/masters', [MasterController::class, 'index']);

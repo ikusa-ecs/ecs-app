@@ -13,6 +13,7 @@ use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\EntryFeed;
+use App\Support\LineGroupText;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
@@ -451,10 +452,12 @@ class AssignBoardController extends Controller
         $assignedByProject = $assignments->groupBy('project_id');
         $appsByProject = $apps->groupBy('project_id');
 
-        // コンテンツ未登録の判定用＝マスタに存在するコンテンツID一覧。
-        $validContentIds = Content::pluck('id')->all();
+        // コンテンツ台帳（ID → 名前）。未登録の判定と、LINEのコピー文のコンテンツ名に使う。
+        // ⚠ ここで1回だけ引く。案件ごとに引くと案件の数だけ問い合わせが増える。
+        $contentMaster = Content::pluck('content_name', 'id')->all();
+        $validContentIds = array_keys($contentMaster);
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $dispatchesByProject) {
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject) {
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -605,6 +608,19 @@ class AssignBoardController extends Controller
                 'scale' => (string) ($p->scale ?? ''),
                 'archived' => false,
                 'draft' => false,
+                // LINEグループを作るときにコピーする3つの文章（2026-09-16 baba要望）。
+                // ⚠ 文章はサーバーで組み立てて、できあがった文字だけ渡す。
+                //   正本＝App\Support\LineGroupText。画面のJSで組み立てない
+                //   （画面ごとに書くと片方だけ直して食い違う／BladeのJSは置換で壊れやすい）。
+                'lineIcon' => LineGroupText::icon($p, $contentMaster),
+                'lineName' => LineGroupText::groupName($p, $contentMaster),
+                'lineText' => LineGroupText::summary($p, $assigned, $contentMaster),
+                // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ）。
+                // ⚠ 案件一覧と**同じ列**を見て、同じ入口（POST /projects/cells）へ保存する。
+                //   画面ごとに別の場所へ保存すると「片方は押されているのに片方は押されていない」になる。
+                'lineMade' => (bool) $p->prep_line_created,
+                'lineSent' => (bool) $p->prep_line_sent,
+                'lineDouble' => (bool) $p->prep_line_double_check,
                 'assigned' => $assigned,
                 'applicants' => $applicants,   // 希望者カラムの元（応募者）
                 // 派遣依頼（2026-09-03）。メンバー欄に紫で出す。キャンセルも印つきで残す

@@ -9,6 +9,7 @@ use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
 use App\Support\ChatworkRooms;
 use App\Support\DangerDays;
+use App\Support\LineGroupText;
 use App\Support\OfficeScope;
 use App\Support\StaffLinks;
 use Illuminate\Http\Request;
@@ -76,6 +77,10 @@ class SettingsController extends Controller
                 'memo' => StaffLinks::MAX_MEMO,
                 'url' => StaffLinks::MAX_URL,
             ],
+            // LINEの概要文のいちばん下に付ける定型文（2026-09-16 baba要望）。
+            // ⚠ 正本＝App\Support\LineGroupText。画面に文面を書かない。
+            'lineNotice' => LineGroupText::notice(),
+            'lineNoticeMax' => LineGroupText::NOTICE_MAX,
         ]);
     }
 
@@ -170,6 +175,28 @@ class SettingsController extends Controller
         return back()
             ->with('chatwork_rooms_status', 'チャットワークの送り先を保存しました。')
             ->with('chatwork_rooms_rejected', $rejected);
+    }
+
+    /**
+     * LINEの概要に付ける定型文を保存する（POST /settings/line-notice）。
+     *
+     * アサインボード（日別）の「📱 LINE」で出る概要文の、いちばん下に付く文章。
+     * 動画チェックのフォルダやレクチャーフォームのURLが変わっても、
+     * コードを直さずにこの画面から変えられるようにするためのもの（2026-09-16 baba要望）。
+     *
+     * ⚠ 空で保存できる（＝定型文を付けない）。空文字と「一度も設定していない」は
+     *   LineGroupText::notice() で区別している（未設定のときだけ初期値が出る）。
+     */
+    public function saveLineNotice(Request $request)
+    {
+        $saved = LineGroupText::saveNotice((string) $request->input('notice', ''));
+
+        return back()->with(
+            'line_notice_status',
+            $saved === ''
+                ? '定型文を空にしました。概要文には何も付きません。'
+                : 'LINEの概要に付ける定型文を保存しました。'
+        );
     }
 
     /**
