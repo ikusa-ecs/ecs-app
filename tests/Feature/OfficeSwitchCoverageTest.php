@@ -32,6 +32,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/experience',          // 経験回数（2026-09-15 に追加）
         '/assign-wishlist',     // スタッフ集計＝希望まとめ（2026-09-15 に追加）
         '/paper-stock',         // 謎解きの紙 在庫（2026-09-15 に追加）
+        '/active-bonus',        // 繁忙期ボーナス（2026-09-17 に追加）
     ];
 
     private function admin(): Person

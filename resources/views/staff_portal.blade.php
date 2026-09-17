@@ -95,6 +95,23 @@
     }
     .extra-notice b { color: #991b1b; }
 
+    /* 🔥 繁忙期ボーナス（2026-09-17）。色は変数で書く＝黒ベースのテーマでも読めるようにするため。 */
+    .bonus-box {
+      background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--warn);
+      border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; line-height: 1.7;
+    }
+    .bonus-head { font-size: 13.5px; font-weight: 800; color: var(--ink); }
+    .bonus-now { font-size: 14px; color: var(--ink); margin-top: 4px; }
+    .bonus-now b { font-size: 17px; }
+    .bonus-got {
+      display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 9px;
+      border-radius: 999px; background: var(--ok-soft); color: var(--ok-ink); margin-left: 6px;
+    }
+    .bonus-next { font-size: 13.5px; color: var(--ink); margin-top: 2px; }
+    .bonus-next b { color: var(--warn-ink); font-size: 15px; }
+    .bonus-rule { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.8; }
+    .bonus-rule b { color: var(--ink); }
+
     /* 🔔 最近の変更（あなたに関係するもの）＝2026-09-09。たたんだ状態で置く。 */
     .news-box {
       background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
@@ -790,6 +807,41 @@
           @elseif (!empty($recruitJobs) && count($recruitJobs))募集が出ています。気になる案件は「エントリーする」を押してください。<b>押し間違い防止のため、2回押すと決まります</b>（1回目は赤い「⚠ もう一度押すとエントリー」に変わるだけです）。担当が確認して、確定したら「確定アサイン」タブに入ります。（エントリー締切は案件ごとに表示しています）
           @else いまは募集中の案件はありません。募集が始まると、ここに案件が並びます。@endif
         </div>
+
+        {{-- 繁忙期ボーナス（2026-09-17 baba要望）。本人の今月の回数と「あと◯回」だけを出す。
+             ⚠ 会社のコスト・削減額・ほかの人の順位は出さない（あれは社員が見るもの）。
+             ⚠ 共通設定で「実施中」にしていないあいだは、丸ごと出さない
+               （やっていないのに「あと1回でボーナス」と出ると、約束していないお金の話になる）。
+             ⚠ JavaScript を使わない＝画面のJSが壊れていても読める。
+             ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
+        @if (!empty($bonus))
+          <div class="bonus-box">
+            <div class="bonus-head">🔥 繁忙期ボーナス</div>
+            <div class="bonus-now">今月のアサイン <b>{{ $bonus['count'] }}回</b>
+              @if ($bonus['rate'] > 0)
+                <span class="bonus-got">＋{{ number_format($bonus['rate']) }}円/h 達成中</span>
+              @endif
+            </div>
+            @if ($bonus['next'])
+              <div class="bonus-next">
+                @if ($bonus['next']['remain'] === 1)
+                  <b>あと1回</b>で {{ $bonus['next']['count'] }}回に届きます（＋{{ number_format($bonus['next']['rate']) }}円/h）
+                @else
+                  あと<b>{{ $bonus['next']['remain'] }}回</b>で {{ $bonus['next']['count'] }}回に届きます（＋{{ number_format($bonus['next']['rate']) }}円/h）
+                @endif
+              </div>
+            @else
+              <div class="bonus-next">いちばん上の階層に届いています。ありがとうございます！</div>
+            @endif
+            <div class="bonus-rule">
+              {{-- ⚠ 「h」のような**文字のすぐ後ろ**にBladeの命令を書くと命令として読まれず、
+                   対になる終わりの命令だけが残って画面が真っ白（500）になる。
+                   かならず タグ（</span>）や }} をはさんでから書くこと。 --}}
+              @foreach ($bonusTiers as $t)<span>{{ $t['count'] }}回で＋{{ number_format($t['rate']) }}円/h</span>@if (! $loop->last)　/　@endif @endforeach<br>
+              上がった時給は<b>その月の全部の回にさかのぼって</b>付きます（1回{{ $bonus['hours'] }}時間で計算）。数えるのは<b>確定したアサイン</b>だけです。
+            </div>
+          </div>
+        @endif
 
         <div class="notice extra-notice" id="extraNotice" style="display:none;"></div>
 

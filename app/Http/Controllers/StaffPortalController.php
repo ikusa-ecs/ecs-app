@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Models\StaffRoleEligibility;
 use App\Support\StaffProjectNews;
+use App\Support\ActiveBonus;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
@@ -197,6 +198,14 @@ class StaffPortalController extends Controller
             'myPrefs' => $this->myPrefs($me),               // 本人の希望（カレンダー初期表示）
             'myPrefMemo' => $this->myPrefMemo($me, $prefPeriod), // 希望のコメント（初期表示）
             'staffLinks' => StaffLinks::all(),               // 便利リンク集（共通設定で社員が編集）
+            // 繁忙期ボーナス（2026-09-17 baba要望）。本人の今月の回数と「あと◯回」だけ。
+            // ⚠ 会社のコスト・削減額・ほかの人の順位は**出さない**（社員だけが見るもの）。
+            // ⚠ 共通設定で「実施中」にしていないあいだは null＝画面に出さない
+            //   （やっていないのに「あと1回でボーナス」と出るのを防ぐ）。
+            'bonus' => ($me && ActiveBonus::enabled())
+                ? ActiveBonus::forStaff((string) $me->id, $today->format('Y-m'))
+                : null,
+            'bonusTiers' => ActiveBonus::tiers(),
         ]);
     }
 
