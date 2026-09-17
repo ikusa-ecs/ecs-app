@@ -756,6 +756,14 @@
       //     落とすと、①社員を自動アサインから外す決まり（2026-09-09 ea4991e）が応募者にだけ効かず
       //     社員が現場に入ってしまう ②MCの規模の上限も応募者だけ素通りする。
       applicants:(c.applicants||[]).map(a => ({ id:a.id, name:a.name, lv:a.lv, pos:a.pos, roleCode:a.roleCode, roles:(a.roles||[]), note:a.note, emp:a.emp, mcMax:a.mcMax })),
+      // ⚠ 派遣依頼（2026-09-16 追加／2026-09-17 詰め替え漏れを修正）。
+      //   ここで詰め替えを忘れていたため、**「＋派遣」で入れたのにメンバー欄に出なかった**
+      //   （アサイン表・案件別アサイン・ピックアップには出るのに、この画面だけ出ない）。
+      //   サーバー（AssignBoardController）が渡していても、ここに書かないと画面には届かない。
+      dispatches:(c.dispatches||[]).map(d => ({
+        id:d.id, agency:d.agency, count:d.count, role:d.role,
+        status:d.status, cls:d.cls, cancelled:d.cancelled, note:d.note, tip:d.tip
+      })),
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。

@@ -270,6 +270,14 @@ class CountDeadlineReminderService
                 }
             }
         }
+        // 共通設定で選んだ「この知らせで毎回メンションする人」も足す（2026-09-17 baba要望）。
+        // ⚠ 案件の営業・Dへの [To:] は今までどおり。ここは**足すだけ**（置き換えない）。
+        // ⚠ 同じ人が両方に入っても、キーがCWIDなので重複しない。
+        //   正本＝App\Support\ChatworkMentions（画面にも他のサービスにも書き写さない）。
+        foreach (ChatworkMentions::chosenWithId(ChatworkRooms::COUNT_DEADLINE) as $person) {
+            $headIds[trim((string) $person->chatwork_id)] = true;
+        }
+
         $head = implode('', array_map(fn ($id) => '[To:' . $id . ']', array_keys($headIds)));
         if ($head !== '') {
             $body .= $head . "\n";

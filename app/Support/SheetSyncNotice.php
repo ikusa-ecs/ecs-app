@@ -78,7 +78,10 @@ final class SheetSyncNotice
         $lines[] = '▼ 受信箱';
         $lines[] = rtrim(config('app.url'), '/').'/sheet-inbox';
 
-        return self::post($title, implode("\n", $lines));
+        // ⚠ 毎朝の「届きました」は**既定でメンションを付けない**。
+        //   毎日鳴らすと見なくなって、本命の「届いていません」に気づけなくなるため。
+        //   付けたいときは共通設定のチェックで入れられる（正本＝ChatworkMentions）。
+        return self::post($title, implode("\n", $lines), ChatworkMentions::mentionDailyReport());
     }
 
     /**
@@ -134,7 +137,7 @@ final class SheetSyncNotice
      * ⚠ 送れなくても例外を投げない。ここで落ちると、
      *   受け取りそのものが失敗したように見えてしまう（本体は受け取れているのに）。
      */
-    private static function post(string $title, string $body): bool
+    private static function post(string $title, string $body, bool $mention = true): bool
     {
         $client = new ChatworkClient();
         if (! $client->hasToken()) {
@@ -152,8 +155,13 @@ final class SheetSyncNotice
             return false;
         }
 
+        // 宛名（メンション）。誰にメンションするかは共通設定で選ぶ＝正本 App\Support\ChatworkMentions。
+        // ⚠ [info] の枠の**外（上）**に置く。枠の中に入れると本文に埋もれて見落としやすい。
+        // ⚠ 誰も選んでいなければ空文字＝これまでとまったく同じ見た目になる。
+        $head = $mention ? ChatworkMentions::head(ChatworkRooms::SHEET_SYNC) : '';
+
         try {
-            $client->postMessage($room, "[info][title]{$title}[/title]{$body}[/info]");
+            $client->postMessage($room, $head."[info][title]{$title}[/title]{$body}[/info]");
 
             return true;
         } catch (\Throwable $e) {

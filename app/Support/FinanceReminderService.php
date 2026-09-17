@@ -272,6 +272,13 @@ class FinanceReminderService
                 }
             }
         }
+        // 共通設定で選んだ「この知らせで毎回メンションする人」も足す（2026-09-17 baba要望）。
+        // ⚠ 案件のD・営業への [To:] は今までどおり。ここは**足すだけ**（置き換えない）。
+        //   正本＝App\Support\ChatworkMentions。
+        foreach (ChatworkMentions::chosenWithId(ChatworkRooms::FINANCE) as $person) {
+            $headIds[trim((string) $person->chatwork_id)] = true;
+        }
+
         $head = implode('', array_map(fn ($id) => '[To:' . $id . ']', array_keys($headIds)));
         if ($head !== '') {
             $body .= $head . "\n";

@@ -77,6 +77,11 @@ class DispatchOnAssignScreensTest extends TestCase
 
         $html = $this->actingAsPerson($this->emp())->get('/assign')->assertOk()->getContent();
         $this->assertStringContainsString('dispatchRowsHtml(c)', $html, 'メンバー欄に派遣の行を描く呼び出し');
+
+        // ⚠ この画面は、サーバーから来たカードを**JSで作り直している**。
+        //   作り直すところに dispatches を書き忘れると、サーバーが渡していても画面には届かない。
+        //   2026-09-17 baba報告「アサイン表には出るのに日別ボードだけ出ない」＝まさにこれだった。
+        $this->assertStringContainsString('dispatches:(c.dispatches||[])', $html, '詰め替え（これが無いと出ない）');
     }
 
     /** アサイン表：メンバー欄の下に派遣会社と状況が出る。 */
