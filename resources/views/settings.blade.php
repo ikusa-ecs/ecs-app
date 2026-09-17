@@ -128,6 +128,25 @@
     html[data-theme="dark"] .lk-row input { background: #1e2128; color: var(--ink); border-color: var(--field-line); }
     html[data-theme="dark"] .lk-row input.bad { background: var(--danger-soft); border-color: #8a4a4a; }
     html[data-theme="dark"] .lk-row .lk-rm { background: var(--panel); color: var(--danger-ink); border-color: var(--danger-line); }
+
+    /* ===== チャットワークの「メンションする人」（2026-09-17 baba要望）=====
+       ⚠ 色は変数で書く（面=--panel／文字=--ink）。直に色を書くと、画面の色を切り替えたとき取り残される。 */
+    .cw-ment { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 9px; }
+    .cw-ment-h { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+    .cw-ment-n { font-weight: 400; font-size: 11.5px; color: var(--muted); margin-left: 8px; }
+    .cw-ment-list { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+    .cw-ment-p {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12.5px; color: var(--ink); cursor: pointer;
+    }
+    /* チャットワークIDが名簿に無い人＝選べない。薄くして理由を添える。 */
+    .cw-ment-p.noid { color: var(--muted); cursor: not-allowed; }
+    .cw-ment-warn {
+      font-size: 10.5px; color: var(--muted); background: var(--chip-bg);
+      border-radius: 999px; padding: 1px 7px; margin-left: 4px;
+    }
+    .cw-ment-alert { font-size: 11.5px; color: var(--danger); margin-top: 7px; line-height: 1.6; }
+    html[data-theme="dark"] .cw-ment-alert { color: var(--danger-ink); }
   </style>
 @endverbatim
 @endpush
@@ -283,7 +302,7 @@
       <div class="panel settings-wrap" style="margin-top:20px;">
         <div class="panel-head"><h2>チャットワークの送り先</h2></div>
         <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
-          知らせごとに、送る部屋を分けられます。<b>空のままにすると「共通」の部屋へ送ります。</b><br>
+          知らせごとに、<b>送る部屋</b>と<b>メンションする人</b>を分けられます。<b>部屋を空のままにすると「共通」の部屋へ送ります。</b><br>
           部屋の番号は、チャットワークでその部屋を開いたときのURLの <b>rid</b> のうしろの数字です
           （例：<code>https://www.chatwork.com/#!rid320609834</code> → <b>320609834</b>）。
           <b>URLを丸ごと貼っても大丈夫です。</b>
@@ -299,26 +318,70 @@
         <form method="POST" action="/settings/chatwork-rooms">
           @csrf
           @foreach (\App\Support\ChatworkRooms::KINDS as $__kind => $__info)
-            <div class="set-row">
-              <div>
-                <span class="set-label">{{ $__info[0] }}</span>
-                <span class="set-note">{{ $__info[1] }}</span>
+            @php($__chosen = \App\Support\ChatworkMentions::ids($__kind))
+            @php($__missing = \App\Support\ChatworkMentions::missingIdNames($__kind))
+            <div class="set-row" style="display:block;">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+                <div>
+                  <span class="set-label">{{ $__info[0] }}</span>
+                  <span class="set-note">{{ $__info[1] }}</span>
+                </div>
+                <div class="set-control">
+                  <input type="text" name="rooms[{{ $__kind }}]" inputmode="numeric"
+                         value="{{ \App\Support\ChatworkRooms::stored($__kind) }}"
+                         placeholder="{{ \App\Support\ChatworkRooms::for($__kind) ?: '未設定' }}"
+                         style="width:200px; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font-size:13px; font-family:inherit;">
+                </div>
               </div>
-              <div class="set-control">
-                <input type="text" name="rooms[{{ $__kind }}]" inputmode="numeric"
-                       value="{{ \App\Support\ChatworkRooms::stored($__kind) }}"
-                       placeholder="{{ \App\Support\ChatworkRooms::for($__kind) ?: '未設定' }}"
-                       style="width:200px; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font-size:13px; font-family:inherit;">
+
+              {{-- メンションする人（2026-09-17 baba要望）。
+                   ⚠ 覚えるのは名簿の人であって、チャットワークIDの数字ではない。
+                   ⚠ チャットワークIDが名簿に無い人は選べない（選んでも [To:] を作れないため）。 --}}
+              <div class="cw-ment">
+                <div class="cw-ment-h">メンションする人<span class="cw-ment-n">{{ $__chosen ? count($__chosen).'名' : '選んでいません' }}</span></div>
+                <div class="cw-ment-list">
+                  @foreach ($mentionPeople as $__p)
+                    <label class="cw-ment-p {{ $__p['hasId'] ? '' : 'noid' }}">
+                      <input type="checkbox" name="mentions[{{ $__kind }}][]" value="{{ $__p['id'] }}"
+                             @checked(in_array($__p['id'], $__chosen, true))
+                             @disabled(! $__p['hasId'])>
+                      {{ $__p['name'] }}@if (! $__p['hasId'])<span class="cw-ment-warn">ID未登録</span>@endif
+                    </label>
+                  @endforeach
+                </div>
+                @if ($__missing)
+                  <div class="cw-ment-alert">⚠ {{ implode('・', $__missing) }} さんはチャットワークIDが登録されていないので、メンションされません。アカウント管理で登録してください。</div>
+                @endif
               </div>
             </div>
           @endforeach
+
+          {{-- 毎朝の「届きました」にメンションを付けるか。既定＝付けない。
+               ⚠ 毎日鳴らすと見なくなって、本命の「届いていません」に気づけなくなるため。 --}}
+          <div class="set-row">
+            <div>
+              <span class="set-label">毎朝の「届きました」にもメンションする</span>
+              <span class="set-note">アサイン表の知らせは2通あります。<b>①毎朝の「届きました」</b>と<b>②届かなかった日の警告</b>です。
+                ②には必ずメンションが付きます。<b>①は毎日鳴るので、既定では付けません</b>（毎日鳴ると見なくなり、②に気づけなくなるためです）。</span>
+            </div>
+            <div class="set-control">
+              <label class="switch">
+                <input type="checkbox" name="mention_daily_report" value="1" @checked($mentionDailyReport)>
+                <span class="track"></span>
+              </label>
+            </div>
+          </div>
+
           <div style="padding:10px 0 2px;">
-            <button type="submit" class="btn primary">この送り先にする</button>
+            <button type="submit" class="btn primary">この送り先・メンションにする</button>
           </div>
         </form>
 
         <p class="muted" style="font-size:11.5px; margin:8px 0 0; line-height:1.7;">
           ※ 薄い文字で出ている番号は「いま実際に送っている先」です（空欄なら、そこへ送ります）。<br>
+          ※ <b>メンションは1つの知らせにつき{{ \App\Support\ChatworkMentions::MAX_PEOPLE }}名まで</b>です（宛名だらけで本文が読めなくならないように）。<br>
+          ※ <b>人数確定リマインド・収支未入力リマインドは、もともと案件の担当者（営業・D）にメンションとタスクが付きます。</b>
+          ここで選んだ人は、それに<b>足す</b>形です（毎回かならず見てほしい人を入れてください）。<br>
           ※ <b>知らせを送るには、別途チャットワークのトークンが必要です</b>（.env の CHATWORK_TOKEN・エンジニア依頼）。
           トークンが無いあいだは、ここを設定しても送信されません。
         </p>

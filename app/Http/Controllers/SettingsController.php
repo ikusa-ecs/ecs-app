@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
+use App\Support\ChatworkMentions;
 use App\Support\ChatworkRooms;
 use App\Support\DangerCalendar;
 use App\Support\DangerDays;
@@ -82,6 +83,10 @@ class SettingsController extends Controller
             // ⚠ 正本＝App\Support\LineGroupText。画面に文面を書かない。
             'lineNotice' => LineGroupText::notice(),
             'lineNoticeMax' => LineGroupText::NOTICE_MAX,
+            // チャットワークの知らせでメンションする人の選択肢（社員・名簿の並び）。
+            // ⚠ 正本＝App\Support\ChatworkMentions。画面にチャットワークIDを書かない。
+            'mentionPeople' => ChatworkMentions::options(),
+            'mentionDailyReport' => ChatworkMentions::mentionDailyReport(),
             // 危険日をカレンダーに入れるときの文面（2026-09-16 baba要望）。
             // ⚠ 正本＝App\Support\DangerCalendar。画面に文面や時間を直書きしない。
             'dangerCalTitle' => DangerCalendar::title(),
@@ -199,8 +204,21 @@ class SettingsController extends Controller
         $rooms = $request->input('rooms', []);
         $rejected = ChatworkRooms::save(is_array($rooms) ? $rooms : []);
 
+        // メンションする人（2026-09-17 baba要望）。正本＝App\Support\ChatworkMentions。
+        // ⚠ チェックを全部外した知らせは、画面から何も送られてこない（チェックボックスの仕様）。
+        //   そのままだと「外したのに残る」ので、**画面に出ている知らせは必ず保存し直す**。
+        $mentions = $request->input('mentions', []);
+        $mentions = is_array($mentions) ? $mentions : [];
+        foreach (array_keys(ChatworkRooms::KINDS) as $kind) {
+            $ids = $mentions[$kind] ?? [];
+            ChatworkMentions::save($kind, is_array($ids) ? $ids : []);
+        }
+
+        // 毎朝の「届きました」にもメンションを付けるか（既定＝付けない）。
+        ChatworkMentions::saveMentionDailyReport($request->boolean('mention_daily_report'));
+
         return back()
-            ->with('chatwork_rooms_status', 'チャットワークの送り先を保存しました。')
+            ->with('chatwork_rooms_status', 'チャットワークの送り先とメンションを保存しました。')
             ->with('chatwork_rooms_rejected', $rejected);
     }
 
