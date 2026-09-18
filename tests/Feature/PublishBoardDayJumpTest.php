@@ -55,4 +55,37 @@ class PublishBoardDayJumpTest extends TestCase
         $this->assertStringNotContainsString('toISOString(', $blade,
             'toISOString は時差で日付がずれる。dayKey は年・月・日を組み立てて作ること。');
     }
+
+    /**
+     * カレンダーから日付を選んでも飛べる（2026-09-18 baba要望「日付に飛べるようにしてほしい」）。
+     * ⚠ 下の日付チップは「案件がある日」しか並ばない。
+     *   案件が1件も無い日や、チップが多くて探しにくいときのために、日付の入力欄を常に出しておく。
+     */
+    public function test_publish_board_has_a_date_picker(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $this->actingAsPerson($me)->get('/assign-publish')
+            ->assertOk()
+            ->assertSee('id="dayPick"', false)
+            ->assertSee('今日へ', false)
+            ->assertSee('function todayKeyStr(', false)
+            // ⚠ その日に案件が無いときは黙らない（押して何も起きないと壊れて見える）。
+            ->assertSee('この日の案件はありません', false);
+    }
+
+    /**
+     * 「非公開にする」ボタンがある（2026-09-18 baba要望「公開する以外に非公開が欲しい」）。
+     * ⚠ 前からある機能だが、ボタンの名前が「公開取消」で見つけてもらえなかった。
+     *   画面の状態バッジ（非公開）と同じ言葉にそろえる。
+     */
+    public function test_publish_board_can_unpublish_one_by_one(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $this->actingAsPerson($me)->get('/assign-publish')
+            ->assertOk()
+            ->assertSee('非公開にする', false)
+            ->assertSee('まとめて非公開', false);
+    }
 }

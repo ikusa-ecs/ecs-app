@@ -187,6 +187,15 @@
        ⚠ 見た目はエントリー一覧の日付チップと同じにそろえる（別の画面で違う見え方にしない）。 */
     .day-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0 0 12px; }
     .day-chips .dc-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+    /* 日付をカレンダーから選んで飛ぶ（2026-09-18 baba要望）。
+       ⚠ 下の日付チップは「案件がある日」しか並ばないので、こちらは常に出しておく。 */
+    .day-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+    .day-pick .dc-label { font-size: 12px; color: var(--muted); }
+    .day-pick input[type="date"] { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 13px; font-family: inherit; background: var(--panel); color: var(--ink); }
+    .day-pick .day-today { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+      font-size: 12px; font-weight: 700; font-family: inherit; background: var(--panel); color: var(--ink); cursor: pointer; }
+    .day-pick .dp-miss { font-size: 12px; font-weight: 700; color: var(--danger-ink, #b91c1c); }
     .day-chip {
       font-family: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer;
       background: #fff; border: 1px solid #d8c8b6; border-radius: 8px; padding: 5px 8px; color: #3a2d20;
@@ -415,6 +424,13 @@
            ⚠ 左メニューの年月フォルダは「月」までしか飛べず、月に案件が多いと探し直しになる。
            ⚠ 出すのは「いま表示しているぶん」の日だけ（タブ・絞り込みに合わせる）。
               押しても案件が無い日が並ぶと、押して何も起きない＝壊れて見えるため。 -->
+      <div class="day-pick">
+        <span class="dc-label">日付で飛ぶ：</span>
+        <input type="date" id="dayPick" onchange="jumpToDay(this.value)"
+               title="この日の案件へ移動します">
+        <button class="day-today" onclick="jumpToDay(todayKeyStr())" title="今日の案件へ移動します">今日へ</button>
+        <span class="dp-miss" id="dayPickMiss"></span>
+      </div>
       <div class="day-chips" id="dayChips"></div>
 
       <!-- 表 -->
@@ -791,7 +807,7 @@
       <td>${pub ? '<span class="pub-badge on"><span class="dot"></span>公開中</span>' : '<span class="pub-badge off"><span class="dot"></span>非公開</span>'}</td>
       <td class="ops-cell">
         ${pub
-          ? `<button class="pub-toggle undo" onclick="toggle('${c.id}')">公開取消</button>`
+          ? `<button class="pub-toggle undo" onclick="toggle('${c.id}')" title="スタッフ画面から外します（案件は消えません）">非公開にする</button>`
           : `<button class="pub-toggle go" onclick="toggle('${c.id}')">公開する</button>`}
         <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します">${extra ? '追加解除' : '＋追加'}</button>
         <a class="detail-link" href="/project-assign?project=${c.id}">アサイン画面 →</a>
@@ -1058,12 +1074,24 @@
     } else {
       buildDayChips();   // 押した日に色を付け直す
     }
-    if (!row) return;
+    // ⚠ その日に案件が無いときは黙って終わらせない（押して何も起きないと壊れて見える）。
+    const miss = document.getElementById('dayPickMiss');
+    if (!row){
+      if (miss) {
+        miss.textContent = 'この日の案件はありません';
+        setTimeout(function(){ miss.textContent = ''; }, 2500);
+      }
+      return;
+    }
+    if (miss) miss.textContent = '';
 
     row.scrollIntoView({ behavior:'smooth', block:'center' });
     row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
     setTimeout(() => row.classList.remove('flash'), 1600);
   }
+
+  /** 今日の日付キー（「今日へ」ボタン用）。 */
+  function todayKeyStr(){ return dayKey(today); }
 
   let flashTimer = null;
   function jumpToMonth(key){
