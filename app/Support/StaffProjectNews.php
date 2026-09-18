@@ -32,6 +32,12 @@ final class StaffProjectNews
     /** 何日前までさかのぼるか（画面が長くなりすぎないように）。 */
     public const DAYS = 30;
 
+    /**
+     * 「公開」を表す言葉（ProjectFieldLabels が履歴に書いている文字）。
+     * ⚠ ここを直すときは ProjectFieldLabels::BOOLEAN_WORDS の staff_published と必ず合わせる。
+     */
+    public const PUBLISHED_WORD = '公開';
+
     /** 最大何件出すか。 */
     public const LIMIT = 30;
 
@@ -121,8 +127,13 @@ final class StaffProjectNews
             ->where('created_at', '>=', $since)
             ->where(function ($q) {
                 // 変更は「スタッフに関係する項目」だけ。新しく出た案件（created）はそのまま。
+                // ⚠ **公開にした瞬間**も「新しい募集が出ました」として出す（2026-09-18 baba指摘
+                //   「案件追加して公開にしたのに、最近の変更が15:44から増えない」）。
+                //   created は**登録した時刻**なので、前に登録した案件を今日公開しても新しい行が出ず、
+                //   スタッフから見ると「急に募集が増えたのに、お知らせが無い」状態だった。
                 $q->where('action', 'created')
-                    ->orWhere(fn ($qq) => $qq->where('action', 'updated')->whereIn('field', self::FIELDS));
+                    ->orWhere(fn ($qq) => $qq->where('action', 'updated')->whereIn('field', self::FIELDS))
+                    ->orWhere(fn ($qq) => $qq->where('action', 'updated')->where('field', 'staff_published'));
             })
             ->orderByDesc('id')
             ->limit(self::LIMIT * 3)   // 出せない行を落としたあとで LIMIT に切るので少し多めに引く
@@ -142,13 +153,25 @@ final class StaffProjectNews
                 continue;
             }
 
+            // 公開の切り替え（2026-09-18）。
+            //   ・非公開 → 公開 ＝「新しい募集が出ました」として出す（created と同じ見せ方）。
+            //   ・公開 → 非公開 ＝ **出さない**。募集が消えたことをわざわざ知らせない
+            //     （調整中に戻しただけのことが多く、スタッフを不安にさせるだけ）。
+            $action = $h->action;
+            if ($h->action === 'updated' && $h->field === 'staff_published') {
+                if ((string) $h->new_value !== self::PUBLISHED_WORD || ! $p->staff_published) {
+                    continue;
+                }
+                $action = 'created';
+            }
+
             $out[] = [
                 'id' => $h->id,
                 'projectId' => $h->project_id,
                 'name' => (string) ($p->project_name ?: $h->project_name),
                 'client' => (string) ($p->client ?? ''),
                 'date' => optional($p->start_date)->format('Y-m-d'),
-                'action' => $h->action,
+                'action' => $action,
                 // 日本語名の正本は ProjectFieldLabels。記録した当時の名前が残っていればそれを使う。
                 'label' => (string) ($h->field_label ?: ProjectFieldLabels::label((string) $h->field) ?: ''),
                 'from' => (string) ($h->old_value ?? ''),

@@ -282,4 +282,51 @@ class StaffProjectNewsTest extends TestCase
 
         $this->assertTrue($ids->contains($p->id), '自分が入っている他拠点の案件が出ていません');
     }
+
+    /**
+     * 公開にした瞬間も「新しい募集が出ました」として出す（2026-09-18 baba指摘
+     * 「案件追加して公開にしたのに、最近の変更が15:44から増えない」）。
+     *
+     * ⚠ それまで「新しい募集」は**登録した時刻（created）**だけだった。
+     *   前に登録しておいた案件を今日公開しても新しい行が出ず、
+     *   スタッフから見ると「募集は増えたのに、お知らせが無い」状態だった。
+     */
+    public function test_公開にしたら新しい募集として出る(): void
+    {
+        $me = $this->staff();
+
+        // 前に登録してあった（＝created の記録は古い）未公開の案件。
+        $p = ProjectFactory::new()->create([
+            'office' => '東京',
+            'start_date' => Carbon::today()->addDays(10)->format('Y-m-d'),
+            'project_name' => 'あとから公開した案件',
+        ]);
+
+        // 公開にする（公開ボードと同じ保存のしかた＝モデルに入れて save）。
+        $p->staff_published = true;
+        $p->save();
+
+        $news = collect(StaffProjectNews::forPerson($me));
+        $new = $news->firstWhere('projectId', $p->id);
+
+        $this->assertNotNull($new, '公開したのにお知らせが出ていません');
+        $this->assertSame('created', $new['action'], '「新しい募集が出ました」として出すこと');
+    }
+
+    /** ⚠ 非公開に戻したことは知らせない（調整中に戻しただけのことが多いため）。 */
+    public function test_非公開に戻したことは知らせない(): void
+    {
+        $me = $this->staff();
+
+        $p = ProjectFactory::new()->published()->create([
+            'office' => '東京',
+            'start_date' => Carbon::today()->addDays(10)->format('Y-m-d'),
+        ]);
+        $p->staff_published = false;
+        $p->save();
+
+        // 公開していないので、そもそもこの案件の話は1件も出ない。
+        $ids = collect(StaffProjectNews::forPerson($me))->pluck('projectId');
+        $this->assertFalse($ids->contains($p->id), '非公開に戻したことを知らせてしまっています');
+    }
 }
