@@ -72,8 +72,9 @@ TXT;
     private const POSITIONS = [
         ['code' => 'D',  'label' => 'ディレクター', 'always' => true],
         ['code' => 'SD', 'label' => 'SD予定',       'always' => false],
-        ['code' => 'OP', 'label' => 'OP予定',       'always' => true],
+        // ⚠ MC を OP より先に出す（2026-09-18 baba要望。それまで OP→MC だった）。
         ['code' => 'MC', 'label' => 'MC予定',       'always' => true],
+        ['code' => 'OP', 'label' => 'OP予定',       'always' => true],
         ['code' => 'FC', 'label' => 'FC予定',       'always' => true],
         ['code' => 'SP', 'label' => '軍師・サポーター予定', 'always' => false],
         ['code' => 'RP', 'label' => '受付予定',     'always' => false],

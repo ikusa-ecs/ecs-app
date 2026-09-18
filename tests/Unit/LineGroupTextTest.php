@@ -191,6 +191,29 @@ class LineGroupTextTest extends TestCase
         $this->assertStringNotContainsString('受付予定', $text);
     }
 
+    /**
+     * ⑧-2 並び順は「ディレクター → MC → OP」（2026-09-18 baba要望。それまで OP→MC だった）。
+     * ⚠ LINEに貼ってそのまま使う文章なので、順番が変わると現場が読み違える。
+     */
+    public function test_position_order_is_director_mc_then_op(): void
+    {
+        $text = LineGroupText::summary($this->sampleProject(), [
+            ['roleCode' => 'D'],
+            ['roleCode' => 'OP'],
+            ['roleCode' => 'MC'],
+        ]);
+
+        $d = strpos($text, 'ディレクター @');
+        $mc = strpos($text, 'MC予定 @');
+        $op = strpos($text, 'OP予定 @');
+
+        $this->assertNotFalse($d);
+        $this->assertNotFalse($mc);
+        $this->assertNotFalse($op);
+        $this->assertLessThan($mc, $d, 'ディレクターがMCより後に出ています');
+        $this->assertLessThan($op, $mc, 'MCがOPより後に出ています（順番が戻っています）');
+    }
+
     /** ⑨ 定型文は共通設定から変えられる。未設定のときだけ初期値が出る。 */
     public function test_notice_is_editable(): void
     {
