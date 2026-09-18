@@ -71,6 +71,12 @@ class AssignPublishController extends Controller
                 'place'     => $p->location ?? '',
                 'meetPlace' => $p->assembly_type ?? '',
                 'published' => (bool) $p->staff_published,      // 公開状態（DBの背骨）
+                // スタッフ募集をするか（案件登録の「募集しない」の裏返し）。2026-09-18 baba指摘
+                // 「メンバー募集しないにしてるのにスタッフ公開ボードに出ている」。
+                // ⚠ 募集しない案件も**一覧からは消さない**。公開はスタッフ画面の「確定アサイン」も
+                //   兼ねているので、消すと入っている人が自分の担当を見られなくなる。
+                //   代わりに「募集なし」の札を出し、絞り込みで隠せるようにした。
+                'recruit'   => (bool) $p->is_recruiting,
                 // 備考＝案件登録と同じ欄（projects.note）。2026-08-21 に担当メモと1つにまとめた。
                 'memo'      => $p->note ?? '',
                 // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）

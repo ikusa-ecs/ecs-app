@@ -300,6 +300,10 @@
     /* 土曜は青（橙の文字だと「仮」と読み違える。日曜の赤と対にする） */
     html[data-theme="orange"] td.date-cell .dow.sat { color: #2f6fb3; }
 
+    /* 募集なし＝案件登録で「募集しない」にした案件（2026-09-18）。
+       ⚠ 灰色にする＝「状態のお知らせ」であって、直してほしい注意ではないため。 */
+    .badge.norec { background: var(--chip-bg, #ece3d4); color: var(--chip-ink, #7a6a58); }
+
     /* 未公開＝赤。⚠ いままで公開ボタンと同じ橙で、状態（未公開）と操作（公開する）の
        区別が付かなかった。橙は公開ボタン側に残し、状態は赤で見せる。 */
     html[data-theme="orange"] .pub-badge.off { background: #fef2f2; color: #b91c1c; }
@@ -347,6 +351,9 @@
       <div class="mock-note">
         この公開ボードは<b>案件データ・公開状態とも実際のDBにつながっています</b>（公開ボタンを押すとDBに保存され、閉じても・他のPCでも残ります）。<br>
         <b>調整中は非公開のまま、固まったら「スタッフに公開」</b>してください。チェックを付けて<b>まとめて公開／非公開</b>もできます。<br>
+        <b>「募集なし」の札</b>＝案件登録で<b>「募集しない」</b>にした案件です。<b>スタッフの募集一覧には出ません</b>が、
+        公開すると<b>入っている人の「確定アサイン」には出ます</b>（だからこの一覧からは消していません）。
+        並べたくないときは右上の<b>「募集なしを隠す」</b>を選んでください。<br>
         ※ 公開した案件は、スタッフ画面の「確定アサイン」に表示されます（集合・解散時間やお知らせ文の変更も、保存すればスタッフ画面に反映されます）。
       </div>
 @endverbatim
@@ -410,6 +417,10 @@
           <option value="">表示：すべて</option>
           <option value="on">公開中のみ</option>
           <option value="off">非公開のみ</option>
+          <!-- 募集しない案件を隠す（2026-09-18 baba指摘）。⚠ 既定では隠さない＝
+               募集なしでも「確定アサイン」をスタッフに見せるために公開する場面があるため。
+               ⚠ ここは「そのまま出す区間」の中なので、Bladeのコメントは使えない（画面に出てしまう）。 -->
+          <option value="norec">募集なしを隠す</option>
         </select>
         <button class="btn" onclick="openStaffView()">👁 スタッフ画面を見る</button>
       </div>
@@ -492,6 +503,9 @@
     return {
       id: c.id, name: c.name, client: c.client, cat: c.cat, category: c.category, need: c.need, off: c.off,
       added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published,
+      // スタッフ募集をするか（2026-09-18）。⚠ ここに書き写さないと画面では undefined になり、
+      //   「募集なし」の札も「募集なしを隠す」も効かない（この画面もカードを作り直すつくり）。
+      recruit: c.recruit,
       staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
       // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
       meetDetail: c.meetDetail || '', belongings: c.belongings || '',
@@ -788,7 +802,7 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
@@ -872,6 +886,8 @@
       const pub = isPublished(c.id);
       if (f === 'on')  return pub;
       if (f === 'off') return !pub;
+      // 「募集なしを隠す」＝案件登録で「募集しない」にした案件を並べない（2026-09-18 baba）。
+      if (f === 'norec') return c.recruit !== false;
       return true;
     }
 

@@ -187,4 +187,42 @@ class AssignPublishBoardTest extends TestCase
 
         $this->assertSame('', OfficeSettings::get(OfficeSettings::NOTICE, '東北'));
     }
+
+    /**
+     * 「募集しない」案件が公開ボードで分かる（2026-09-18 baba指摘
+     * 「メンバー募集しないにしてるのにスタッフ公開ボードに出てるのはなぜ？」）。
+     *
+     * ⚠ 一覧からは**消さない**。公開はスタッフ画面の「確定アサイン」も兼ねているので、
+     *   消すと入っている人が自分の担当を見られなくなる。
+     *   代わりに「募集なし」の札を出し、絞り込み「募集なしを隠す」で並べないようにできる。
+     */
+    public function test_募集しない案件は募集なしと分かる(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $no = ProjectFactory::new()->create([
+            'office' => '東京', 'is_recruiting' => false,
+            'start_date' => now()->addDays(5)->format('Y-m-d'),
+        ]);
+        $yes = ProjectFactory::new()->create([
+            'office' => '東京', 'is_recruiting' => true,
+            'start_date' => now()->addDays(6)->format('Y-m-d'),
+        ]);
+
+        $cases = collect(
+            $this->actingAsPerson($me)->get('/assign-publish')->assertOk()->original->getData()['cases']
+        );
+
+        // 両方とも一覧には出る（消さない）。
+        $this->assertNotNull($cases->firstWhere('id', $no->id), '募集しない案件が一覧から消えています');
+        $this->assertFalse($cases->firstWhere('id', $no->id)['recruit'], '募集の有無が渡っていません');
+        $this->assertTrue($cases->firstWhere('id', $yes->id)['recruit']);
+
+        $html = $this->actingAsPerson($me)->get('/assign-publish')->assertOk()->getContent();
+        // 札と絞り込みがあること。
+        $this->assertStringContainsString('募集なし', $html, '「募集なし」の札がありません');
+        $this->assertStringContainsString('募集なしを隠す', $html, '絞り込みがありません');
+        // ⚠ この画面もカードを作り直すつくり＝詰め替えを忘れると札も絞り込みも効かない。
+        $this->assertStringContainsString('recruit: c.recruit', $html, '詰め替え（これが無いと効かない）');
+    }
 }
