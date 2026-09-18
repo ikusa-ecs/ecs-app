@@ -105,6 +105,24 @@ class StaffProjectNewsTest extends TestCase
     }
 
     /**
+     * ⚠ 移動・車両も出さない（2026-09-18 baba「移動車両はいらない」）。
+     *   社内の手配なので、スタッフの動きは変わらない。
+     */
+    public function test_transport_is_not_shown(): void
+    {
+        $me = $this->staff();
+        $p = ProjectFactory::new()->published()->create([
+            'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'), 'office' => '東京',
+        ]);
+        Application::create(['project_id' => $p->id, 'staff_id' => $me->id, 'intent' => '希望']);
+        $this->history($p, 'transport', '電車', 'レンタカー');
+
+        $changes = collect(StaffProjectNews::forPerson($me))->where('action', 'updated');
+
+        $this->assertCount(0, $changes, '移動・車両を出してしまっている');
+    }
+
+    /**
      * 企業名（お客様）も渡すこと（2026-09-09 baba
      * 「同じコンテンツが同日にあるかもしれないから企業名も入れてほしい」）。
      */
