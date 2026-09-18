@@ -8,6 +8,7 @@ use App\Models\Content;
 use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\ProjectShare;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
@@ -21,6 +22,7 @@ use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ShiftWish;
+use App\Support\ShareTags;
 use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -452,6 +454,11 @@ class AssignBoardController extends Controller
         //   （アサイン表・案件別アサイン・ピックアップにも同じものを出すため）。
         $dispatchesByProject = DispatchRows::forProjects($projectIds);
 
+        // 拠点間の関わり（ヘルプ／巻き取り）。2026-09-18 baba要望
+        // 「他拠点からの巻き取りとかヘルプのときはそれもわかるようにしてほしい」。
+        // ⚠ 案件は複製しない作りなので、札を出さないと自拠点の案件と見分けが付かない。
+        $sharesByProject = ProjectShare::whereIn('project_id', $projectIds)->get()->groupBy('project_id');
+
         // 関係する人（名前・区分・できる役割）をまとめて引く。
         $people = $this->peopleWithPos(
             $assignments->pluck('staff_id')->merge($apps->pluck('staff_id'))->unique()->all()
@@ -465,7 +472,7 @@ class AssignBoardController extends Controller
         $contentMaster = Content::pluck('content_name', 'id')->all();
         $validContentIds = array_keys($contentMaster);
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject) {
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $sharesByProject, $office) {
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -606,6 +613,9 @@ class AssignBoardController extends Controller
                 'needLabel' => Headcount::label($p->required_count_min, $p->required_count),
                 'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'mine' => $mine,
+                // 拠点間の関わりの札（例：「名古屋からヘルプ」「名古屋に巻き取り」）。2026-09-18 baba要望。
+                // ⚠ 文言は App\Support\ShareTags が正本（画面で文字をつなげない）。
+                'shareTags' => ShareTags::forProject($p->office, $sharesByProject->get($p->id, collect()), $office),
                 // 営業担当（2026-09-18 baba要望）。LINEグループを作るとき営業担当も招待するので、
                 // 誰を呼ぶのかカードで分かるようにする。⚠ 複数なら「・」でつなぐ。
                 'sales' => implode('・', array_filter(array_map('trim', $salesOwners))),

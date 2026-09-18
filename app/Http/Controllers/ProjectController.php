@@ -21,6 +21,7 @@ use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
 use App\Support\ProjectHistoryRecorder;
 use App\Support\ProjectImportColumns;
+use App\Support\ShareTags;
 use App\Support\RequiredCountEstimate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -185,7 +186,8 @@ class ProjectController extends Controller
                 // ⚠ 自分の拠点ぶんは入れない（「自拠点にコピー済」の印で別に出している）。
                 'shareTags' => $sharesByProject->get($p->id, collect())
                     ->filter(fn ($s) => $s->office !== $myOffice)
-                    ->map(fn ($s) => ['label' => $s->office.$s->kind, 'kind' => $s->kind])
+                    // ⚠ 文言は App\Support\ShareTags が正本（この画面は「名古屋巻き取り」の短い形）。
+                    ->map(fn ($s) => ['label' => ShareTags::short($s->office, $s->kind), 'kind' => $s->kind])
                     ->values()->all(),
                 'isOwn' => ($p->office ?? '') === $myOffice,
                 'sharedToMe' => (bool) $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),

@@ -189,6 +189,10 @@
     .ctag.renkin { background: var(--danger-soft); color: #b91c1c; }
     .ctag.stay   { background: #fdecd9;            color: #b4530a; }
     .ctag.day    { background: var(--brand-soft);  color: var(--brand-dark); }
+    .ctag.big    { background: #fde68a;            color: #92600a; }
+    /* 拠点間の関わり。巻き取り＝相手の拠点が運営する＝ヘルプより目立たせる。 */
+    .ctag.share    { background: #e1f1ee; color: #0f766e; }
+    .ctag.share.takeover { background: #ffedd5; color: #9a3412; }
 
     /* 詳細ボタン（案件名の欄に配置） */
     .open-btn {
@@ -419,6 +423,9 @@
     html[data-theme="dark"] .ctag.setup  { background: var(--chip-bg); color: var(--chip-ink); }
     html[data-theme="dark"] .ctag.renkin { color: var(--danger-ink); }
     html[data-theme="dark"] .ctag.stay   { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .ctag.big    { background: var(--warn-soft); color: var(--warn-ink); }
+    html[data-theme="dark"] .ctag.share    { background: var(--info-soft); color: var(--info-ink); }
+    html[data-theme="dark"] .ctag.share.takeover { background: var(--warn-soft); color: var(--warn-ink); }
     html[data-theme="dark"] .open-btn { color: #ffffff; }
     /* メンバー行 */
     html[data-theme="dark"] .m-st.kari { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
@@ -747,6 +754,12 @@
       // 運営人数の表示（「6〜8」の形）と、IKUSAの添え書き「（IKUSA 10名）」（2026-09-18）。
       // ⚠ 詰め替えを忘れるとカードに出ない。
       needLabel:c.needLabel || '', needIkusaNote:c.needIkusaNote || '',
+      // 案件規模（小型／中型／大型）。⚠ 2026-09-18 まで**ここに書き写していなかった**＝
+      //   カードに大型の札が出ないだけでなく、**MCの規模上限の判定（scaleOf）も効いていなかった**。
+      scale:c.scale || '',
+      // 拠点間の関わりの札（「名古屋からヘルプ」「名古屋に巻き取り」）。2026-09-18。
+      // ⚠ 詰め替えを忘れるとカードに出ない。
+      shareTags:(c.shareTags || []).slice(),
       // 実施形態（リアル／リアルロング／オンライン／ARENA場所貸し／体験会）とバッジの色。
       // ⚠ 2026-09-18 まで**ここに書き写していなかった**＝サーバーは渡していたのに、
       //   カードの実施形態バッジ（fmtBadgeHtml）が**ずっと空**だった（baba指摘）。
@@ -1784,6 +1797,22 @@
     return parts.join('');
   }
 
+  // 拠点間の関わりの札（例：「名古屋からヘルプ」）。2026-09-18 baba要望。
+  // ⚠ 案件は複製しない作りなので、札が無いと自拠点の案件と見分けが付かない。
+  // ⚠ 文言はサーバー（App\Support\ShareTags）が作る。ここで文字をつなげない。
+  function shareTagsHtml(c){
+    return (c.shareTags || []).map(function (t) {
+      const cls = (t.kind === '巻き取り') ? ' takeover' : '';
+      return `<span class="ctag share${cls}" title="拠点間の関わり">${escHtml(t.label)}</span>`;
+    }).join('');
+  }
+
+  // 案件規模の札。⚠ 出すのは**大型だけ**（2026-09-18 baba要望）。
+  //   小型・中型はふつうなので札にすると埋もれる。判定は scaleOf（サーバーと同じ決まり）。
+  function scaleBadgeHtml(c){
+    return scaleOf(c) === '大型' ? '<span class="ctag big" title="案件規模">大型</span>' : '';
+  }
+
   function fmtBadgeHtml(c){
     const text = (c.format || '').trim();
     if (!text) return '';
@@ -2717,7 +2746,7 @@
     card.innerHTML = `
       <div class="cc-head">
         <div class="cc-headmain">
-          ${titleBlockHtml(c, fmtBadgeHtml(c) + tagHtml)}
+          ${titleBlockHtml(c, scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)}
           <div class="cc-client">${c.client}</div>
           <div class="cc-meta">
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>

@@ -76,7 +76,7 @@ class BoardFormatAndStayTest extends TestCase
         // ⚠ 置き場所＝コンテンツ名の横（2026-09-18 baba「前泊とかリアルとかはコンテンツの横に表示で」）。
         //   カードの下に離して置くと、横に並んだカードを目で追うときに見落とす。
         $this->assertStringContainsString(
-            'titleBlockHtml(c, fmtBadgeHtml(c) + tagHtml)',
+            'titleBlockHtml(c, scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)',
             $html,
             '実施形態と札がコンテンツ名の横に出ていません'
         );
@@ -139,5 +139,77 @@ class BoardFormatAndStayTest extends TestCase
 
         $this->assertStringContainsString('前泊集合', $text, '「前後泊あり」で前泊集合の行が出ていません');
         $this->assertStringContainsString('6:00', $text);
+    }
+
+    /**
+     * 案件規模が大型だと分かる（2026-09-18 baba要望「日別ボードで大型もわかるようにしてほしい」）。
+     * ⚠ scale も**詰め替えが漏れていた**。カードに札が出ないだけでなく、
+     *   MCの規模上限の判定（画面の scaleOf）も効いていなかった。
+     */
+    public function test_scale_reaches_the_card(): void
+    {
+        $me = $this->emp();
+        $big = $this->project(['scale' => '大型']);
+        $mid = $this->project(['scale' => '中型']);
+
+        $this->assertSame('大型', $this->card($me, $big->id)['scale'] ?? null);
+        $this->assertSame('中型', $this->card($me, $mid->id)['scale'] ?? null);
+
+        $html = $this->actingAsPerson($me)->get('/assign')->assertOk()->getContent();
+        $this->assertStringContainsString('scale:c.scale', $html, '詰め替え（これが無いと出ない）');
+        $this->assertStringContainsString('scaleBadgeHtml(c)', $html, 'カードに大型の札を描くところ');
+    }
+
+    /**
+     * 他拠点との関わり（ヘルプ／巻き取り）が分かる
+     * （2026-09-18 baba「他拠点からの巻き取りとかヘルプのときはそれもわかるようにしてほしい」）。
+     */
+    public function test_share_tags_reach_the_card(): void
+    {
+        $me = $this->emp();   // 東京の社員
+
+        // ① 名古屋の案件を、東京が手伝っている → 「名古屋からヘルプ」
+        $fromOther = $this->project(['office' => '名古屋']);
+        \App\Models\ProjectShare::create([
+            'project_id' => $fromOther->id, 'office' => '東京', 'kind' => 'ヘルプ',
+        ]);
+
+        // ② 東京の案件を、名古屋に手伝ってもらっている → 「名古屋にヘルプ」
+        $toOther = $this->project(['office' => '東京']);
+        \App\Models\ProjectShare::create([
+            'project_id' => $toOther->id, 'office' => '名古屋', 'kind' => 'ヘルプ',
+        ]);
+
+        $this->assertSame(
+            [['label' => '名古屋からヘルプ', 'kind' => 'ヘルプ']],
+            $this->card($me, $fromOther->id)['shareTags'] ?? null
+        );
+        $this->assertSame(
+            [['label' => '名古屋にヘルプ', 'kind' => 'ヘルプ']],
+            $this->card($me, $toOther->id)['shareTags'] ?? null
+        );
+
+        // 関わりの無い案件には札を出さない。
+        $plain = $this->project([]);
+        $this->assertSame([], $this->card($me, $plain->id)['shareTags'] ?? null);
+
+        $html = $this->actingAsPerson($me)->get('/assign')->assertOk()->getContent();
+        $this->assertStringContainsString('shareTags:(c.shareTags || [])', $html, '詰め替え（これが無いと出ない）');
+        $this->assertStringContainsString('shareTagsHtml(c)', $html, 'カードに関わりの札を描くところ');
+    }
+
+    /** 他拠点の案件を「巻き取った」ときも分かる（引き取った側のボードには出る）。 */
+    public function test_taken_over_from_another_office(): void
+    {
+        $me = $this->emp();
+        $p = $this->project(['office' => '名古屋']);
+        \App\Models\ProjectShare::create([
+            'project_id' => $p->id, 'office' => '東京', 'kind' => '巻き取り',
+        ]);
+
+        $this->assertSame(
+            [['label' => '名古屋から巻き取り', 'kind' => '巻き取り']],
+            $this->card($me, $p->id)['shareTags'] ?? null
+        );
     }
 }
