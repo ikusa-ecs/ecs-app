@@ -14,6 +14,7 @@ use App\Http\Controllers\AssignSheetController;
 use App\Http\Controllers\AssignWishlistController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AvailabilityImportController;
+use App\Http\Controllers\BroadcastListController;
 use App\Http\Controllers\CountDeadlineReminderController;
 use App\Http\Controllers\DangerDayFeedController;
 use App\Http\Controllers\DashboardController;
@@ -326,6 +327,11 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/dispatches', [DispatchController::class, 'store']);
     Route::post('/dispatches/{id}', [DispatchController::class, 'update']);
     Route::delete('/dispatches/{id}', [DispatchController::class, 'destroy']);
+
+    // 配信・中継案件一覧（2026-09-18・FBシート No.21 馬場さん）。
+    // 「配信／中継」の案件だけを開催日順に並べ、案件ごとに配信担当を決める画面。
+    // ⚠ 担当の保存先は案件一覧と同じ入口（POST /projects/cells）＝拠点チェックもそこで通る。
+    Route::get('/broadcast-list', [BroadcastListController::class, 'index']);
 
     Route::get('/pickup', [AssignBoardController::class, 'pickup']);
     // ピックアップのメンバーを assignments にDB保存（担当メモ・巡回数も一緒に上書き）。

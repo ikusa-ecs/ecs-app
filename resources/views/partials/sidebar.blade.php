@@ -58,6 +58,9 @@
         {{-- 派遣一覧＝どの案件にどこへ何名頼んだかのシート（2026-09-03 baba要望）。
              ⚠ 入れる場所は日別ボードの「＋派遣」。それまでDBに何も残っていなかった。 --}}
         <a class="{{ ($active ?? '') === 'dispatch_list' ? 'active' : '' }}" href="/dispatch-list"><span class="nav-icon">🤝</span> 派遣一覧</a>
+        {{-- 配信・中継案件一覧＝配信／中継のある案件だけを並べ、配信担当を決める画面
+             （2026-09-18・FBシート No.21 馬場さん）。 --}}
+        <a class="{{ ($active ?? '') === 'broadcast_list' ? 'active' : '' }}" href="/broadcast-list"><span class="nav-icon">📡</span> 配信・中継案件一覧</a>
         {{-- 経験回数＝「このコンテンツをやったことがある人は誰か」を探す画面。名簿の詳細から独立させた（2026-08-28）。 --}}
         <a class="{{ ($active ?? '') === 'experience' ? 'active' : '' }}" href="/experience"><span class="nav-icon">🏅</span> 経験回数</a>
         <a href="#" onclick="window.open('/assign-wishlist','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">📊</span> スタッフ集計</a>

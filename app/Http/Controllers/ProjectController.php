@@ -891,6 +891,9 @@ class ProjectController extends Controller
             'director_id' => ['nullable', 'string'],
             'sd_id' => ['nullable', 'string'],
             'goods_owner_id' => ['nullable', 'string'],
+            // 配信担当（2026-09-18・FB No.21）。社員（全拠点）から選ぶ＋外部業者は自由入力。
+            'broadcast_owner_id' => ['nullable', 'string'],
+            'broadcast_owner_name' => ['nullable', 'string', 'max:100'],
             // 複数選べるようにしたので、つないだ文字（電車+IKUSAカー+...）が入る（2026-08-25 baba）。
             'transport' => ['nullable', 'string', 'max:200'],
             'audio_equipment' => ['nullable', 'string', 'max:200'],
@@ -940,6 +943,19 @@ class ProjectController extends Controller
             $project->goods_owner_id = ($val !== '' && Person::employees()->whereKey($val)->exists())
                 ? $val
                 : null;
+        }
+
+        // 配信担当（2026-09-18・FB No.21）。物品担当と同じ持ち方だが、選べるのは**全拠点の社員**。
+        // ⚠ 外部業者（名簿にいない相手）は名前を自由入力で残す＝社員と両方入れてもよい。
+        if ($request->has('broadcast_owner_id')) {
+            $val = trim((string) $request->input('broadcast_owner_id'));
+            $project->broadcast_owner_id = ($val !== '' && Person::employees()->whereKey($val)->exists())
+                ? $val
+                : null;
+        }
+        if ($request->has('broadcast_owner_name')) {
+            $val = trim((string) $request->input('broadcast_owner_name'));
+            $project->broadcast_owner_name = $val !== '' ? $val : null;
         }
 
         // 移動・音響：送られたキーだけ更新。空文字は null（未設定）に。

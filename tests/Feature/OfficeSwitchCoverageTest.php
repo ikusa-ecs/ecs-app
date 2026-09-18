@@ -33,6 +33,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/assign-wishlist',     // スタッフ集計＝希望まとめ（2026-09-15 に追加）
         '/paper-stock',         // 謎解きの紙 在庫（2026-09-15 に追加）
         '/active-bonus',        // 繁忙期ボーナス（2026-09-17 に追加）
+        '/broadcast-list',      // 配信・中継案件一覧（2026-09-18 に追加・FB No.21）
     ];
 
     private function admin(): Person
@@ -64,6 +65,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/experience',
         '/assign-wishlist',
         '/paper-stock',
+        '/broadcast-list',
     ];
 
     public function test_全拠点はoffice_allで指定する(): void

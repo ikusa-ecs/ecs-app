@@ -74,6 +74,9 @@ class ProjectFieldLabels
         'required_count_min' => '運営人数（下限）',
         // そのうち自社で出す人数（2026-09-18）。⚠ 覚えておくための数字＝募集の計算には使わない。
         'ikusa_count'        => '運営人数（IKUSA）',
+        // 配信担当（2026-09-18・FB No.21）。社員から選ぶぶんと、外部業者の自由入力。
+        'broadcast_owner_id'   => '配信担当（社員）',
+        'broadcast_owner_name' => '配信担当（外部業者）',
         'ikusa_count_min'    => '運営人数（IKUSA・下限）',
         'count_as_event'     => 'イベント数に数える',
         'count_tentative'    => '運営人数は仮',
