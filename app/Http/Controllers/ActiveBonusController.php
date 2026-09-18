@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
- * 繁忙期ボーナス（/active-bonus）。2026-09-17 baba要望。
+ * アクティブスタッフ増加計画（/active-bonus）。2026-09-17 baba要望。
  *
  * 「あと1回出てもらえれば、その人にボーナスが付く＝タイミーを頼むより安く済む」を
  * 一目で分かるようにする画面。アサインする人が、誰を優先して声かけすればよいか決めるのに使う。
@@ -74,7 +74,7 @@ class ActiveBonusController extends Controller
             (bool) ($data['show_to_staff'] ?? false),
         );
 
-        return back()->with('active_bonus_status', '繁忙期ボーナスの決まりを保存しました。');
+        return back()->with('active_bonus_status', 'アクティブスタッフ増加計画の決まりを保存しました。');
     }
 
     /** ?month=YYYY-MM（形が違う・未指定なら今月）。 */

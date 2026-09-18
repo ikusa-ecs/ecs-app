@@ -154,7 +154,7 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/stats', [StatsController::class, 'index']);
     // 集計ダッシュボードのCSV出力（1枚に全情報・画面と同じ並び。画面と同じ期間・表示範囲）。
     Route::get('/stats/export.csv', [StatsController::class, 'exportCsv']);
-    // 繁忙期ボーナス＝「あと1回でボーナスが付く人」を出して、優先アサインの判断に使う（baba 2026-09-17）。
+    // アクティブスタッフ増加計画＝「あと1回でボーナスが付く人」を出して、優先アサインの判断に使う（baba 2026-09-17）。
     // 計算の正本は App\Support\ActiveBonus。金額が出るので社員以上だけ（スタッフには自分の回数だけ見せる）。
     Route::get('/active-bonus', [ActiveBonusController::class, 'index']);
     // 決まりの設定（階層・1回の時間・タイミー費用・スタッフに見せるか）。

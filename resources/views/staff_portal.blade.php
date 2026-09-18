@@ -95,7 +95,7 @@
     }
     .extra-notice b { color: #991b1b; }
 
-    /* 🔥 繁忙期ボーナス（2026-09-17）。色は変数で書く＝黒ベースのテーマでも読めるようにするため。 */
+    /* 🔥 アクティブスタッフ増加計画（2026-09-17）。色は変数で書く＝黒ベースのテーマでも読めるようにするため。 */
     .bonus-box {
       background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--warn);
       border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; line-height: 1.7;
@@ -808,7 +808,7 @@
           @else いまは募集中の案件はありません。募集が始まると、ここに案件が並びます。@endif
         </div>
 
-        {{-- 繁忙期ボーナス（2026-09-17 baba要望）。本人の今月の回数と「あと◯回」だけを出す。
+        {{-- アクティブスタッフ増加計画（2026-09-17 baba要望）。本人の今月の回数と「あと◯回」だけを出す。
              ⚠ 会社のコスト・削減額・ほかの人の順位は出さない（あれは社員が見るもの）。
              ⚠ 共通設定で「実施中」にしていないあいだは、丸ごと出さない
                （やっていないのに「あと1回でボーナス」と出ると、約束していないお金の話になる）。
@@ -816,7 +816,7 @@
              ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
         @if (!empty($bonus))
           <div class="bonus-box">
-            <div class="bonus-head">🔥 繁忙期ボーナス</div>
+            <div class="bonus-head">🔥 アクティブスタッフ増加計画</div>
             <div class="bonus-now">今月のアサイン <b>{{ $bonus['count'] }}回</b>
               @if ($bonus['rate'] > 0)
                 <span class="bonus-got">＋{{ number_format($bonus['rate']) }}円/h 達成中</span>

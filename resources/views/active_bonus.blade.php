@@ -1,9 +1,9 @@
 @extends('layouts.app')
-@section('title', '繁忙期ボーナス')
-@section('h1', '繁忙期ボーナス')
+@section('title', 'アクティブスタッフ増加計画')
+@section('h1', 'アクティブスタッフ増加計画')
 @php($active = 'active_bonus')
 
-{{-- 繁忙期ボーナス（/active-bonus）。2026-09-17 baba要望。
+{{-- アクティブスタッフ増加計画（/active-bonus）。2026-09-17 baba要望。
      「あと1回出てもらえればボーナスが付く＝タイミーを頼むより安い」を一目で分かるようにする。
      ⚠ 計算はすべて App\Support\ActiveBonus で済ませてある。この画面では計算しない
        （画面ごとに数え直すと、スタッフ画面と数字が食い違う）。

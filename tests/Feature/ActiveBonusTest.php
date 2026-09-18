@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * 繁忙期ボーナス（/active-bonus）。2026-09-17 baba要望。
+ * アクティブスタッフ増加計画（/active-bonus）。2026-09-17 baba要望。
  *
  * 見本の画像から逆算した計算のきまりを、そのまま見張る：
  *   ・階層に届くと時給が上がり、**その月の全回数にさかのぼって**ボーナスが付く
@@ -226,7 +226,7 @@ class ActiveBonusTest extends TestCase
 
         $this->actingAsPerson($me)->get('/active-bonus')
             ->assertOk()
-            ->assertSee('繁忙期ボーナス')
+            ->assertSee('アクティブスタッフ増加計画')
             ->assertSee('あと1回でボーナス')
             ->assertSee('S-001さん')
             ->assertSee('¥27,000');   // 9 × 6 × 500
@@ -253,7 +253,7 @@ class ActiveBonusTest extends TestCase
         ]);
 
         ActiveBonus::save([['count' => 5, 'rate' => 500]], 6, 10000, false);
-        $this->actingAsPerson($me)->get('/dashboard')->assertSee('繁忙期ボーナス');
+        $this->actingAsPerson($me)->get('/dashboard')->assertSee('アクティブスタッフ増加計画');
         $this->actingAsPerson($me)->get('/active-bonus')->assertOk();
 
         // ⚠ 置き場所は「案件」のくくりの中（2026-09-18 baba指定）。
@@ -264,7 +264,7 @@ class ActiveBonusTest extends TestCase
         $this->assertStringContainsString('/active-bonus', $projectGroup, '「案件」のくくりに入っていません');
 
         ActiveBonus::save([['count' => 5, 'rate' => 500]], 6, 10000, true);
-        $this->actingAsPerson($me)->get('/dashboard')->assertSee('繁忙期ボーナス');
+        $this->actingAsPerson($me)->get('/dashboard')->assertSee('アクティブスタッフ増加計画');
     }
 
     public function test_スタッフ画面には実施中のときだけ自分の回数が出る(): void
@@ -272,7 +272,7 @@ class ActiveBonusTest extends TestCase
         $staff = $this->person('S-001');
         $this->assignTimes('S-001', 4, '確定');
 
-        // ⚠ 「繁忙期ボーナス」という語は画面の書式（CSS）のコメントにも出るので、
+        // ⚠ 「アクティブスタッフ増加計画」という語は画面の書式（CSS）のコメントにも出るので、
         //   出ているかどうかは**中身の文言**で見る（枠が出ていないことを確かめたいため）。
         // 実施していないあいだは出さない（約束していないお金の話をしない）。
         ActiveBonus::save([['count' => 5, 'rate' => 500]], 6, 10000, false);
@@ -287,10 +287,10 @@ class ActiveBonusTest extends TestCase
     }
 
     /**
-     * 決まりの設定は**繁忙期ボーナスの画面の中**で保存する
+     * 決まりの設定は**アクティブスタッフ増加計画の画面の中**で保存する
      * （2026-09-18 baba要望「1つの画面に設定画面も集約して」。前は共通設定にあった）。
      */
-    public function test_繁忙期ボーナスの画面から保存できる(): void
+    public function test_アクティブスタッフ増加計画の画面から保存できる(): void
     {
         $me = PersonFactory::new()->create([
             'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin',

@@ -35,10 +35,10 @@
         {{-- 収支未入力リマインド＝締切(イベント終了後3営業日)を過ぎて未入力の案件をDへタスク化。 --}}
         <a class="{{ ($active ?? '') === 'finance_reminder' ? 'active' : '' }}" href="/finance-reminder"><span class="nav-icon">💸</span> 収支未入力リマインド</a>
         <a href="#" onclick="(window.openAggWindow ? openAggWindow() : window.open('/projects-agg','ecs_agg','width=820,height=640')); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
-        {{-- 繁忙期ボーナス（2026-09-17 baba要望）。
+        {{-- アクティブスタッフ増加計画（2026-09-17 baba要望）。
              ⚠ 2026-09-18：常時表示にし、設定もこの画面の中に移した。
              ⚠ 置き場所は「案件」のくくり（2026-09-18 baba指定）。 --}}
-        <a class="{{ ($active ?? '') === 'active_bonus' ? 'active' : '' }}" href="/active-bonus"><span class="nav-icon">🔥</span> 繁忙期ボーナス</a>
+        <a class="{{ ($active ?? '') === 'active_bonus' ? 'active' : '' }}" href="/active-bonus"><span class="nav-icon">🔥</span> アクティブスタッフ増加計画</a>
       </div>
     </div>
 
