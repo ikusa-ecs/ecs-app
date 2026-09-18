@@ -15,6 +15,7 @@ use App\Support\DispatchRows;
 use App\Support\EntryFeed;
 use App\Support\Headcount;
 use App\Support\LineGroupText;
+use App\Support\Lodging;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
@@ -538,7 +539,9 @@ class AssignBoardController extends Controller
             if (($p->date_type ?? '本番') !== '本番') {
                 $tags[] = $p->date_type;
             }
-            if ($p->lodging && str_contains($p->lodging, '前泊')) {
+            // ⚠ ここに判定を書かない。正本＝App\Support\Lodging::hasPreStay。
+            //   文字を探すだけだと「前後泊あり」が前泊なし扱いになる（2026-09-18 に直した）。
+            if (Lodging::hasPreStay($p->lodging)) {
                 $tags[] = '前泊';
             }
             if ($p->is_repeat) {

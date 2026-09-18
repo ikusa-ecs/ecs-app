@@ -1210,7 +1210,10 @@
     const sel = document.getElementById('lodgingSel');
     const row = document.getElementById('stayPreRow');
     if (!sel || !row) return;
-    row.style.display = (sel.value || '').indexOf('前泊') >= 0 ? '' : 'none';
+    // ⚠ 「前泊」だけを探すと「前後泊あり」で欄が開かない（2026-09-18 に直した）。
+    //   数える言葉はサーバー側の正本 App\Support\Lodging::PRE_STAY_WORDS と合わせること。
+    const v = sel.value || '';
+    row.style.display = (v.indexOf('前泊') >= 0 || v.indexOf('前後泊') >= 0) ? '' : 'none';
   }
 
   // ===== 確度（ヨミ）：確定以外なら見込み時期欄を開く =====

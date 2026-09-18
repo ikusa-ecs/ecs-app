@@ -284,18 +284,20 @@ TXT;
         return $client.'（'.$agency.'）';
     }
 
-    /** 宿泊（無／前泊有 など）。空なら「無」。 */
+    /** 宿泊（無／前泊有 など）。空なら「無」。⚠ 正本＝App\Support\Lodging。 */
     private static function lodging(Project $project): string
     {
-        $v = trim((string) ($project->lodging ?? ''));
-
-        return $v !== '' ? $v : '無';
+        return Lodging::label($project->lodging);
     }
 
-    /** 前泊ありか。 */
+    /**
+     * 前泊ありか。
+     * ⚠ ここに判定を書かない。正本＝App\Support\Lodging::hasPreStay。
+     *   文字を探すだけだと「前後泊あり」が前泊なし扱いになる（2026-09-18 に直した）。
+     */
     private static function hasPreStay(Project $project): bool
     {
-        return str_contains((string) ($project->lodging ?? ''), '前泊');
+        return Lodging::hasPreStay($project->lodging);
     }
 
     /** 営業担当（複数なら「・」でつなぐ）。 */

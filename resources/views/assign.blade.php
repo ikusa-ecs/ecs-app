@@ -742,6 +742,10 @@
       // 運営人数の表示（「6〜8」の形）と、IKUSAの添え書き「（IKUSA 10名）」（2026-09-18）。
       // ⚠ 詰め替えを忘れるとカードに出ない。
       needLabel:c.needLabel || '', needIkusaNote:c.needIkusaNote || '',
+      // 実施形態（リアル／リアルロング／オンライン／ARENA場所貸し／体験会）とバッジの色。
+      // ⚠ 2026-09-18 まで**ここに書き写していなかった**＝サーバーは渡していたのに、
+      //   カードの実施形態バッジ（fmtBadgeHtml）が**ずっと空**だった（baba指摘）。
+      format:c.format || '', fmtCls:c.fmtCls || '',
       // お客様（参加者）の人数・チーム数（2026-09-07 baba要望）。
       // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
       guest:c.guest, guestType:c.guestType, teams:c.teams, teamsTbd:c.teamsTbd,
