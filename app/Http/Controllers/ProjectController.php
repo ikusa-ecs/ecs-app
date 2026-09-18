@@ -104,6 +104,10 @@ class ProjectController extends Controller
                 'meetPlace' => $p->assembly_type ?? '',      // 集合形式。アサイン表書き出し用
                 // 運営人数。「6〜8」のような範囲もそのまま出せる形にして渡す（2026-08-25 baba）。
                 'need' => Headcount::label($p->required_count_min, $p->required_count),
+                // 運営人数のうちIKUSAが出す人数（2026-09-18 baba要望）。
+                // ⚠ 添え書きの文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。
+                'needIkusa' => Headcount::label($p->ikusa_count_min, $p->ikusa_count),
+                'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'category' => $p->category ?? '',
                 'toc' => (bool) $p->is_toc,     // toC（一般消費者向け）＝一覧の絞り込み用
                 'yomi' => $p->yomi ?? '',

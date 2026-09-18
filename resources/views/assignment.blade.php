@@ -272,7 +272,7 @@
         <div class="meta">
           <span>コンテンツ：<b>{{ $contentName }}</b></span>
           <span>日程：<b>{{ $date ? $date->format('Y/n/j') . '（' . ['日','月','火','水','木','金','土'][$date->dayOfWeek] . '）' : '未設定' }}</b></span>
-          <span>必要人数：<b>{{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名</b></span>
+          <span>必要人数：<b>{{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名</b>{{ $needIkusaNote ?? '' }}</span>
           <span>会場：<b>{{ $project->location ?: '—' }}</b></span>
           <span>顧客：<b>{{ $project->client ?: '—' }}</b></span>
           <span>D：<b>{{ $project->director->name ?? '未定' }}</b></span>

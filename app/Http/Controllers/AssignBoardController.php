@@ -13,6 +13,7 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\DispatchRows;
 use App\Support\EntryFeed;
+use App\Support\Headcount;
 use App\Support\LineGroupText;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
@@ -563,6 +564,8 @@ class AssignBoardController extends Controller
                 'note' => $p->note ?? '',   // 案件の備考（見落とし防止でカードに出す）
                 'cat' => $p->site_category ?: '通常',
                 'need' => $p->required_count ?? 0,
+                // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
+                'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'filled' => count($assigned),
                 // お客様（参加者）の人数とチーム数（2026-09-07 baba要望）。
                 // ⚠ スタッフの運営人数（need）とは**別のもの**。取り違えると当日の規模を読み違える。
@@ -595,6 +598,10 @@ class AssignBoardController extends Controller
                 //   これで「締切（満員）／募集中」を判定する＝社員とスタッフで言うことを合わせる。
                 //   運営人数を増やせば、その場でまた「募集中」に戻る（公開し直さなくてよい）。
                 'needStaff' => RecruitStatus::need($p->required_count),
+                // 運営人数の表示用（「6〜8」の形）と、IKUSAの添え書き（2026-09-18 baba要望）。
+                // ⚠ 添え書きの文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。
+                'needLabel' => Headcount::label($p->required_count_min, $p->required_count),
+                'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'mine' => $mine,
                 // 営業担当（2026-09-18 baba要望）。LINEグループを作るとき営業担当も招待するので、
                 // 誰を呼ぶのかカードで分かるようにする。⚠ 複数なら「・」でつなぐ。
@@ -942,6 +949,8 @@ class AssignBoardController extends Controller
                 'client' => $p->client ?? '',
                 'cat' => $p->site_category ?: '通常',
                 'need' => $p->required_count ?? 0,
+                // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
+                'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'filled' => count($assignedIds),
                 'status' => $p->status ?? '未着手',
                 'dayType' => $p->date_type ?? '本番',
@@ -1085,6 +1094,8 @@ class AssignBoardController extends Controller
                 'dayType' => $p->date_type ?? '本番',
                 'parentId' => $p->parent_project_id,
                 'need' => $p->required_count ?? 0,
+                // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
+                'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'filled' => count($assignedIds),
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',

@@ -739,6 +739,9 @@
       // 営業担当（2026-09-18 baba要望。LINEグループに営業担当も招待するため）。
       // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
       sales:c.sales,
+      // 運営人数の表示（「6〜8」の形）と、IKUSAの添え書き「（IKUSA 10名）」（2026-09-18）。
+      // ⚠ 詰め替えを忘れるとカードに出ない。
+      needLabel:c.needLabel || '', needIkusaNote:c.needIkusaNote || '',
       // お客様（参加者）の人数・チーム数（2026-09-07 baba要望）。
       // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
       guest:c.guest, guestType:c.guestType, teams:c.teams, teamsTbd:c.teamsTbd,
@@ -2708,6 +2711,7 @@
             <span><span class="ic">📍</span> <span class="venue" title="${c.place || ''}">${c.placeShort || c.place || '—'}</span></span>
             ${c.meetPlace ? `<span><span class="ic">🚩</span> 集合場所：${c.meetPlace}</span>` : ''}
             ${c.sales ? `<span><span class="ic">💼</span> 営業：${escHtml(c.sales)}</span>` : ''}
+            ${(c.needLabel || c.needIkusaNote) ? `<span><span class="ic">👥</span> 運営 ${c.needLabel ? c.needLabel + '名' : '—'}${c.needIkusaNote || ''}</span>` : ''}
             ${guestTeamHtml(c)}
           </div>
         </div>

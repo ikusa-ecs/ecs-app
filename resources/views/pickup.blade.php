@@ -779,7 +779,7 @@
             <span>D <b>${c.dir || '—'}</b></span>
             ${guests}${teams}
           </div>
-          <div class="pk-block-h">メンバー（アサイン済み） <span class="cnt ${short ? 'short' : ''}">${roster.length} / 必要 ${c.need}名</span></div>
+          <div class="pk-block-h">メンバー（アサイン済み） <span class="cnt ${short ? 'short' : ''}">${roster.length} / 必要 ${c.need}名</span>${c.needIkusaNote ? `<span class="cnt" style="font-weight:600;">${c.needIkusaNote}</span>` : ''}</div>
           ${memHtml}
           ${dispatchHtml(c)}
           <div class="pk-block-h">希望者（未割当・エントリー中） <span class="cnt">${wishers.length}名</span></div>

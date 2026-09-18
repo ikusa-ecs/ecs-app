@@ -900,6 +900,8 @@
       logo:c.logo, camera:c.camera, article:c.article, video:c.video,
       note:c.note || undefined, draft:!!c.draft, archived:!!c.archived, cancelled:!!c.cancelled, scale:c.scale, sd:c.sd, id:c.id,
       toc:!!c.toc, cateringNote:c.cateringNote, need:c.need,
+      // 運営人数のうちIKUSAが出す人数（2026-09-18）。⚠ 詰め替えを忘れると画面に出ない。
+      needIkusa:c.needIkusa || '', needIkusaNote:c.needIkusaNote || '',
       // 拠点まわり（全拠点運用・設計書19.2）。ここに書き写さないと画面側では空になり、
       // 拠点の札も「自拠点にコピー」も出なくなる（ケータリングで同じ抜けをやった＝注意）。
       office:c.office || '', sharedOffices:c.sharedOffices || [], isOwn:!!c.isOwn,
@@ -1408,6 +1410,10 @@
               <span style="font-weight:600;">${p.area ? p.area : '<span style=\"color:var(--muted);font-weight:400;\">（未設定）</span>'}</span>
             </div>
             <div class="d-item">
+              <span class="d-label">運営人数</span>
+              <span style="font-weight:600;">${p.need ? p.need + '名' : '<span style=\"color:var(--muted);font-weight:400;\">（未設定）</span>'}<span style="color:var(--muted);font-weight:400;font-size:11.5px;margin-left:4px;">${p.needIkusaNote}</span></span>
+            </div>
+            <div class="d-item">
               <span class="d-label">お客様人数・チーム数</span>
               <span style="font-weight:600;">${p.guests}名${p.tentative ? '（仮）' : ''}<span style="color:var(--muted);margin:0 5px;">/</span>${p.teams}チーム</span>
             </div>
@@ -1796,7 +1802,7 @@
           p.client  ? 'クライアント：' + p.client : '',
           p.place   ? '会場：' + p.place : '',
           (p.meet && p.meet !== '—') ? '集合' + p.meet + '〜解散' + (p.leave || '—') : '時間未定',
-          p.need    ? '運営' + p.need + '名' : '',
+          p.need    ? '運営' + p.need + '名' + (p.needIkusaNote || '') : '',
           p.director && p.director !== '未定' ? 'D：' + p.director : '',
           p.draft   ? '※下書き' : ''
         ].filter(Boolean).join('\n');
@@ -1995,7 +2001,7 @@
 <!-- ===== アサイン表へ書き出し（GAS取込用の表をつくる） ===== -->
 <script>
   // 書き出す項目と並び（1行目の見出し）。GAS側はこの見出し名で読むので、並びを変えても動く。
-  const EXPORT_COLS = ['日付','コンテンツ','日程種別','種別','規模','営業','顧客名','エリア','会場住所','集合形式','集合','解散','入場','開始','終了','人数','チーム','運営人数','宿泊','音響','物品','移動','備考','D'];
+  const EXPORT_COLS = ['日付','コンテンツ','日程種別','種別','規模','営業','顧客名','エリア','会場住所','集合形式','集合','解散','入場','開始','終了','人数','チーム','運営人数','運営人数(IKUSA)','宿泊','音響','物品','移動','備考','D'];
 
   // セル値を整える（タブ・改行はスペースに、「—」など実体のない記号は空欄に）
   function expCell(v) {
@@ -2020,7 +2026,7 @@
         ymd, expCell(c.content), expCell(c.dayType), expCell(c.format), expCell(c.scale),
         expCell(c.sales), expCell(c.client), expCell(c.area), expCell(c.place), expCell(c.meetPlace),
         expCell(c.meet), expCell(c.leave), expCell(c.enter), expCell(c.evStart), expCell(c.evEnd),
-        expCell(c.guests), expCell(c.teams), expCell(c.need), expCell(c.lodging), expCell(c.sound),
+        expCell(c.guests), expCell(c.teams), expCell(c.need), expCell(c.needIkusa), expCell(c.lodging), expCell(c.sound),
         expCell(c.goods), expCell(c.transport), expCell(c.note), expCell(c.dir)
       ].join('\t'));
     });
@@ -2122,7 +2128,7 @@
       const parts = [d + ' ' + expCell(p.content) + of];
       if (place) parts.push(place);
       if (dir)   parts.push('D:' + dir);
-      if (need)  parts.push('運営' + need + '名');
+      if (need)  parts.push('運営' + need + '名' + (p.needIkusaNote || ''));
       return [parts.join(' ／ ')];
     }
 
@@ -2134,7 +2140,7 @@
     if (l2.length) lines.push('　' + l2.join('／'));
     const l3 = [];
     if (meet && leave) l3.push('集合' + meet + '〜解散' + leave);
-    if (need)  l3.push('運営' + need + '名');
+    if (need)  l3.push('運営' + need + '名' + (p.needIkusaNote || ''));
     if (dir)   l3.push('D:' + dir);
     if (sales) l3.push('営業:' + sales);
     if (l3.length) lines.push('　' + l3.join('／'));

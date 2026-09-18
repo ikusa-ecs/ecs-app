@@ -148,4 +148,46 @@ class IkusaCountTest extends TestCase
         // 仮（未定）のチェックは1つで2つの欄をまとめて休みにする。
         $this->assertStringContainsString('data-tbd-for="requiredCount,ikusaCount"', $html);
     }
+
+    /**
+     * アサイン人数が関わる画面に「（IKUSA ◯名）」が出る（2026-09-18 baba要望）。
+     * ⚠ 出し方の文言は App\Support\Headcount::ikusaNote の1か所で決めている。
+     */
+    public function test_the_note_reaches_every_screen(): void
+    {
+        $me = $this->manager();
+        $p = ProjectFactory::new()->published()->create([
+            'office' => '東京',
+            'start_date' => \Illuminate\Support\Carbon::today()->addDays(3)->format('Y-m-d'),
+            'required_count' => 16,
+            'ikusa_count' => 10,
+        ]);
+
+        $note = '（IKUSA 10名）';
+
+        // ① 案件一覧（JSで描くので、画面へ渡した中身を見る）
+        $case = collect($this->actingAsPerson($me)->get('/projects')->assertOk()
+            ->original->getData()['cases'])->firstWhere('id', $p->id);
+        $this->assertSame($note, $case['needIkusaNote'], '案件一覧');
+
+        // ② 日別ボード（同上）
+        $card = collect($this->actingAsPerson($me)->get('/assign')->assertOk()
+            ->original->getData()['boardCases'])->firstWhere('id', $p->id);
+        $this->assertSame($note, $card['needIkusaNote'], '日別ボード');
+
+        // ③ アサイン表（Bladeで描くのでHTMLに出る）
+        $html = $this->actingAsPerson($me)
+            ->get('/assign-sheet?month='.$p->start_date->format('Y-m'))->assertOk()->getContent();
+        $this->assertStringContainsString($note, $html, 'アサイン表');
+
+        // ④ 案件別アサイン
+        $html = $this->actingAsPerson($me)->get('/project-assign?project='.$p->id)->assertOk()->getContent();
+        $this->assertStringContainsString($note, $html, '案件別アサイン');
+
+        // ⑤ ⚠ 画面はサーバーの中身をJSで詰め替える＝忘れると出ない（この画面でよくある事故）。
+        $board = $this->actingAsPerson($me)->get('/assign')->assertOk()->getContent();
+        $this->assertStringContainsString('needIkusaNote:c.needIkusaNote', $board, '日別ボードの詰め替え');
+        $projects = $this->actingAsPerson($me)->get('/projects')->assertOk()->getContent();
+        $this->assertStringContainsString('needIkusaNote:c.needIkusaNote', $projects, '案件一覧の詰め替え');
+    }
 }

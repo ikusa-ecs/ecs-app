@@ -257,6 +257,9 @@ class AssignSheetController extends Controller
                 'note'        => $this->clean($p->note),
                 'roleDetail'  => $this->roleDetailText($p, $reqByContent),
                 'need_i'      => (int) ($p->required_count ?? 0),
+                // 運営人数のうちIKUSAが出す人数の添え書き（2026-09-18 baba要望）。
+                // ⚠ 文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。
+                'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 'filled'      => $members->count(),
                 'members'     => $members->all(),
                 // 派遣（2026-09-16）。メンバーとは別の行で出す＝人ではなく「会社への依頼」だから。

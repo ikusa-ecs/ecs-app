@@ -78,6 +78,24 @@ final class Headcount
         return (string) $max;
     }
 
+    /**
+     * 運営人数のうち「IKUSAが出す人数」の添え書き。「（IKUSA 10名）」の形。未入力なら空文字。
+     * 2026-09-18 baba要望＝アサイン人数が関わる画面に出す。
+     *
+     * ⚠ 文言はここが正本。画面ごとに書くと「（IKUSA10）」「うちIKUSA10名」のように食い違う。
+     * ⚠ IKUSAの人数は**覚えておくための数字**。募集・残り◯名・自動アサインは
+     *   今までどおり全体人数（required_count）で計算する。
+     *
+     * @param  int|null  $min  ikusa_count_min（範囲の少ないほう）
+     * @param  int|null  $max  ikusa_count（範囲の多いほう＝ふだんの数字）
+     */
+    public static function ikusaNote(?int $min, ?int $max): string
+    {
+        $label = self::label($min, $max);
+
+        return $label === '' ? '' : '（IKUSA '.$label.'名）';
+    }
+
     /** 範囲かどうか（画面で「おおよそ」と添えるときに使う）。 */
     public static function isRange(?int $min, ?int $max): bool
     {

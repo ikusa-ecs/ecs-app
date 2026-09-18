@@ -494,6 +494,16 @@
       <tr><th style="width:110px;">日付</th><th>変わったこと</th></tr>
       <tr>
         <td>2026-09-18</td>
+        <td><b>アサイン人数が関わる画面に「<u>（IKUSA ◯名）</u>」を出しました。</b>（baba要望）<br>
+          <span class="why">※ 出る場所＝<span class="menu">案件一覧</span>（行を開いた「運営人数」・カレンダーのふきだし・CSV書き出し・コピー用の文章）／
+          <span class="menu">日別ボード</span>のカード上部／<span class="menu">アサイン表</span>の「運営」／
+          <span class="menu">案件別アサイン</span>の「必要人数」／<span class="menu">ピックアップ</span>のメンバー欄。<br>
+          ※ <b>読むだけです。</b>直すのは <span class="menu">案件登録</span> からで、数字が空の案件には何も出ません。<br>
+          ※ ⚠ <b>アサインの「◯/◯名」「あと◯名」は今までどおり全体人数で数えます</b>（IKUSAの人数では数えません）。</span>
+        </td>
+      </tr>
+      <tr>
+        <td>2026-09-18</td>
         <td><b>案件登録に <u>運営人数（全体人数）</u> と <u>運営人数（IKUSA）</u> の2つの欄ができました。</b>（baba要望）<br>
           <span class="why">※ <b>全体人数</b>＝当日その現場に立つ全員（派遣や他社の方も含む）。<b>IKUSA</b>＝そのうち自社で出す人数。<br>
           ※ <b>これまでの「運営人数」がそのまま「全体人数」です。</b>

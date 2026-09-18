@@ -255,6 +255,9 @@ class AssignmentController extends Controller
             'needIsDefault' => ((int) ($project->required_count ?? 0)) <= 0,
             // 画面に出す文字。「6〜8」のような範囲はそのまま見せる（2026-08-25 baba）。
             'needLabel' => Headcount::label($project->required_count_min, $project->required_count),
+            // そのうちIKUSAが出す人数の添え書き（2026-09-18 baba要望）。
+            // ⚠ 文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。
+            'needIkusaNote' => Headcount::ikusaNote($project->ikusa_count_min, $project->ikusa_count),
             'noteOptions' => $noteOptions,
             'roleAssigned' => $roleAssigned,
             'sameDay' => $sameDay,
