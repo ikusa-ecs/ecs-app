@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignmentRole;
+use App\Support\ProjectContentName;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -123,15 +124,9 @@ class AssignHistoryController extends Controller
                     ->sortByDesc(fn (Project $p) => $p->start_date ? $p->start_date->timestamp : 0)
                     ->values()
                     ->map(function (Project $p) use ($membersByProject, $people, $contentNames, $roleOrder) {
-                        // 見出しコンテンツ名（複数あれば「／」でつなぐ）。無ければ案件名。
-                        $cids = is_array($p->content_ids) ? $p->content_ids : [];
-                        $contentLabels = collect($cids)
-                            ->map(fn ($id) => $contentNames[$id] ?? null)
-                            ->filter()
-                            ->values();
-                        $title = $contentLabels->isNotEmpty()
-                            ? $contentLabels->implode('／')
-                            : ($p->project_name ?: $p->id);
+                        // 見出しコンテンツ名。複数選んであれば「A・B」と全部つなぐ。
+                        // ⚠ ここに判定を書かない。正本＝App\Support\ProjectContentName。
+                        $title = ProjectContentName::of($p, $contentNames, $p->project_name ?: $p->id);
 
                         // アサイン済みメンバー（氏名＋役割ラベル）。役割順で並べる。
                         $members = $membersByProject->get($p->id, collect())

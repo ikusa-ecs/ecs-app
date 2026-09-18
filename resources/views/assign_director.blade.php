@@ -237,7 +237,7 @@
     .emp-chip.free { color: #9c8f80; }                                                         /* 未アサイン＝グレー */
     .emp-chip .e-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
     .emp-chip .e-nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .emp-chip .e-star { font-size: 10px; flex-shrink: 0; }                                      /* 大型のD/SD＝⭐だけ */
+    .emp-chip .e-star { font-size: 10px; flex-shrink: 0; }                                      /* 大型のD/SD/FC＝⭐だけ */
     .emp-chip .e-role { font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 5px; background: #e3edf7; color: #2c6ca0; flex-shrink: 0; }
     .emp-chip .e-multi { font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 5px; background: #ece3d4; color: #7a6a58; flex-shrink: 0; }
     .emp-chip .e-newbie { font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 5px; background: #efe6f6; color: #6d28d9; flex-shrink: 0; }
@@ -482,7 +482,7 @@
           日付の横の<b>●件数</b>にカーソルを当てると、その日の案件一覧が出ます。
           社員名をクリック → その日の案件を選び → <b>D</b>／<b>SD</b>／<b>FC</b>を押すと割当（もう一度押すと外せます）。同じ人を同日に複数案件へ兼任もできます。<br>
           <b>SD と FC は何人でも付けられます</b>（2026-09-02 追加。大型案件はコンテンツごとにSDが2名いたりするため）。<b>D は1案件1名</b>です。<br>
-          <span style="color:var(--dirlg-green); font-weight:700;">緑＝D/SD担当</span>／<span style="color:var(--dirlg-blue); font-weight:700;">青＝FC等で稼働</span>／<span style="color:var(--dirlg-gray); font-weight:700;">グレー＝未アサイン</span>／<span style="color:var(--dirlg-gold); font-weight:700;">⭐＝大型のD/SD</span>／<span style="color:var(--dirlg-brown); font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:var(--dirlg-purple); font-weight:700;">新＝新人</span>。
+          <span style="color:var(--dirlg-green); font-weight:700;">緑＝D/SD担当</span>／<span style="color:var(--dirlg-blue); font-weight:700;">青＝FC等で稼働</span>／<span style="color:var(--dirlg-gray); font-weight:700;">グレー＝未アサイン</span>／<span style="color:var(--dirlg-gold); font-weight:700;">⭐＝大型のD/SD/FC</span>／<span style="color:var(--dirlg-brown); font-weight:700;">掛N＝同日N件の掛け持ち</span>／<span style="color:var(--dirlg-purple); font-weight:700;">新＝新人</span>。
           名前の<b>文字色は部署</b>（<span style="color:var(--dirlg-orange);font-weight:700;">イベプラ</span>・<span style="color:var(--dirlg-indigo);font-weight:700;">セールス</span>・<span style="color:var(--dirlg-cre);font-weight:700;">クリエイティブ</span>・<span style="color:var(--dirlg-brown2);font-weight:700;">その他</span>）＝この文字の色そのものです。
           右上の<b>「＋全社員を表示」</b>を押すと、セールスなど<b>全部の社員</b>が並びます（既定は<b>イベプラだけ</b>）。<br>
           <b>保存ボタンはありません。押したその場で保存されます</b>（2026-09-02 変更。保存の押し忘れで決めた担当が消えていたため）。
@@ -527,7 +527,7 @@
         <span><span class="lg-dot green"></span>緑＝D/SD担当</span>
         <span><span class="lg-dot blue"></span>青＝他ロール(FC等)でアサイン済</span>
         <span><span class="lg-dot gray"></span>灰＝空き</span>
-        <span>⭐＝大型のD/SD</span>
+        <span>⭐＝大型のD/SD/FC</span>
         <span><span class="lg-tag role">FC</span>＝その日の別ロール</span>
         <span><span class="lg-tag newb">新</span>＝新人</span>
         <span><span class="lg-tag multi">掛N</span>＝同日N件の掛け持ち</span>
@@ -732,11 +732,16 @@
   }
 
   // ===== その社員のその日の担当状況（色・バッジ用）=====
+  // ⚠ ⭐（大型）は D・SD だけでなく **FC でも付ける**（2026-09-18 baba要望）。
+  //   大型の日はFCも手が空かないので、⭐が無いと「空いている人」に見えてしまう。
+  // ⚠ 掛N（count）はこれまでどおり D・SD だけ。FCまで数えると意味が変わる。
   function empDayInfo(empId, dcs){
     let count = 0, big = false;
     dcs.forEach(c => {
-      if (c.dirId === empId) { count++; if (c.scale === '大型') big = true; }
-      if ((c.sdIds || []).includes(empId)) { count++; if (c.scale === '大型') big = true; }
+      const isBig = c.scale === '大型';
+      if (c.dirId === empId) { count++; if (isBig) big = true; }
+      if ((c.sdIds || []).includes(empId)) { count++; if (isBig) big = true; }
+      if ((c.fcIds || []).includes(empId) && isBig) big = true;
     });
     return { count, big };
   }
@@ -892,7 +897,7 @@
           const otherRoles = busyMap[e.id] ? [...new Set(busyMap[e.id])] : [];
           // 色：D/SD担当=緑 ＞ FC・他ロール=青 ＞ 空き=灰
           const cls = info.count > 0 ? 'assigned' : ((isFc || otherRoles.length) ? 'busy' : 'free');
-          const star = info.big ? '<span class="e-star">⭐</span>' : '';       // 大型のD/SDは⭐だけ
+          const star = info.big ? '<span class="e-star">⭐</span>' : '';       // 大型のD/SD/FCは⭐だけ
           const roleTags = (isFc ? '<span class="e-role">FC</span>' : '')
                          + otherRoles.map(r => `<span class="e-role">${r}</span>`).join('');
           const multi = info.count >= 2 ? `<span class="e-multi">掛${info.count}</span>` : '';

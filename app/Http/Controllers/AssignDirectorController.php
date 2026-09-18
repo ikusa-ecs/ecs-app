@@ -14,6 +14,7 @@ use App\Support\Departments;
 use App\Support\OfficeScope;
 use App\Support\PersonNotes;
 use App\Support\ProjectAccess;
+use App\Support\ProjectContentName;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -135,10 +136,8 @@ class AssignDirectorController extends Controller
                 $start = $p->start_date;
                 $off = $start ? (int) $today->diffInDays($start, false) : 0;
 
-                $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-                $content = $firstContentId
-                    ? ($contentNames[$firstContentId] ?? $p->project_name)
-                    : $p->project_name;
+                // 見出し＝コンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+                $content = ProjectContentName::of($p, $contentNames);
 
                 // 実施形態のコード。⚠ ここに判定を書かない。
                 //   正本＝App\Support\ProjectFormats::countCode（cases.js の ECS_fmtCode と同じ規則）。

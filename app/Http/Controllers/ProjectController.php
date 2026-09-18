@@ -17,6 +17,7 @@ use App\Support\Headcount;
 use App\Support\OfficeOptions;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
 use App\Support\ProjectHistoryRecorder;
 use App\Support\ProjectImportColumns;
@@ -79,11 +80,9 @@ class ProjectController extends Controller
                 )
                 : 0;
 
-            // 見出し＝登録されたコンテンツ名（複数あれば先頭）。無ければ案件名で代用。
-            $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-            $content = $firstContentId
-                ? ($contentNames[$firstContentId] ?? $p->project_name)
-                : $p->project_name;
+            // 見出し＝登録されたコンテンツ名。複数選んであれば「A・B」と全部つなぐ。
+            // ⚠ ここに判定を書かない。正本＝App\Support\ProjectContentName（画面ごとに書き分けない）。
+            $content = ProjectContentName::of($p, $contentNames);
 
             // 実効アーカイブ状態＝アーカイブタブの振り分けに使う「本物の隠す/表示」判定。
             // is_archived が null なら「開催日<今日」で自動アーカイブ。true/false なら手動を優先。
@@ -175,6 +174,15 @@ class ProjectController extends Controller
                 'office' => $p->office ?? '',                          // 登録拠点
                 'sharedOffices' => $sharesByProject->get($p->id, collect())
                     ->map(fn ($s) => ['office' => $s->office, 'kind' => $s->kind])->values()->all(),
+                // 他の拠点にお願いしている印（例：「名古屋巻き取り」）。
+                // ⚠ 拠点バッジと違って、自拠点だけを見ているときも出す（2026-09-18 baba要望）。
+                //   巻き取り＝相手の拠点が運営するのに、一覧ではふつうの案件と同じ見た目で並んでいて、
+                //   自分でアサインする案件だと思ってしまうため。
+                // ⚠ 自分の拠点ぶんは入れない（「自拠点にコピー済」の印で別に出している）。
+                'shareTags' => $sharesByProject->get($p->id, collect())
+                    ->filter(fn ($s) => $s->office !== $myOffice)
+                    ->map(fn ($s) => ['label' => $s->office.$s->kind, 'kind' => $s->kind])
+                    ->values()->all(),
                 'isOwn' => ($p->office ?? '') === $myOffice,
                 'sharedToMe' => (bool) $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
                 'myKind' => optional($sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice))->kind ?? 'ヘルプ',

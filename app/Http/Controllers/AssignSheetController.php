@@ -13,6 +13,7 @@ use App\Support\DispatchRows;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ProjectContentName;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -186,13 +187,10 @@ class AssignSheetController extends Controller
                 ]);
             }
 
-            // 見出しコンテンツ名（複数あれば「／」でつなぐ）。無ければ案件名。
-            $cids = is_array($p->content_ids) ? $p->content_ids : [];
-            $contentLabels = collect($cids)
-                ->map(fn ($id) => $contentNames[$id] ?? null)
-                ->filter()
-                ->values();
-            $content = $contentLabels->isNotEmpty() ? $contentLabels->implode('／') : $p->project_name;
+            // 見出しコンテンツ名。複数選んであれば「A・B」と全部つなぐ。
+            // ⚠ ここに判定を書かない。正本＝App\Support\ProjectContentName。
+            //   以前はこの画面だけ「／」でつなぎ、台帳に無い単発コンテンツを落としていた。
+            $content = ProjectContentName::of($p, $contentNames);
 
             $sales = is_array($p->sales_owners) ? implode('・', $p->sales_owners) : '';
 

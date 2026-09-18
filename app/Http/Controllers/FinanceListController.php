@@ -11,6 +11,7 @@ use App\Support\FinanceAccess;
 use App\Support\FinanceItems;
 use App\Support\OfficeScope;
 use App\Support\PersonalCases;
+use App\Support\ProjectContentName;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -185,10 +186,8 @@ class FinanceListController extends Controller
             // 「遅れ」＝締切を過ぎているのに未入力（締切当日はまだ遅れにしない）。
             $overdue = ! $filled && $deadline && $today->gt($deadline);
 
-            $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-            $name = $firstContentId
-                ? ($contentNames[$firstContentId] ?? $p->project_name)
-                : $p->project_name;
+            // 見出し＝コンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+            $name = ProjectContentName::of($p, $contentNames);
 
             $sales = is_array($p->sales_owners) ? implode('・', array_filter($p->sales_owners)) : '';
 

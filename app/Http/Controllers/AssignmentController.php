@@ -18,6 +18,7 @@ use App\Support\AssignmentStamp;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ProjectContentName;
 use App\Support\ProjectSeries;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -52,11 +53,8 @@ class AssignmentController extends Controller
                 ->with('status', 'アサインする案件が見つかりませんでした。案件一覧から選び直してください。');
         }
 
-        // 見出しコンテンツ名（先頭）。無ければ案件名で代用。
-        $firstContentId = is_array($project->content_ids) ? ($project->content_ids[0] ?? null) : null;
-        $contentName = $firstContentId
-            ? (Content::whereKey($firstContentId)->value('content_name') ?? $project->project_name)
-            : $project->project_name;
+        // 見出しコンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+        $contentName = ProjectContentName::of($project);
 
         // この案件の日付（複数日案件は本番/予備日/リハで別レコード＝1案件1日）。
         $date = $project->start_date; // Carbon|null

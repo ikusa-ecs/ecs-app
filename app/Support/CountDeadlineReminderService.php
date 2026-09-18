@@ -82,8 +82,9 @@ class CountDeadlineReminderService
                 continue;   // 開催済み or まだ14日より先＝対象外
             }
 
-            $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-            $content = $firstContentId ? ($contentNames[$firstContentId] ?? '') : '';
+            // 知らせに出すコンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+            // ⚠ 分からないときは空のまま（この下で「コンテンツも企業名も空の行」を飛ばしている）。
+            $content = ProjectContentName::of($p, $contentNames, '');
             $client = (string) ($p->client ?? '');
             if ($content === '' && $client === '') {
                 continue;   // 空行スキップ

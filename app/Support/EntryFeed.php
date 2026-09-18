@@ -94,10 +94,8 @@ class EntryFeed
             $p = $projects->get($a->project_id);
             $person = $people->get($a->staff_id);
 
-            $firstContentId = is_array($p->content_ids ?? null) ? ($p->content_ids[0] ?? null) : null;
-            $contentName = $firstContentId
-                ? ($contentNames[$firstContentId] ?? $p->project_name)
-                : $p->project_name;
+            // 見出し＝コンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+            $contentName = ProjectContentName::of($p, $contentNames);
 
             $when = $a->applied_at ?? $a->created_at;
             $key = $a->project_id . '|' . $a->staff_id;

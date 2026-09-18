@@ -9,6 +9,7 @@ use App\Models\ProjectDispatch;
 use App\Support\DispatchStatus;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
+use App\Support\ProjectContentName;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -67,8 +68,9 @@ class DispatchController extends Controller
                     $day = $p->start_date?->format('Y-m-d');
 
                     // コンテンツ名（案件名が「（名称未定）」のことがあるので併記する）。
-                    $cids = is_array($p->content_ids ?? null) ? $p->content_ids : [];
-                    $contents = collect($cids)->map(fn ($id) => $contentNames[$id] ?? null)->filter()->implode('・');
+                    // ⚠ ここに判定を書かない。正本＝App\Support\ProjectContentName。
+                    //   分からないときは空のまま（案件名を横に出しているので二重に出さない）。
+                    $contents = ProjectContentName::of($p, $contentNames, '');
 
                     return [
                         'id' => $d->id,

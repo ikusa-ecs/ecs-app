@@ -499,6 +499,7 @@
     html[data-theme="dark"] .cal-cell.sat .dnum { color: var(--info-ink); }
     /* 拠点まわり（下の2つ目の <style> にある指定を、黒地向けに上書きする） */
     html[data-theme="dark"] .of-mine { color: var(--ok-ink); background: var(--ok-soft); border-color: var(--ok-line); }
+    html[data-theme="dark"] .of-share.takeover { color: var(--warn-ink); background: var(--warn-soft); border-color: var(--warn-line); }
 
     /* ===== 会社カラー（2026-09-09 デザイナー・アサイン担当の点検）=====
        白地×グレー×オレンジに合わせて、ベージュ・茶色をニュートラルグレーに置き換える。
@@ -597,6 +598,8 @@
   .of-badge.of-sapporo { background: #3f6fa3; }
   .of-badge.of-etc      { background: #6b7280; }
   .of-share { font-size: 10.5px; font-weight: 700; color: var(--brand-dark, #6d4526); background: var(--brand-soft, #f6e9dd); border: 1px solid var(--line, #e6d8c8); border-radius: 6px; padding: 2px 8px; }
+  /* 巻き取り＝相手の拠点が運営する。うちは手を出さない案件なので、ヘルプより目立たせる。 */
+  .of-share.takeover { color: #9a3412; background: #ffedd5; border-color: #fdba74; font-weight: 800; }
   .of-mine { font-size: 10.5px; font-weight: 800; color: #166534; background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 6px; padding: 2px 8px; }
   .ops .copy-ctl { display: inline-flex; align-items: center; gap: 4px; }
   .ops .copy-ctl select { font-size: 11px; padding: 1px 4px; }
@@ -901,6 +904,8 @@
       // 拠点の札も「自拠点にコピー」も出なくなる（ケータリングで同じ抜けをやった＝注意）。
       office:c.office || '', sharedOffices:c.sharedOffices || [], isOwn:!!c.isOwn,
       sharedToMe:!!c.sharedToMe, myKind:c.myKind || 'ヘルプ', canCopy:!!c.canCopy,
+      // 「名古屋巻き取り」の札。⚠ ここに書き写さないと画面側では空になる（詰め替え漏れ）。
+      shareTags:c.shareTags || [],
       // 詳細プルダウンの現在値（社員ID）。担当なしは null。音響(sound)は上で設定済み。
       directorId:c.director_id, sdId:c.sd_id, goodsId:c.goods_owner_id,
       // 登録日（今日から何日前か。マイナス＝過去に登録）。「登録順」の並べ替えに使う。
@@ -1266,12 +1271,19 @@
         : '<span class="na">—</span>';
 
       // 拠点まわり（全拠点運用・設計書19.2）：拠点バッジ（全拠点表示のときだけ）とコピー/巻き取り操作。
+      // 「名古屋巻き取り」などの札は、自拠点だけを見ているときも出す（2026-09-18 baba要望）。
+      // 巻き取り＝相手の拠点が運営する案件。ふつうの案件と同じ見た目で並ぶと取り違えるため。
+      let extra = '';
+      (p.shareTags || []).forEach(function (t) {
+        extra += `<span class="of-share${t.kind === '巻き取り' ? ' takeover' : ''}">${t.label}</span>`;
+      });
+      if (p.sharedToMe) extra += `<span class="of-mine">自拠点にコピー済(${p.myKind})</span>`;
+
       let officeBadge = '';
       if (window.ECS_SHOW_OFFICE && p.office) {
-        let extra = '';
-        (p.sharedOffices || []).forEach(function (so) { extra += `<span class="of-share">${so.office}に${so.kind}</span>`; });
-        if (p.sharedToMe) extra += `<span class="of-mine">自拠点にコピー済(${p.myKind})</span>`;
         officeBadge = `<div class="sub-info os-line"><span class="of-badge ${officeClass(p.office)}">${p.office}${p.isOwn ? '<small>（自拠点）</small>' : ''}</span>${extra}</div>`;
+      } else if (extra) {
+        officeBadge = `<div class="sub-info os-line">${extra}</div>`;
       }
       let copyCtl = '';
       if (window.ECS_CAN_SHARE && p.canCopy) {

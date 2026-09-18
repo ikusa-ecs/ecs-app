@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Content;
 use App\Models\Project;
 use App\Models\Setting;
 use Illuminate\Support\Carbon;
@@ -230,36 +229,8 @@ TXT;
      */
     public static function contentName(Project $project, array $master = []): string
     {
-        $names = [];
-
-        if (is_array($project->content_names) && $project->content_names) {
-            $names = array_values(array_filter(array_map('trim', $project->content_names)));
-        }
-
-        if (! $names && is_array($project->content_ids) && $project->content_ids) {
-            foreach ($project->content_ids as $cid) {
-                if (isset($master[$cid])) {
-                    $names[] = $master[$cid];
-                }
-            }
-
-            // 表を渡してもらえなかったときだけ台帳を引く（1件だけ作るときの保険）。
-            if (! $names && ! $master) {
-                $map = Content::whereIn('id', $project->content_ids)->pluck('content_name', 'id');
-                foreach ($project->content_ids as $cid) {
-                    if (isset($map[$cid])) {
-                        $names[] = $map[$cid];
-                    }
-                }
-            }
-        }
-
-        // コンテンツが分からない案件は案件名で代用する（カードの表示と同じ考え方）。
-        if (! $names) {
-            return trim((string) $project->project_name);
-        }
-
-        return implode('・', $names);
+        // ⚠ ここに判定を書かない。正本＝App\Support\ProjectContentName（案件一覧などと同じ名前になる）。
+        return trim(ProjectContentName::of($project, $master));
     }
 
     /**

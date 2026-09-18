@@ -15,6 +15,7 @@ use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectSeries;
 use App\Support\ProfileOptions;
+use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
 use App\Support\RecruitStatus;
 use App\Support\StaffLinks;
@@ -653,8 +654,8 @@ class StaffPortalController extends Controller
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
 
-            $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-            $content = $firstContentId ? ($contentNames[$firstContentId] ?? $p->project_name) : $p->project_name;
+            // 見出し＝コンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+            $content = ProjectContentName::of($p, $contentNames);
 
             // 実施形態のバッジ。⚠ 振り分けは正本（ProjectFormats::badgeCode）に任せる。
             //   ここで自前に「オンライン／ロング／リアル」の3つだけに分けていたため、

@@ -87,11 +87,9 @@ class FinanceReminderService
                 continue;   // すでに入力済み
             }
 
-            $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-            $content = $firstContentId ? ($contentNames[$firstContentId] ?? '') : '';
-            if ($content === '') {
-                $content = (string) ($p->project_name ?? '');
-            }
+            // 知らせに出すコンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+            // 分からないときは今までどおり案件名で代用する。
+            $content = ProjectContentName::of($p, $contentNames);
 
             $sales = is_array($p->sales_owners) ? (string) ($p->sales_owners[0] ?? '') : '';
             $wd = ['日', '月', '火', '水', '木', '金', '土'][$ev->dayOfWeek];

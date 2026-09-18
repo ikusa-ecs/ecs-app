@@ -17,6 +17,7 @@ use App\Support\LineGroupText;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
+use App\Support\ProjectContentName;
 use App\Support\ShiftWish;
 use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
@@ -1066,8 +1067,8 @@ class AssignBoardController extends Controller
                 })
                 ->values()->all();
 
-            $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-            $content = $firstContentId ? ($contentNames[$firstContentId] ?? $p->project_name) : $p->project_name;
+            // 見出し＝コンテンツ名。複数選んであれば「A・B」と全部つなぐ（正本＝ProjectContentName）。
+            $content = ProjectContentName::of($p, $contentNames);
 
             return [
                 'id' => $p->id,

@@ -92,11 +92,9 @@ class PersonalCases
             )
             : 0;
 
-        // 見出し＝登録されたコンテンツ名（複数あれば先頭）。無ければ案件名で代用。
-        $firstContentId = is_array($p->content_ids) ? ($p->content_ids[0] ?? null) : null;
-        $content = $firstContentId
-            ? ($contentNames[$firstContentId] ?? $p->project_name)
-            : $p->project_name;
+        // 見出し＝登録されたコンテンツ名。複数選んであれば「A・B」と全部つなぐ。
+        // ⚠ ここに判定を書かない。正本＝App\Support\ProjectContentName。
+        $content = ProjectContentName::of($p, $contentNames);
 
         // 実施形態（収支の「当日スタッフ費」どの行に人数を仮入力するか）。
         // ⚠ ここに判定を書かない。正本＝App\Support\ProjectFormats::countCode
