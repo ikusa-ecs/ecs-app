@@ -184,4 +184,21 @@ class BoardLineGroupCopyTest extends TestCase
             ->assertSee('LINEの概要に付ける定型文')
             ->assertSee('いまの決まり文句');
     }
+
+    /**
+     * パネルを閉じる道が「上のLINEボタン」以外にもある
+     * （2026-09-18 baba「下まで行った後、また閉じるためにラインのボタン押すの面倒」）。
+     * ⚠ 概要文が長いので、下まで読んだあと上へ戻らないと閉じられない状態だった。
+     */
+    public function test_the_panel_can_be_closed_from_the_bottom(): void
+    {
+        $html = $this->actingAsPerson($this->manager())->get('/assign')->assertOk()->getContent();
+
+        $this->assertStringContainsString('function closeLine(', $html, '閉じる処理');
+        $this->assertStringContainsString('line-foot', $html, 'パネルの下の閉じる欄');
+        // Escキーでも閉じられる。
+        $this->assertStringContainsString("e.key !== 'Escape'", $html, 'Escキーで閉じる');
+        // 閉じたあとは、その案件のLINEボタンまで画面を戻す（どの案件を見ていたか分かるように）。
+        $this->assertStringContainsString("scrollIntoView", $html, '閉じたあと位置を戻す');
+    }
 }

@@ -579,6 +579,15 @@
     }
     .line-checks .lc { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink); cursor: pointer; }
     .line-checks .lc-note { font-size: 11.5px; color: var(--muted); }
+    /* パネルの「閉じる」。⚠ 上と下の両方に置く（長い概要文の下まで読んだあと、
+       上のLINEボタンまで戻るのが手間だったため・2026-09-18 baba）。 */
+    .line-close { margin-left: 8px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px;
+      background: var(--panel, #fff); color: var(--ink); font-size: 11.5px; font-weight: 700;
+      font-family: inherit; cursor: pointer; white-space: nowrap; }
+    .line-close:hover { background: var(--brand-soft); }
+    .line-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px;
+      padding-top: 8px; border-top: 1px dashed var(--line); }
+    .line-foot .lc-note { font-size: 11.5px; color: var(--muted); }
     /* カード上の「📱 LINE」ボタン。作成ずみのときだけ色を変えて、押さなくても分かるようにする。 */
     /* ⚠ 名前を .line-btn にしないこと。他の画面（マイページ・共通設定）では
        .line-btn は「枠線のふつうのボタン」という別の意味で使っている。 */
@@ -2438,6 +2447,30 @@
     render();
   }
 
+  // パネルを閉じる（2026-09-18 baba「下まで行った後、また上のボタンを押しに戻るのが面倒」）。
+  // ⚠ 閉じたあとは**その案件のLINEボタンまで画面を戻す**。閉じるとカードが縮むので、
+  //   戻さないと「いまどの案件を見ていたのか」が分からなくなる。
+  function closeLine(id){
+    lineOpen.delete(id);
+    render();
+    const btn = document.getElementById('linegrp-btn-' + id);
+    if (btn && btn.scrollIntoView) {
+      btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  // Escキーでも閉じる（開いているパネルを全部）。⚠ 枠の中で文字を打っている最中は閉じない。
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || lineOpen.size === 0) return;
+    const t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) { t.blur(); return; }
+    const first = lineOpen.values().next().value;
+    lineOpen.clear();
+    render();
+    const btn = first ? document.getElementById('linegrp-btn-' + first) : null;
+    if (btn && btn.scrollIntoView) { btn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  });
+
   // 枠の中身をクリップボードへ写す。
   // ⚠ navigator.clipboard は https か 127.0.0.1 でしか使えないので、古いやり方を控えに用意する。
   //   どちらも駄目なときは黙って終わらせず、手でコピーしてもらうよう伝える。
@@ -2508,12 +2541,17 @@
         onchange="saveLineCheck('${c.id}','${key}','${field}',this.checked,this)"> ${label}</label>`;
     }).join('');
 
+    // ⚠ 「閉じる」は**上と下の両方**に置く（2026-09-18 baba要望）。
+    //   概要文が長いので、下まで読んだあとに上まで戻るのが手間だった。Escでも閉じられる。
+    const closeBtn = `<button class="line-close" onclick="closeLine('${c.id}')" title="この枠を閉じます（Escキーでも閉じられます）">✕ 閉じる</button>`;
+
     return `<div class="line-box">
-        <div class="lb-lead">LINEグループを作るときに貼る文章です。<b>枠の中は直してからコピーできます</b>（直した内容は案件には保存されません）。</div>
+        <div class="lb-lead">LINEグループを作るときに貼る文章です。<b>枠の中は直してからコピーできます</b>（直した内容は案件には保存されません）。${closeBtn}</div>
         ${boxes}
         <div class="line-checks">${checks}
           <span class="lc-note">案件一覧の同じチェックと中身は1つです（どちらで押しても同じ）。</span>
         </div>
+        <div class="line-foot">${closeBtn}<span class="lc-note">Escキーでも閉じられます。</span></div>
       </div>`;
   }
 
