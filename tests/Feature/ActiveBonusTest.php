@@ -256,6 +256,13 @@ class ActiveBonusTest extends TestCase
         $this->actingAsPerson($me)->get('/dashboard')->assertSee('繁忙期ボーナス');
         $this->actingAsPerson($me)->get('/active-bonus')->assertOk();
 
+        // ⚠ 置き場所は「案件」のくくりの中（2026-09-18 baba指定）。
+        //   左メニューの並びは、この画面を探すときの道しるべなので動かしたら気づけるようにする。
+        $html = $this->actingAsPerson($me)->get('/dashboard')->assertOk()->getContent();
+        $projectGroup = substr($html, (int) strpos($html, 'data-group="案件"'));
+        $projectGroup = substr($projectGroup, 0, (int) strpos($projectGroup, 'data-group="アサイン"'));
+        $this->assertStringContainsString('/active-bonus', $projectGroup, '「案件」のくくりに入っていません');
+
         ActiveBonus::save([['count' => 5, 'rate' => 500]], 6, 10000, true);
         $this->actingAsPerson($me)->get('/dashboard')->assertSee('繁忙期ボーナス');
     }
