@@ -33,6 +33,50 @@ class ActiveBonusController extends Controller
         return view('active_bonus', $data);
     }
 
+    /**
+     * 決まりの設定を保存する（POST /active-bonus/settings）。
+     *
+     * ⚠ 2026-09-18 に共通設定（/settings）からこの画面へ移した（baba要望
+     *   「1つの画面に設定画面も集約して、常時表示にする」）。保存先のキーは変えていない
+     *   ＝共通設定で入れていた値はそのまま生きる。
+     * ⚠ 計算・保存の中身は App\Support\ActiveBonus が正本。ここでは受け取って渡すだけ。
+     */
+    public function saveSettings(Request $request)
+    {
+        $data = $request->validate([
+            'counts' => ['present', 'array'],
+            'counts.*' => ['nullable', 'integer', 'min:1', 'max:999'],
+            'rates' => ['present', 'array'],
+            'rates.*' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'hours' => ['required', 'integer', 'min:1', 'max:24'],
+            'spot_cost' => ['required', 'integer', 'min:0', 'max:1000000'],
+            // スタッフ画面に出すか（2026-09-18 から「実施中」ではなくこの意味）。
+            'show_to_staff' => ['nullable'],
+        ]);
+
+        // 回数と単価は同じ行どうしを組にする。どちらかが空の行は入れない（書きかけを保存しない）。
+        $tiers = [];
+        foreach ($data['counts'] as $i => $count) {
+            $rate = $data['rates'][$i] ?? null;
+            if ($count !== null && $rate !== null) {
+                $tiers[] = ['count' => (int) $count, 'rate' => (int) $rate];
+            }
+        }
+
+        if ($tiers === []) {
+            return back()->with('active_bonus_status', '階層を1つも読み取れませんでした。回数と上がる時給の両方を入れてください。');
+        }
+
+        ActiveBonus::save(
+            $tiers,
+            (int) $data['hours'],
+            (int) $data['spot_cost'],
+            (bool) ($data['show_to_staff'] ?? false),
+        );
+
+        return back()->with('active_bonus_status', '繁忙期ボーナスの決まりを保存しました。');
+    }
+
     /** ?month=YYYY-MM（形が違う・未指定なら今月）。 */
     private function month(Request $request): string
     {

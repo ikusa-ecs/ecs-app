@@ -203,7 +203,7 @@ class StaffPortalController extends Controller
             // ⚠ 会社のコスト・削減額・ほかの人の順位は**出さない**（社員だけが見るもの）。
             // ⚠ 共通設定で「実施中」にしていないあいだは null＝画面に出さない
             //   （やっていないのに「あと1回でボーナス」と出るのを防ぐ）。
-            'bonus' => ($me && ActiveBonus::enabled())
+            'bonus' => ($me && ActiveBonus::showToStaff())
                 ? ActiveBonus::forStaff((string) $me->id, $today->format('Y-m'))
                 : null,
             'bonusTiers' => ActiveBonus::tiers(),

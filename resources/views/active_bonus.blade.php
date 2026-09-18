@@ -38,6 +38,24 @@
   .ab-kpi.save { border-top: 3px solid var(--ok); }
   .ab-kpi.save .k-num { color: var(--ok-ink); }
 
+  /* 決まりの設定（2026-09-18 に共通設定からここへ移した） */
+  .ab-flash { background: var(--ok-soft); color: var(--ok-ink); border: 1px solid var(--ok-line);
+    border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; margin-bottom: 10px; }
+  table.ab-set { border-collapse: collapse; font-size: 13px; margin: 6px 0 12px; }
+  table.ab-set th { text-align: left; padding: 4px 12px 4px 0; font-size: 11.5px; color: var(--muted); font-weight: 700; }
+  table.ab-set td { padding: 3px 12px 3px 0; color: var(--ink); }
+  table.ab-set input, .ab-setrow input { padding: 6px 8px; border: 1px solid var(--field-line); border-radius: 8px;
+    font-size: 13px; font-family: inherit; background: var(--surface-3); color: var(--ink); }
+  table.ab-set input { width: 100px; }
+  .ab-setrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    padding: 10px 0; border-top: 1px solid var(--line); }
+  .ab-setrow .s-label { display: block; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .ab-setrow .s-note { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.7; margin-top: 2px; }
+  .ab-check { font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .ab-setfoot { padding: 12px 0 2px; border-top: 1px solid var(--line); }
+  .ab-setfoot button { padding: 8px 18px; border: 1px solid var(--brand-dark); border-radius: 8px;
+    font-size: 13px; font-weight: 700; font-family: inherit; background: var(--brand-fill); color: #fff; cursor: pointer; }
+
   /* 進捗バー */
   .ab-prog { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
     margin-bottom: 14px; box-shadow: var(--shadow); }
@@ -216,16 +234,77 @@
 
   </div>
 
-  {{-- ── いまの決まり（設定のおさらい） ── --}}
+  {{-- ── 決まりの設定（2026-09-18 baba要望で共通設定からこの画面に移した） ──
+       ⚠ 保存先は今までと同じ（App\Support\ActiveBonus）。共通設定に置いていたときの値はそのまま使える。
+       ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
   <div class="ab-panel">
-    <h3>⚙ いまの決まり</h3>
-    <div class="ab-rule">
-      階層：@foreach ($tiers as $t)<b>{{ $t['count'] }}回で +{{ number_format($t['rate']) }}円/h</b>@if (! $loop->last)　/　@endif @endforeach<br>
-      1回あたりの時間：<b>{{ $hours }}時間</b>　/　タイミー1回あたりの費用：<b>¥{{ number_format($spotCost) }}</b><br>
+    <h3>⚙ 決まりの設定</h3>
+
+    @if (session('active_bonus_status'))
+      <div class="ab-flash">{{ session('active_bonus_status') }}</div>
+    @endif
+
+    <form method="POST" action="/active-bonus/settings">
+      @csrf
+      {{-- 保存したあと、いま見ている月と拠点のまま戻るために持ち回る。 --}}
+      <input type="hidden" name="month" value="{{ $month }}">
+      <input type="hidden" name="office" value="{{ request()->query('office', '') }}">
+
+      <table class="ab-set">
+        <tr>
+          <th>達成する回数</th>
+          <th>上がる時給（円/h）</th>
+        </tr>
+        {{-- いまの階層＋空き2行。行を消したいときは、その行の両方を空にして保存します。 --}}
+        @foreach (array_pad($tiers, count($tiers) + 2, null) as $t)
+          <tr>
+            <td><input type="number" name="counts[]" min="1" max="999" value="{{ $t['count'] ?? '' }}"> 回</td>
+            <td>＋<input type="number" name="rates[]" min="1" max="100000" value="{{ $t['rate'] ?? '' }}"> 円/h</td>
+          </tr>
+        @endforeach
+      </table>
+
+      <div class="ab-setrow">
+        <div>
+          <span class="s-label">1回あたりの時間</span>
+          <span class="s-note">ボーナス額の計算に使います（回数 × この時間 × 上がる時給）</span>
+        </div>
+        <div><input type="number" name="hours" min="1" max="24" value="{{ $hours }}" required> 時間</div>
+      </div>
+
+      <div class="ab-setrow">
+        <div>
+          <span class="s-label">タイミー1回あたりの費用</span>
+          <span class="s-note">手数料込み。削減見込額＝この金額 × のべ回数 − ボーナス合計。0にすると比較は0円になります</span>
+        </div>
+        <div>¥<input type="number" name="spot_cost" min="0" max="1000000" value="{{ $spotCost }}" required></div>
+      </div>
+
+      <div class="ab-setrow">
+        <div>
+          <span class="s-label">スタッフに見せる</span>
+          <span class="s-note">
+            ONにすると、スタッフ画面に「今月のアサイン◯回／あと◯回」が出ます。<br>
+            ⚠ <b>この画面（社員側）は、OFFでもいつでも見られます。</b>
+            繁忙期をやっていないときにスタッフへ「あと1回でボーナス」と出さないための切替です。
+          </span>
+        </div>
+        <div>
+          <label class="ab-check">
+            <input type="checkbox" name="show_to_staff" value="1" @checked($enabled)> スタッフに見せる
+          </label>
+        </div>
+      </div>
+
+      <div class="ab-setfoot">
+        <button type="submit">この決まりにする</button>
+      </div>
+    </form>
+
+    <div class="ab-rule" style="margin-top:12px;">
       数え方：<b>「確定」のアサインだけ</b>を数えます（仮置き・キャンセルは数えません）。<br>
       対象：<b>その月に1回以上入ったスタッフ</b>（社員は入りません）。拠点は<b>スタッフの所属拠点</b>で分けます。<br>
-      ⚠ 集計ダッシュボードの出勤数は「キャンセル以外」なので、数が一致しないことがあります。<br>
-      変えるところ：<a href="/settings">共通設定</a> の「繁忙期ボーナス」
+      ⚠ 集計ダッシュボードの出勤数は「キャンセル以外」なので、数が一致しないことがあります。
     </div>
   </div>
 

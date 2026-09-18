@@ -11,11 +11,10 @@
     @if (in_array(optional(Auth::user())->permission, ['employee', 'manager', 'admin'], true))
     <a class="{{ ($active ?? '') === 'dashboard' ? 'active' : '' }}" href="/dashboard"><span class="nav-icon">▣</span> ダッシュボード</a>
     <a class="{{ ($active ?? '') === 'stats' ? 'active' : '' }}" href="/stats"><span class="nav-icon">📈</span> 集計ダッシュボード</a>
-    {{-- 繁忙期ボーナス（2026-09-17 baba要望）。繁忙期だけ使う画面なので、
-         共通設定で「実施中」にしたときだけメニューに出す＝ふだんはメニューを長くしない。 --}}
-    @if (\App\Support\ActiveBonus::enabled())
+    {{-- 繁忙期ボーナス（2026-09-17 baba要望）。
+         ⚠ 2026-09-18 から常時表示（baba要望）。以前は「実施中」のときだけ出していた。
+         設定（階層・単価・スタッフに見せるか）も、この画面の中に移した。 --}}
     <a class="{{ ($active ?? '') === 'active_bonus' ? 'active' : '' }}" href="/active-bonus"><span class="nav-icon">🔥</span> 繁忙期ボーナス</a>
-    @endif
     <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">🙍</span> マイページ</a>
     <a class="{{ ($active ?? '') === 'employee_availability' ? 'active' : '' }}" href="/employee-availability"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
     <a class="{{ ($active ?? '') === 'mypage_finance' ? 'active' : '' }}" href="/mypage-finance"><span class="nav-icon">💰</span> 収支入力</a>

@@ -240,7 +240,12 @@ class ActiveBonusTest extends TestCase
         $this->actingAsPerson($staff)->get('/active-bonus')->assertRedirect();
     }
 
-    public function test_実施中にしたときだけ左メニューに出る(): void
+    /**
+     * 左メニューには**いつも**出る（2026-09-18 baba要望「常時表示にする」）。
+     * ⚠ 前は「実施中」のときだけ出していたが、繁忙期でなくても社員は数字を見たいので変えた。
+     *   スタッフに見せるかどうかは別の切替（下のテスト）。
+     */
+    public function test_左メニューにはいつも出る(): void
     {
         $me = PersonFactory::new()->create([
             'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin',
@@ -248,7 +253,8 @@ class ActiveBonusTest extends TestCase
         ]);
 
         ActiveBonus::save([['count' => 5, 'rate' => 500]], 6, 10000, false);
-        $this->actingAsPerson($me)->get('/dashboard')->assertDontSee('繁忙期ボーナス');
+        $this->actingAsPerson($me)->get('/dashboard')->assertSee('繁忙期ボーナス');
+        $this->actingAsPerson($me)->get('/active-bonus')->assertOk();
 
         ActiveBonus::save([['count' => 5, 'rate' => 500]], 6, 10000, true);
         $this->actingAsPerson($me)->get('/dashboard')->assertSee('繁忙期ボーナス');
@@ -273,19 +279,28 @@ class ActiveBonusTest extends TestCase
             ->assertSee('あと1回');
     }
 
-    public function test_共通設定から保存できる(): void
+    /**
+     * 決まりの設定は**繁忙期ボーナスの画面の中**で保存する
+     * （2026-09-18 baba要望「1つの画面に設定画面も集約して」。前は共通設定にあった）。
+     */
+    public function test_繁忙期ボーナスの画面から保存できる(): void
     {
         $me = PersonFactory::new()->create([
             'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin',
             'office' => '東京', 'must_onboard' => false,
         ]);
 
-        $this->actingAsPerson($me)->post('/settings/active-bonus', [
+        // 設定の欄がその画面に出ていること（共通設定を開かなくても直せる）。
+        $this->actingAsPerson($me)->get('/active-bonus')->assertOk()
+            ->assertSee('決まりの設定')
+            ->assertSee('スタッフに見せる');
+
+        $this->actingAsPerson($me)->post('/active-bonus/settings', [
             'counts' => [3, 8, null],
             'rates' => [300, 800, null],
             'hours' => 5,
             'spot_cost' => 9000,
-            'enabled' => '1',
+            'show_to_staff' => '1',
         ])->assertRedirect();
 
         $tiers = ActiveBonus::tiers();
@@ -295,5 +310,50 @@ class ActiveBonusTest extends TestCase
         $this->assertSame(5, ActiveBonus::hours());
         $this->assertSame(9000, ActiveBonus::spotCost());
         $this->assertTrue(ActiveBonus::enabled());
+    }
+
+    /**
+     * スタッフに見せる／見せないを切り替えられる（2026-09-18 baba要望）。
+     * ⚠ OFFでも**社員側の画面はいつでも見られる**。OFFが効くのはスタッフ画面だけ。
+     */
+    public function test_スタッフに見せるかを切り替えられる(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+        $staff = $this->person('S-001');
+        $this->assignTimes('S-001', 4, '確定');
+
+        // OFFにする → スタッフには出ない。社員の画面は見られる。
+        $this->actingAsPerson($me)->post('/active-bonus/settings', [
+            'counts' => [5], 'rates' => [500], 'hours' => 6, 'spot_cost' => 10000,
+        ])->assertRedirect();
+
+        $this->assertFalse(ActiveBonus::showToStaff());
+        $this->actingAsPerson($staff)->get('/staff-portal')->assertDontSee('今月のアサイン');
+        $this->actingAsPerson($me)->get('/active-bonus')->assertOk();
+
+        // ONにする → スタッフにも出る。
+        $this->actingAsPerson($me)->post('/active-bonus/settings', [
+            'counts' => [5], 'rates' => [500], 'hours' => 6, 'spot_cost' => 10000,
+            'show_to_staff' => '1',
+        ])->assertRedirect();
+
+        $this->assertTrue(ActiveBonus::showToStaff());
+        $this->actingAsPerson($staff)->get('/staff-portal')->assertSee('今月のアサイン');
+    }
+
+    /** 共通設定には「画面が移った」案内だけを残す（探して迷わないように）。 */
+    public function test_共通設定には案内だけ残す(): void
+    {
+        $me = PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin',
+            'office' => '東京', 'must_onboard' => false,
+        ]);
+
+        $this->actingAsPerson($me)->get('/settings')->assertOk()
+            ->assertSee('設定はこの画面から移りました')
+            ->assertSee('/active-bonus', false);
     }
 }

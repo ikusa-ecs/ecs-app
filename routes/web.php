@@ -157,6 +157,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // 繁忙期ボーナス＝「あと1回でボーナスが付く人」を出して、優先アサインの判断に使う（baba 2026-09-17）。
     // 計算の正本は App\Support\ActiveBonus。金額が出るので社員以上だけ（スタッフには自分の回数だけ見せる）。
     Route::get('/active-bonus', [ActiveBonusController::class, 'index']);
+    // 決まりの設定（階層・1回の時間・タイミー費用・スタッフに見せるか）。
+    // ⚠ 2026-09-18 に共通設定からこの画面へ移した（baba要望）。保存先のキーは変えていない。
+    Route::post('/active-bonus/settings', [ActiveBonusController::class, 'saveSettings']);
     // 案件一覧は DB（projects テーブル）から読む。Controller が cases.js と同じ形に整える。
     Route::get('/projects', [ProjectController::class, 'index']);
     // 案件登録／編集フォーム。?project=<案件ID> が来たら既存案件を読み、各欄に埋めて開く。
@@ -394,9 +397,6 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // LINEの概要に付ける定型文を settings に保存。2026-09-16 baba要望。
     // ⚠ 正本＝App\Support\LineGroupText（アサインボードの「📱 LINE」が読む）。
     Route::post('/settings/line-notice', [SettingsController::class, 'saveLineNotice']);
-    // 繁忙期ボーナスの決まり（階層・1回の時間・タイミー費用・実施中か）を settings に保存。2026-09-17 baba要望。
-    // ⚠ 正本＝App\Support\ActiveBonus。画面・テストに数字を直書きしない。
-    Route::post('/settings/active-bonus', [SettingsController::class, 'saveActiveBonus']);
 
     // マスタ管理（コンテンツ・拠点＝追加/編集/削除、ポジション＝表示のみ）。
     Route::get('/masters', [MasterController::class, 'index']);

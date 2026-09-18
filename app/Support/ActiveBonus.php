@@ -109,13 +109,27 @@ final class ActiveBonus
     }
 
     /**
-     * いま繁忙期ボーナスをやっているか。
-     * OFF のあいだも画面は開ける（数字は出る）が、左メニューとスタッフ画面には出さない
-     * ＝「やっていないのに、あと1回でボーナスと出る」事故を防ぐ。
+     * スタッフ画面に「今月のアサイン◯回／あと◯回」を出すか（2026-09-18 baba要望）。
+     *
+     * ⚠ 2026-09-18 に意味を変えた。
+     *   前＝「実施中」＝**左メニューにも**出すか（OFFだと社員側の画面もメニューから消えていた）。
+     *   今＝**スタッフに見せるかどうかだけ**。社員側の画面（/active-bonus）は**常に**メニューに出す。
+     *   理由＝繁忙期でなくても社員は数字を見たい。スタッフに「あと1回でボーナス」と出るのだけが
+     *   実施していないときに困る（やっていないのに期待させてしまう）。
+     * ⚠ 保存先のキー（active_bonus_enabled）は変えていない＝これまでの設定がそのまま生きる。
+     */
+    public static function showToStaff(): bool
+    {
+        return (string) Setting::get(self::KEY_ENABLED, '') === '1';
+    }
+
+    /**
+     * 旧名。⚠ 意味は showToStaff と同じ（スタッフに見せるか）。
+     *   以前の「実施中＝メニューにも出す」ではないので、新しく書くときは showToStaff を使うこと。
      */
     public static function enabled(): bool
     {
-        return (string) Setting::get(self::KEY_ENABLED, '') === '1';
+        return self::showToStaff();
     }
 
     /**

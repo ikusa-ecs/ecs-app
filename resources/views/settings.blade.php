@@ -465,93 +465,16 @@
         </p>
       </div>
 
-      {{-- 繁忙期ボーナスの決まり（2026-09-17 baba要望）。
-           ⚠ 正本は App\Support\ActiveBonus。ここに書いた数字が
-             繁忙期ボーナス画面とスタッフ画面の「あと◯回」の両方に効く。
-           ⚠ この欄は「そのまま出す区間」の外に置くこと。
+      {{-- 繁忙期ボーナス。
+           ⚠ 2026-09-18 に設定の欄そのものを「繁忙期ボーナス」画面へ移した（baba要望
+             「1つの画面に設定画面も集約して、常時表示にする」）。ここは行き先の案内だけ。
            ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
       <div class="panel settings-wrap" style="margin-top:20px;">
         <div class="panel-head"><h2>繁忙期ボーナス</h2></div>
-        <p class="muted" style="font-size:12.5px; margin:0 0 6px;">
-          繁忙期に<b>自社スタッフにもう1回出てもらう</b>ためのボーナスの決まりです。
-          アサイン回数が階層に届くと時給が上がり、その月の<b>全部の回にさかのぼって</b>付きます。<br>
-          例）1回6時間・9回入った人は「5回」の階層 → 9回 × 6時間 × 500円 = 27,000円。<br>
-          画面はこちら → <a href="/active-bonus">繁忙期ボーナス</a>
-        </p>
-
-        @if (session('active_bonus_status'))
-          <div class="flash" style="margin:8px 0;">{{ session('active_bonus_status') }}</div>
-        @endif
-
-        <form method="POST" action="/settings/active-bonus">
-          @csrf
-
-          <table style="border-collapse:collapse; font-size:13px; margin:6px 0 10px;">
-            <tr>
-              <th style="text-align:left; padding:4px 10px 4px 0; font-size:11.5px; color:var(--muted);">達成する回数</th>
-              <th style="text-align:left; padding:4px 0; font-size:11.5px; color:var(--muted);">上がる時給（円/h）</th>
-            </tr>
-            {{-- いまの階層＋空き2行。行を消したいときは、その行の両方を空にして保存します。 --}}
-            @foreach (array_pad($abTiers, count($abTiers) + 2, null) as $t)
-              <tr>
-                <td style="padding:3px 10px 3px 0;">
-                  <input type="number" name="counts[]" min="1" max="999" value="{{ $t['count'] ?? '' }}"
-                         style="width:90px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
-                                font-size:13px; font-family:inherit; background:var(--panel); color:var(--ink);"> 回
-                </td>
-                <td style="padding:3px 0;">
-                  ＋<input type="number" name="rates[]" min="1" max="100000" value="{{ $t['rate'] ?? '' }}"
-                         style="width:110px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
-                                font-size:13px; font-family:inherit; background:var(--panel); color:var(--ink);"> 円/h
-                </td>
-              </tr>
-            @endforeach
-          </table>
-
-          <div class="set-row">
-            <div>
-              <span class="set-label">1回あたりの時間</span>
-              <span class="set-note">ボーナス額の計算に使います（回数 × この時間 × 上がる時給）</span>
-            </div>
-            <div>
-              <input type="number" name="hours" min="1" max="24" value="{{ $abHours }}" required
-                     style="width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
-                            font-size:13px; font-family:inherit; background:var(--panel); color:var(--ink);"> 時間
-            </div>
-          </div>
-
-          <div class="set-row">
-            <div>
-              <span class="set-label">タイミー1回あたりの費用</span>
-              <span class="set-note">手数料込み。削減見込額＝この金額 × のべ回数 − ボーナス合計。0にすると比較は0円になります</span>
-            </div>
-            <div>
-              ¥<input type="number" name="spot_cost" min="0" max="1000000" value="{{ $abSpotCost }}" required
-                     style="width:120px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
-                            font-size:13px; font-family:inherit; background:var(--panel); color:var(--ink);">
-            </div>
-          </div>
-
-          <div class="set-row">
-            <div>
-              <span class="set-label">いま実施中にする</span>
-              <span class="set-note">OFFのあいだは左メニューとスタッフ画面に出しません（やっていないのに「あと1回でボーナス」と出るのを防ぐため）</span>
-            </div>
-            <div>
-              <label style="font-size:13px; cursor:pointer;">
-                <input type="checkbox" name="enabled" value="1" @checked($abEnabled)> 実施中
-              </label>
-            </div>
-          </div>
-
-          <div style="padding:10px 0 2px;">
-            <button type="submit" class="btn primary">この決まりにする</button>
-          </div>
-        </form>
-
-        <p class="muted" style="font-size:11.5px; margin:8px 0 0; line-height:1.7;">
-          ※ 数えるのは<b>「確定」のアサインだけ</b>です（仮置き・キャンセルは数えません）。<br>
-          ※ 対象は<b>その月に1回以上入ったスタッフ</b>です（社員は入りません）。拠点は<b>スタッフの所属拠点</b>で分けます。
+        <p class="muted" style="font-size:12.5px; margin:0;">
+          <b>設定はこの画面から移りました。</b>階層・1回あたりの時間・タイミーの費用・
+          <b>スタッフに見せるかどうか</b>は、<a href="/active-bonus">繁忙期ボーナス</a> の画面の下にある
+          「⚙ 決まりの設定」で変えられます（数字を見ながら直せるように1つの画面にまとめました）。
         </p>
       </div>
 

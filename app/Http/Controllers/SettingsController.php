@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
-use App\Support\ActiveBonus;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
 use App\Support\ChatworkMentions;
@@ -98,52 +97,7 @@ class SettingsController extends Controller
             'dangerCalStart' => DangerCalendar::START_TIME,
             'dangerCalEnd' => DangerCalendar::END_TIME,
             'dangerCalMonths' => DangerCalendar::MONTHS_AHEAD,
-            // 繁忙期ボーナスの決まり（2026-09-17 baba要望）。
-            // ⚠ 正本＝App\Support\ActiveBonus。画面に階層や単価を直書きしない。
-            'abTiers' => ActiveBonus::tiers(),
-            'abHours' => ActiveBonus::hours(),
-            'abSpotCost' => ActiveBonus::spotCost(),
-            'abEnabled' => ActiveBonus::enabled(),
         ]);
-    }
-
-    /**
-     * 繁忙期ボーナスの決まりを保存する（POST /settings/active-bonus）。
-     *
-     * ここで決めた階層・単価は、繁忙期ボーナス画面(/active-bonus)とスタッフ画面の
-     * 「あと◯回でボーナス」の**両方**に効く（計算は ActiveBonus 1か所だけ）。
-     *
-     * ⚠ 「実施中」を OFF にすると、左メニューとスタッフ画面から消える。
-     *   数字だけ見たいときは /active-bonus を直接開けば見られる（OFFでも計算はする）。
-     */
-    public function saveActiveBonus(Request $request)
-    {
-        $data = $request->validate([
-            'counts' => ['present', 'array'],
-            'counts.*' => ['nullable', 'integer', 'min:1', 'max:999'],
-            'rates' => ['present', 'array'],
-            'rates.*' => ['nullable', 'integer', 'min:1', 'max:100000'],
-            'hours' => ['required', 'integer', 'min:1', 'max:24'],
-            'spot_cost' => ['required', 'integer', 'min:0', 'max:1000000'],
-            'enabled' => ['nullable'],
-        ]);
-
-        // 回数と単価は同じ行どうしを組にする。どちらかが空の行は入れない（書きかけを保存しない）。
-        $tiers = [];
-        foreach ($data['counts'] as $i => $count) {
-            $rate = $data['rates'][$i] ?? null;
-            if ($count !== null && $rate !== null) {
-                $tiers[] = ['count' => (int) $count, 'rate' => (int) $rate];
-            }
-        }
-
-        if ($tiers === []) {
-            return back()->with('active_bonus_status', '階層を1つも読み取れませんでした。回数と上がる時給の両方を入れてください。');
-        }
-
-        ActiveBonus::save($tiers, (int) $data['hours'], (int) $data['spot_cost'], (bool) ($data['enabled'] ?? false));
-
-        return back()->with('active_bonus_status', '繁忙期ボーナスの決まりを保存しました。');
     }
 
     /**
