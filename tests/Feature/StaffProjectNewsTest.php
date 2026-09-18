@@ -216,4 +216,70 @@ class StaffProjectNewsTest extends TestCase
             ->assertSee('🆕 新しい募集が出ました')
             ->assertSee('class="news-new"', false);
     }
+
+    /**
+     * ⚠ 他の拠点の案件は出さない（2026-09-18 baba指摘
+     * 「東京でログインしているのに、最近の変更が名古屋のことばかり」）。
+     *
+     * それまで**拠点でまったく絞っていなかった**ので、他拠点の公開案件の変更まで全部出ていた。
+     * 絞り方は募集一覧と同じ＝自拠点の案件＋自拠点に共有（ヘルプ／巻き取り）された案件。
+     */
+    public function test_他拠点の公開案件は出さない(): void
+    {
+        $me = PersonFactory::new()->staff()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $tokyo = ProjectFactory::new()->published()->create([
+            'office' => '東京', 'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
+        ]);
+        $nagoya = ProjectFactory::new()->published()->create([
+            'office' => '名古屋', 'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
+        ]);
+        $this->history($tokyo, 'start_time', '9:00', '8:30');
+        $this->history($nagoya, 'start_time', '9:00', '8:30');
+
+        $ids = collect(StaffProjectNews::forPerson($me))->pluck('projectId');
+
+        $this->assertTrue($ids->contains($tokyo->id), '自分の拠点の変更が出ていません');
+        $this->assertFalse($ids->contains($nagoya->id), '他拠点の変更が出てしまっています');
+    }
+
+    /** 自分の拠点に共有（ヘルプ）された他拠点の案件は出す（募集一覧と同じ範囲）。 */
+    public function test_自拠点にヘルプで来ている案件は出す(): void
+    {
+        $me = PersonFactory::new()->staff()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $p = ProjectFactory::new()->published()->create([
+            'office' => '名古屋', 'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
+        ]);
+        \App\Models\ProjectShare::create([
+            'project_id' => $p->id, 'office' => '東京', 'kind' => 'ヘルプ',
+        ]);
+        $this->history($p, 'start_time', '9:00', '8:30');
+
+        $ids = collect(StaffProjectNews::forPerson($me))->pluck('projectId');
+
+        $this->assertTrue($ids->contains($p->id), '自拠点にヘルプで来ている案件が出ていません');
+    }
+
+    /**
+     * ⚠ 自分が入っている案件は、拠点が違っても出す。
+     * 他拠点の案件に入っている人が、その変更を知れないと困るため。
+     */
+    public function test_自分が入っている案件は拠点が違っても出す(): void
+    {
+        $me = PersonFactory::new()->staff()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $p = ProjectFactory::new()->published()->create([
+            'office' => '名古屋', 'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
+        ]);
+        Assignment::create([
+            'project_id' => $p->id, 'staff_id' => $me->id,
+            'date' => $p->start_date, 'role' => 'OP', 'status' => '確定',
+        ]);
+        $this->history($p, 'start_time', '9:00', '8:30');
+
+        $ids = collect(StaffProjectNews::forPerson($me))->pluck('projectId');
+
+        $this->assertTrue($ids->contains($p->id), '自分が入っている他拠点の案件が出ていません');
+    }
 }

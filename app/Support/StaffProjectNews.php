@@ -7,6 +7,7 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectHistory;
+use App\Support\OfficeScope;
 use Illuminate\Support\Carbon;
 
 /**
@@ -73,6 +74,7 @@ final class StaffProjectNews
         $since = $today->copy()->subDays(self::DAYS);
 
         // ① 自分が関わる案件（アサイン＋エントリー）。キャンセルは除く。
+        //    ⚠ こちらは**拠点で絞らない**。他拠点の案件に入っている人は、その変更を知る必要がある。
         $mine = Assignment::where('staff_id', $person->id)
             ->where('status', '!=', 'キャンセル')
             ->pluck('project_id')
@@ -81,11 +83,20 @@ final class StaffProjectNews
 
         // ② 公開中の案件（募集としてスタッフに見えているもの）。
         //    ⚠ 公開していない案件は、そもそもスタッフに見せていないので出さない。
-        $open = Project::where('staff_published', true)
-            ->whereNotNull('start_date')
-            ->whereDate('start_date', '>=', $today->format('Y-m-d'))
-            ->notCancelled()
-            ->pluck('id');
+        //    ⚠ **自分の拠点のぶんだけ**（2026-09-18 baba指摘
+        //      「東京でログインしているのに、最近の変更が名古屋のことばかり」）。
+        //      それまで拠点で絞っておらず、他拠点の公開案件の変更まで全部出ていた。
+        //      絞り方は募集一覧と同じ＝自拠点の案件＋自拠点に共有（ヘルプ／巻き取り）された案件。
+        //      ⚠ 拠点が空の人は東京あつかい（名簿・案件と同じ決まり）。
+        $office = trim((string) ($person->office ?? '')) ?: OfficeScope::DEFAULT_OFFICE;
+
+        $open = OfficeScope::applyToProjects(
+            Project::where('staff_published', true)
+                ->whereNotNull('start_date')
+                ->whereDate('start_date', '>=', $today->format('Y-m-d'))
+                ->notCancelled(),
+            $office
+        )->pluck('id');
 
         $ids = $mine->merge($open)->unique()->values();
         if ($ids->isEmpty()) {
