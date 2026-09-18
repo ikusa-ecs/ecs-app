@@ -245,4 +245,49 @@ class LineGroupTextTest extends TestCase
         $this->assertStringContainsString('集合形式　—', $text);
         $this->assertStringContainsString('会場住所（〒なし）　—', $text);
     }
+
+    /**
+     * グループ名の印（2026-09-18 baba指定）。コンテンツ名の**前**に付ける。
+     *   リアル＝何も付けない／大型＝⭐／リアルロング＝◎／オンライン＝【オンライン】
+     *   リアルロング＋大型＝⭐◎（大型が先）
+     * ⚠ LINEに貼ってそのまま使う名前なので、印が消えたり順番が変わると現場が混乱する。
+     */
+    public function test_group_name_marks(): void
+    {
+        $cases = [
+            // [実施形態, 規模, 期待する印]
+            ['リアル',        '中型', ''],
+            ['リアル',        '大型', '⭐'],
+            ['リアルロング',  '中型', '◎'],
+            ['リアルロング',  '大型', '⭐◎'],
+            ['オンライン',    '中型', '【オンライン】'],
+            ['オンライン',    '大型', '⭐【オンライン】'],
+            // 実際の案件は「イベント東(リアルロング)」のような書き方でも入ってくる。
+            ['イベント東(リアルロング)', '大型', '⭐◎'],
+            // ARENA場所貸し・体験会はリアル系＝印を付けない（大型なら⭐だけ）。
+            ['ARENA場所貸し', '中型', ''],
+            ['体験会',        '大型', '⭐'],
+            // 規模が空のときは大型ではない＝⭐は付けない。
+            ['リアル',        null,   ''],
+        ];
+
+        foreach ($cases as [$format, $scale, $expected]) {
+            $p = $this->sampleProject(['format' => $format, 'scale' => $scale]);
+
+            $this->assertSame($expected, LineGroupText::nameMarks($p), $format.'／'.($scale ?? '空'));
+        }
+    }
+
+    /** 印はグループ名の「コンテンツ名の前」に入る（アイコンや概要文には入れない）。 */
+    public function test_marks_go_before_the_content_name(): void
+    {
+        $p = $this->sampleProject(['format' => 'リアルロング', 'scale' => '大型']);
+
+        $name = LineGroupText::groupName($p);
+        $ymd = LineGroupText::ymd($p);
+
+        $this->assertStringStartsWith($ymd.'⭐◎', $name, 'コンテンツ名の前に印が入っていません');
+        // アイコンの3行には入れない（文字数がきついので日付・コンテンツ・会社名だけ）。
+        $this->assertStringNotContainsString('⭐', LineGroupText::icon($p));
+    }
 }

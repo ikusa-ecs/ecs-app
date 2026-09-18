@@ -133,17 +133,52 @@ TXT;
     // ------------------------------------------------------------------
 
     /**
-     * グループ名＝ 261001謎パ＠東京水道株式会社様
+     * グループ名＝ 261001⭐◎謎パ＠東京水道株式会社様
      *
      * ⚠ グループ名は「様」を付ける（2026-09-16 baba）。
      *   様を省くのは**アイコン（テキストプロフィール）だけ**＝あちらは文字数がきついため。
+     * ⚠ 印（⭐◎【オンライン】）は**コンテンツ名の前**（2026-09-18 baba指定）。→ nameMarks()
      */
     public static function groupName(Project $project, array $contentMaster = []): string
     {
         return self::ymd($project)
+            .self::nameMarks($project)
             .self::contentName($project, $contentMaster)
             .'＠'
             .self::companyWithSama($project);
+    }
+
+    /**
+     * グループ名でコンテンツ名の前に付ける印（2026-09-18 baba指定）。
+     *
+     *   ・リアル             … 何も付けない（ふつうのリアルイベントはそのまま）
+     *   ・案件規模が大型     … ⭐
+     *   ・リアルロング       … ◎
+     *   ・オンライン         … 【オンライン】
+     *   ・リアルロング＋大型 … ⭐◎（**大型の印が先**）
+     *
+     * ⚠ 印を増やす・順番を変えるときはここ1か所。画面（Blade）側で組み立てない。
+     * ⚠ 実施形態の見分けは App\Support\ProjectFormats::countCode が正本
+     *   （案件の実施形態は「イベント東(リアルロング)」のような書き方でも入ってくる）。
+     *   ARENA場所貸し・体験会はリアル系＝印を付けない（大型なら⭐だけ付く）。
+     * ⚠ オンラインで大型のときは ⭐【オンライン】（⭐が先＝⭐◎と同じ並び）。
+     */
+    public static function nameMarks(Project $project): string
+    {
+        $marks = '';
+
+        if (ProjectScale::of($project->scale) === '大型') {
+            $marks .= '⭐';
+        }
+
+        $code = ProjectFormats::countCode($project->format);
+        if ($code === 'long') {
+            $marks .= '◎';
+        } elseif ($code === 'online') {
+            $marks .= '【オンライン】';
+        }
+
+        return $marks;
     }
 
     // ------------------------------------------------------------------
