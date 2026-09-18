@@ -119,7 +119,13 @@
     }
     .news-box > summary { cursor: pointer; font-weight: 700; color: var(--ink); }
     .news-hint { color: var(--muted); font-size: 11.5px; font-weight: 400; margin-left: 6px; }
-    .news-list { list-style: none; margin: 8px 0 0; padding: 0; }
+    /* ⚠ 枠は伸ばさず、中だけスクロールする（2026-09-18 baba要望）。
+       たくさん登録した月があると、お知らせが長くなって下のタブまで遠くなるため。
+       -webkit-overflow-scrolling＝iPhoneで指の滑りを自然にする。 */
+    .news-list { list-style: none; margin: 8px 0 0; padding: 0 4px 0 0;
+      max-height: 320px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* スマホは画面が狭いので少し低くする（半分くらいが見える高さ）。 */
+    @media (max-width: 720px) { .news-list { max-height: 260px; } }
     .news-list li {
       padding: 7px 0; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap;
       gap: 4px 8px; align-items: baseline; font-size: 12.5px;
@@ -851,7 +857,7 @@
              ⚠ JavaScript を使わない（details タグ）＝画面のJSが壊れても開ける。 --}}
         @if (!empty($news))
           <details class="news-box">
-            <summary>🔔 最近の変更（{{ count($news) }}件）<span class="news-hint">集合時間や会場が変わったとき・新しい募集が出たときに出ます</span></summary>
+            <summary>🔔 最近の変更（{{ count($news) }}件）<span class="news-hint">集合時間や会場が変わったとき・新しい募集が出たときに出ます（枠の中をスクロールできます）</span></summary>
             <ul class="news-list">
               @foreach ($news as $n)
                 {{-- ⚠ 「新しい募集が出ました」は行ごと目立たせる（2026-09-09 baba要望）。

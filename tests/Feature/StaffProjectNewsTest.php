@@ -329,4 +329,32 @@ class StaffProjectNewsTest extends TestCase
         $ids = collect(StaffProjectNews::forPerson($me))->pluck('projectId');
         $this->assertFalse($ids->contains($p->id), '非公開に戻したことを知らせてしまっています');
     }
+
+    /**
+     * たくさん登録しても前のぶんが消えない（2026-09-18 baba指摘
+     * 「11月分をたくさん登録したから、前のが全部消えちゃってる」）。
+     * ⚠ 60件まで出す。枠は伸ばさず、画面側で**中だけスクロール**する。
+     */
+    public function test_六十件まで出す(): void
+    {
+        $me = $this->staff();
+
+        // 70件ぶんの「新しい募集」を作る（登録した順＝新しいものが上に来る）。
+        for ($i = 0; $i < 70; $i++) {
+            ProjectFactory::new()->published()->create([
+                'office' => '東京',
+                'start_date' => Carbon::today()->addDays(20)->format('Y-m-d'),
+                'project_name' => '案件'.$i,
+            ]);
+        }
+
+        $news = StaffProjectNews::forPerson($me);
+
+        $this->assertSame(60, count($news), '60件まで出すこと');
+        $this->assertSame(60, StaffProjectNews::LIMIT);
+
+        // 枠の中でスクロールする指定があること（枠そのものは伸ばさない）。
+        $html = $this->actingAsPerson($me)->get('/staff-portal')->assertOk()->getContent();
+        $this->assertStringContainsString('overflow-y: auto', $html, '枠の中でスクロールする指定がありません');
+    }
 }

@@ -38,8 +38,12 @@ final class StaffProjectNews
      */
     public const PUBLISHED_WORD = '公開';
 
-    /** 最大何件出すか。 */
-    public const LIMIT = 30;
+    /**
+     * 最大何件出すか。
+     * ⚠ 2026-09-18 に 30 → 60 へ（baba「11月分をたくさん登録したら、前のが全部消えてしまった」）。
+     *   枠は伸ばさず、画面側（.news-list）で**中だけスクロール**する。
+     */
+    public const LIMIT = 60;
 
     /**
      * スタッフに関係する項目（DBの列名）。ここに無い項目の変更は出さない。
