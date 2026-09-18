@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Support\Headcount;
+use App\Models\ProjectShare;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
+use App\Support\ShareTags;
 use App\Support\ProjectAccess;
 use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
@@ -43,7 +45,20 @@ class AssignPublishController extends Controller
             $office
         )
             ->notCancelled()   // キャンセルになった案件は公開の対象にしない（2026-08-26）
-            ->orderBy('start_date')->get()->map(function (Project $p) use ($today) {
+            ->orderBy('start_date')->get();
+
+        // 拠点間の関わり（ヘルプ／巻き取り）。2026-09-18 baba指摘
+        // 「東京のスタッフ公開ボードに名古屋の案件が混じってた」。
+        // ⚠ 混ざるのは決まりどおりで、入り口は2つ。
+        //   ① 名古屋の案件に東京がヘルプ／巻き取りで関わっている（project_shares に行がある）。
+        //      ⚠ **他拠点の社員を1人アサインしただけでも自動でヘルプが記録される**（CrossOfficeHelp）。
+        //   ② 案件の登録拠点が空＝東京あつかいになる（OfficeScope の決まり）。
+        // どちらも画面では見分けが付かなかったので、登録拠点と関わりを札で出す。
+        $sharesByProject = $cases->isEmpty()
+            ? collect()
+            : ProjectShare::whereIn('project_id', $cases->pluck('id')->all())->get()->groupBy('project_id');
+
+        $cases = $cases->map(function (Project $p) use ($today, $office, $sharesByProject) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400)
@@ -77,6 +92,12 @@ class AssignPublishController extends Controller
                 //   兼ねているので、消すと入っている人が自分の担当を見られなくなる。
                 //   代わりに「募集なし」の札を出し、絞り込みで隠せるようにした。
                 'recruit'   => (bool) $p->is_recruiting,
+                // 登録拠点と、その案件への関わりの札（2026-09-18）。
+                // ⚠ 文言は App\Support\ShareTags が正本（日別ボードと同じ言い方にそろえる）。
+                'office'    => (string) ($p->office ?? ''),
+                'otherOffice' => trim((string) ($p->office ?? '')) !== '' && $office !== null
+                    && trim((string) $p->office) !== $office,
+                'shareTags' => ShareTags::forProject($p->office, $sharesByProject->get($p->id, collect()), $office),
                 // 備考＝案件登録と同じ欄（projects.note）。2026-08-21 に担当メモと1つにまとめた。
                 'memo'      => $p->note ?? '',
                 // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）

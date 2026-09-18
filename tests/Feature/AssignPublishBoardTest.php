@@ -225,4 +225,49 @@ class AssignPublishBoardTest extends TestCase
         // ⚠ この画面もカードを作り直すつくり＝詰め替えを忘れると札も絞り込みも効かない。
         $this->assertStringContainsString('recruit: c.recruit', $html, '詰め替え（これが無いと効かない）');
     }
+
+    /**
+     * 他拠点の案件が混ざっていることが分かる（2026-09-18 baba指摘
+     * 「東京のスタッフ公開ボードに名古屋の案件が混じってた」）。
+     *
+     * ⚠ 混ざること自体は決まりどおり＝その案件に自分の拠点がヘルプ／巻き取りで関わっているため。
+     *   ⚠ 他拠点の社員を1人アサインしただけでも、自動でヘルプが記録される（CrossOfficeHelp）。
+     *   画面に登録拠点と関わりを出して、見て分かるようにする。
+     */
+    public function test_他拠点の案件だと分かる(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false]);
+
+        $mine = ProjectFactory::new()->create([
+            'office' => '東京', 'start_date' => now()->addDays(5)->format('Y-m-d'),
+        ]);
+        $other = ProjectFactory::new()->create([
+            'office' => '名古屋', 'start_date' => now()->addDays(6)->format('Y-m-d'),
+        ]);
+        \App\Models\ProjectShare::create([
+            'project_id' => $other->id, 'office' => '東京', 'kind' => 'ヘルプ',
+        ]);
+
+        $cases = collect(
+            $this->actingAsPerson($me)->get('/assign-publish')->assertOk()->original->getData()['cases']
+        );
+
+        $row = $cases->firstWhere('id', $other->id);
+        $this->assertNotNull($row, '関わっている他拠点の案件が出ていません');
+        $this->assertTrue($row['otherOffice'], '他拠点の案件だと分かる印がありません');
+        $this->assertSame('名古屋', $row['office']);
+        $this->assertSame(
+            [['label' => '名古屋からヘルプ', 'kind' => 'ヘルプ']],
+            $row['shareTags'],
+            'どう関わっているかが出ていません'
+        );
+
+        // 自拠点の案件には印を付けない。
+        $this->assertFalse($cases->firstWhere('id', $mine->id)['otherOffice']);
+
+        $html = $this->actingAsPerson($me)->get('/assign-publish')->assertOk()->getContent();
+        $this->assertStringContainsString('otherOffice: !!c.otherOffice', $html, '詰め替え（これが無いと出ない）');
+        $this->assertStringContainsString('function otherOfficeHtml(', $html, '札を描くところ');
+        $this->assertStringContainsString('自拠点の案件だけ', $html, '絞り込みがありません');
+    }
 }

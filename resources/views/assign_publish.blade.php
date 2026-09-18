@@ -303,6 +303,9 @@
     /* 募集なし＝案件登録で「募集しない」にした案件（2026-09-18）。
        ⚠ 灰色にする＝「状態のお知らせ」であって、直してほしい注意ではないため。 */
     .badge.norec { background: var(--chip-bg, #ece3d4); color: var(--chip-ink, #7a6a58); }
+    /* 他拠点の案件（2026-09-18）。⚠ 気づいてほしい情報なので、募集なしより色を付ける。 */
+    .badge.other-office { background: #e1f1ee; color: #0f766e; }
+    html[data-theme="dark"] .badge.other-office { background: var(--info-soft); color: var(--info-ink); }
 
     /* 未公開＝赤。⚠ いままで公開ボタンと同じ橙で、状態（未公開）と操作（公開する）の
        区別が付かなかった。橙は公開ボタン側に残し、状態は赤で見せる。 */
@@ -354,6 +357,10 @@
         <b>「募集なし」の札</b>＝案件登録で<b>「募集しない」</b>にした案件です。<b>スタッフの募集一覧には出ません</b>が、
         公開すると<b>入っている人の「確定アサイン」には出ます</b>（だからこの一覧からは消していません）。
         並べたくないときは右上の<b>「募集なしを隠す」</b>を選んでください。<br>
+        <b>「名古屋の案件（名古屋からヘルプ）」の札</b>＝<b>他の拠点が登録した案件</b>です。
+        自分の拠点が<b>ヘルプ／巻き取りで関わっている</b>ので、この一覧にも出ます
+        （⚠ <b>他拠点の社員を1人アサインしただけでも、自動でヘルプが記録されます</b>）。
+        関わりを外すのは<b>案件一覧の「解除」</b>です。並べたくないときは<b>「自拠点の案件だけ」</b>を選んでください。<br>
         ※ 公開した案件は、スタッフ画面の「確定アサイン」に表示されます（集合・解散時間やお知らせ文の変更も、保存すればスタッフ画面に反映されます）。
       </div>
 @endverbatim
@@ -421,6 +428,7 @@
                募集なしでも「確定アサイン」をスタッフに見せるために公開する場面があるため。
                ⚠ ここは「そのまま出す区間」の中なので、Bladeのコメントは使えない（画面に出てしまう）。 -->
           <option value="norec">募集なしを隠す</option>
+          <option value="mine">自拠点の案件だけ</option>
         </select>
         <button class="btn" onclick="openStaffView()">👁 スタッフ画面を見る</button>
       </div>
@@ -506,6 +514,9 @@
       // スタッフ募集をするか（2026-09-18）。⚠ ここに書き写さないと画面では undefined になり、
       //   「募集なし」の札も「募集なしを隠す」も効かない（この画面もカードを作り直すつくり）。
       recruit: c.recruit,
+      // 登録拠点と、その案件への関わりの札（2026-09-18）。
+      // ⚠ 書き写さないと「他拠点の案件」と見分けが付かない（混じって見える元）。
+      office: c.office || '', otherOffice: !!c.otherOffice, shareTags: (c.shareTags || []).slice(),
       staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
       // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
       meetDetail: c.meetDetail || '', belongings: c.belongings || '',
@@ -782,6 +793,17 @@
     saveDeadline();
   }
 
+  // 他の拠点の案件だと分かる札（2026-09-18 baba指摘「名古屋の案件が混じってた」）。
+  // ⚠ 混ざるのは決まりどおり＝その案件に自分の拠点がヘルプ／巻き取りで関わっているため。
+  //   関わりの文言はサーバー（App\Support\ShareTags）が作る。ここで文字をつなげない。
+  function otherOfficeHtml(c){
+    if (!c.otherOffice) return '';
+    const how = (c.shareTags || []).map(t => t.label).join('・');
+    const text = c.office + 'の案件' + (how ? '（' + how + '）' : '');
+    return '<span class="badge other-office" title="この案件の登録拠点です。自分の拠点が関わっているので、この一覧にも出ます">'
+      + escapeHtml(text) + '</span> ';
+  }
+
   // ===== 1案件の行（＋備考の折りたたみ行）を表に追加。カレンダー順・登録順の両方で使う =====
   function appendCaseRow(c){
     const pub = isPublished(c.id);
@@ -802,7 +824,7 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
@@ -888,6 +910,8 @@
       if (f === 'off') return !pub;
       // 「募集なしを隠す」＝案件登録で「募集しない」にした案件を並べない（2026-09-18 baba）。
       if (f === 'norec') return c.recruit !== false;
+      // 「自拠点の案件だけ」＝他拠点が登録した案件（ヘルプ等で混ざるもの）を並べない（2026-09-18）。
+      if (f === 'mine') return !c.otherOffice;
       return true;
     }
 
