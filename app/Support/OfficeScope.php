@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Office;
+use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -149,6 +150,36 @@ class OfficeScope
             }
             $qq->orWhereHas('shares', fn ($s) => $s->where('office', $office));
         }));
+    }
+
+    /**
+     * その案件は「いま見ている拠点のボード」に属するか（2026-09-18）。
+     *
+     * ⚠ **applyToProjects（一覧に出す条件）と必ず同じ答えにすること。**
+     *   2026-09-18 に事故になった：公開ボードの保存側だけ `$project->office !== $scope` と
+     *   素の文字比べをしていたため、
+     *     ・**拠点が空の案件**（一覧には東京として出る）
+     *     ・**他拠点からヘルプ／巻き取りで来ている案件**（一覧には出る）
+     *   が保存だけ黙って弾かれていた。画面は先に「公開中」に変えるので、
+     *   **押せたのに、開き直すと非公開に戻る**という見え方になる（baba報告）。
+     *
+     * @param  string|null  $office  いま見ている拠点（null・空＝全拠点＝いつでも true）
+     */
+    public static function belongsTo(Project $project, ?string $office): bool
+    {
+        $scope = trim((string) $office);
+        if ($scope === '') {
+            return true;
+        }
+
+        // 拠点が空の案件は東京あつかい（名簿・案件・applyToProjects と同じ決まり）。
+        $owner = trim((string) ($project->office ?? '')) ?: self::DEFAULT_OFFICE;
+        if ($owner === $scope) {
+            return true;
+        }
+
+        // その拠点に共有（ヘルプ／巻き取り）されている案件も、その拠点のボードに出る。
+        return $project->shares()->where('office', $scope)->exists();
     }
 
     /**

@@ -141,7 +141,11 @@ class AssignPublishController extends Controller
             if (! ProjectAccess::canEdit($project)) {
                 continue;   // 他拠点の案件は公開状態を変えられない
             }
-            if ($scope !== '' && (string) ($project->office ?? '') !== $scope) {
+            // ⚠ 判定は OfficeScope::belongsTo（一覧に出す条件と必ず同じ答えにする）。
+            //   2026-09-18 まで素の文字比べだったため、**拠点が空の案件**と
+            //   **他拠点からヘルプ／巻き取りで来ている案件**が、一覧には出るのに保存だけ黙って
+            //   弾かれていた（baba報告「公開ボタンを押して更新したら非公開に戻る」）。
+            if (! OfficeScope::belongsTo($project, $scope)) {
                 continue;   // 画面で見ていた拠点と違う＝まとめて公開する事故を防ぐ
             }
             if ((bool) $project->staff_published === (bool) $data['publish']) {

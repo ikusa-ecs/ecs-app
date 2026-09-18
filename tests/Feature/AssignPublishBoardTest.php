@@ -270,4 +270,57 @@ class AssignPublishBoardTest extends TestCase
         $this->assertStringContainsString('function otherOfficeHtml(', $html, '札を描くところ');
         $this->assertStringContainsString('自拠点の案件だけ', $html, '絞り込みがありません');
     }
+
+    /**
+     * ⚠ 一覧に出ている案件は、必ず公開できること（2026-09-18 baba報告
+     * 「公開ボタン押して更新したら非公開にまた戻ってた」）。
+     *
+     * 原因＝保存側だけ「案件の拠点 === 見ている拠点」と素の文字で比べていた。
+     *   ・**拠点が空の案件**（一覧には東京として出る）
+     *   ・**他拠点からヘルプで来ている案件**（一覧には出る）
+     *   が保存だけ黙って弾かれ、画面は先に「公開中」に変わるので、
+     *   開き直すと非公開に戻って見えた。⚠ 履歴にも残らない（保存していないため）。
+     */
+    public function test_一覧に出ている案件はすべて公開できる(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false]);
+
+        // ① ふつうの自拠点の案件
+        $mine = ProjectFactory::new()->create(['office' => '東京']);
+        // ② 拠点が空の案件（東京あつかいで一覧に出る）
+        $blank = ProjectFactory::new()->create(['office' => null]);
+        // ③ 名古屋の案件を東京がヘルプ（一覧に出る）
+        $help = ProjectFactory::new()->create(['office' => '名古屋']);
+        \App\Models\ProjectShare::create([
+            'project_id' => $help->id, 'office' => '東京', 'kind' => 'ヘルプ',
+        ]);
+
+        $ids = [$mine->id, $blank->id, $help->id];
+
+        $this->actingAsPerson($me)->postJson('/assign-publish/set', [
+            'ids' => $ids, 'publish' => true, 'office' => '東京',
+        ])->assertOk()->assertJson(['ok' => true, 'updated' => 3]);
+
+        $this->assertTrue((bool) $mine->fresh()->staff_published, '自拠点の案件が公開できていません');
+        $this->assertTrue((bool) $blank->fresh()->staff_published, '拠点が空の案件が公開できていません');
+        $this->assertTrue((bool) $help->fresh()->staff_published, 'ヘルプで来ている案件が公開できていません');
+
+        // 公開したことは編集履歴にも残る（残らない＝保存できていない、の目印になる）。
+        $this->assertDatabaseHas('project_histories', [
+            'project_id' => $blank->id, 'field' => 'staff_published',
+        ]);
+    }
+
+    /** ⚠ 一覧に出ていない拠点の案件は、これまでどおり変えられない。 */
+    public function test_関わりの無い他拠点の案件は公開できない(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false]);
+        $other = ProjectFactory::new()->create(['office' => '名古屋']);
+
+        $this->actingAsPerson($me)->postJson('/assign-publish/set', [
+            'ids' => [$other->id], 'publish' => true, 'office' => '東京',
+        ])->assertOk()->assertJson(['updated' => 0]);
+
+        $this->assertFalse((bool) $other->fresh()->staff_published);
+    }
 }
