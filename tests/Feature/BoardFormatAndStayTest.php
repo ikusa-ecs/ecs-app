@@ -73,6 +73,13 @@ class BoardFormatAndStayTest extends TestCase
 
         $this->assertStringContainsString('format:c.format', $html, '詰め替え（これが無いと出ない）');
         $this->assertStringContainsString('fmtBadgeHtml(c)', $html, 'カードに実施形態を描くところ');
+        // ⚠ 置き場所＝コンテンツ名の横（2026-09-18 baba「前泊とかリアルとかはコンテンツの横に表示で」）。
+        //   カードの下に離して置くと、横に並んだカードを目で追うときに見落とす。
+        $this->assertStringContainsString(
+            'titleBlockHtml(c, fmtBadgeHtml(c) + tagHtml)',
+            $html,
+            '実施形態と札がコンテンツ名の横に出ていません'
+        );
     }
 
     /** 前泊ありの案件には「前泊」の札が付く。 */

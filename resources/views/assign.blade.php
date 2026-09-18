@@ -131,9 +131,14 @@
 
     .cc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .cc-headmain { flex: 1 1 auto; min-width: 0; }
-    /* タイトルは1行で、長い分は「…」。全文はマウスを乗せると出る（title属性）。カードが横長にならないように。 */
-    .cc-name { font-size: 15px; font-weight: 700; line-height: 1.35;
+    /* コンテンツ名の横に、実施形態（リアル／ロング／オンライン）と札（前泊など）を並べる（2026-09-18 baba要望）。
+       ⚠ 名前だけを縮めて「…」にし、札は縮めない（札が切れると付いている意味がなくなる）。 */
+    .cc-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      font-size: 15px; font-weight: 700; line-height: 1.35; }
+    /* 長い案件名は「…」。全文はマウスを乗せると出る（title属性）。カードが横長にならないように。 */
+    .cc-name .nm { min-width: 0; flex: 0 1 auto;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cc-name .fbadge, .cc-name .ctag, .cc-name .ymk, .cc-name .cc-nocontent { flex: none; }
     /* コンテンツ未登録の印（案件名で仮表示していることを一目で示す） */
     .cc-nocontent { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px;
       background: var(--warn-soft); color: #b45309; white-space: nowrap; }
@@ -177,8 +182,8 @@
     .plamp.short { background: var(--danger-soft); color: #b91c1c; }
     .plamp.none  { background: #ece3d4;            color: #7a6a58; }
 
-    /* 案件カードのタグ（前日設営・連勤・前泊・◯日目） */
-    .cc-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    /* 案件カードのタグ（前日設営・連勤・前泊・◯日目）。
+       ⚠ 2026-09-18 から、置く場所は**コンテンツ名の横**（.cc-name の中）。専用の行は無くした。 */
     .ctag { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; }
     .ctag.setup  { background: #ece3d4;            color: #7a6a58; }
     .ctag.renkin { background: var(--danger-soft); color: #b91c1c; }
@@ -1795,14 +1800,18 @@
       + ` title="この案件の詳細（登録・編集画面）を開きます。時間・会場・運営人数・備考などはそこで直せます。">📄 案件の詳細 →</a>`;
   }
 
-  function titleBlockHtml(c){
+  // 案件名（コンテンツ）のブロック。
+  // ⚠ 実施形態（リアル／ロング／オンライン）と札（前泊・前日設営など）は
+  //   **コンテンツ名の横**に出す（2026-09-18 baba要望）。カードの下のほうに離して置くと、
+  //   横に並んだカードを目で追うときに見落とすため。
+  function titleBlockHtml(c, extraHtml){
     const name = c.name || '';
     const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツがマスタに未登録です。案件名で仮表示しています。">⚠未登録</span> ' : '';
     // 案件名を押したら案件の詳細（編集画面）へ。アサインしながら中身を確認できる（2026-08-21 baba）。
     const inner = USING_DB
       ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く">${badge}${name}</a>`
       : `${badge}${name}`;
-    return `<div class="cc-name" title="${name}">${inner}${yomiHtml(c)}</div>`;
+    return `<div class="cc-name" title="${name}"><span class="nm">${inner}</span>${yomiHtml(c)}${extraHtml || ''}</div>`;
   }
 
   // メンバーのポジション欄。手動編集中でスタッフIDがあればプルダウン（選ぶとDB保存）、それ以外は表示のみ。
@@ -2708,7 +2717,7 @@
     card.innerHTML = `
       <div class="cc-head">
         <div class="cc-headmain">
-          ${titleBlockHtml(c)}
+          ${titleBlockHtml(c, fmtBadgeHtml(c) + tagHtml)}
           <div class="cc-client">${c.client}</div>
           <div class="cc-meta">
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>
@@ -2734,8 +2743,7 @@
       </div>
       ${noteHtml}
       ${lineBoxHtml(c)}
-      ${tagHtml ? `<div class="cc-tags">${tagHtml}</div>` : ''}
-      <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${fmtBadgeHtml(c)}${posHtml}</div>
+      <div class="cc-pos"><span class="badge cat-${c.cat}">${c.cat}</span>${posHtml}</div>
       <div class="cc-fill">
         <div class="fbar"><i class="${barCls}" style="width:${Math.round(ratio*100)}%;"></i></div>
         <span class="fnum">${filled}${settled
