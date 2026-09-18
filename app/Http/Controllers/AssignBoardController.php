@@ -596,6 +596,9 @@ class AssignBoardController extends Controller
                 //   運営人数を増やせば、その場でまた「募集中」に戻る（公開し直さなくてよい）。
                 'needStaff' => RecruitStatus::need($p->required_count),
                 'mine' => $mine,
+                // 営業担当（2026-09-18 baba要望）。LINEグループを作るとき営業担当も招待するので、
+                // 誰を呼ぶのかカードで分かるようにする。⚠ 複数なら「・」でつなぐ。
+                'sales' => implode('・', array_filter(array_map('trim', $salesOwners))),
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',
                 'enter' => $p->event_enter_time ?? '—',

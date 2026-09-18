@@ -736,6 +736,9 @@
       needStaff:c.needStaff,   // スタッフ画面で使っている必要人数（未入力なら既定）。締切の判定に使う。
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
+      // 営業担当（2026-09-18 baba要望。LINEグループに営業担当も招待するため）。
+      // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
+      sales:c.sales,
       // お客様（参加者）の人数・チーム数（2026-09-07 baba要望）。
       // ⚠ 詰め替えを忘れるとカードに出ない（この画面でよくある事故）。
       guest:c.guest, guestType:c.guestType, teams:c.teams, teamsTbd:c.teamsTbd,
@@ -2704,6 +2707,7 @@
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>
             <span><span class="ic">📍</span> <span class="venue" title="${c.place || ''}">${c.placeShort || c.place || '—'}</span></span>
             ${c.meetPlace ? `<span><span class="ic">🚩</span> 集合場所：${c.meetPlace}</span>` : ''}
+            ${c.sales ? `<span><span class="ic">💼</span> 営業：${escHtml(c.sales)}</span>` : ''}
             ${guestTeamHtml(c)}
           </div>
         </div>
