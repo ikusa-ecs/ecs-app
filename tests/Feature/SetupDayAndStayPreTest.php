@@ -39,6 +39,7 @@ class SetupDayAndStayPreTest extends TestCase
             'required_count' => '10',
             'start_date' => now()->addDays(20)->format('Y-m-d'),
             'office' => '東京',
+            'ikusa_count'   => '5',
             'intent' => 'publish',
         ], $over);
     }

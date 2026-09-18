@@ -862,19 +862,28 @@
           <div class="full">
             <div class="triple">
               <div class="form-row">
-                <label>運営人数<span class="req-mark yellow">必須</span></label>
+                <label>運営人数（全体人数）<span class="req-mark yellow">必須</span></label>
                 <!-- 「6〜8人」のような おおよその人数 も入れられる（2026-08-25 baba）。
                      ⚠ type="number" だと「6〜8」が入力できないので text にしている。
                         読み取りは App\Support\Headcount が正本。 -->
                 <input type="text" id="requiredCount" name="required_count" data-need="later"
                        inputmode="numeric" placeholder="例）16 ／ 6〜8">
+                <!-- 運営人数（IKUSA）＝そのうち自社で出す人数（2026-09-18 baba要望）。
+                     ⚠ 覚えておくための数字。募集・残り◯名・自動アサイン・スタッフ画面の締切は
+                        今までどおり上の「全体人数」で動く。 -->
+                <label style="margin-top:10px;">運営人数（IKUSA）<span class="req-mark yellow">必須</span></label>
+                <input type="text" id="ikusaCount" name="ikusa_count" data-need="later"
+                       inputmode="numeric" placeholder="例）8 ／ 4〜6">
                 <div class="check-row tbd-row" style="margin-top:8px;">
-                  <input type="checkbox" id="countTentative" name="count_tentative" class="tbd-check" data-tbd-for="requiredCount">
+                  <input type="checkbox" id="countTentative" name="count_tentative" class="tbd-check" data-tbd-for="requiredCount,ikusaCount">
                   <label for="countTentative">人数は仮（未定）</label>
                 </div>
-                <div class="hint">当日の運営に入る人数（＝アサインする人数）。
+                <div class="hint"><b>全体人数</b>＝当日その現場に立つ全員（派遣や他社の方も含む）。
+                  <b>IKUSA</b>＝そのうち自社で出す人数。<br>
                   <b>「6〜8」のように幅を持たせて書けます。</b>
-                  その場合、募集・残り人数の計算は<b>多いほう（8名）</b>で行います。</div>
+                  募集・残り人数・自動アサインは<b>全体人数の多いほう（8名）</b>で計算します
+                  （IKUSAの人数は記録用で、計算には使いません）。<br>
+                  「人数は仮（未定）」のチェックは<b>2つまとめて</b>仮にします。</div>
               </div>
               <div class="form-row">
                 <label>お客様（参加者）の人数<span class="req-mark yellow">必須</span></label>
@@ -1665,9 +1674,10 @@
     // 実施形態＝リアル
     document.getElementById('format').value = 'イベント東(リアル)';
     onFormatChange();
-    // 運営人数＝18（仮チェックは外す）
+    // 運営人数＝全体18名・うちIKUSA 12名（仮チェックは外す）
     if (document.getElementById('countTentative').checked) { document.getElementById('countTentative').checked = false; onTbd(document.getElementById('countTentative')); }
     document.getElementById('requiredCount').value = '18';
+    document.getElementById('ikusaCount').value = '12';
     // その他の見本
     const setVal = function (id, v) { const el = document.getElementById(id); if (el) el.value = v; };
     setVal('client', 'サンプル株式会社');
@@ -1690,10 +1700,16 @@
     const date = document.getElementById('startDate').value;
     // 「6〜8」のような範囲でも「入力あり」と数える（数字が1つでもあればOK）。
     // ⚠ parseInt だけだと全角や「6〜8」で 0 になり、入力済みなのに怒られる。
-    const countRaw = String(document.getElementById('requiredCount').value || '')
-      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); });
-    const countNums = countRaw.match(/\d+/g) || [];
-    const count = countNums.length ? Math.max.apply(null, countNums.map(Number)) : 0;
+    // ⚠ 人数の欄は「全体人数」と「IKUSA」の2つある（2026-09-18）。読み方は同じなので1つにまとめる。
+    const headcountOf = function (id) {
+      const el = document.getElementById(id);
+      const raw = String((el && el.value) || '')
+        .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); });
+      const nums = raw.match(/\d+/g) || [];
+      return nums.length ? Math.max.apply(null, nums.map(Number)) : 0;
+    };
+    const count = headcountOf('requiredCount');
+    const ikusa = headcountOf('ikusaCount');
     const missing = [];   // 足りないものの文章
     let firstEl = null;   // 最初に直してほしい欄（あとでそこへ移動する）
 
@@ -1709,7 +1725,10 @@
       add('開催日を入力するか、「日付未定」にチェックを入れてください。', document.getElementById('startDate'));
     }
     if (count < 1 && !document.getElementById('countTentative').checked) {
-      add('運営人数を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('requiredCount'));
+      add('運営人数（全体人数）を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('requiredCount'));
+    }
+    if (ikusa < 1 && !document.getElementById('countTentative').checked) {
+      add('運営人数（IKUSA）を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('ikusaCount'));
     }
 
     if (missing.length === 0) return true;
@@ -1745,20 +1764,29 @@
   function refreshAllNeed() { document.querySelectorAll('[data-need]').forEach(refreshNeed); }
 
   // 「未定」チェックの動作＝欄を休みにして黄色に（開催日はメモ欄も開く）
+  // ⚠ data-tbd-for は「,」でつないで複数の欄を指せる（2026-09-18）。
+  //   運営人数は「全体人数」と「IKUSA」の2欄あるが、仮（未定）のチェックは1つでまとめて効かせる。
   function onTbd(cb) {
-    const f = document.getElementById(cb.getAttribute('data-tbd-for'));
-    if (!f) return;
-    f.dataset.tbd = cb.checked ? '1' : '';
-    if (f.id === 'contentBox') {
-      const s = document.getElementById('contentSearch');
-      if (s) s.disabled = cb.checked;
-      f.classList.toggle('contentBox-tbd', cb.checked);
-    } else {
-      f.disabled = cb.checked;
-    }
+    const ids = (cb.getAttribute('data-tbd-for') || '').split(',')
+      .map(function (s) { return s.trim(); }).filter(Boolean);
+    let hit = false;
+    ids.forEach(function (id) {
+      const f = document.getElementById(id);
+      if (!f) return;
+      hit = true;
+      f.dataset.tbd = cb.checked ? '1' : '';
+      if (f.id === 'contentBox') {
+        const s = document.getElementById('contentSearch');
+        if (s) s.disabled = cb.checked;
+        f.classList.toggle('contentBox-tbd', cb.checked);
+      } else {
+        f.disabled = cb.checked;
+      }
+      refreshNeed(f);
+    });
+    if (!hit) return;
     const memoId = cb.getAttribute('data-memo');
     if (memoId) { const memo = document.getElementById(memoId); if (memo) memo.style.display = cb.checked ? '' : 'none'; }
-    refreshNeed(f);
   }
 
   // イベント時間未定：入場・開始・終了の3つをまとめて「未定」にする（2026-08-21 baba）。
@@ -1848,6 +1876,7 @@
     setVal('staffMeetTime', E.staff_meet_time);
     setVal('staffLeaveTime', E.staff_leave_time);
     setVal('requiredCount', E.required_count);
+    setVal('ikusaCount', E.ikusa_count);   // 運営人数（IKUSA）。⚠ ここを忘れると編集で空に見える
     setVal('guestNum', E.guest_count);
     setVal('teamCount', E.team_count);
 

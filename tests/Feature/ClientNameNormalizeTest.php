@@ -40,6 +40,7 @@ class ClientNameNormalizeTest extends TestCase
             'client'         => '〇〇株式会社 様',
             'start_date'     => '2026-09-01',
             'required_count' => '10',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ]);
 

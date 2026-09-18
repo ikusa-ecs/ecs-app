@@ -30,6 +30,7 @@ class OneOffContentTest extends TestCase
             'oneoff_content_names'   => 'オリジナル脱出ゲーム',
             'start_date'             => '2026-09-10',
             'required_count'         => '8',
+            'ikusa_count'   => '5',
             'intent'                 => 'publish',
         ])->assertRedirect('/projects');
 
@@ -52,6 +53,7 @@ class OneOffContentTest extends TestCase
             'content_names'  => '新定番ゲーム',
             'start_date'     => '2026-09-11',
             'required_count' => '8',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ])->assertRedirect('/projects');
 
@@ -71,6 +73,7 @@ class OneOffContentTest extends TestCase
             'oneoff_content_names' => 'その場かぎりの余興',
             'start_date'           => '2026-09-12',
             'required_count'       => '12',
+            'ikusa_count'   => '5',
             'intent'               => 'publish',
         ])->assertRedirect('/projects');
 
@@ -95,6 +98,7 @@ class OneOffContentTest extends TestCase
             'oneoff_content_names' => 'オリジナル脱出ゲーム',
             'start_date'           => '2026-09-13',
             'required_count'       => '8',
+            'ikusa_count'   => '5',
             'intent'               => 'publish',
         ]);
 

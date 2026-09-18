@@ -37,6 +37,7 @@ class HeadcountRangeTest extends TestCase
             'content_names'  => '謎解き',
             'start_date'     => '2026-09-01',
             'required_count' => '6〜8',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ])->assertRedirect('/projects');
 
@@ -52,6 +53,7 @@ class HeadcountRangeTest extends TestCase
             'content_names'  => '水合戦',
             'start_date'     => '2026-09-01',
             'required_count' => '10',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ])->assertRedirect('/projects');
 
@@ -70,6 +72,7 @@ class HeadcountRangeTest extends TestCase
             'content_names'  => '謎解き',
             'start_date'     => '2026-09-01',
             'required_count' => '9',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ])->assertRedirect('/projects');
 

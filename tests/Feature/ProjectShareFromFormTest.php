@@ -38,6 +38,7 @@ class ProjectShareFromFormTest extends TestCase
     private function payload(array $extra = []): array
     {
         return array_merge([
+            'ikusa_count'   => '5',
             'intent' => 'publish',
             'content_names' => '水合戦',
             'client' => 'テスト株式会社',

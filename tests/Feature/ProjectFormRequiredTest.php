@@ -25,14 +25,17 @@ class ProjectFormRequiredTest extends TestCase
         return PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京']);
     }
 
-    /** 確定で保存：案件名・開催日・人数が空なら止める。 */
+    /**
+     * 確定で保存：案件名・開催日・人数が空なら止める。
+     * ⚠ 人数は2つとも必須（2026-09-18 baba「マストで」）＝全体人数とIKUSA。
+     */
     public function test_publish_requires_name_date_and_count(): void
     {
         $before = Project::count();
 
         $this->actingAsPerson($this->emp())
             ->post('/project-form', ['intent' => 'publish'])
-            ->assertSessionHasErrors(['content_names', 'start_date', 'required_count']);
+            ->assertSessionHasErrors(['content_names', 'start_date', 'required_count', 'ikusa_count']);
 
         $this->assertSame($before, Project::count(), '不備があれば登録しない');
     }
@@ -71,11 +74,13 @@ class ProjectFormRequiredTest extends TestCase
                 'content_names'  => '水合戦',
                 'start_date'     => Carbon::today()->addDays(10)->format('Y-m-d'),
                 'required_count' => '12',
+                'ikusa_count'    => '8',
             ])
             ->assertSessionHasNoErrors();
 
         $p = Project::first();
         $this->assertSame(12, $p->required_count);
+        $this->assertSame(8, $p->ikusa_count);
         $this->assertFalse((bool) $p->staff_published, '登録直後は必ず非公開');
     }
 

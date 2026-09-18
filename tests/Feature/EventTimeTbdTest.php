@@ -28,6 +28,7 @@ class EventTimeTbdTest extends TestCase
             'start_date'     => '2026-09-01',
             'required_count' => '10',
             'event_time_tbd' => '1',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ]);
 
@@ -44,6 +45,7 @@ class EventTimeTbdTest extends TestCase
             'start_date'       => '2026-09-02',
             'required_count'   => '10',
             'event_start_time' => '13:00',
+            'ikusa_count'   => '5',
             'intent'           => 'publish',
         ]);
 

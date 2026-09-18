@@ -116,6 +116,7 @@ class EventCountTest extends TestCase
 
         foreach ([['auto', null], ['yes', true], ['no', false]] as [$sent, $expected]) {
             $this->actingAsPerson($emp)->post('/project-form', [
+                'ikusa_count'   => '5',
                 'intent'         => 'publish',
                 'content_names'  => '水合戦',
                 'start_date'     => $this->thisMonth(),

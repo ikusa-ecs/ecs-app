@@ -38,6 +38,7 @@ class TransportAudioMultiPickTest extends TestCase
             'required_count'  => '8',
             'transport'       => '電車+IKUSAカー+レンタカー',
             'audio_equipment' => 'CUBE+TOA',
+            'ikusa_count'   => '5',
             'intent'          => 'publish',
         ])->assertRedirect('/projects');
 
@@ -96,6 +97,7 @@ class TransportAudioMultiPickTest extends TestCase
             'start_date'     => '2026-09-01',
             'required_count' => '8',
             'transport'      => $long,
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ])->assertRedirect('/projects');
 

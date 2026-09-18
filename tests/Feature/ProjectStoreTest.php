@@ -26,6 +26,7 @@ class ProjectStoreTest extends TestCase
             'content_names'  => '水合戦',
             'start_date'     => '2026-09-01',
             'required_count' => '10',
+            'ikusa_count'    => '5',
             'intent'         => 'publish',   // 「募集中」で保存
         ]);
 
@@ -56,6 +57,7 @@ class ProjectStoreTest extends TestCase
             'content_names'  => '運動会',
             'start_date'     => '2026-10-01',
             'required_count' => '12',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ])->assertRedirect('/projects');
 
@@ -76,6 +78,7 @@ class ProjectStoreTest extends TestCase
         $res = $this->actingAsPerson($employee)->post('/project-form', [
             'content_names' => '水合戦',
             'start_date'    => 'not-a-date',
+            'ikusa_count'   => '5',
             'intent'        => 'publish',
         ]);
 
@@ -95,6 +98,7 @@ class ProjectStoreTest extends TestCase
             'content_names'  => '水合戦',
             'start_date'     => '2026-09-01',
             'required_count' => '10',
+            'ikusa_count'   => '5',
             'intent'         => 'next',
         ]);
 
@@ -124,6 +128,7 @@ class ProjectStoreTest extends TestCase
             'content_names'  => '水合戦',
             'start_date'     => '2026-09-01',
             'required_count' => '10',
+            'ikusa_count'   => '5',
             'intent'         => 'publish',
         ]);
 
@@ -151,6 +156,7 @@ class ProjectStoreTest extends TestCase
             'end_time'         => '19:00',
             'staff_meet_time'  => '08:30',
             'staff_leave_time' => '17:30',
+            'ikusa_count'   => '5',
             'intent'           => 'publish',
         ])->assertRedirect('/projects');
 
@@ -175,6 +181,7 @@ class ProjectStoreTest extends TestCase
             'end_time'         => '18:00',
             'staff_meet_time'  => '',
             'staff_leave_time' => '',
+            'ikusa_count'   => '5',
             'intent'           => 'publish',
         ])->assertRedirect('/projects');
 
@@ -191,6 +198,7 @@ class ProjectStoreTest extends TestCase
         $this->actingAsPerson($staff)->post('/project-form', [
             'content_names' => '水合戦',
             'start_date'    => '2026-09-01',
+            'ikusa_count'   => '5',
             'intent'        => 'publish',
         ])->assertRedirect('/staff-portal');
 

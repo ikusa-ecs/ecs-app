@@ -46,6 +46,7 @@ class ProjectSeriesTest extends TestCase
             'required_count' => '10',
             'start_date' => $d1->format('Y-m-d'),
             'office' => '東京',
+            'ikusa_count'   => '5',
             'intent' => 'publish',
             'has_series' => '1',
             'series_dates' => [
@@ -78,6 +79,7 @@ class ProjectSeriesTest extends TestCase
             'required_count' => '10',
             'start_date' => $d1->format('Y-m-d'),
             'office' => '東京',
+            'ikusa_count'   => '5',
             'intent' => 'publish',
             'has_series' => '1',
             'series_dates' => [

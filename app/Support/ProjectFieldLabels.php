@@ -67,9 +67,14 @@ class ProjectFieldLabels
         'event_end_time'     => 'イベント終了',
         // ── 人数 ──
         'staff_role'         => '運営体制',
+        // ⚠ 名前は「運営人数」のまま（アサイン表の差分表示など、この文字で照らし合わせている所がある）。
+        //   画面では「運営人数（全体人数）」と出している。中身は同じもの。
         'required_count'     => '運営人数',
         // ⚠ 範囲で入れたときの少ないほう（例 6〜8人 の 6）。多いほうは required_count。
         'required_count_min' => '運営人数（下限）',
+        // そのうち自社で出す人数（2026-09-18）。⚠ 覚えておくための数字＝募集の計算には使わない。
+        'ikusa_count'        => '運営人数（IKUSA）',
+        'ikusa_count_min'    => '運営人数（IKUSA・下限）',
         'count_as_event'     => 'イベント数に数える',
         'count_tentative'    => '運営人数は仮',
         'guest_count'        => 'お客様人数',

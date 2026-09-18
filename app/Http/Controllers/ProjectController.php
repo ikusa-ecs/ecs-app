@@ -334,6 +334,8 @@ class ProjectController extends Controller
                     'staff_role' => $p->staff_role,
                     // 編集フォームには「6〜8」の形で戻す（入れたとおりに直せるように）。
                     'required_count' => Headcount::label($p->required_count_min, $p->required_count),
+                    // 運営人数（IKUSA）も同じ形で戻す（「4〜6」と入れたらそのまま出す）。
+                    'ikusa_count' => Headcount::label($p->ikusa_count_min, $p->ikusa_count),
                     'count_tentative' => (bool) $p->count_tentative,
                     'guest_count' => $p->guest_count,
                     'guest_count_type' => $p->guest_count_type,
@@ -562,7 +564,13 @@ class ProjectController extends Controller
             // 「6〜8人」のような範囲でもよい（2026-08-25 baba）。読み方は Headcount が正本。
             $count = Headcount::parse($request->input('required_count'))['max'] ?? 0;
             if ($count < 1 && ! $request->boolean('count_tentative')) {
-                $errors['required_count'] = '運営人数を入力するか、「人数は仮（未定）」にチェックを入れてください。';
+                $errors['required_count'] = '運営人数（全体人数）を入力するか、「人数は仮（未定）」にチェックを入れてください。';
+            }
+            // 運営人数（IKUSA）も必須（2026-09-18 baba「マストで」）。
+            // ⚠ 逃げ道は全体人数と同じ「人数は仮（未定）」ひとつ（チェック1つで両方を仮にする）。
+            $ikusa = Headcount::parse($request->input('ikusa_count'))['max'] ?? 0;
+            if ($ikusa < 1 && ! $request->boolean('count_tentative')) {
+                $errors['ikusa_count'] = '運営人数（IKUSA）を入力するか、「人数は仮（未定）」にチェックを入れてください。';
             }
             if ($errors) {
                 return back()->withInput()->withErrors($errors);
@@ -703,6 +711,11 @@ class ProjectController extends Controller
             //   こうすると「残り○名」の計算をひとつも変えずに「8人埋まって初めて満員」になる。
             'required_count' => Headcount::parse($request->input('required_count'))['max'],
             'required_count_min' => Headcount::parse($request->input('required_count'))['min'],
+            // 運営人数（IKUSA）＝そのうち自社で出す人数（2026-09-18 baba要望）。
+            // ⚠ **覚えておくための数字**。募集・残り◯名・自動アサイン・スタッフ画面の締切は
+            //   今までどおり全体人数（required_count）で動く。ここに付け替えない。
+            'ikusa_count' => Headcount::parse($request->input('ikusa_count'))['max'],
+            'ikusa_count_min' => Headcount::parse($request->input('ikusa_count'))['min'],
             'count_tentative' => $request->has('count_tentative'),
             'guest_count' => $request->filled('guest_count') ? (int) $request->input('guest_count') : null,
             'guest_count_type' => $request->input('guestCount'),
