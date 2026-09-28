@@ -49,7 +49,9 @@
   /* 1案件＝縦カード（できるだけ詰める）。
      ※ sticky を効かせるため overflow:hidden は使わない（角丸は頭側で付ける）。 */
   .acard {
-    flex: 0 0 auto; width: 202px;
+    /* ⚠ 2026-09-28、メンバーを「NO／名前／P／巡回／備考」の5列ブロックにしたので幅を広げた
+       （202px では5列が入らない）。横に並ぶ案件の数は減るが、現場のアサイン表と同じ形を優先。 */
+    flex: 0 0 auto; width: 288px;
     border: 1px solid var(--line); border-radius: 10px; background: #fff;
     box-shadow: 0 1px 2px rgba(60,45,30,.06);
   }
@@ -88,7 +90,33 @@
   .chip-ck.on { background: #e9f6ef; border-color: #bfe6d2; color: #2e9e6b; }
 
   /* メンバー表 */
-  .acard-members { margin-top: 4px; border-top: 2px solid var(--line); }
+  /* ▼ メンバーのブロック（2026-09-28 baba要望）＝現場のアサイン表と同じ
+     「NO／名前／P／巡回／備考」の5列。行数は小型・中型＝15／大型＝30で固定し、
+     空いている行も枠として出す（あと何人入るのかが一目で分かる）。
+     ⚠ 行数の正本はサーバー側の 'blockRows'（画面に 15/30 と書かない）。 */
+  .mblk { display: flex; font-size: 10.5px; line-height: 1.35; }
+  .mblk > span { padding: 1px 3px; border-right: 1px solid #f2ece3; min-width: 0; overflow-wrap: anywhere; }
+  .mblk > span:last-child { border-right: 0; }
+  .mblk .c-no { flex: 0 0 20px; text-align: right; color: #b3a696; }
+  .mblk .c-nm { flex: 1 1 78px; }
+  .mblk .c-p  { flex: 0 0 40px; }
+  .mblk .c-jn { flex: 0 0 54px; }
+  .mblk .c-rm { flex: 1 1 74px; }
+  .mblk-head { font-weight: 800; color: #a89680; font-size: 9.5px; background: #faf7f2;
+    border-top: 2px solid var(--line); border-bottom: 1px solid var(--line); }
+  /* ⚠ .mrow の既定（padding・font-size・align-items）を上書きする。
+     クラス2つぶんの強さが要るので .mrow.mblk と書く（.mblk だけだと .mrow に負ける）。 */
+  .mrow.mblk { padding: 0; font-size: 10.5px; align-items: stretch;
+    border-top: 1px solid #f7f3ec; }
+  .mblk .c-nm { color: var(--ink); }
+  .mblk .c-nm .emp { font-size: 9px; color: #b8875a; margin-left: 2px; }
+  /* 空いている行＝うっすら。うるさくならないように罫線だけ見せる。 */
+  .mrow.mblk.vacant { background: #fdfcfa; min-height: 15px; }
+  .mrow.mblk.vacant .c-no { color: #d8cfc2; }
+  /* 派遣の行（ブロックの中・2026-09-28 baba指定）。状況の色は .ecs-dsp-st が正本。 */
+  .mrow.mblk.dsp .c-nm { color: var(--accent2-ink); font-weight: 700; }
+  .mrow.mblk.dsp.off { opacity: .55; text-decoration: line-through; }
+  .acard-members { margin-top: 4px; }
   .acard-members .mhead { display: flex; font-size: 10px; font-weight: 800; color: #a89680;
     background: #f6f1ea; padding: 3px 9px; }
   .acard-members .mhead .p { flex: 0 0 46px; }
@@ -106,9 +134,17 @@
   .mrow .m-tag { font-size: 9.5px; color: #8a7a66; margin-left: 4px; white-space: nowrap; }
 
   /* ▼ 編集モード（カードに .editing が付くと入力欄を出す。日別ボードと同じ「選ぶと保存」） */
-  .mhead .m-edit-btn { margin-left: auto; font-size: 9.5px; font-weight: 700; color: #2f6fb3;
-    cursor: pointer; background: #eaf1f8; border-radius: 5px; padding: 0 6px; }
-  .acard.editing .mhead .m-edit-btn { background: #2f6fb3; color: #fff; }
+  .mhead .m-edit-btn,
+  .mblk-head .m-edit-btn { margin-left: auto; font-size: 9.5px; font-weight: 700; color: #2f6fb3;
+    cursor: pointer; background: #eaf1f8; border-radius: 5px; padding: 0 6px; border-right: 0; }
+  .acard.editing .mhead .m-edit-btn,
+  .acard.editing .mblk-head .m-edit-btn { background: #2f6fb3; color: #fff; }
+  /* 編集モードの入力欄は、列の幅いっぱいに縦積みする（列が細いので横には並ばない）。 */
+  .acard.editing .mblk .m-role,
+  .acard.editing .mblk .m-note,
+  .acard.editing .mblk .m-patrol,
+  .acard.editing .mblk .m-remark { width: 100%; max-width: 100%; margin-left: 0; display: block; }
+  .acard.editing .mblk .m-patrol { margin-top: 2px; }
   .mrow .m-edit { display: none; }
   .acard.editing .mrow .m-edit { display: inline-flex; }
   .acard.editing .mrow .pos-badge,
@@ -132,8 +168,19 @@
   .pe-edit { display: none; }
   .acard.editing .pe-read { display: none; }
   .acard.editing .pe-edit { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
-  /* 空の項目は「編集モードのときだけ」出す（普段は今まで通り、値のある行だけ表示）。 */
-  .acard:not(.editing) .pe-empty { display: none; }
+  /* ⚠ 2026-09-28、空の項目も**常に出す**ようにした（baba要望「空欄も未入力で表示してほしい」）。
+     以前は .pe-empty を隠していたので、埋め忘れに気づけなかった。
+     代わりに「未入力」の札を出す。色の意味は案件登録と同じ＝赤＝必須／黄＝後で必要／灰＝任意。
+     色分けの正本＝App\Support\ProjectRequiredFields（画面に項目名を書き並べない）。 */
+  .unfilled { font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 4px;
+    background: #f1ece4; color: #b3a696; }
+  .unfilled.req   { background: var(--danger-soft); color: #b91c1c; }
+  .unfilled.later { background: var(--warn-soft);   color: #b45309; }
+  /* 必須が空の行は、ラベルのほうにも色を付ける（列が長いので札だけだと埋もれる）。 */
+  .arow.miss-req   .lbl { color: #b91c1c; font-weight: 700; }
+  .arow.miss-later .lbl { color: #b45309; font-weight: 700; }
+  /* 案件の備考は長くなることがあるので、枠の中でスクロールさせる（カードが伸びない）。 */
+  .arow.note-row .val.pe-read { max-height: 68px; overflow-y: auto; white-space: pre-wrap; }
   /* 編集モードでは進行チェックのチップをクリックで切り替えられる（見た目のヒント）。 */
   .acard.editing .chips .chip-ck { cursor: pointer; }
   .pe-in { font-size: 10.5px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 5px;
@@ -413,9 +460,7 @@
           ['edit' => true, 'lbl' => '規模/営業',
             'read' => trim($c['scale'] . '　' . $c['sales']), 'empty' => ($c['scale'] === '' && $c['sales'] === ''),
             'inputs' => [['f' => 'scale', 'v' => $c['scale'], 'ph' => '規模', 'w' => 'wide']]],
-          ['edit' => true, 'lbl' => '顧客', 'sep' => '／',
-            'read' => $c['client'] . ($c['agency'] !== '' ? '（' . $c['agency'] . '）' : ''), 'empty' => ($c['client'] === '' && $c['agency'] === ''),
-            'inputs' => [['f' => 'client', 'v' => $c['client'], 'ph' => '顧客'], ['f' => 'agency', 'v' => $c['agency'], 'ph' => '代理店']]],
+          // ⚠ 顧客は 2026-09-28 に「頭」へ移した（baba要望）。ここには積まない。
           ['edit' => true, 'lbl' => '運営場所',
             'read' => $c['operationPlace'] . ($c['isMulti'] ? '（複数開催）' : ''), 'empty' => ($c['operationPlace'] === ''),
             'inputs' => [['f' => 'operation_place', 'v' => $c['operationPlace'], 'ph' => '運営場所', 'w' => 'wide'],
@@ -423,16 +468,21 @@
           ['edit' => true, 'lbl' => '配信', 'sep' => '／',
             'read' => trim($c['onlineTool'] . '　' . $c['broadcast']), 'empty' => ($c['onlineTool'] === '' && $c['broadcast'] === ''),
             'inputs' => [['f' => 'online_tool', 'v' => $c['onlineTool'], 'ph' => 'ツール'], ['f' => 'broadcast', 'v' => $c['broadcast'], 'ph' => '配信']]],
+          // 拘束時間も出す（2026-09-28 baba要望）。計算の正本＝App\Support\WorkSpan。
+          // ⚠ 時間の書き方が読めないときは拘束時間を出さない（推測で埋めない）。
           ['edit' => true, 'lbl' => '集合/解散', 'sep' => '〜',
-            'read' => ($c['meet'] !== '' ? $c['meet'] : '—') . ' 〜 ' . ($c['leave'] !== '' ? $c['leave'] : '—'), 'empty' => ($c['meet'] === '' && $c['leave'] === ''),
+            'read' => ($c['meet'] !== '' ? $c['meet'] : '—') . ' 〜 ' . ($c['leave'] !== '' ? $c['leave'] : '—')
+                      . ($c['span'] !== '' ? '（拘束 ' . $c['span'] . '）' : ''),
+            'empty' => ($c['meet'] === '' && $c['leave'] === ''),
             'inputs' => [['f' => 'start_time', 'v' => $c['meet'], 'ph' => '集合'], ['f' => 'end_time', 'v' => $c['leave'], 'ph' => '解散']]],
           ['edit' => true, 'lbl' => '入/開/終', 'sep' => '/',
             'read' => ($c['enter'] !== '' ? $c['enter'] : '—') . '/' . ($c['evStart'] !== '' ? $c['evStart'] : '—') . '/' . ($c['evEnd'] !== '' ? $c['evEnd'] : '—'),
             'empty' => ($c['enter'] === '' && $c['evStart'] === '' && $c['evEnd'] === ''),
             'inputs' => [['f' => 'event_enter_time', 'v' => $c['enter'], 'ph' => '入'], ['f' => 'event_start_time', 'v' => $c['evStart'], 'ph' => '開'], ['f' => 'event_end_time', 'v' => $c['evEnd'], 'ph' => '終']]],
-          ['edit' => true, 'lbl' => '客数/組',
-            'read' => ($c['guests'] !== '' ? $c['guests'] . '名' : '') . ($c['teams'] !== '' ? ' ' . $c['teams'] . '組' : ''), 'empty' => ($c['guests'] === '' && $c['teams'] === ''),
-            'inputs' => [['f' => 'guest_count', 'v' => $c['guests'], 't' => 'number', 'w' => 'num', 'ph' => '客', 'suf' => '名'], ['f' => 'team_count', 'v' => $c['teams'], 't' => 'number', 'w' => 'num', 'ph' => '組', 'suf' => '組']]],
+          // ⚠ 2026-09-28、言い方を案件登録に合わせた（baba要望）＝「客数」→人数／「組数」→チーム数。
+          ['edit' => true, 'lbl' => '人数/チーム',
+            'read' => ($c['guests'] !== '' ? $c['guests'] . '名' : '') . ($c['teams'] !== '' ? ' ' . $c['teams'] . 'チーム' : ''), 'empty' => ($c['guests'] === '' && $c['teams'] === ''),
+            'inputs' => [['f' => 'guest_count', 'v' => $c['guests'], 't' => 'number', 'w' => 'num', 'ph' => '人数', 'suf' => '名'], ['f' => 'team_count', 'v' => $c['teams'], 't' => 'number', 'w' => 'num', 'ph' => 'チーム', 'suf' => 'チーム']]],
           ['edit' => true, 'lbl' => '運営',
             // ⚠ 「（IKUSA ◯名）」は読むだけ（直すのは案件登録から）。文言＝Headcount::ikusaNote が正本。
             'read' => ($c['need'] !== '' ? $c['need'] . '名' : '') . $c['needIkusaNote'],
@@ -461,12 +511,22 @@
           ['edit' => true, 'lbl' => '実績公開', 'sep' => ' ',
             'read' => implode(' ', $jisseki), 'empty' => ($c['logo'] === '' && $c['camera'] === '' && $c['article'] === '' && $c['video'] === ''),
             'inputs' => [['f' => 'pub_logo', 'v' => $c['logo'], 'ph' => 'ロゴ'], ['f' => 'pub_camera', 'v' => $c['camera'], 'ph' => 'カメ'], ['f' => 'pub_article', 'v' => $c['article'], 'ph' => '記事'], ['f' => 'pub_video', 'v' => $c['video'], 'ph' => '動画']]],
-          ['edit' => true, 'lbl' => '備考',
+          // 長い備考は枠の中でスクロールさせる（cls＝note-row・2026-09-28 baba要望）。
+          ['edit' => true, 'lbl' => '備考', 'cls' => 'note-row',
             'read' => $c['note'], 'empty' => ($c['note'] === ''),
             'inputs' => [['f' => 'note', 'v' => $c['note'], 'ph' => '備考', 'w' => 'wide']]],
         ];
-        // 担当内訳は自動計算（読み取りのみ）。
-        if ($c['roleDetail'] !== '') $rows[] = ['担当内訳', $c['roleDetail']];
+        // ⚠ 担当内訳は 2026-09-28 に外した（baba「必要ないです」）。計算そのものは残してある。
+
+        // 各行の「未入力」の段階を決める（赤＝必須／黄＝後で必要／灰＝任意）。
+        // ⚠ どの項目がどの段階かは App\Support\ProjectRequiredFields が正本＝ここには書かない。
+        //   1行に複数の欄があるときは、いちばん強い段階を採る。
+        foreach ($rows as $i => $r) {
+            if (! isset($r['edit'])) { continue; }
+            $rows[$i]['miss'] = ($r['empty'] ?? false)
+                ? \App\Support\ProjectRequiredFields::levelOfRow(array_column($r['inputs'], 'f'))
+                : '';
+        }
         $anyPrep = $c['lineSent'] || $c['handover'] || $c['script'];
       @endphp
       <div class="acard"
@@ -503,6 +563,19 @@
           <span class="val pe-read"><a href="/project-form?project={{ urlencode($c['id']) }}" title="案件の詳細・編集を開く" style="color:inherit;">{{ $c['content'] }}</a></span>
           <span class="val pe-edit"><input class="pe-in wide" type="text" value="{{ $c['projectName'] }}" placeholder="案件名" title="案件名（入れると保存）" onchange="ecsSheetSaveProject(this,'project_name',this.value)"></span>
         </div>
+
+        {{-- 顧客（2026-09-28 baba要望で「頭」へ移動）。案件名の次に来るのがいちばん探しやすいため。
+             ⚠ クライアントは案件登録では「黄（後で必要）」＝空なら黄色の「未入力」を出す。 --}}
+        @php $cliMiss = ($c['client'] === '' && $c['agency'] === '') ? \App\Support\ProjectRequiredFields::levelOfRow(['client']) : ''; @endphp
+        <div class="arow hl pe-row {{ $cliMiss !== '' ? 'miss-later' : '' }}">
+          <span class="lbl">顧客</span>
+          <span class="val pe-read">@if ($c['client'] !== '' || $c['agency'] !== ''){{ $c['client'] }}@if ($c['agency'] !== '')（{{ $c['agency'] }}）@endif @else<span class="unfilled later">未入力</span>@endif</span>
+          <span class="val pe-edit">
+            <input class="pe-in" type="text" value="{{ $c['client'] }}" placeholder="顧客" title="顧客（入れると保存）" onchange="ecsSheetSaveProject(this,'client',this.value)">
+            <span class="pe-sep">／</span>
+            <input class="pe-in" type="text" value="{{ $c['agency'] }}" placeholder="代理店" title="代理店（入れると保存）" onchange="ecsSheetSaveProject(this,'agency',this.value)">
+          </span>
+        </div>
         </div>{{-- /acard-sticky（ここまでが上に貼り付く部分） --}}
 
         {{-- 拠点まわり（全拠点運用・設計書19.2）：登録拠点／関わっている他拠点／自拠点にコピー。
@@ -526,9 +599,11 @@
         {{-- 値のある項目だけ（編集できる項目は編集モードで入力欄に切り替わる） --}}
         @foreach ($rows as $r)
           @if (isset($r['edit']))
-            <div class="arow pe-row {{ $r['empty'] ? 'pe-empty' : '' }}">
+            {{-- ⚠ 空でも隠さない（2026-09-28 baba要望）。埋め忘れに気づけるよう「未入力」を出す。
+                 miss-req／miss-later が付いた行はラベルにも色が付く。 --}}
+            <div class="arow pe-row {{ $r['cls'] ?? '' }} {{ $r['miss'] !== '' ? 'miss-' . ($r['miss'] === 'req' ? 'req' : 'later') : '' }}">
               <span class="lbl">{{ $r['lbl'] }}</span>
-              <span class="val pe-read">{{ $r['read'] !== '' ? $r['read'] : '—' }}</span>
+              <span class="val pe-read">@if ($r['read'] !== ''){{ $r['read'] }}@else<span class="unfilled {{ $r['miss'] === 'req' ? 'req' : ($r['miss'] === 'later' ? 'later' : '') }}">未入力</span>@endif</span>
               <span class="val pe-edit">
                 @foreach ($r['inputs'] as $ii => $in)
                   @if ($ii > 0 && ! empty($r['sep']))<span class="pe-sep">{{ $r['sep'] }}</span>@endif
@@ -560,12 +635,30 @@
           <div class="arow"><span class="lbl">運営シート</span><a class="val" href="{{ $c['opsSheet'] }}" target="_blank" rel="noopener">開く</a></div>
         @endif
 
-        {{-- メンバー --}}
+        {{-- メンバー＝現場のアサイン表と同じ「NO／名前／P／巡回／備考」の5列ブロック（2026-09-28 baba要望）。
+             行数は小型・中型＝15／大型＝30。空いている行も枠として出す＝あと何人入るかが一目で分かる。
+             ⚠ 行数の正本はサーバーの blockRows（ここに 15/30 と書かない）。
+             ⚠ 担当メモ（軍師/サポ等）は baba 指定で「巡回」の列にまとめて出す。
+             ⚠ 派遣も baba 指定でブロックの中に入れる＝NOを1つ使う（人ではないので名前欄に会社名を出す）。 --}}
         <div class="acard-members">
-          <div class="mhead"><span class="p">P</span><span>名前（割り当てメンバー）</span><span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span></div>
-          @forelse ($c['members'] as $m)
-            <div class="mrow" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
-              <span class="p">
+          <div class="mblk mblk-head">
+            <span class="c-no">NO</span><span class="c-nm">名前</span><span class="c-p">P</span>
+            <span class="c-jn">巡回</span><span class="c-rm">備考</span>
+            <span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span>
+          </div>
+          @php
+            $dsp = $c['dispatches'] ?? [];
+            $used = count($c['members']) + count($dsp);
+          @endphp
+          @foreach ($c['members'] as $mi => $m)
+            <div class="mrow mblk" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
+              <span class="c-no">{{ $mi + 1 }}</span>
+              <span class="c-nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
+                @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
+                @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
+                @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
+              </span>
+              <span class="c-p">
                 <span class="pos-badge {{ $m['roleCode'] === 'D' ? 'd' : ($m['pos'] === '—' ? 'none' : '') }}">{{ $m['pos'] }}</span>
                 <select class="m-edit m-role" title="役割（選ぶと保存）" onchange="ecsSheetSave(this,'role',this.value)">
                   <option value="">—</option>
@@ -574,27 +667,36 @@
                   @endforeach
                 </select>
               </span>
-              <span class="nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
-                @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
-                @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
-                @if ($m['note'] !== '' || $m['patrol'] !== null)<span class="m-tag">· {{ $m['note'] }}@if ($m['patrol'] !== null) 巡回{{ $m['patrol'] }}@endif</span>@endif
+              <span class="c-jn">
+                @if ($m['note'] !== '' || $m['patrol'] !== null)<span class="m-tag">{{ $m['note'] }}@if ($m['patrol'] !== null) {{ $m['note'] !== '' ? ' ' : '' }}巡{{ $m['patrol'] }}@endif</span>@endif
                 <input class="m-edit m-note" list="sheetNoteOpts" placeholder="担当" value="{{ $m['note'] }}" title="担当メモ（軍師/サポ等・入力で保存）" onchange="ecsSheetSave(this,'note',this.value)">
                 <input class="m-edit m-patrol" type="number" min="0" placeholder="巡" value="{{ $m['patrol'] ?? '' }}" title="巡回数（入力で保存）" onchange="ecsSheetSave(this,'patrol',this.value)">
+              </span>
+              <span class="c-rm">
                 {{-- この人ひとりへの備考（自由記述・2026-08-21 baba）。保存先は assignments.remark＝
                      日別ボード／ピックアップ／エントリー一覧の「備考（一言）」と同じ欄なので、どこで書いても同期する。 --}}
-                @if ($m['remark'] !== '')<span class="m-remark-tag">💬 {{ $m['remark'] }}</span>@endif
-                <input class="m-edit m-remark" type="text" placeholder="備考（自由に記入）" value="{{ $m['remark'] }}" title="この人への備考（入力すると保存されます）" onchange="ecsSheetSave(this,'remark',this.value)">
+                @if ($m['remark'] !== '')<span class="m-remark-tag">{{ $m['remark'] }}</span>@endif
+                <input class="m-edit m-remark" type="text" placeholder="備考" value="{{ $m['remark'] }}" title="この人への備考（入力すると保存されます）" onchange="ecsSheetSave(this,'remark',this.value)">
               </span>
-              @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
             </div>
-          @empty
-            @if (empty($c['dispatches']))
-              <div class="mempty">まだアサインされていません</div>
-            @endif
-          @endforelse
-          {{-- 派遣依頼（2026-09-16 baba要望）。人ではないのでメンバー行とは分けて下に出す。
-               見た目・中身の正本＝partials/dispatch_rows（4画面で同じ）。 --}}
-          @include('partials.dispatch_rows', ['dispatches' => $c['dispatches']])
+          @endforeach
+          @foreach ($dsp as $di => $d)
+            {{-- 派遣（会社への依頼）。⚠ 状況・色・説明文はサーバーで作ったものをそのまま使う
+                 （正本＝App\Support\DispatchRows。画面ごとに組み立て直すと言葉が食い違う）。 --}}
+            <div class="mrow mblk dsp {{ !empty($d['cancelled']) ? 'off' : '' }}" title="{{ $d['tip'] ?? '' }}">
+              <span class="c-no">{{ count($c['members']) + $di + 1 }}</span>
+              <span class="c-nm">{{ $d['agency'] }}<span class="emp">派遣{{ $d['count'] }}名</span></span>
+              <span class="c-p"><span class="pos-badge">{{ $d['role'] !== '' ? $d['role'] : '—' }}</span></span>
+              <span class="c-jn"><span class="ecs-dsp-st {{ $d['cls'] ?? 'asked' }}">{{ $d['status'] }}</span></span>
+              <span class="c-rm"></span>
+            </div>
+          @endforeach
+          @for ($n = $used; $n < $c['blockRows']; $n++)
+            <div class="mrow mblk vacant">
+              <span class="c-no">{{ $n + 1 }}</span><span class="c-nm"></span><span class="c-p"></span>
+              <span class="c-jn"></span><span class="c-rm"></span>
+            </div>
+          @endfor
         </div>
 
       </div>

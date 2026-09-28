@@ -14,6 +14,8 @@ use App\Support\Headcount;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
+use App\Support\ProjectScale;
+use App\Support\WorkSpan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -255,7 +257,12 @@ class AssignSheetController extends Controller
                 'catering'    => $this->clean($p->catering),
                 'transport'   => $this->clean($p->transport),
                 'note'        => $this->clean($p->note),
-                'roleDetail'  => $this->roleDetailText($p, $reqByContent),
+                // 集合〜解散の拘束時間（2026-09-28 baba要望）。読めない書き方なら空＝推測で埋めない。
+                // ⚠ 計算の正本＝App\Support\WorkSpan（画面で引き算しない）。
+                'span'        => WorkSpan::label($p->start_time, $p->end_time),
+                // メンバーのブロックの行数（2026-09-28 baba指定）。大型＝30行・それ以外＝15行。
+                // ⚠ 規模が空の案件は小型あつかい（＝15行）。正本＝App\Support\ProjectScale。
+                'blockRows'   => ProjectScale::of($p->scale) === '大型' ? 30 : 15,
                 'need_i'      => (int) ($p->required_count ?? 0),
                 // 運営人数のうちIKUSAが出す人数の添え書き（2026-09-18 baba要望）。
                 // ⚠ 文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。

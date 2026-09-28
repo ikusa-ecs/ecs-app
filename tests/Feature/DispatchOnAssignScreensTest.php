@@ -84,7 +84,15 @@ class DispatchOnAssignScreensTest extends TestCase
         $this->assertStringContainsString('dispatches:(c.dispatches||[])', $html, '詰め替え（これが無いと出ない）');
     }
 
-    /** アサイン表：メンバー欄の下に派遣会社と状況が出る。 */
+    /**
+     * アサイン表：派遣会社と状況が出る。
+     *
+     * ⚠ 2026-09-28 に置き場所が変わった（baba指定）＝メンバー欄の**下**ではなく、
+     *   「NO／名前／P／巡回／備考」ブロックの**中**に入り、NOを1つ使う。
+     *   そのため共通部品 partials/dispatch_rows は通らない。
+     *   ただし**状況の色だけは今までどおり共通**（.ecs-dsp-st が正本）＝画面ごとに色を作らない。
+     *   行の並びそのものは AssignSheetBlockTest で見張っている。
+     */
     public function test_assign_sheet_shows_agency_and_status(): void
     {
         $p = $this->projectWithDispatch();
@@ -94,7 +102,8 @@ class DispatchOnAssignScreensTest extends TestCase
 
         $this->assertStringContainsString(self::AGENCY, $html, '派遣会社名');
         $this->assertStringContainsString(DispatchStatus::ASKED, $html, '今の状況（依頼中）');
-        $this->assertStringContainsString('ecs-dsp-row', $html, '共通の見た目（partials/dispatch_rows）を通っている');
+        $this->assertStringContainsString('ecs-dsp-st', $html, '状況の色は共通のもの（.ecs-dsp-st）を使う');
+        $this->assertStringContainsString('mrow mblk dsp', $html, 'ブロックの中の行として出す');
     }
 
     /** 案件別アサイン：名簿から人を選ぶ画面にも、派遣で埋めたぶんを出す。 */
