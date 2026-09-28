@@ -32,6 +32,18 @@ class OfficeScopeBoardTest extends TestCase
         return Carbon::today()->addDays($plusDays)->format('Y-m-d');
     }
 
+    /**
+     * 「今月の中の日」。⚠ 月ごとに集計する画面（/projects-agg）のテストでは soon() を使わない。
+     *
+     * soon()＝今日+3日 は**月末3日間だけ翌月にはみ出す**ため、
+     * 今月ぶんしか数えない画面では 0件 と数えられ、テストが月末だけ落ちていた
+     * （2026-09-28 に実際に落ちた。製品の不具合ではなくテストの作りの問題）。
+     */
+    private function thisMonth(): string
+    {
+        return Carbon::today()->startOfMonth()->format('Y-m-d');
+    }
+
     /** 4画面すべて、一般社員には自拠点の案件だけが出る。 */
     public function test_board_screens_show_only_own_office_for_employee(): void
     {
@@ -203,10 +215,11 @@ class OfficeScopeBoardTest extends TestCase
         $osakaEmp = PersonFactory::new()->create(['office' => '大阪', 'name' => '大阪の社員']);
 
         // 東京の社員が「大阪の案件」でDを務めた＝他拠点への応援。これも数える。
-        $osakaProject = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->soon()]);
+        // ⚠ この画面は「今月ぶん」を数えるので、日付は必ず今月の中にする（thisMonth の説明を読むこと）。
+        $osakaProject = ProjectFactory::new()->create(['office' => '大阪', 'start_date' => $this->thisMonth()]);
         Assignment::create([
             'project_id' => $osakaProject->id, 'staff_id' => $tokyoEmp->id,
-            'date' => $this->soon(), 'role' => 'D', 'status' => '仮',
+            'date' => $this->thisMonth(), 'role' => 'D', 'status' => '仮',
         ]);
 
         $rows = collect(
