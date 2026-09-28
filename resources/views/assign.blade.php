@@ -658,7 +658,11 @@
         </select>
         <label class="chk"><input type="checkbox" id="mineOnly" onchange="render()"> 自分の担当のみ</label>
         <button class="btn" onclick="openWishlist()" style="margin-left:8px;">👥 スタッフ一覧（別ウィンドウ）</button>
+        <button class="btn" id="recruitBtn" onclick="toggleRecruit()" style="margin-left:8px;"
+                title="まだ人が足りない案件（スタッフに公開ずみ・募集中）を、LINEに1回で貼れる文章にまとめます">📣 再募集の文章</button>
       </div>
+      <!-- 再募集の文章（2026-09-28 baba要望）。中身はJSの recruitBoxHtml が作る。 -->
+      <div id="recruitBox"></div>
 
       <!-- 希望者の色の凡例 -->
       <div class="legend">
@@ -729,6 +733,9 @@
        ⚠ ここに数字を書かないこと。サーバーが案件・希望を集める範囲と食い違うと、
           「案件は出るのにその日の希望者が出ない」になる。 --}}
   window.ECS_BOARD_DAYS = @json($boardDays ?? 42);
+  {{-- 再募集の文章の見出しと締め（2026-09-28）。正本＝App\Support\RecruitAgainText。 --}}
+  window.ECS_RECRUIT_HEADER = @json($recruitHeader ?? '');
+  window.ECS_RECRUIT_FOOTER = @json($recruitFooter ?? '');
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -795,6 +802,8 @@
       //   サーバー側（AssignBoardController）に足しただけでは画面に出ない。
       lineIcon:c.lineIcon, lineName:c.lineName, lineText:c.lineText,
       lineMade:c.lineMade, lineSent:c.lineSent, lineDouble:c.lineDouble,
+      // 再募集の文章（1件ぶん・2026-09-28）。⚠ 詰め替えを忘れると「📣 再募集の文章」が空になる。
+      recruitText:c.recruitText || '',
       // ⚠ 応募者（エントリー）。ここで詰め替え忘れると「希望者」欄に誰も出ない
       //   （2026-08-21 baba指摘。/entries と /pickup では出るのにこの画面だけ出なかった）。
       //   ⚠ 2026-09-15 追記＝**emp（社員か）と mcMax（MCで入れる上限の規模）も必ず持ってくる**。
@@ -2624,6 +2633,78 @@
         if (btn && key === 'lineMade') btn.className = 'edit-btn linegrp-btn' + (c.lineMade ? ' done' : '');
         alert('チェックを保存できませんでした（' + e + '）。もう一度押してください。');
       });
+  }
+
+  // ===== 再募集の文章（2026-09-28 baba要望）=====
+  // まだ人が足りない案件を、スタッフ全体のLINEグループに1回で貼れる文章にまとめる。
+  // 対象＝スタッフに公開ずみ・募集中（🔒で締めていない）・スタッフ画面で「あと◯名」が出ている・今日以降。
+  //   未公開の案件はスタッフがエントリーできないので入れない（baba決定）。
+  //   「自分の担当のみ」にチェックがあれば、それにも合わせる。
+  // ⚠ 1件ぶんの文章はサーバーが作ったもの（c.recruitText）をそのまま使う。
+  //   ここでするのは「番号をふる」「あと◯名を足す」「見出しと締めでくるむ」だけ。
+  //   正本＝App\Support\RecruitAgainText。
+  // ⚠ 「あと◯名」はスタッフ画面と同じ数（remainForStaff＝確定の人だけ数える）。
+  let recruitOpen = false;
+
+  function recruitTargets(){
+    const mine = document.getElementById('mineOnly').checked;
+    const today = new Date(); today.setHours(0,0,0,0);
+    return cases
+      .filter(c => !mine || c.mine)
+      .filter(c => bPubOn(c) && bRecruit(c) && remainForStaff(c) > 0)
+      .filter(c => addDays(c.off) >= today)
+      .sort((a,b) => a.off - b.off);
+  }
+
+  function recruitMark(i){
+    const marks = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+    return i < marks.length ? marks[i] : '(' + (i + 1) + ')';
+  }
+
+  function recruitTextOf(list){
+    const parts = [];
+    if (window.ECS_RECRUIT_HEADER) parts.push(window.ECS_RECRUIT_HEADER);
+    list.forEach(function(c, i){
+      const body = c.recruitText || c.name || '';
+      parts.push(recruitMark(i) + ' ' + body + '\nあと' + remainForStaff(c) + '名');
+    });
+    if (window.ECS_RECRUIT_FOOTER) parts.push(window.ECS_RECRUIT_FOOTER);
+    return parts.join('\n\n');
+  }
+
+  function toggleRecruit(){
+    recruitOpen = !recruitOpen;
+    drawRecruit();
+  }
+
+  // 作るのは「開いたとき」と「作り直す」を押したときだけ。
+  // ⚠ 画面を描き直すたびに作り直すと、枠の中で直した文字が消えてしまうため。
+  function drawRecruit(){
+    const box = document.getElementById('recruitBox');
+    if (!box) return;
+    if (!recruitOpen) { box.innerHTML = ''; return; }
+
+    const list = recruitTargets();
+    const closeBtn = `<button class="line-close" onclick="toggleRecruit()" title="この枠を閉じます">✕ 閉じる</button>`;
+    if (list.length === 0) {
+      box.innerHTML = `<div class="line-box"><div class="lb-lead">
+          いま表示している期間に、<b>まだ人が足りない募集中の案件はありません</b>
+          （対象＝スタッフに公開ずみ・🔒で締めていない・今日以降）。${closeBtn}</div></div>`;
+      return;
+    }
+    const names = list.map(c => escHtml(c.name)).join('／');
+    box.innerHTML = `<div class="line-box">
+        <div class="lb-lead"><b>${list.length}件</b>の案件をまとめました（スタッフに公開ずみ・募集中・「あと◯名」はスタッフ画面と同じ数）。
+          <b>枠の中は直してからコピーできます</b>（直した内容は保存されません）。${closeBtn}<br>
+          <span class="lb-hint">対象：${names}</span></div>
+        <div class="lb-item">
+          <div class="lb-h">📣 再募集の文章
+            <button class="line-copy" onclick="copyLineBox(this,'recruit-text')">コピー</button>
+            <button class="line-close" onclick="drawRecruit()" title="アサインを動かしたあと、いまの人数で作り直します（枠の中で直した文字は消えます）">↻ いまの人数で作り直す</button>
+          </div>
+          <textarea id="recruit-text" rows="16" spellcheck="false">${escHtml(recruitTextOf(list))}</textarea>
+        </div>
+      </div>`;
   }
 
   function buildCard(c, dayCases, dupNames, amap){

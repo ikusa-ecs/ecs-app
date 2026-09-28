@@ -16,6 +16,7 @@ use App\Support\DispatchRows;
 use App\Support\EntryFeed;
 use App\Support\Headcount;
 use App\Support\LineGroupText;
+use App\Support\RecruitAgainText;
 use App\Support\Lodging;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
@@ -110,6 +111,9 @@ class AssignBoardController extends Controller
             // ⚠ 画面の絞り込みにも同じ日数を使う。画面に数字を書くと、ここと食い違って
             //   「案件は出るのに希望者が出ない」状態になる（2026-09-07）。
             'boardDays' => self::BOARD_DAYS,
+            // 「📣 再募集の文章」の見出しと締め（2026-09-28）。正本＝App\Support\RecruitAgainText。
+            'recruitHeader' => RecruitAgainText::HEADER,
+            'recruitFooter' => RecruitAgainText::footer(),
         ]);
     }
 
@@ -644,6 +648,9 @@ class AssignBoardController extends Controller
                 'lineIcon' => LineGroupText::icon($p, $contentMaster),
                 'lineName' => LineGroupText::groupName($p, $contentMaster),
                 'lineText' => LineGroupText::summary($p, $assigned, $contentMaster),
+                // 再募集の文章（1件ぶん・2026-09-28 baba要望）。番号と「あと◯名」は画面が付ける。
+                // ⚠ 正本＝App\Support\RecruitAgainText。画面のJSで組み立てない。
+                'recruitText' => RecruitAgainText::block($p, $contentMaster),
                 // 準備チェック（LINE作成／LINE概要送付／LINEダブチェ）。
                 // ⚠ 案件一覧と**同じ列**を見て、同じ入口（POST /projects/cells）へ保存する。
                 //   画面ごとに別の場所へ保存すると「片方は押されているのに片方は押されていない」になる。
