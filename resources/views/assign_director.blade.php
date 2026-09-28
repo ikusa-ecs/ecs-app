@@ -210,6 +210,12 @@
     /* 日付の横の件数バッジ（カーソルでその日の案件一覧） */
     .c-count { font-size: 10px; font-weight: 700; color: #fff; background: var(--brand-fill); border-radius: 999px; padding: 0 7px; cursor: default; }
     .c-count.has-undecided { background: var(--warn); }   /* D未定の案件がある日＝橙で注意 */
+    /* 「イベプラ待ち」＝アサイン表でD枠だけ立ててある案件の数（2026-09-28 baba要望）。
+       D未定のうち「先に決めたいもの」が分かるようにする。 */
+    .c-wait { font-size: 10px; font-weight: 700; margin-left: 3px; padding: 0 5px; border-radius: 999px;
+      background: var(--warn-soft); color: #b45309; cursor: default; }
+    .dt-wait { font-size: 10px; font-weight: 700; margin-left: 5px; padding: 0 5px; border-radius: 4px;
+      background: var(--warn-soft); color: #b45309; }
     /* 件数ふきだし */
     .day-tip {
       /* 件数バッジとの間に余白を入れない＝ふきだしの中の案件名リンクまでカーソルを動かせるようにする
@@ -661,6 +667,9 @@
       dirId:c.dirId || null, sdIds: Array.isArray(c.sdIds) ? c.sdIds.slice() : (c.sdId ? [c.sdId] : []),
       fcIds: Array.isArray(c.fcIds) ? c.fcIds.slice() : [],   // FC（複数可・この画面で増減）
       dayType:c.dayType, status:c.status,
+      // アサイン表で「D枠を作る（イベプラ）」を押した案件＝イベプラ待ち（2026-09-28）。
+      // ⚠ 詰め替えを忘れるとサーバーが渡していても画面に出ない（この画面で何度もやらかしている）。
+      plannerWait: !!c.plannerWait,
       guests:c.guests, teams:c.teams, repeat:c.repeat,
       evStart:c.evStart, evEnd:c.evEnd, meet:c.meet, leave:c.leave,
       date:c.date || null,
@@ -822,7 +831,9 @@
   function dayTip(dcs){
     const rows = dcs.map(c => {
       const t = timeOf(c);
-      const dTxt = c.dirId ? ('D: ' + empName(c.dirId)) : '<span style="color:#b45309">D未定</span>';
+      // ⚠ 「イベプラ待ち」＝アサイン表でD枠だけ立ててある案件。ここで先に決めてしまう（2026-09-28 baba要望）。
+      const wait = (!c.dirId && c.plannerWait) ? '<span class="dt-wait">🎬 イベプラ待ち</span>' : '';
+      const dTxt = c.dirId ? ('D: ' + empName(c.dirId)) : ('<span style="color:#b45309">D未定</span>' + wait);
       const sTxt = (c.sdIds || []).length ? ('｜SD: ' + c.sdIds.map(empName).join('・')) : '';
       const meta = [caseSub(c), t].filter(Boolean).join(' / ');
       // 案件名を押したら案件の詳細（編集画面）へ。見本データのときは飛べる先が無いのでそのまま（2026-08-21 baba）。
@@ -881,8 +892,11 @@
       const dcs = dayCases(key);
       const cnt = dcs.length;
       const undec = dcs.filter(c => !c.dirId).length;   // この日の「D未定」の数
+      // そのうち「イベプラ待ち」（アサイン表でD枠だけ立てた案件）の数＝先に決めるべきもの（2026-09-28）。
+      const waiting = dcs.filter(c => !c.dirId && c.plannerWait).length;
+      const waitHtml = waiting ? `<span class="c-wait" title="アサイン表でD枠だけ立ててある案件（先に決めたいもの）">🎬${waiting}</span>` : '';
       const countHtml = cnt
-        ? `<span class="c-count ${undec ? 'has-undecided' : ''}">${cnt}件${undec ? '（' + undec + '）' : ''}</span>${dayTip(dcs)}`
+        ? `<span class="c-count ${undec ? 'has-undecided' : ''}">${cnt}件${undec ? '（' + undec + '）' : ''}</span>${waitHtml}${dayTip(dcs)}`
         : '';
       // 当月外の日は「10/1」のように月から出す（数字だけだと何月か分からない）。
       const dLabel = inMonth ? d.getDate() : ((d.getMonth() + 1) + '/' + d.getDate());

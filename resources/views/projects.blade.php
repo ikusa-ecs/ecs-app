@@ -88,6 +88,9 @@
     .tag-mini.multi { background: var(--brand-soft);  color: var(--brand-dark); }
     .tag-mini.yobi  { background: var(--warn-soft);   color: #b45309; }
     .tag-mini.reha  { background: #ece3d4;            color: #7a6a58; }
+    /* 区分の札（2026-09-28 baba要望）。本番は数が多いので、いちばん目立たない灰色にする。 */
+    .tag-mini.setup { background: #e6eef7;            color: #40587a; }
+    .tag-mini.honban{ background: #f1ece4;            color: #a8998a; }
     .tag-mini.stay  { background: #e8833a;            color: #fff; }
     .tag-mini.draft { background: #6b5544;            color: #fff; }
     .tag-mini.repeat{ background: var(--brand-fill);       color: #fff; }  /* リピート（常連）クライアント */
@@ -445,6 +448,8 @@
     html[data-theme="dark"] .tag-mini.add    { color: var(--danger-ink); }
     html[data-theme="dark"] .tag-mini.yobi   { color: var(--warn-ink); }
     html[data-theme="dark"] .tag-mini.reha   { background: var(--chip-bg); color: var(--chip-ink); }
+    html[data-theme="dark"] .tag-mini.setup  { background: var(--accent-soft, var(--chip-bg)); color: var(--ink); }
+    html[data-theme="dark"] .tag-mini.honban { background: var(--chip-bg); color: var(--muted); }
     html[data-theme="dark"] .tag-mini.repeat { color: #ffffff; }
     /* 実施形態のバッジ */
     html[data-theme="dark"] .fbadge.fmt-real   { background: var(--ok-soft); color: var(--ok-ink); }
@@ -526,6 +531,8 @@
     /* 確度（ヨミ）Cと小タグ＝意味の薄い茶バッジは灰へ */
     html[data-theme="orange"] .ymk.c { background: #f3f4f6; color: #4b5563; }
     html[data-theme="orange"] .tag-mini.reha { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .tag-mini.setup { background: #f3f4f6; color: #4b5563; }
+    html[data-theme="orange"] .tag-mini.honban { background: #f3f4f6; color: #9ca3af; }
 
     /* 実施形態バッジ＝面はグレーにそろえ、意味は文字色で出す（淡い面＋中間色の文字は白地で読みにくい）。
        ⚠ キャンセル（赤）はそのまま＝注意の色を弱めない。 */
@@ -918,7 +925,8 @@
   projects.forEach((p, i) => { p._i = i; });   // 編集・展開用に番号を保持
   // 規模(scale)・SD(sd) は共通データ（data/cases.js）側で持っているのでここでは設定しない。
 
-  const kbnClass    = { '予備日':'yobi', 'リハ':'reha' };
+  // 区分の札の色。⚠ キーは kbnKey() が返す言葉（日程種別そのものではない）。
+  const kbnClass    = { '予備日':'yobi', 'リハ':'reha', '前日設営':'setup', '本番':'honban' };
   const yomiMark    = { 'Aヨミ':{ t:'A', c:'a' }, 'Bヨミ':{ t:'B', c:'b' }, 'Cヨミ':{ t:'C', c:'c' } };
   const statusBadge = { '未着手':'amber', '調整中':'blue', '確定':'green' };
   const rsClass     = { '募集中':'open', '締切':'closed', '募集前':'pre', '下書き':'draft', '未公開':'unpub' };
@@ -996,7 +1004,16 @@
     if (sel === '他拠点')    return fmt.indexOf('他拠点') !== -1;
     return true;
   }
-  function kbnKey(dayType) { return dayType === '予備日' ? '予備日' : (dayType.indexOf('リハ') !== -1 ? 'リハ' : '本番'); }
+  // 日程種別のまとめ方（区分の絞り込みと、案件名の横の札で使う）。
+  // ⚠ 2026-09-28、「前日設営」が抜けていて**本番あつかいになっていた**（札も出ていなかった）。
+  //   baba「案件一覧で予備日か本番かわからない」。本番以外は必ず札を出す。
+  function kbnKey(dayType) {
+    const t = String(dayType || '本番');
+    if (t === '予備日') return '予備日';
+    if (t.indexOf('リハ') !== -1) return 'リハ';
+    if (t.indexOf('設営') !== -1) return '前日設営';
+    return '本番';
+  }
 
   // 実施形態 → 色分けクラス。
   // ⚠ 判定はサーバーが済ませて p.fmtCls で渡している（正本＝App\Support\ProjectFormats::badgeCode）。
@@ -1248,7 +1265,9 @@
       // 案件名の横タグ（下書き・予備日/リハ・複数案件）
       let tags = '';
       if (p.draft)       tags += '<span class="tag-mini draft">下書き</span>';
-      if (kk !== '本番') tags += `<span class="tag-mini ${kbnClass[p.dayType] || 'reha'}">${kk}</span>`;
+      // ⚠ 2026-09-28 baba要望「予備日か本番かわからない」＝**本番にも札を出す**ようにした
+      //   （札が無い＝本番、という読み方は分かりにくかった）。本番は目立たない灰色にしてある。
+      tags += `<span class="tag-mini ${kbnClass[kk] || 'reha'}">${kk}</span>`;
       if (p.multi)       tags += '<span class="tag-mini multi">複数</span>';
 
       // 備考があれば📝マーク（一覧でひと目で気づけるように）

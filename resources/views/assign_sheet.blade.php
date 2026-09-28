@@ -116,6 +116,20 @@
   /* 派遣の行（ブロックの中・2026-09-28 baba指定）。状況の色は .ecs-dsp-st が正本。 */
   .mrow.mblk.dsp .c-nm { color: var(--accent2-ink); font-weight: 700; }
   .mrow.mblk.dsp.off { opacity: .55; text-decoration: line-through; }
+  /* まだ人が決まっていない枠（2026-09-28）。書いてあるものは薄い青で「予定」だと分かるようにする。 */
+  .mrow.mblk.slot:not(.vacant) { background: #f7fbff; }
+  .mrow.mblk.slot .pos-badge.slot-pos { background: #e3edf8; color: #4a6484; }
+  .slot-mark { font-size: 9.5px; font-weight: 800; padding: 0 5px; border-radius: 4px;
+    background: var(--warn-soft); color: #b45309; }
+  /* 編集モードでないときは入力欄を出さない（他の行と同じ）。 */
+  .mrow.mblk .m-addname { display: none; width: 100%; font-size: 10px; padding: 1px 2px;
+    border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
+  .acard.editing .mrow.mblk .m-addname { display: block; }
+  .mblk-foot { display: none; padding: 3px 6px; border-top: 1px solid var(--line); }
+  .acard.editing .mblk-foot { display: block; }
+  .dslot-btn { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px;
+    border: 1px solid var(--warn-line); background: var(--warn-soft); color: #b45309; cursor: pointer;
+    font-family: inherit; }
   .acard-members { margin-top: 4px; }
   .acard-members .mhead { display: flex; font-size: 10px; font-weight: 800; color: #a89680;
     background: #f6f1ea; padding: 3px 9px; }
@@ -646,13 +660,12 @@
             <span class="c-jn">巡回</span><span class="c-rm">備考</span>
             <span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span>
           </div>
-          @php
-            $dsp = $c['dispatches'] ?? [];
-            $used = count($c['members']) + count($dsp);
-          @endphp
-          @foreach ($c['members'] as $mi => $m)
+          @php $used = count($c['blockLines']); @endphp
+          @foreach ($c['blockLines'] as $line)
+          @if ($line['kind'] === 'member')
+            @php $m = $line['m']; @endphp
             <div class="mrow mblk" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
-              <span class="c-no">{{ $mi + 1 }}</span>
+              <span class="c-no">{{ $line['no'] }}</span>
               <span class="c-nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
                 @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
                 @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
@@ -679,24 +692,37 @@
                 <input class="m-edit m-remark" type="text" placeholder="備考" value="{{ $m['remark'] }}" title="この人への備考（入力すると保存されます）" onchange="ecsSheetSave(this,'remark',this.value)">
               </span>
             </div>
-          @endforeach
-          @foreach ($dsp as $di => $d)
+          @elseif ($line['kind'] === 'dispatch')
+            @php $d = $line['d']; @endphp
             {{-- 派遣（会社への依頼）。⚠ 状況・色・説明文はサーバーで作ったものをそのまま使う
                  （正本＝App\Support\DispatchRows。画面ごとに組み立て直すと言葉が食い違う）。 --}}
             <div class="mrow mblk dsp {{ !empty($d['cancelled']) ? 'off' : '' }}" title="{{ $d['tip'] ?? '' }}">
-              <span class="c-no">{{ count($c['members']) + $di + 1 }}</span>
+              <span class="c-no">{{ $line['no'] }}</span>
               <span class="c-nm">{{ $d['agency'] }}<span class="emp">派遣{{ $d['count'] }}名</span></span>
               <span class="c-p"><span class="pos-badge">{{ $d['role'] !== '' ? $d['role'] : '—' }}</span></span>
               <span class="c-jn"><span class="ecs-dsp-st {{ $d['cls'] ?? 'asked' }}">{{ $d['status'] }}</span></span>
               <span class="c-rm"></span>
             </div>
+          @else
+            @php $s = $line['s']; @endphp
+            {{-- まだ人が決まっていない枠（2026-09-28 baba要望）。
+                 「ここはOP」「IKUSAマスト」「派遣でOK」を、人を決める前に書いておく場所。
+                 ⚠ 人を入れるのは名前の欄から（保存先は assignments＝今までどおり）。 --}}
+            @include('partials.sheet_slot_row', ['c' => $c, 'no' => $line['no'], 's' => $s])
+          @endif
           @endforeach
+          {{-- 空いている行。編集モードでは、ここに書くと新しい枠になる。 --}}
           @for ($n = $used; $n < $c['blockRows']; $n++)
-            <div class="mrow mblk vacant">
-              <span class="c-no">{{ $n + 1 }}</span><span class="c-nm"></span><span class="c-p"></span>
-              <span class="c-jn"></span><span class="c-rm"></span>
-            </div>
+            @include('partials.sheet_slot_row', ['c' => $c, 'no' => $n + 1, 's' => null])
           @endfor
+          @if ($c['dUndecided'])
+            {{-- Dは必ず要るので、決まっていない案件では枠だけ先に立てられるようにする（2026-09-28 baba要望）。
+                 押すと「D／イベプラ（未定）」の枠ができ、あとでD決めの画面から人を入れる。 --}}
+            <div class="mblk-foot m-edit">
+              <button type="button" class="dslot-btn" onclick="ecsSheetAddDirectorSlot(this)"
+                      title="Dの枠を作ります。人はまだ決めません（D決めの画面で決めます）">🎬 D枠を作る（イベプラ）</button>
+            </div>
+          @endif
         </div>
 
       </div>
@@ -746,6 +772,80 @@
       .then(function (r) { return r.json(); })
       .then(function (res) { if (!(res && res.ok)) alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); })
       .catch(function () { alert('通信エラーで保存できませんでした。'); });
+  }
+
+  // まだ人が決まっていない「枠」を保存する（2026-09-28 baba要望）。
+  // ⚠ はじめて書いたときはサーバー側で枠が作られる。返ってきたIDを行に覚えさせて、
+  //   2回目からは同じ枠を直す（覚えないと、1マスごとに別の枠ができてしまう）。
+  // ⚠ 全部空にすると枠ごと消える（サーバー側）。そのときはIDも消す。
+  function ecsSheetSaveSlot(inp, field, value) {
+    var row = inp.closest('.mrow');
+    if (!row) return;
+    fetch('/assign-sheet/slot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({
+        project_id: row.getAttribute('data-project'),
+        slot_id: row.getAttribute('data-slot') || null,
+        field: field,
+        value: value
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!(res && res.ok)) { alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; }
+        row.setAttribute('data-slot', res.slot_id || '');
+      })
+      .catch(function () { alert('通信エラーで保存できませんでした。'); });
+  }
+
+  // 空いている行の「＋社員」から社員を入れる（2026-09-28 baba要望）。
+  // ⚠ 保存先は今までどおり assignments（/entries/assign）＝誰がアサインされているかの正本は1つ。
+  // ⚠ 入れると行の並びが変わる（ポジション順に並べ直す）ので、保存できたら画面を開き直す。
+  function ecsSheetAddMember(sel) {
+    var row = sel.closest('.mrow');
+    var id = sel.value;
+    if (!row || !id) return;
+    sel.disabled = true;
+    fetch(window.ECS_QUICK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({
+        project_id: row.getAttribute('data-project'),
+        staff_id: id,
+        action: 'assign',
+        status: '仮'
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!(res && res.ok)) {
+          sel.disabled = false; sel.value = '';
+          alert('入れられませんでした。' + (res && res.message ? '\n' + res.message : ''));
+          return;
+        }
+        location.reload();
+      })
+      .catch(function () { sel.disabled = false; sel.value = ''; alert('通信エラーで入れられませんでした。'); });
+  }
+
+  // 「D枠を作る（イベプラ）」＝Dの枠だけ先に立てる。人はD決めの画面で決める。
+  function ecsSheetAddDirectorSlot(btn) {
+    var card = btn.closest('.acard');
+    var pid = card && card.getAttribute('data-project');
+    if (!pid) return;
+    btn.disabled = true;
+    fetch('/assign-sheet/director-slot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: pid })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!(res && res.ok)) { btn.disabled = false; alert('作れませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
+        location.reload();
+      })
+      .catch(function () { btn.disabled = false; alert('通信エラーで作れませんでした。'); });
   }
 
   // 案件の各項目（時間・人数・文字・はい/いいえ）を projects に保存する（送ったキーだけ更新）。

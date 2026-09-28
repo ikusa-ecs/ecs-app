@@ -8,6 +8,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\AssignSlots;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
 use App\Support\Departments;
@@ -87,6 +88,9 @@ class AssignDirectorController extends Controller
             ->groupBy('project_id')
             ->map(fn ($rows) => $rows->pluck('staff_id')->unique()->values()->all());
 
+        // アサイン表で立てた「D枠（イベプラ待ち）」を読む（2026-09-28）。1回だけ読む。
+        $slotsByProject = AssignSlots::forProjects($projectIds);
+
         // 拠点で絞っても「すでにD/SD/FCに入っている他拠点の社員」は残す。
         // 理由：保存は「いま画面に出ている人で上書き」なので、候補から消えると保存時に担当が外れてしまう。
         $keepIds = $dirByProject
@@ -132,7 +136,7 @@ class AssignDirectorController extends Controller
 
         // カレンダーに並べる案件（上で拠点・状態を絞り込んだもの）を画面用の形に詰め替える。
         $cases = $projects
-            ->map(function (Project $p) use ($today, $dirByProject, $fcByProject, $contentNames) {
+            ->map(function (Project $p) use ($today, $dirByProject, $fcByProject, $contentNames, $slotsByProject) {
                 $start = $p->start_date;
                 $off = $start ? (int) $today->diffInDays($start, false) : 0;
 
@@ -163,6 +167,10 @@ class AssignDirectorController extends Controller
                     'fcIds' => $fcByProject->get($p->id, []),  // FC の社員ID（複数可）
                     'dStatus' => $decided['D']['status'] ?? null,
                     'sStatus' => $decided['sdStatus'] ?? null,
+                    // アサイン表で「D枠を作る（イベプラ）」を押した案件＝**イベプラ待ち**（2026-09-28 baba要望）。
+                    // ⚠ ねらい＝Dがまだ決まっていない案件のうち、「決めると先方に約束した案件」を
+                    //   この画面で先に片づけられるようにする。判定の正本＝App\Support\AssignSlots。
+                    'plannerWait' => AssignSlots::waitingForPlanner($slotsByProject[$p->id] ?? []),
                     'dayType' => $p->date_type ?? '本番',
                     'status' => $p->status ?? '',
                     'guests' => $p->guest_count,

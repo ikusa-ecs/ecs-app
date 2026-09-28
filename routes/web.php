@@ -262,6 +262,11 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/assign-sheet', [AssignSheetController::class, 'index']);
     // アサイン表から案件の時間・人数・備考を直接保存（公開ボードの時間保存と同じ「選ぶ/入れると保存」方式）。
     Route::post('/assign-sheet/project', [AssignSheetController::class, 'updateProject']);
+    // まだ人が決まっていない「枠」（ここはOP／IKUSAマスト／派遣でOK）を足す・直す・消す（2026-09-28 baba要望）。
+    // ⚠ 人を入れるのは今までどおり /entries/assign（誰がアサインされているかの正本は assignments ひとつ）。
+    Route::post('/assign-sheet/slot', [AssignSheetController::class, 'saveSlot']);
+    // 「D枠を作る（イベプラ未定）」＝Dが決まっていない案件に、役割Dの枠だけ先に立てる。
+    Route::post('/assign-sheet/director-slot', [AssignSheetController::class, 'addDirectorSlot']);
     // 他拠点の案件を自拠点にコピー（ヘルプ/巻き取り）／解除。アサイン担当＝管理者以上のみ（全拠点運用・設計書19.2）。
     Route::post('/assign-sheet/share', [AssignSheetController::class, 'shareToOffice'])->middleware('tier:manager');
     Route::post('/assign-sheet/share/remove', [AssignSheetController::class, 'removeShare'])->middleware('tier:manager');

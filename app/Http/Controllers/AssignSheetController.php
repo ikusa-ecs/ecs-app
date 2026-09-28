@@ -8,7 +8,9 @@ use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectShare;
+use App\Models\ProjectSlot;
 use App\Support\AssignmentRole;
+use App\Support\AssignSlots;
 use App\Support\DispatchRows;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
@@ -128,6 +130,8 @@ class AssignSheetController extends Controller
         // ⚠ 名簿（people）には入らない人たちなので、assignments からは絶対に出てこない。
         //   読み方と見せ方の正本＝App\Support\DispatchRows。
         $dispatchesByProject = DispatchRows::forProjects($projectIds);
+        // まだ人が決まっていない枠（2026-09-28）。ここで1回だけ読む（案件の数だけ問い合わせない）。
+        $slotsByProject = AssignSlots::forProjects($projectIds);
 
         // この月の案件の「拠点間共有」（ヘルプ/巻き取り）をまとめて引く。案件ごとにまとめる。
         $sharesByProject = $projectIds->isEmpty()
@@ -150,7 +154,7 @@ class AssignSheetController extends Controller
                 ->get(['content_id', 'scale', 'position', 'count', 'note', 'patrol'])
                 ->groupBy('content_id');
 
-        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $dispatchesByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
+        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $dispatchesByProject, $slotsByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。
             $members = ($membersByProject->get($p->id) ?? collect())
                 ->map(function ($a) use ($people) {
@@ -271,6 +275,15 @@ class AssignSheetController extends Controller
                 'members'     => $members->all(),
                 // 派遣（2026-09-16）。メンバーとは別の行で出す＝人ではなく「会社への依頼」だから。
                 'dispatches'  => $dispatchesByProject[$p->id] ?? [],
+                // ブロックに並べる行（アサイン済み・派遣・空き枠をポジション順に並べてNOを振ったもの）。
+                // ⚠ 並べ方の正本＝App\Support\AssignSlots::rows（画面で並べ直さない）。
+                'blockLines'  => AssignSlots::rows(
+                    $members->all(),
+                    $dispatchesByProject[$p->id] ?? [],
+                    $slotsByProject[$p->id] ?? []
+                ),
+                // Dがまだ決まっていない（人がアサインされていない）＝「D枠を作る」ボタンを出す。
+                'dUndecided'  => AssignSlots::directorUndecided($members->all()),
             ];
         })->values();
 
@@ -290,6 +303,15 @@ class AssignSheetController extends Controller
             'selectedMonth' => $selectedMonth,
             'roleOptions'   => AssignmentRole::positionLabels(),
             'noteOptions'   => $noteOptions,
+            // 「名前」の欄から入れられる社員（2026-09-28 baba要望）。
+            // ⚠ 社員だけ。スタッフは日別ボード・案件別アサインから入れる（希望や上限を見ながら決める場所なので）。
+            // ⚠ 名簿から選ばせる＝自由入力にすると出勤数・重複チェックにつながらない。
+            // ⚠ 退職した人は出さない（列は `active`。日別ボードの rosterPeople と同じ決まり）。
+            'employees'     => OfficeScope::applyToPeople(
+                Person::where('role', 'employee')->where('active', true),
+                $officeScope
+            )->byKana()->get(['id', 'name'])
+                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->all(),
             // 拠点バッジは「全拠点」表示のときだけ出す（単体拠点なら自明なので出さない・baba 2026-07-29）。
             'showOfficeBadge' => $officeScope === null,
         ]);
@@ -364,6 +386,111 @@ class AssignSheetController extends Controller
         $project->save();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * まだ人が決まっていない「枠」を足す・直す・消す（2026-09-28 baba要望）。
+     *
+     * 現場のアサイン表では、人を決める前に「ここはOP」「IKUSAマスト」「派遣でOK」と
+     * 枠だけ先に書いている。それをこの画面でもできるようにする入口。
+     *
+     * ⚠ ここに staff_id は来ない。人を入れるのは今までどおり /entries/assign（assignments が正本）。
+     * ⚠ 全部空にしたら枠ごと消す＝空っぽの行が残り続けないように。
+     */
+    public function saveSlot(Request $request)
+    {
+        $data = $request->validate([
+            'project_id' => ['required', 'string'],
+            'slot_id' => ['nullable', 'integer'],         // 既にある枠を直すとき
+            'field' => ['required', 'string', 'in:role,note,patrol,remark,placeholder'],
+            'value' => ['nullable', 'string'],
+        ]);
+
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        // 拠点チェック（保存の入口で必ず通す）＝他拠点の案件をURL直打ちで書き換えられないようにする。
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+
+        $field = $data['field'];
+        $value = trim((string) ($data['value'] ?? ''));
+
+        // 役割と印は、決まった言葉しか受け付けない（画面から自由な文字が入らないように）。
+        if ($field === 'role' && $value !== '' && ! AssignmentRole::isValid($value)) {
+            return response()->json(['ok' => false, 'message' => '知らないポジションです。'], 422);
+        }
+        if ($field === 'placeholder' && $value !== '' && ! AssignSlots::isPlaceholder($value)) {
+            return response()->json(['ok' => false, 'message' => '知らない印です。'], 422);
+        }
+
+        // ⚠ 送られてこないキーは validate の結果に入らない（?? null が要る）。
+        $slotId = $data['slot_id'] ?? null;
+        $slot = $slotId
+            ? ProjectSlot::where('project_id', $project->id)->find($slotId)
+            : null;
+
+        if (! $slot) {
+            if ($value === '') {
+                return response()->json(['ok' => true, 'slot_id' => null]);   // 空のまま何も作らない
+            }
+            $slot = new ProjectSlot([
+                'project_id' => $project->id,
+                // 並び順＝いまある枠の次。⚠ 画面のNOではない（NOは並べ直して振る）。
+                'no' => (int) ProjectSlot::where('project_id', $project->id)->max('no') + 1,
+                'created_by' => Auth::id(),
+            ]);
+        }
+
+        $slot->{$field} = $field === 'patrol'
+            ? ($value === '' ? null : (int) $value)
+            : ($value === '' ? null : $value);
+        $slot->save();
+
+        // 中身が全部空になったら枠ごと消す（空っぽの行が残らないように）。
+        $empty = ($slot->role ?? '') === '' && ($slot->note ?? '') === ''
+            && $slot->patrol === null && ($slot->remark ?? '') === ''
+            && ($slot->placeholder ?? '') === '';
+        if ($empty) {
+            $slot->delete();
+
+            return response()->json(['ok' => true, 'slot_id' => null]);
+        }
+
+        return response()->json(['ok' => true, 'slot_id' => $slot->id]);
+    }
+
+    /**
+     * 「D枠を作る（イベプラ未定）」（2026-09-28 baba要望）。
+     *
+     * Dは必ず要るので、まだ決まっていない案件では**枠だけ先に立てて**おき、
+     * あとで D決めの画面から人を入れる。押すと役割Dの枠を1つ作り、「イベプラ」の印を付ける。
+     * ⚠ すでにD枠があるときは作らない（二重に並ばないように）。
+     */
+    public function addDirectorSlot(Request $request)
+    {
+        $data = $request->validate(['project_id' => ['required', 'string']]);
+
+        $project = Project::find($data['project_id']);
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+
+        $slot = ProjectSlot::firstOrCreate(
+            ['project_id' => $project->id, 'role' => 'D'],
+            [
+                'no' => (int) ProjectSlot::where('project_id', $project->id)->max('no') + 1,
+                'placeholder' => AssignSlots::EVENT_PLANNER,
+                'created_by' => Auth::id(),
+            ]
+        );
+
+        return response()->json(['ok' => true, 'slot_id' => $slot->id]);
     }
 
     /**
