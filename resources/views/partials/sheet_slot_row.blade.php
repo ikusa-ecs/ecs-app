@@ -19,8 +19,11 @@
   $sRemark = $s['remark'] ?? '';
   $sMark = $s['placeholder'] ?? '';
   $blank = ($sRole === '' && $sNote === '' && $sPatrol === null && $sRemark === '' && $sMark === '');
+  // 運営人数が入っている案件で、その人数までの行に名前が無い＝まだ埋まっていない（2026-09-28 baba要望）。
+  // 名前の欄を黄色くして気づけるようにする。⚠ 「6〜8」のように幅があるときは多いほう（need_i）まで。
+  $needEmpty = ($c['need_i'] ?? 0) > 0 && $no <= ($c['need_i'] ?? 0);
 @endphp
-<div class="mrow mblk slot {{ $blank ? 'vacant' : '' }}"
+<div class="mrow mblk slot {{ $blank ? 'vacant' : '' }} {{ $needEmpty ? 'need-empty' : '' }}"
      data-project="{{ $c['id'] }}" data-slot="{{ $slotId }}">
   <span class="c-no">{{ $no }}</span>
   <span class="c-nm">

@@ -119,6 +119,9 @@
   /* まだ人が決まっていない枠（2026-09-28）。書いてあるものは薄い青で「予定」だと分かるようにする。 */
   .mrow.mblk.slot:not(.vacant) { background: #f7fbff; }
   .mrow.mblk.slot .pos-badge.slot-pos { background: #e3edf8; color: #4a6484; }
+  /* 運営人数までの行で、まだ名前が入っていない＝黄色（2026-09-28 baba要望）。判定は partials/sheet_slot_row。 */
+  .mrow.mblk.slot.need-empty .c-nm { background: #fff1b8; }
+  html[data-theme="dark"] .mrow.mblk.slot.need-empty .c-nm { background: var(--warn-soft); }
   .slot-mark { font-size: 9.5px; font-weight: 800; padding: 0 5px; border-radius: 4px;
     background: var(--warn-soft); color: #b45309; }
   /* 編集モードでないときは入力欄を出さない（他の行と同じ）。 */
@@ -378,6 +381,7 @@
 @section('content')
 
 @include('partials.office_switch')
+@include('partials.rich_note')
 
 <style>
   /* 拠点まわり（全拠点運用・設計書19.2）のバッジ・コピー操作 */
@@ -526,9 +530,10 @@
             'read' => implode(' ', $jisseki), 'empty' => ($c['logo'] === '' && $c['camera'] === '' && $c['article'] === '' && $c['video'] === ''),
             'inputs' => [['f' => 'pub_logo', 'v' => $c['logo'], 'ph' => 'ロゴ'], ['f' => 'pub_camera', 'v' => $c['camera'], 'ph' => 'カメ'], ['f' => 'pub_article', 'v' => $c['article'], 'ph' => '記事'], ['f' => 'pub_video', 'v' => $c['video'], 'ph' => '動画']]],
           // 長い備考は枠の中でスクロールさせる（cls＝note-row・2026-09-28 baba要望）。
+          // 赤・太字の印（[赤]…[/赤]／**…**）を色で出す（2026-09-28 baba要望）。正本＝App\Support\RichNote。
           ['edit' => true, 'lbl' => '備考', 'cls' => 'note-row',
-            'read' => $c['note'], 'empty' => ($c['note'] === ''),
-            'inputs' => [['f' => 'note', 'v' => $c['note'], 'ph' => '備考', 'w' => 'wide']]],
+            'read' => $c['note'], 'html' => \App\Support\RichNote::html($c['note']), 'empty' => ($c['note'] === ''),
+            'inputs' => [['f' => 'note', 'v' => $c['note'], 'ph' => '備考', 'w' => 'wide', 't' => 'textarea']]],
         ];
         // ⚠ 担当内訳は 2026-09-28 に外した（baba「必要ないです」）。計算そのものは残してある。
 
@@ -617,11 +622,21 @@
                  miss-req／miss-later が付いた行はラベルにも色が付く。 --}}
             <div class="arow pe-row {{ $r['cls'] ?? '' }} {{ $r['miss'] !== '' ? 'miss-' . ($r['miss'] === 'req' ? 'req' : 'later') : '' }}">
               <span class="lbl">{{ $r['lbl'] }}</span>
-              <span class="val pe-read">@if ($r['read'] !== ''){{ $r['read'] }}@else<span class="unfilled {{ $r['miss'] === 'req' ? 'req' : ($r['miss'] === 'later' ? 'later' : '') }}">未入力</span>@endif</span>
+              <span class="val pe-read">@if ($r['read'] !== '')@if (isset($r['html'])){!! $r['html'] !!}@else{{ $r['read'] }}@endif @else<span class="unfilled {{ $r['miss'] === 'req' ? 'req' : ($r['miss'] === 'later' ? 'later' : '') }}">未入力</span>@endif</span>
               <span class="val pe-edit">
                 @foreach ($r['inputs'] as $ii => $in)
                   @if ($ii > 0 && ! empty($r['sep']))<span class="pe-sep">{{ $r['sep'] }}</span>@endif
-                  @if (($in['t'] ?? 'text') === 'select')
+                  @if (($in['t'] ?? 'text') === 'textarea')
+                    {{-- 備考＝複数行。上のボタンで選んだ文字を赤・太字の印で挟む（正本＝partials/rich_note）。 --}}
+                    <span class="rn-wrap" style="display:block; width:100%;">
+                      <span class="rn-tools">
+                        <button type="button" onclick="ecsRichWrap(this,'b')" title="選んだ文字を太字にします">B</button>
+                        <button type="button" class="red" onclick="ecsRichWrap(this,'red')" title="選んだ文字を赤にします">赤</button>
+                        <button type="button" onclick="ecsRichWrap(this,'clear')" title="選んだ文字の赤・太字の印を消します">印を消す</button>
+                      </span>
+                      <textarea class="pe-in {{ $in['w'] ?? '' }}" rows="3" placeholder="{{ $in['ph'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（枠の外を押すと保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)" style="width:100%; box-sizing:border-box; resize:vertical; font-family:inherit;">{{ $in['v'] }}</textarea>
+                    </span>
+                  @elseif (($in['t'] ?? 'text') === 'select')
                     <select class="pe-in {{ $in['w'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（選ぶと保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)">
                       @foreach ($in['opts'] as $ov => $ol)
                         <option value="{{ $ov }}" {{ (string) $in['v'] === (string) $ov ? 'selected' : '' }}>{{ $ol }}</option>
@@ -859,7 +874,15 @@
       body: JSON.stringify({ project_id: pid, field: field, value: value })
     })
       .then(function (r) { return r.json(); })
-      .then(function (res) { if (!(res && res.ok)) alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); })
+      .then(function (res) {
+        if (!(res && res.ok)) { alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; }
+        // 備考は、ふつうの表示も赤・太字つきで書き直す（開き直さなくても見た目が合うように）。
+        if (field === 'note' && window.ecsRichNote) {
+          var row = inp.closest('.pe-row');
+          var read = row && row.querySelector('.pe-read');
+          if (read) read.innerHTML = value.trim() !== '' ? window.ecsRichNote(value.trim()) : '<span class="unfilled">未入力</span>';
+        }
+      })
       .catch(function () { alert('通信エラーで保存できませんでした。'); });
   }
 

@@ -13,6 +13,7 @@
   ・保存できたあと画面のデータも直したいときは、画面側で window.ecsNoteApplied = function(id, 備考){…} を定義する
     （これをやらないと、再描画で古い備考に戻って見える）。
 --}}
+@include('partials.rich_note')
 @once
   @push('head')
     <style>
@@ -63,7 +64,8 @@
           // 帯の中身（ラベル＋本文＋「直す」ボタン）。
           function inner(txt, canEdit) {
             var body = txt !== ''
-              ? '<span class="pn-body">' + esc(txt).replace(/\r?\n/g, '<br>') + '</span>'
+              // 赤・太字の印を色で出す（2026-09-28）。正本＝App\Support\RichNote／partials/rich_note。
+              ? '<span class="pn-body">' + (window.ecsRichNote ? window.ecsRichNote(txt) : esc(txt).replace(/\r?\n/g, '<br>')) + '</span>'
               : '<span class="pn-body empty">未記入</span>';
             var btn = canEdit ? '<button type="button" class="pn-btn" onclick="ecsNoteEdit(this)">✎ 直す</button>' : '';
             return '<span class="pn-lbl">📌 備考</span>' + body + btn;

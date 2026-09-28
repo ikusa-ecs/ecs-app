@@ -591,6 +591,7 @@
 <div class="mock-note" style="background:var(--ok-soft); border-color:var(--ok-line); color:var(--ok-ink);">✓ {{ session('status') }}</div>
 @endif
 @include('partials.office_switch')
+@include('partials.rich_note')
 <style>
   /* 拠点まわり（全拠点運用・設計書19.2）：一覧の拠点バッジ・コピー操作 */
   .proj-cell .os-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; }
@@ -1265,9 +1266,9 @@
       // 案件名の横タグ（下書き・予備日/リハ・複数案件）
       let tags = '';
       if (p.draft)       tags += '<span class="tag-mini draft">下書き</span>';
-      // ⚠ 2026-09-28 baba要望「予備日か本番かわからない」＝**本番にも札を出す**ようにした
-      //   （札が無い＝本番、という読み方は分かりにくかった）。本番は目立たない灰色にしてある。
-      tags += `<span class="tag-mini ${kbnClass[kk] || 'reha'}">${kk}</span>`;
+      // 札は本番以外（予備日・リハ・前日設営）だけに出す（2026-09-28 baba「本番は無くていい・特殊な場合のみ」）。
+      //   ⚠ 一度は本番にも札を出したが、数が多くてうるさいため戻した。前日設営が本番あつかいになる直しはそのまま。
+      if (kk !== '本番') tags += `<span class="tag-mini ${kbnClass[kk] || 'reha'}">${kk}</span>`;
       if (p.multi)       tags += '<span class="tag-mini multi">複数</span>';
 
       // 備考があれば📝マーク（一覧でひと目で気づけるように）
@@ -1456,7 +1457,7 @@
             </div>
             <div class="d-item" style="flex-basis:100%;">
               <span class="d-label">備考</span>
-              <div class="note-text">${hasNote ? p.note : '<span style="color:var(--muted);">（なし）</span>'}</div>
+              <div class="note-text">${hasNote ? (window.ecsRichNote ? window.ecsRichNote(p.note) : escHtml(p.note)) : '<span style="color:var(--muted);">（なし）</span>'}</div>
             </div>
             <div class="d-item">
               <span class="d-label">運営シート</span>
