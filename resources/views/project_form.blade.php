@@ -306,7 +306,17 @@
 <input type="hidden" name="intent" id="intentField">
 {{-- 編集モードのとき、対象の案件IDを一緒に送る（来ていれば store() は上書き更新する） --}}
 <input type="hidden" name="project_id" id="projectIdField" value="{{ $editProject['id'] ?? '' }}">
-@if(!empty($copyFrom))
+@if(!empty($copyFrom) && !empty($copyFrom['subType']))
+{{-- 本番案件から「予備日・リハ日・前日設営」を作るとき（2026-09-28 baba要望）。
+     何を引き継いで何を空にするかは App\Support\SubDateProject が正本。ここは案内文だけ。 --}}
+<div class="mock-note" style="background:#fff7e6;border-color:#f0d9a8;color:#92400e;">
+  🗓 本番案件「{{ $copyFrom['name'] }}」（{{ $copyFrom['id'] }}）の<b>{{ $copyFrom['subType'] }}</b>を作ります。元の本番案件は変わりません。<br>
+  <b>顧客・会場・コンテンツはそのまま引き継いでいます。</b>
+  <b>開催日・時間・人数は空</b>にしてあります（本番とは別ものなので、必ず入れ直してください）。
+  アサインした人は引き継ぎません。<br>
+  「{{ $copyFrom['subType'] }}として登録する」と「紐づく本番案件」は、すでに入った状態になっています。
+</div>
+@elseif(!empty($copyFrom))
 {{-- 複製で開いたとき。project_id は空なので「確定」で新しい案件として登録される（元の案件は変わらない）。 --}}
 <div class="mock-note" style="background:#f0fdf4;border-color:#bbe7c8;color:#166534;">
   ⧉ 案件「{{ $copyFrom['name'] }}」（{{ $copyFrom['id'] }}）をもとに<b>新しい案件を作ります</b>。元の案件は変わりません。<br>
@@ -315,6 +325,18 @@
 @elseif(!empty($editProject))
 <div class="mock-note" style="background:#eef6ff;border-color:#bcd8f0;color:#1d4ed8;">
   ✎ 既存案件「{{ $editProject['id'] }}」を編集しています。内容を直して「確定」を押すと、この案件に上書き保存されます。
+  @if (($editProject['date_type'] ?? '本番') === '本番')
+    {{-- 本番案件を編集しているときだけ、ここから枝分かれの日程を作れるようにする（2026-09-28 baba要望）。
+         ⚠ 実際の作り方が「まず本番を登録 → あとから予備日を足す」なので、入口を本番案件の側に置く。 --}}
+    <div style="margin-top:6px;">
+      この本番案件から作る：
+      @foreach (\App\Support\SubDateProject::TYPES as $t)
+        <a class="btn" style="padding:2px 10px;margin-right:4px;"
+           href="/project-form?copy={{ urlencode($editProject['id']) }}&sub={{ urlencode($t) }}"
+           title="この本番案件の{{ $t }}を作ります（顧客・会場・コンテンツは引き継ぎ、開催日・時間・人数は空になります）">🗓 {{ $t }}</a>
+      @endforeach
+    </div>
+  @endif
 </div>
 @endif
 {{-- CSV取込のエラー行から来たときの案内（JSで表示）。 --}}

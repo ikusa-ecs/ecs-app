@@ -23,6 +23,7 @@ use App\Support\ProjectHistoryRecorder;
 use App\Support\ProjectImportColumns;
 use App\Support\ShareTags;
 use App\Support\RequiredCountEstimate;
+use App\Support\SubDateProject;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -263,6 +264,8 @@ class ProjectController extends Controller
         $projectId = $request->query('project');
         $copyId = $request->query('copy');
         $copyFrom = null;                       // 複製のとき、元になった案件の表示用の情報
+        // 「本番案件から予備日・リハ日・前日設営を作る」ときの種別（2026-09-28）。?sub= で来る。
+        $subType = (string) $request->query('sub', '');
 
         // 編集と複製で読む先は同じ。?project= が優先（両方来ることは想定しない）。
         $sourceId = $projectId ?: $copyId;
@@ -375,6 +378,14 @@ class ProjectController extends Controller
                     $editProject['id'] = null;
                     $editProject['start_date'] = '';
                     $editProject['ops_sheet_url'] = '';
+
+                    // 本番案件から「予備日・リハ日・前日設営」を作る（2026-09-28 baba要望）。
+                    // ?copy=<本番のID>&sub=予備日 で開く。案件の情報だけ引き継ぎ、時間と人数は空にする。
+                    // ⚠ 何を空にするかは App\Support\SubDateProject が正本（ここに項目を並べない）。
+                    if (SubDateProject::isType($subType)) {
+                        $editProject = SubDateProject::apply($editProject, $subType, $p->id);
+                        $copyFrom['subType'] = $subType;
+                    }
                 }
             }
         }
