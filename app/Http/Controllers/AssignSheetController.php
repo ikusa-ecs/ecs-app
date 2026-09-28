@@ -307,11 +307,10 @@ class AssignSheetController extends Controller
             // ⚠ 社員だけ。スタッフは日別ボード・案件別アサインから入れる（希望や上限を見ながら決める場所なので）。
             // ⚠ 名簿から選ばせる＝自由入力にすると出勤数・重複チェックにつながらない。
             // ⚠ 退職した人は出さない（列は `active`。日別ボードの rosterPeople と同じ決まり）。
-            'employees'     => OfficeScope::applyToPeople(
-                Person::where('role', 'employee')->where('active', true),
-                $officeScope
-            )->byKana()->get(['id', 'name'])
-                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->all(),
+            // ⚠ 2026-09-28 baba要望＝**他拠点の社員も選べる**（新入社員が東京で研修に入るなど）。
+            //   拠点ごとのまとまりで出し、いま見ている拠点をいちばん上にする。
+            //   入れた人には、メンバー欄に「○○ヘルプ」が付く（今までどおり）。
+            'employeeGroups' => $this->employeeGroups($officeScope),
             // 拠点バッジは「全拠点」表示のときだけ出す（単体拠点なら自明なので出さない・baba 2026-07-29）。
             'showOfficeBadge' => $officeScope === null,
         ]);
@@ -625,6 +624,35 @@ class AssignSheetController extends Controller
     }
 
     /** 実体のない記号（—/ー/-）は空欄にそろえる。表示のノイズを消す。 */
+    /**
+     * 「＋社員」に並べる社員を拠点ごとにまとめる。いま見ている拠点がいちばん上、あとは拠点名の順。
+     * 拠点が空の社員は東京あつかい（OfficeScope の決まりと同じ）。
+     *
+     * @return array<int, array{office: string, people: array<int, array{id: string, name: string}>}>
+     */
+    private function employeeGroups(?string $officeScope): array
+    {
+        $groups = [];
+        Person::where('role', 'employee')->where('active', true)->byKana()->get(['id', 'name', 'office'])
+            ->each(function ($e) use (&$groups) {
+                $off = trim((string) $e->office) !== '' ? trim((string) $e->office) : OfficeScope::DEFAULT_OFFICE;
+                $groups[$off][] = ['id' => $e->id, 'name' => $e->name];
+            });
+
+        uksort($groups, function ($a, $b) use ($officeScope) {
+            if ($a === $officeScope) {
+                return -1;
+            }
+            if ($b === $officeScope) {
+                return 1;
+            }
+
+            return strcmp($a, $b);
+        });
+
+        return collect($groups)->map(fn ($people, $office) => ['office' => $office, 'people' => $people])->values()->all();
+    }
+
     private function clean(?string $v): string
     {
         $s = trim((string) $v);

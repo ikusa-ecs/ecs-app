@@ -67,6 +67,24 @@ class AssignSheetNoteAndVacancyTest extends TestCase
         $this->assertSame(3, substr_count($html, 'need-empty"'));
     }
 
+    /** ＋社員に他拠点の社員も出る（新入社員が東京で研修に入る・2026-09-28 baba要望）。東京が上。 */
+    public function test_他拠点の社員も選べる(): void
+    {
+        $date = Carbon::today()->addDays(5)->format('Y-m-d');
+        ProjectFactory::new()->create(['office' => '東京', 'start_date' => $date]);
+        PersonFactory::new()->create(['role' => 'employee', 'office' => '大阪', 'name' => '大阪の新人', 'active' => true]);
+        PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => '東京の社員', 'active' => true]);
+
+        $html = $this->sheet($date)->assertOk()->getContent();
+
+        $this->assertStringContainsString('大阪の新人', $html);
+        $tokyo = strpos($html, '<optgroup label="東京">');
+        $osaka = strpos($html, '<optgroup label="大阪">');
+        $this->assertNotFalse($tokyo);
+        $this->assertNotFalse($osaka);
+        $this->assertLessThan($osaka, $tokyo, 'いま見ている拠点（東京）が上');
+    }
+
     public function test_運営人数が空なら黄色にしない(): void
     {
         $date = Carbon::today()->addDays(5)->format('Y-m-d');

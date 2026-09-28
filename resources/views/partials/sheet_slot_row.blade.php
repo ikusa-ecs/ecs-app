@@ -31,8 +31,13 @@
     {{-- 社員をここから入れる。選ぶと assignments に「仮」で入り、この行は人の行に変わる。 --}}
     <select class="m-edit m-addname" title="社員を入れます（仮で入ります）" onchange="ecsSheetAddMember(this)">
       <option value="">＋社員</option>
-      @foreach ($employees as $e)
-        <option value="{{ $e['id'] }}">{{ $e['name'] }}</option>
+      {{-- 拠点ごとのまとまり（いま見ている拠点が上）。他拠点の社員も入れられる（新入社員の研修など・2026-09-28）。 --}}
+      @foreach ($employeeGroups as $g)
+        <optgroup label="{{ $g['office'] }}">
+          @foreach ($g['people'] as $e)
+            <option value="{{ $e['id'] }}">{{ $e['name'] }}</option>
+          @endforeach
+        </optgroup>
       @endforeach
     </select>
   </span>
