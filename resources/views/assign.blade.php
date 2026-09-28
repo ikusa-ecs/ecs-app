@@ -128,6 +128,14 @@
     .case-card.adj  { border-left: 4px solid #2c6ca0; }
     .case-card.fix  { border-left: 4px solid #16a34a; }
     .case-card.pub  { border-left: 4px solid #16a34a; }
+    /* カードを作れなかった案件の札（2026-09-28）。⚠ 黙って消さないための最後の受け皿。
+       面と文字はテーマの変数で書く（黒ベースでも読めるように）。 */
+    .case-card.broken { border-left: 4px solid #b91c1c; background: var(--panel); color: var(--ink); }
+    .case-card.broken .cc-head { color: #b91c1c; }
+    .cc-broken-body { font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+    .cc-broken-id, .cc-broken-help { color: var(--muted); font-size: 11px; }
+    .cc-broken-msg { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all;
+      background: var(--danger-soft); color: #b91c1c; border-radius: 6px; padding: 3px 6px; }
 
     .cc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .cc-headmain { flex: 1 1 auto; min-width: 0; }
@@ -1769,6 +1777,14 @@
       .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
+  // title="..." のような属性の中に入れる用。escHtml が引用符まで逃がしているので中身は同じ。
+  // ⚠ 名前を分けているのは、呼ぶ側で「ここは属性の中だ」と分かるようにするため
+  //   （ピックアップ・エントリー一覧・社員名簿も同じ2本立て）。
+  // ⚠ 2026-09-28、この1本が**この画面にだけ無かった**ため、派遣依頼のある案件のカードを
+  //   作るところで画面が止まり、**その案件から後ろの案件が全部消えていた**（baba報告）。
+  //   見張り＝tests/Feature/ViewJsEscHelpersTest.php（呼んでいるのに定義が無い画面があると落ちる）。
+  function escAttr(s){ return escHtml(s); }
+
   // 案件カードのタイトル部分のHTML。タイトルは1行省略（長い分は「…」・ホバーで全文）。
   // コンテンツ未登録の案件は先頭に小さな「⚠未登録」バッジを付け、案件名で仮表示する。
   // 確度（Aヨミ/Bヨミ/Cヨミ）の印。⚠ 印も色も案件一覧と同じにそろえる（画面ごとに変えない）。
@@ -2159,8 +2175,34 @@
 
       const amap = assignmentMap();   // 名前→出ている案件id（メンバーに「他にどこに出ているか」を出す）
       const row = block.querySelector('.case-row');
-      dayCases.forEach(c => row.appendChild(buildCard(c, dayCases, dupNames, amap)));
+      // ⚠ 1枚ずつ囲む（2026-09-28）。囲む前は、カード1枚を作るところで止まると
+      //   **その案件から後ろの案件が全部消えて**いた（日別ボードで「案件一覧にはあるのに出ない」）。
+      //   しかも画面には何も出ないので、消えたことに気づけなかった。
+      //   失敗した案件だけ札を出して、残りは今までどおり並べる。
+      dayCases.forEach(c => {
+        try {
+          row.appendChild(buildCard(c, dayCases, dupNames, amap));
+        } catch (e) {
+          console.error('案件カードを作れませんでした', c && c.id, e);
+          row.appendChild(brokenCard(c, e));
+        }
+      });
     });
+  }
+
+  /** カードを作れなかった案件の代わりに出す札。⚠ 黙って消さない（消えると誰も気づけない）。 */
+  function brokenCard(c, e){
+    const el = document.createElement('div');
+    el.className = 'case-card broken';
+    el.id = 'case-' + ((c && c.id) || 'unknown');
+    el.innerHTML = `<div class="cc-head"><b>⚠ この案件は表示できませんでした</b></div>
+      <div class="cc-broken-body">
+        <div>${escHtml((c && c.name) || '（案件名不明）')}</div>
+        <div class="cc-broken-id">案件ID：${escHtml((c && c.id) || '—')}</div>
+        <div class="cc-broken-msg">${escHtml(String((e && e.message) || e || ''))}</div>
+        <div class="cc-broken-help">案件一覧からは開けます。この文言を小沼さんに伝えてください。</div>
+      </div>`;
+    return el;
   }
 
   // ===== その日をまとめて確定・まとめて公開（2026-08-28 baba要望）=====
