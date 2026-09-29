@@ -109,6 +109,11 @@
   .st-emp-table td.l { color: var(--ink); font-weight: 600; }
   .st-emp-table td.l .sub { font-size: 10.5px; color: #a89680; font-weight: 400; margin-left: 5px; }
   .st-emp-table tbody tr:hover { background: #faf6f0; }
+  /* 見出しを押して並べ替え（2026-09-29）。いま並べている列は太字＋▼ */
+  .st-emp-table th a.st-sort { color: inherit; text-decoration: none; cursor: pointer; }
+  .st-emp-table th a.st-sort:hover { text-decoration: underline; }
+  .st-emp-table th a.st-sort.on { color: var(--brand); }
+  .st-emp-table td.on { font-weight: 800; }
 
   /* 部署別の合計カード */
   .st-depts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -428,6 +433,9 @@
   // 表示順＝定番の順→それ以外（未設定など）は後ろ。
   $groupKeys = collect($groupOrder)->filter(fn ($k) => $empGrouped->has($k))
       ->merge($empGrouped->keys()->diff($groupOrder))->values();
+  // 社員別の表の数字の列（キーはコントローラの並び順 SORTS と同じ）。
+  $empCols = ['count' => 'イベント出勤', 'dTotal' => 'D＋SD合計', 'd' => 'D', 'realD' => 'リアルD',
+              'bigD' => '大型D', 'bigSD' => '大型SD', 'onlineD' => 'オンラインD'];
 @endphp
 
 {{-- 社員別 出勤数＋ディレクター内訳（全拠点=拠点ごと／拠点や所属で絞ると部署ごと・
@@ -439,16 +447,14 @@
     <h3>{{ $gk }}（{{ $empGrouped[$gk]->count() }}名）</h3>
     <div class="st-emp-scroll">
       <table class="st-emp-table">
+        {{-- 見出しを押すと、その列の多い順に並べ直す（2026-09-29 baba要望）。氏名を押すと社歴順に戻る。
+             リンクはコントローラで作ったもの（拠点・所属・期間を引き継ぐ）。 --}}
         <thead>
           <tr>
-            <th class="l">氏名</th>
-            <th>イベント出勤</th>
-            <th>D＋SD合計</th>
-            <th>D</th>
-            <th>リアルD</th>
-            <th>大型D</th>
-            <th>大型SD</th>
-            <th>オンラインD</th>
+            <th class="l"><a class="st-sort {{ $sort === 'hire' ? 'on' : '' }}" href="{{ $links['sort']['hire'] }}" title="社歴順に並べる">氏名{{ $sort === 'hire' ? ' ▼' : '' }}</a></th>
+            @foreach ($empCols as $key => $label)
+              <th><a class="st-sort {{ $sort === $key ? 'on' : '' }}" href="{{ $links['sort'][$key] }}" title="{{ $label }}の多い順に並べる">{{ $label }}{{ $sort === $key ? ' ▼' : '' }}</a></th>
+            @endforeach
           </tr>
         </thead>
         <tbody>
@@ -457,13 +463,9 @@
               <td class="l">{{ $m['name'] }}@if ($scopeOffice !== '' && $m['office'] !== '')<span class="sub">{{ $m['office'] }}</span>@endif
                 {{-- ⚠ 上の @endif とこの下の行をくっつけて書かないこと。Bladeが命令として読まず、画面が500になる。 --}}
                 @if ($sort === 'hire')<span class="sub">{{ $m['hireLabel'] }}</span>@endif</td>
-              <td>{{ $m['count'] }}</td>
-              <td>{{ $m['dTotal'] }}</td>
-              <td>{{ $m['d'] }}</td>
-              <td>{{ $m['realD'] }}</td>
-              <td>{{ $m['bigD'] }}</td>
-              <td>{{ $m['bigSD'] }}</td>
-              <td>{{ $m['onlineD'] }}</td>
+              @foreach ($empCols as $key => $label)
+                <td class="{{ $sort === $key ? 'on' : '' }}">{{ $m[$key] }}</td>
+              @endforeach
             </tr>
           @endforeach
         </tbody>
@@ -473,7 +475,7 @@
 @empty
   <div class="st-panel"><div class="empty">この期間に出勤した社員がいません。</div></div>
 @endforelse
-<p class="st-note">全拠点＝拠点ごと／拠点や所属を選ぶと部署ごとに表示。並びは「{{ $sort === 'count' ? '出勤数が多い順' : '社歴順' }}」。出勤＝出勤日数。D＋SD合計〜オンラインDは「社員・ディレクター集計」と同じ数え方（同じ案件は1回）。</p>
+<p class="st-note">全拠点＝拠点ごと／拠点や所属を選ぶと部署ごとに表示。並びは「{{ $sortLabel }}」（表の見出しを押すと、その列の多い順に並べ替え・「氏名」で社歴順に戻る）。出勤＝出勤日数。D＋SD合計〜オンラインDは「社員・ディレクター集計」と同じ数え方（同じ案件は1回）。</p>
 
 {{-- スタッフ別 出勤数（上長要望で追加・baba 2026-07-27）。
      ⚠ 所属で絞っているときは出さない。スタッフ（アルバイト）に所属は無いので、
@@ -492,7 +494,7 @@
       <div class="empty">この期間に出勤したスタッフがいません。</div>
     @endforelse
   </div>
-  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。並びは「{{ $sort === 'count' ? '出勤数が多い順' : '社歴順（IKUSAで働き始めた年月が古い人が上・未入力は下）' }}」。</p>
+  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。並びは「{{ $sort === 'hire' ? '社歴順（IKUSAで働き始めた年月が古い人が上・未入力は下）' : '出勤数が多い順' }}」。</p>
 </div>
 @endif
 

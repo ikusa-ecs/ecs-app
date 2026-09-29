@@ -34,6 +34,22 @@ class StatsController extends Controller
     /** 拠点（事務所）の表示順。実データが無くても常にこの順で全拠点を出す。 */
     private const OFFICE_ORDER = ['東京', '名古屋', '大阪', '福岡', '札幌', '東北'];
 
+    /**
+     * 並び順の一覧（URLの sort=… → 画面・CSVに出す名前）。
+     * 'hire' 以外は「その列の数が多い順」（2026-09-29 baba要望＝ディレクター数など全部の列で並べたい）。
+     * ⚠ 社員別の表の見出しを押すと、ここのキーで開き直す。列を足したらここにも1行足す。
+     */
+    private const SORTS = [
+        'hire'    => '社歴順',
+        'count'   => 'イベント出勤が多い順',
+        'dTotal'  => 'D＋SD合計が多い順',
+        'd'       => 'Dが多い順',
+        'realD'   => 'リアルDが多い順',
+        'bigD'    => '大型Dが多い順',
+        'bigSD'   => '大型SDが多い順',
+        'onlineD' => 'オンラインDが多い順',
+    ];
+
     public function index(Request $request)
     {
         return view('stats', $this->aggregate($request));
@@ -71,7 +87,7 @@ class StatsController extends Controller
         $rows[] = ['表示範囲', $scopeLabel];
         // 画面と同じ条件で出していることが、CSVだけ見ても分かるようにしておく。
         $rows[] = ['所属', $data['scopeDept'] !== '' ? $data['scopeDept'] : 'すべて'];
-        $rows[] = ['並び順', $data['sort'] === 'count' ? '出勤数が多い順' : '社歴順（入社が古い人が上）'];
+        $rows[] = ['並び順', $data['sort'] === 'hire' ? '社歴順（入社が古い人が上）' : $data['sortLabel']];
         if ($data['scopeDept'] !== '') {
             $rows[] = ['※ イベント数は案件ごとの集計なので、所属では変わりません'];
         }
@@ -231,7 +247,7 @@ class StatsController extends Controller
 
         // 並び順＝社歴順（既定）／出勤数の多い順（FB No.11・baba 2026-09-03「基本的に社歴順だと分かりやすい」）。
         $sort = (string) $request->query('sort', 'hire');
-        if (! in_array($sort, ['hire', 'count'], true)) {
+        if (! array_key_exists($sort, self::SORTS)) {
             $sort = 'hire';
         }
         // 拠点で絞る前の「その期間の全拠点ぶん」を控える（他拠点依頼数＝拠点をまたぐ共有の集計に使う）。
@@ -490,6 +506,7 @@ class StatsController extends Controller
             'deptGroups'      => Departments::GROUPS,
             // 並び順（FB No.11）
             'sort'            => $sort,
+            'sortLabel'       => self::SORTS[$sort],
             // 画面のリンクで「いまの条件」をそのまま持ち回すための一式。
             'query'           => $query,
             // 画面に置くリンク（1つだけ条件を変えて、他は今のまま）。
@@ -502,7 +519,7 @@ class StatsController extends Controller
                     ->mapWithKeys(fn ($o) => [$o => $this->statsLink($query, ['office' => $o === '' ? OfficeScope::ALL : $o])])->all(),
                 'dept'   => collect([''])->merge(array_keys($deptOptions))
                     ->mapWithKeys(fn ($d) => [$d => $this->statsLink($query, ['dept' => $d])])->all(),
-                'sort'   => collect(['hire', 'count'])
+                'sort'   => collect(array_keys(self::SORTS))
                     ->mapWithKeys(fn ($s) => [$s => $this->statsLink($query, ['sort' => $s])])->all(),
                 'csv'    => '/stats/export.csv?' . http_build_query($query),
             ],
@@ -667,16 +684,24 @@ class StatsController extends Controller
      *   ⚠ 入社年月日が空の人は**いちばん下**にまとめる。
      *     空を「いちばん古い」と扱うと、入れていない新人が先頭に並んで意味が逆になる。
      * 'count' ＝出勤数の多い順（これまでの並び）。
+     * 'd'・'realD' など ＝その列の数が多い順（2026-09-29 baba要望）。
+     *   ⚠ スタッフ別の欄は出勤数しか出していないので、D系の並びのときは出勤数の多い順にする
+     *     （見えない数字で並ぶと、順番の意味が分からなくなるため）。
      *
      * 同じ値のときは「出勤の多い順→氏名順」で決める＝開き直しても並びが入れ替わらない。
      */
     private function sortMembers(Collection $members, string $sort): Collection
     {
-        return $members->sortBy(function (array $m) use ($sort) {
-            // 出勤数は「多い順」にしたいので、大きいほど小さい文字列になるように引き算しておく。
-            $byCount = sprintf('%04d', 9999 - min(9999, (int) $m['count'])) . '|' . $m['name'];
+        // 大きいほど小さい文字列になるように引き算しておく（sortBy は小さい順なので「多い順」になる）。
+        $desc = fn ($n) => sprintf('%04d', 9999 - min(9999, (int) $n));
+
+        return $members->sortBy(function (array $m) use ($sort, $desc) {
+            $byCount = $desc($m['count']) . '|' . $m['name'];
             if ($sort === 'count') {
                 return $byCount;
+            }
+            if ($sort !== 'hire') {
+                return $m['kind'] === '社員' ? $desc($m[$sort] ?? 0) . '|' . $byCount : $byCount;
             }
 
             $hire = (string) $m['hire'];

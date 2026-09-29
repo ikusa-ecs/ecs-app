@@ -99,6 +99,28 @@ class StatsFilterSortTest extends TestCase
         $this->assertLessThan(strpos($html, 'センパイ太郎'), strpos($html, 'ミテイ三郎'), '出勤2回の人が1回の人より上');
     }
 
+    /** ディレクター数などの列でも並べ替えられる＝見出しがリンクになり、その列の多い順（2026-09-29 baba要望）。 */
+    public function test_sort_by_director_column(): void
+    {
+        [$me] = $this->seedMembers();
+        // 出勤がいちばん少ない先輩だけがDを2件＝D順なら先輩が上に来る。
+        $senior = \App\Models\Person::where('name', 'センパイ太郎')->first();
+        foreach ([1, 2] as $i) {
+            $p = ProjectFactory::new()->create(['start_date' => $this->today(), 'office' => '東京', 'format' => 'リアル']);
+            Assignment::create(['project_id' => $p->id, 'staff_id' => $senior->id,
+                'date' => $this->today(), 'role' => 'D', 'status' => '確定']);
+        }
+
+        $html = $this->actingAsPerson($me)->get('/stats?sort=d&office=all')->assertOk()->getContent();
+
+        $this->assertLessThan(strpos($html, 'コウハイ次郎'), strpos($html, 'センパイ太郎'), 'Dが多い人が上');
+        $this->assertStringContainsString('並びは「Dが多い順」', $html);
+        $this->assertStringContainsString('sort=realD', $html, '見出しから他の列でも並べられる');
+
+        $csv = $this->actingAsPerson($me)->get('/stats/export.csv?sort=d&office=all')->assertOk()->getContent();
+        $this->assertStringContainsString('並び順,Dが多い順', $csv);
+    }
+
     /** 所属で絞ると、その所属の人だけになる（他の所属の人は消える）。 */
     public function test_department_filter_keeps_only_that_department(): void
     {
