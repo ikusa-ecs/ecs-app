@@ -125,14 +125,91 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('P-2026-0042', Project::first()->id);
     }
 
-    public function test_IDの日付が違えば信じない(): void
+    /** IDがあれば日付が違っても同じ案件（baba「IDで管理してるなら同じものって紐づけたい」）。日程とアサインも新しい日に移る。 */
+    public function test_IDがあれば日付が違っても同じ案件(): void
     {
         $me = $this->manager();
-        $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => '別の日の案件', 'client' => 'X', 'start_date' => '2026-09-20']);
+        $p = $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => '別の日の案件', 'client' => 'X', 'start_date' => '2026-09-20']);
+        $staff = PersonFactory::new()->create(['office' => '東京']);
+        \App\Models\Assignment::create(['project_id' => $p->id, 'staff_id' => $staff->id, 'date' => '2026-09-20', 'role' => 'OP', 'status' => '確定']);
 
         $this->import($me, $this->rows('新しい名前', 'Y', 'P-2026-0042'));
 
-        $this->assertSame(2, Project::count(), '日付の違う案件に上書きしている');
+        $this->assertSame(1, Project::count(), 'IDがあるのに新しい案件が増えている');
+        $this->assertSame('2026-09-01', $p->fresh()->start_date->format('Y-m-d'), '日程がシートに合わせて直っていない');
+        $this->assertSame('2026-09-01', \App\Models\Assignment::first()->date->format('Y-m-d'), 'アサインが古い日に残っている');
+    }
+
+    /** 下見で手でECSの案件IDを入れたら、その案件に上書きする（baba「IDで紐づけを手動でも」）。 */
+    public function test_手で入れたIDでつなぐ(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => '名古屋巻き取りの案件', 'client' => 'まったく別']);
+
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ・運動会', '金沢（VIPROGY）')])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        // 下見にも「手でつなぐ」が出る。
+        $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', [
+            'sync' => $sync->id, 'edits' => json_encode(['0' => ['linkId' => 'p-2026-0042']]),
+        ])->assertOk()->json('rows.0');
+        $this->assertSame('manual', $pre['link']['by']);
+        $this->assertNotSame('new', $pre['diff']['kind']);
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'sync' => $sync->id, 'edits' => json_encode(['0' => ['linkId' => 'P-2026-0042']]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(1, Project::count(), '手でつないだのに新しい案件が増えた');
+        $this->assertSame(['13' => 'P-2026-0042'], array_map('strval', $sync->fresh()->project_ids), 'シートへ書き戻すIDになっていない');
+    }
+
+    /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
+    public function test_手で入れたIDが無ければ作らない(): void
+    {
+        $me = $this->manager();
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ', '顧客')])->assertOk();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'sync' => SheetSync::firstOrFail()->id, 'edits' => json_encode(['0' => ['linkId' => 'P-2026-7777']]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(0, Project::count());
+    }
+
+    /**
+     * 100行目がまだ空でも、ECSが前回残した「列 → ID」の対応表でつなぐ（2026-09-29 P-2026-0315 の件）。
+     * IDがシートに書かれるのは受け取ったあと＝その朝に届いた中身にはまだ入っていないため。
+     */
+    public function test_100行目が空でも前回の対応表でつなぐ(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0315', 'project_name' => '名古屋巻き取りの案件', 'client' => '別の書き方']);
+
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ・運動会', '金沢（VIPROGY）')])->assertOk();
+        $sync = SheetSync::firstOrFail();
+        $sync->forceFill(['project_ids' => [(string) self::A => 'P-2026-0315']])->save();
+
+        $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id])->assertRedirect('/past-import');
+
+        $this->assertSame(1, Project::count(), '前回の対応表があるのに新しい案件が増えた');
+    }
+
+    /** 消した案件のIDが残っていたら、ふつうに名前で探す（落ちない）。 */
+    public function test_消した案件のIDなら名前で探す(): void
+    {
+        $me = $this->manager();
+
+        $this->import($me, $this->rows('新しい名前', 'Y', 'P-2026-0999'));
+
+        $this->assertSame(1, Project::count());
+        $this->assertNotSame('P-2026-0999', Project::first()->id);
     }
 
     public function test_複数コンテンツは区切って台帳につなぎ台帳を増やさない(): void

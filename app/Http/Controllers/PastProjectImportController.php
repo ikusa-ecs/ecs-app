@@ -208,7 +208,29 @@ class PastProjectImportController extends Controller
         if ($isMonthly) {
             // 月シート＝項目名を探して読む（拠点で位置が少し違っても当たるように）。
             $read = MonthlySheetReader::read($rows);
+            // 100行目のECSの案件IDは、1つのシートで1回だけ使う（ブロックをコピーしてIDまで写った、などに備える）。
+            $seenIds = [];
             foreach ($read['cases'] as $i => $case) {
+                $ecsId = $this->ecsIdAt($rows, $case['col'] ?? null);
+                // 100行目が空なら、ECSが前回の取込で残した「列 → ID」の対応表も使う（2026-09-29）。
+                // ⚠ IDがシートに書かれるのは「受け取ったあと」なので、書かれた朝に届いた中身にはまだ入っていない
+                //   （P-2026-0315 がこれで新しい案件に見えた）。
+                // ⚠ 対応表は列の位置で覚えているだけ（ブロックを入れ替えるとずれる）ので、日付が合うときだけ使う。
+                if ($ecsId === null && $sync !== null && isset($case['col'])) {
+                    $mapped = (string) (($sync->project_ids ?? [])[(string) $case['col']] ?? (($sync->project_ids ?? [])[(int) $case['col']] ?? ''));
+                    $blockDate = MonthlySheetReader::completeDate((string) ($case['fields']['日程'] ?? ''), $period);
+                    $mp = $mapped !== '' ? Project::find($mapped) : null;
+                    if ($mp && optional($mp->start_date)->format('Y-m-d') === $blockDate) {
+                        $ecsId = $mp->id;
+                    }
+                }
+                if ($ecsId !== null) {
+                    if (isset($seenIds[$ecsId])) {
+                        $ecsId = null;
+                    } else {
+                        $seenIds[$ecsId] = true;
+                    }
+                }
                 $entries[] = [
                     'label' => ($i + 1).'件目',
                     'header' => array_keys($case['fields']),
@@ -220,7 +242,7 @@ class PastProjectImportController extends Controller
                     // 書き戻すときの目印（2026-09-15 baba要望）。取り込みには使わない。
                     'col' => $case['col'] ?? null,
                     // そのブロックの100行目に書き戻してあるECSの案件ID（2026-09-29 から照合に使う）。
-                    'ecsId' => $this->ecsIdAt($rows, $case['col'] ?? null),
+                    'ecsId' => $ecsId,
                 ];
             }
             $unmapped = $read['unknownLabels'];
@@ -476,9 +498,14 @@ class PastProjectImportController extends Controller
             }
 
             // すでに入っている案件をさがすのは、この1回だけ（重なりの表示と差分の両方で使う）。
+            // 手でつなぐ先のECSの案件ID（下見で入れたもの）があれば、シートのIDより優先（2026-09-29）。
+            [$useId, $linkError] = $this->linkIdFor($entry, $edit);
+            if ($linkError !== null) {
+                $info['errors'][] = $linkError;
+            }
             $found = $info['errors']
                 ? ['exact' => null, 'similar' => null, 'similarCount' => 0]
-                : $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null, $entry['ecsId'] ?? null);
+                : $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null, $useId);
 
             // 取込を押したら「ECSの中身が実際にどう変わるか」（2026-09-10 baba要望）。
             //
@@ -507,6 +534,14 @@ class PastProjectImportController extends Controller
                 // すでに入っている案件との重なり（2026-09-01 baba要望）。
                 // ⚠ 判定は findExisting の1か所（下見と取込で同じ）。画面で判定し直さない。
                 'dup' => $this->dupInfo($info, $found, $edit),
+                // ECSの案件IDでつながっているか（sheet＝シートの100行目／manual＝下見で手で入れた）。
+                'link' => [
+                    'by' => ($edit['linkId'] ?? '') !== '' ? 'manual'
+                        : (($entry['ecsId'] ?? null) !== null && $found['exact'] && $found['exact']->id === $entry['ecsId'] ? 'sheet' : ''),
+                    'id' => (string) ($edit['linkId'] ?? ''),
+                    'project' => $found['exact'] ? $found['exact']->id.'『'.$found['exact']->project_name.'』'
+                        .optional($found['exact']->start_date)->format('n/j') : '',
+                ],
                 // 取込で書き換わる項目・人（new＝新規／changed＝変わる／same＝変化なし）。
                 'diff' => $diff,
                 'label' => $entry['label'],
@@ -649,7 +684,14 @@ class PastProjectImportController extends Controller
 
             // 同じ案件があるか。⚠ 探し方の正本は findExisting（下見とまったく同じものを使う）。
             //   「似ているだけ」の案件を上書きするかどうかは、下見で人が選んだ印（asNew）で決める。
-            $found = $this->findExisting($date, $name, $client, $meetTime, $entry['ecsId'] ?? null);
+            [$useId, $linkError] = $this->linkIdFor($entry, $edit);
+            if ($linkError !== null) {
+                // ⚠ 手で入れたIDが見つからないときは、新しく作らずに止める（打ち間違いで二重にしない）。
+                $errors[] = $entry['label']."（{$name}）：".$linkError;
+
+                continue;
+            }
+            $found = $this->findExisting($date, $name, $client, $meetTime, $useId);
             // ⚠ どの案件に上書きするかの決め方は SheetDiff::target の1か所にまとめてある。
             //   下見（差分の表示）と取込がここで食い違うと、「変化なし」と出した案件を
             //   別の案件に上書きする、という最悪の事故になる。
@@ -686,7 +728,19 @@ class PastProjectImportController extends Controller
                     if (! ($isFuture && $wasPastImport)) {
                         unset($attrs['staff_published']);
                     }
+                    $oldDate = optional($existing->start_date)->format('Y-m-d');
                     $existing->fill($attrs)->save();
+
+                    // 100行目のIDで結び付いて、シートで日程が変わっていたとき（2026-09-29）。
+                    // その案件のアサインも新しい日へ移す（古い日に人が取り残されないように）。
+                    // ⚠ 新しい日にもう同じ人がいれば、古い日のほうを消す（同じ案件×人×日は1行＝unique）。
+                    if ($oldDate !== null && $oldDate !== $date) {
+                        foreach (Assignment::where('project_id', $existing->id)->whereDate('date', $oldDate)->get() as $old) {
+                            $clash = Assignment::where('project_id', $existing->id)
+                                ->where('staff_id', $old->staff_id)->whereDate('date', $date)->exists();
+                            $clash ? $old->delete() : $old->update(['date' => $date]);
+                        }
+                    }
                     $project = $existing;
                     $updated++;
                 } else {
@@ -1139,6 +1193,14 @@ class PastProjectImportController extends Controller
             if (! empty($edit['asNew'])) {
                 $clean['asNew'] = true;
             }
+            // 手でつなぐECSの案件ID（2026-09-29）。
+            // ⚠ 形がおかしくても捨てない＝linkIdFor で「見つかりません」と止める（黙って新しい案件にしない）。
+            if (isset($edit['linkId']) && is_scalar($edit['linkId'])) {
+                $link = mb_substr(strtoupper(trim((string) $edit['linkId'])), 0, 40);
+                if ($link !== '') {
+                    $clean['linkId'] = $link;
+                }
+            }
             if ($clean !== []) {
                 $edits[(int) $index] = $clean;
             }
@@ -1381,10 +1443,14 @@ class PastProjectImportController extends Controller
             return ['exact' => null, 'similar' => null, 'similarCount' => 0];
         }
 
-        // ① シートに書き戻したECSの案件ID（100行目）。日付が合うときだけ信じる。
+        // ① シートに書き戻したECSの案件ID（100行目）＝**IDがあれば必ず同じ案件**（2026-09-29 baba
+        //   「アサイン表で取り込んでるIDで管理してるなら同じものって紐づけられるようにしたい」）。
+        //   日付・コンテンツ・顧客名が変わっていても、そのIDの案件に上書きする（日程変更もそのまま直る）。
+        //   ⚠ そのIDの案件がECSに無い（消した）ときだけ、名前で探す。
+        //   ⚠ 同じシートで同じIDが2か所にあるときは、2か所目からはIDを使わない（ecsIdAt の呼び出し側で外す）。
         if ($ecsId !== null && $ecsId !== '') {
             $byId = Project::find($ecsId);
-            if ($byId && optional($byId->start_date)->format('Y-m-d') === $date) {
+            if ($byId) {
                 return ['exact' => $byId, 'similar' => null, 'similarCount' => 0];
             }
         }
@@ -1465,6 +1531,26 @@ class PastProjectImportController extends Controller
         }
 
         return $attrs;
+    }
+
+    /**
+     * この件をどのECSの案件IDでつなぐか（2026-09-29 baba「IDで紐づけを手動でも行えるように」）。
+     * 下見で手で入れたID（edits の linkId）＞ シートの100行目のID。
+     * 手で入れたIDがECSに無いときはエラーの文を返す（新しく作ってしまわないように）。
+     *
+     * @return array{0: ?string, 1: ?string}  [使うID, エラーの文]
+     */
+    private function linkIdFor(array $entry, array $edit): array
+    {
+        $manual = strtoupper(trim((string) ($edit['linkId'] ?? '')));
+        if ($manual === '') {
+            return [$entry['ecsId'] ?? null, null];
+        }
+        if (! Project::whereKey($manual)->exists()) {
+            return [null, 'つなぐ先のECSの案件ID「'.$manual.'」が見つかりません（打ち間違いがないか確かめてください）'];
+        }
+
+        return [$manual, null];
     }
 
     /** シートの100行目（ECSが書き戻した案件ID）から、そのブロックのIDを読む。無ければ null。 */

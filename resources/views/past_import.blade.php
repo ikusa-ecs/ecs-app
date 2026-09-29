@@ -690,7 +690,27 @@
     }
 
     // 似た案件があるときは、この下に「同じ案件か別の案件か」の選択が続く。
-    return head + pjDupCell(r);
+    return head + pjDupCell(r) + pjLinkCell(r);
+  }
+
+  // ECSの案件IDでつなぐ（2026-09-29 baba「IDで紐づけを手動でも行えるように」）。
+  // ・シートの100行目にIDがあれば、それでつながっている（どれだけ中身が違っても同じ案件）。
+  // ・無いとき・違う案件につながっているときは、ここにECSの案件IDを入れて「② 確かめ直す」→ その案件に上書き。
+  //   取り込んだあと、次の朝そのIDがシートの100行目に書き戻される＝次からは自動でつながる。
+  // ⚠ 判定はサーバー（linkIdFor / findExisting）。ここは出すだけ。
+  function pjLinkCell(r) {
+    var l = r.link || {};
+    var now = '';
+    if (l.by === 'sheet') {
+      now = '<div class="pj-dup-note">🔗 シートのIDでつながっています：' + pjEsc(l.project) + '</div>';
+    } else if (l.by === 'manual' && l.project) {
+      now = '<div class="pj-dup-note">🔗 手でつなぎます：' + pjEsc(l.project) + '</div>';
+    }
+    var v = pjEsc(l.id || '');
+    return now + '<div class="pj-dup-note" style="margin-top:4px;">'
+      + '<input type="text" data-f="linkId" value="' + v + '" placeholder="例 P-2026-0315" style="width:120px;"'
+      + ' title="すでにECSにある案件につなぐときは、その案件IDを入れて「② 直した内容で確かめ直す」を押してください">'
+      + ' <span style="font-size:11px;">← ECSの案件IDでつなぐ</span></div>';
   }
 
   // 変わる項目・人の一覧。多いときは4件だけ出して残りは件数にする（表がのびないように）。
@@ -735,6 +755,9 @@
       // 似た案件のとき「別の案件として登録する」を選んだか。
       var an = tr.querySelector('[data-f="asNew"]');
       if (an) { if (an.value === '1') { cur.asNew = true; } else { delete cur.asNew; } }
+      // 手でつなぐECSの案件ID（空なら外す）。
+      var li = tr.querySelector('[data-f="linkId"]');
+      if (li) { var lv = li.value.trim(); if (lv) { cur.linkId = lv; } else { delete cur.linkId; } }
       if (Object.keys(cur).length) { pjEdits[idx] = cur; } else { delete pjEdits[idx]; }
     });
 
