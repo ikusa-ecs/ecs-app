@@ -275,11 +275,13 @@
   @endforeach
 </div>
 
-{{-- 並び順＝社歴順（既定）／出勤数の多い順（FB No.11）。社員別・スタッフ別の両方に効く。 --}}
+{{-- 並び順＝社歴順（既定）／出勤数・D系の列の多い順（FB No.11・2026-09-29 全部の列をボタンに）。
+     ボタンの一覧はコントローラの SORTS が正本（表の見出しのリンクと同じ）。 --}}
 <div class="st-scope">
   <span class="sc-label">並び替え</span>
-  <a class="{{ $sort === 'hire' ? 'active' : '' }}" href="{{ $links['sort']['hire'] }}">社歴順</a>
-  <a class="{{ $sort === 'count' ? 'active' : '' }}" href="{{ $links['sort']['count'] }}">出勤数が多い順</a>
+  @foreach ($sortOptions as $key => $label)
+    <a class="{{ $sort === $key ? 'active' : '' }}" href="{{ $links['sort'][$key] }}">{{ $label }}</a>
+  @endforeach
   <span class="st-note" style="margin:0;">
     社歴順＝入社が古い人（先輩）が上。入社年月日を入れていない人はいちばん下にまとめます。
   </span>

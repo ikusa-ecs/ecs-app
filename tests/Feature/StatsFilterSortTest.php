@@ -116,6 +116,7 @@ class StatsFilterSortTest extends TestCase
         $this->assertLessThan(strpos($html, 'コウハイ次郎'), strpos($html, 'センパイ太郎'), 'Dが多い人が上');
         $this->assertStringContainsString('並びは「Dが多い順」', $html);
         $this->assertStringContainsString('sort=realD', $html, '見出しから他の列でも並べられる');
+        $this->assertStringContainsString('>オンラインDが多い順</a>', $html, '並び替えの横にも全部の列のボタンがある');
 
         $csv = $this->actingAsPerson($me)->get('/stats/export.csv?sort=d&office=all')->assertOk()->getContent();
         $this->assertStringContainsString('並び順,Dが多い順', $csv);

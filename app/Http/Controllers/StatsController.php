@@ -507,6 +507,7 @@ class StatsController extends Controller
             // 並び順（FB No.11）
             'sort'            => $sort,
             'sortLabel'       => self::SORTS[$sort],
+            'sortOptions'     => self::SORTS,   // 「並び替え」の横に並べるボタン（2026-09-29）
             // 画面のリンクで「いまの条件」をそのまま持ち回すための一式。
             'query'           => $query,
             // 画面に置くリンク（1つだけ条件を変えて、他は今のまま）。
