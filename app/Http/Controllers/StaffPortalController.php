@@ -11,6 +11,7 @@ use App\Models\StaffRoleEligibility;
 use App\Support\StaffProjectNews;
 use App\Support\ActiveBonus;
 use App\Support\AssignmentRole;
+use App\Support\DispatchRows;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectSeries;
@@ -637,6 +638,11 @@ class StaffPortalController extends Controller
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
             ->map(fn ($rows) => $rows->pluck('staff_id')->unique()->count());
+        // 派遣で埋まっている人数も足す（依頼中＋確定・派遣10名＝10名・2026-09-29 baba決定）。
+        // ⚠ 会社に頼んだ枠にスタッフを重ねて募集しないため。正本＝DispatchRows::liveCountsFor。
+        foreach (DispatchRows::liveCountsFor($projects->pluck('id')) as $pid => $n) {
+            $filledByProject[$pid] = ($filledByProject[$pid] ?? 0) + $n;
+        }
 
         $contentNames = Content::pluck('content_name', 'id');
 

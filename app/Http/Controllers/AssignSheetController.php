@@ -271,7 +271,8 @@ class AssignSheetController extends Controller
                 // 運営人数のうちIKUSAが出す人数の添え書き（2026-09-18 baba要望）。
                 // ⚠ 文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。
                 'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
-                'filled'      => $members->count(),
+                // 派遣10名＝10名と数える（依頼中＋確定・2026-09-29 baba決定）。正本＝DispatchRows::liveCount。
+                'filled'      => $members->count() + DispatchRows::liveCount($dispatchesByProject[$p->id] ?? []),
                 'members'     => $members->all(),
                 // 派遣（2026-09-16）。メンバーとは別の行で出す＝人ではなく「会社への依頼」だから。
                 'dispatches'  => $dispatchesByProject[$p->id] ?? [],

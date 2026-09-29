@@ -94,13 +94,42 @@ class AssignSlots
         }
         usort($withIndex, fn ($a, $b) => ($a[1] <=> $b[1]) ?: ($a[2] <=> $b[2]));
 
+        // NOを振る。⚠ 派遣は**人数ぶんのNOを使う**（派遣10名＝「3〜12」の1行・2026-09-29 baba決定）。
+        //   1行＝1名にすると、運営人数に対して空きがずれて、黄色の空き行も「あと◯名」も合わなくなる。
+        //   キャンセルした派遣は薄く残すだけで、NOも人数も使わない（no＝null）。
         $out = [];
-        foreach ($withIndex as $i => [$r]) {
-            $r['no'] = $i + 1;
+        $next = 1;
+        foreach ($withIndex as [$r]) {
+            if ($r['kind'] === 'dispatch') {
+                if (! empty($r['d']['cancelled'])) {
+                    $r['no'] = null;
+                    $r['noEnd'] = null;
+                } else {
+                    $n = max(1, (int) ($r['d']['count'] ?? 1));
+                    $r['no'] = $next;
+                    $r['noEnd'] = $next + $n - 1;
+                    $next += $n;
+                }
+            } else {
+                $r['no'] = $next;
+                $r['noEnd'] = $next;
+                $next++;
+            }
             $out[] = $r;
         }
 
         return $out;
+    }
+
+    /** ブロックで使い終わったNOの最後（空き行はこの次から）。 */
+    public static function lastNo(array $lines): int
+    {
+        $last = 0;
+        foreach ($lines as $l) {
+            $last = max($last, (int) ($l['noEnd'] ?? 0));
+        }
+
+        return $last;
     }
 
     /** そのポジションの並び順。知らない・空は後ろ。 */

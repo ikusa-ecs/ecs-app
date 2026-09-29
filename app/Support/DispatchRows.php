@@ -49,6 +49,31 @@ final class DispatchRows
         return self::forProjects([$projectId])[$projectId] ?? [];
     }
 
+    /**
+     * 案件ごとの「派遣で埋まっている人数」＝キャンセル以外（依頼中＋確定）の合計。返り値＝案件ID => 人数。
+     *
+     * ⚠ 派遣10名は**10名**と数える（2026-09-29 baba決定＝依頼した時点で埋まったとみなす）。
+     *   以前は人数に入れていなかった／アサイン表では1行＝1名に見えていたので、「あと◯名」がずれていた。
+     * ⚠ メンバーの人数（充足）を数える画面は、すべてこれを足す：
+     *   アサイン表・日別ボード・エントリー一覧・ピックアップ・スタッフ画面・月まとめ自動アサイン。
+     *
+     * @return array<string, int>
+     */
+    public static function liveCountsFor(iterable $projectIds): array
+    {
+        $ids = collect($projectIds)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return ProjectDispatch::whereIn('project_id', $ids->all())
+            ->where('status', '!=', DispatchStatus::CANCELLED)
+            ->get(['project_id', 'count'])
+            ->groupBy('project_id')
+            ->map(fn (Collection $rows) => (int) $rows->sum(fn ($d) => max(0, (int) $d->count)))
+            ->all();
+    }
+
     /** 頼んでいる人数＝キャンセル以外の合計（「あと何名」の計算に使う）。 */
     public static function liveCount(array $rows): int
     {

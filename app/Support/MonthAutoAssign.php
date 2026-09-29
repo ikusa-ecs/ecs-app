@@ -130,9 +130,12 @@ class MonthAutoAssign
         $wishDays = array_map(fn ($v) => $v['wish'], $wishInfo);
 
         // ── ② 取り合いが厳しい案件から先に ─────────────────────────
-        $rows = $projects->map(function (Project $p) use ($apps, $memberOf, $people, $wishByKey, $busyByDay, $monthCount) {
+        // 派遣で埋まっている人数（依頼中＋確定・派遣10名＝10名）。正本＝DispatchRows::liveCountsFor（2026-09-29）。
+        $dispatched = DispatchRows::liveCountsFor($projects->pluck('id'));
+
+        $rows = $projects->map(function (Project $p) use ($apps, $memberOf, $people, $wishByKey, $busyByDay, $monthCount, $dispatched) {
             $need = $this->needOf($p);
-            $filled = count($memberOf[$p->id] ?? []);
+            $filled = count($memberOf[$p->id] ?? []) + ($dispatched[$p->id] ?? 0);
             $short = max(0, $need - $filled);
             $cand = $this->candidatesFor($p, $apps, $memberOf, $people, $wishByKey, $busyByDay, $monthCount);
 

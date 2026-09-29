@@ -138,6 +138,20 @@ class AssignSlotTest extends TestCase
         $this->assertSame('member', $lines[1]['kind'], 'その下にアサイン済みのOP');
     }
 
+    /** 「D枠を作る」ボタンが画面に出る＝見出しのすぐ下（1番の行より上）。以前はいちばん下で見つからなかった（2026-09-29）。 */
+    public function test_D枠ボタンは見出しのすぐ下に出る(): void
+    {
+        $p = $this->project();
+
+        $html = $this->sheet($p)->assertOk()->getContent();
+
+        $btn = strpos($html, 'ecsSheetAddDirectorSlot(this)');
+        $row1 = strpos($html, '<span class="c-no">1</span>');
+        $this->assertNotFalse($btn, 'ボタンが出ている');
+        $this->assertNotFalse($row1);
+        $this->assertLessThan($row1, $btn, '1番の行より上');
+    }
+
     /** Dに人が入っている案件には「D枠を作る」ボタンを出さない。 */
     public function test_Dが決まっていればボタンは出さない(): void
     {

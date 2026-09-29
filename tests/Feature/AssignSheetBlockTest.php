@@ -112,7 +112,7 @@ class AssignSheetBlockTest extends TestCase
         );
     }
 
-    /** 派遣もブロックの中に入り、NOを1つ使う（＝空き行が1つ減る）。 */
+    /** 派遣もブロックの中に入り、**人数ぶんのNOを使う**（派遣2名＝「1〜2」の1行・空き行は2つ減る・2026-09-29）。 */
     public function test_派遣もブロックの中に入る(): void
     {
         $date = Carbon::today()->addDays(5)->format('Y-m-d');
@@ -125,8 +125,9 @@ class AssignSheetBlockTest extends TestCase
         $html = $this->sheet($date)->assertOk()->getContent();
 
         $this->assertStringContainsString('テスト派遣会社', $html);
-        // 行の合計は15のまま（派遣が1行ぶんを使い、空き行が1つ減る）。
-        $this->assertSame(15, substr_count($html, 'class="mrow mblk'));
+        // NOは15まで＝派遣の1行（1〜2）＋空き行13（3〜15）。
+        $this->assertSame(14, substr_count($html, 'class="mrow mblk'));
+        $this->assertStringContainsString('1<br>〜2', $html);
     }
 
     /** 空の項目は隠さず「未入力」を出す。必須の段階で色が変わる。 */

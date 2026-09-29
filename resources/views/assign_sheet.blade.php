@@ -113,6 +113,8 @@
   /* 空いている行＝うっすら。うるさくならないように罫線だけ見せる。 */
   .mrow.mblk.vacant { background: #fdfcfa; min-height: 15px; }
   .mrow.mblk.vacant .c-no { color: #d8cfc2; }
+  /* 派遣は人数ぶんのNO（例：3〜12）を2段で小さく（2026-09-29） */
+  .mblk .c-no .no-range { display: block; font-size: 8.5px; line-height: 1.1; white-space: nowrap; }
   /* 派遣の行（ブロックの中・2026-09-28 baba指定）。状況の色は .ecs-dsp-st が正本。 */
   .mrow.mblk.dsp .c-nm { color: var(--accent2-ink); font-weight: 700; }
   .mrow.mblk.dsp.off { opacity: .55; text-decoration: line-through; }
@@ -128,7 +130,7 @@
   .mrow.mblk .m-addname { display: none; width: 100%; font-size: 10px; padding: 1px 2px;
     border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
   .acard.editing .mrow.mblk .m-addname { display: block; }
-  .mblk-foot { display: none; padding: 3px 6px; border-top: 1px solid var(--line); }
+  .mblk-foot { display: none; padding: 3px 6px; border-bottom: 1px solid var(--line); }
   .acard.editing .mblk-foot { display: block; }
   .dslot-btn { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px;
     border: 1px solid var(--warn-line); background: var(--warn-soft); color: #b45309; cursor: pointer;
@@ -675,7 +677,17 @@
             <span class="c-jn">巡回</span><span class="c-rm">備考</span>
             <span class="m-edit-btn" onclick="ecsSheetToggleEdit(this)">✎編集</span>
           </div>
-          @php $used = count($c['blockLines']); @endphp
+          @if ($c['dUndecided'])
+            {{-- Dは必ず要るので、決まっていない案件では枠だけ先に立てられるようにする（2026-09-28 baba要望）。
+                 押すと「D／イベプラ（未定）」の枠ができ、あとでD決めの画面から人を入れる。
+                 ⚠ 見出しのすぐ下に置く（2026-09-29）。以前はいちばん下＝15〜30行の下にあって見つからなかった。 --}}
+            <div class="mblk-foot m-edit">
+              <button type="button" class="dslot-btn" onclick="ecsSheetAddDirectorSlot(this)"
+                      title="Dの枠を作ります。人はまだ決めません（D決めの画面で決めます）">🎬 D枠を作る（イベプラ）</button>
+            </div>
+          @endif
+          {{-- ⚠ 使ったNOの最後＝行の数ではない（派遣10名は1行で10個のNOを使う）。正本＝AssignSlots。 --}}
+          @php $used = \App\Support\AssignSlots::lastNo($c['blockLines']); @endphp
           @foreach ($c['blockLines'] as $line)
           @if ($line['kind'] === 'member')
             @php $m = $line['m']; @endphp
@@ -712,7 +724,8 @@
             {{-- 派遣（会社への依頼）。⚠ 状況・色・説明文はサーバーで作ったものをそのまま使う
                  （正本＝App\Support\DispatchRows。画面ごとに組み立て直すと言葉が食い違う）。 --}}
             <div class="mrow mblk dsp {{ !empty($d['cancelled']) ? 'off' : '' }}" title="{{ $d['tip'] ?? '' }}">
-              <span class="c-no">{{ $line['no'] }}</span>
+              {{-- 派遣は人数ぶんのNO（例：3〜12）。キャンセルはNOを使わない＝「—」。 --}}
+              <span class="c-no">@if ($line['no'] === null)—@elseif ($line['noEnd'] > $line['no'])<span class="no-range">{{ $line['no'] }}<br>〜{{ $line['noEnd'] }}</span>@else{{ $line['no'] }}@endif</span>
               <span class="c-nm">{{ $d['agency'] }}<span class="emp">派遣{{ $d['count'] }}名</span></span>
               <span class="c-p"><span class="pos-badge">{{ $d['role'] !== '' ? $d['role'] : '—' }}</span></span>
               <span class="c-jn"><span class="ecs-dsp-st {{ $d['cls'] ?? 'asked' }}">{{ $d['status'] }}</span></span>
@@ -730,14 +743,6 @@
           @for ($n = $used; $n < $c['blockRows']; $n++)
             @include('partials.sheet_slot_row', ['c' => $c, 'no' => $n + 1, 's' => null])
           @endfor
-          @if ($c['dUndecided'])
-            {{-- Dは必ず要るので、決まっていない案件では枠だけ先に立てられるようにする（2026-09-28 baba要望）。
-                 押すと「D／イベプラ（未定）」の枠ができ、あとでD決めの画面から人を入れる。 --}}
-            <div class="mblk-foot m-edit">
-              <button type="button" class="dslot-btn" onclick="ecsSheetAddDirectorSlot(this)"
-                      title="Dの枠を作ります。人はまだ決めません（D決めの画面で決めます）">🎬 D枠を作る（イベプラ）</button>
-            </div>
-          @endif
         </div>
 
       </div>

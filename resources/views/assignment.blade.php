@@ -302,13 +302,15 @@
       <div>この案件は<b>開催日が未設定</b>です。アサインは日付ごとに保存するため、先に「案件登録」で日付を入れてください。</div>
     </div>
   @else
-    <form method="POST" action="/project-assign/save" id="asgForm" data-need="{{ $project->required_count ?? '' }}">
+    {{-- data-dispatch＝派遣で埋まっている人数（依頼中＋確定・派遣10名＝10名・2026-09-29）。
+         選ぶ人数は「必要人数 − 派遣」で数える。数はコントローラで作る（正本＝App\Support\DispatchRows::liveCount）。 --}}
+    <form method="POST" action="/project-assign/save" id="asgForm" data-need="{{ $project->required_count ?? '' }}" data-dispatch="{{ $dspLive ?? 0 }}">
       @csrf
       <input type="hidden" name="project_id" value="{{ $project->id }}">
 
       <div class="asg-bar">
         {{-- 範囲で入っているときは「6〜8名」と出す。数え合わせは多いほう（data-need）で行う。 --}}
-        <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名</span></span>
+        <span class="selnum" id="selnumWrap">選択 <b id="selCount">0</b> <span class="need">/ 必要 {{ ($needLabel ?? '') !== '' ? $needLabel : '—' }}名{{ ($dspLive ?? 0) > 0 ? '（うち派遣 '.$dspLive.'名＝選ぶのは残り）' : '' }}</span></span>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="onlyAvail" checked onchange="filterStaff()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> エントリー・この日 希望/稼働可 の人だけ</label>
         <label style="font-size:13px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="sortByScore" checked onchange="sortRows()" style="width:16px; height:16px; accent-color:var(--brand); cursor:pointer;"> おすすめ順に並べる</label>
         <button type="button" class="btn primary" id="autoPlaceBtn" onclick="autoPlace()" title="空いている必要人数ぶん、おすすめ上位を自動でチェックします（保存はしません）">✨ おすすめを自動で仮置き</button>
@@ -525,7 +527,10 @@
 @verbatim
 <script>
   var asgForm = document.getElementById('asgForm');
+  // 選ぶ人数の目安＝必要人数 − 派遣（依頼中＋確定）。派遣10名で頼んでいれば、その10名は選ばなくてよい（2026-09-29）。
+  var DSP = asgForm ? (parseInt(asgForm.dataset.dispatch || '0', 10) || 0) : 0;
   var NEED = asgForm ? parseInt(asgForm.dataset.need || '', 10) : NaN;
+  if (!isNaN(NEED)) NEED = Math.max(0, NEED - DSP);
 
   function checkedRows() {
     return Array.from(document.querySelectorAll('input[name="staff_ids[]"]:checked'))
@@ -783,7 +788,7 @@
       const n = selectedCount();
       const warns = [];
       if (!isNaN(NEED) && n !== NEED) {
-        warns.push('・必要 ' + NEED + '名 に対して選択は ' + n + '名です'
+        warns.push('・必要 ' + NEED + '名' + (DSP > 0 ? '（派遣 ' + DSP + '名を除く）' : '') + ' に対して選択は ' + n + '名です'
           + (n < NEED ? '（' + (NEED - n) + '名 不足）' : '（' + (n - NEED) + '名 超過）'));
       }
       const pairs = ngPairs();

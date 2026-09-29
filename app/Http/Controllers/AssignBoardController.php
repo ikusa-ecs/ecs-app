@@ -594,7 +594,8 @@ class AssignBoardController extends Controller
                 'need' => $p->required_count ?? 0,
                 // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
                 'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
-                'filled' => count($assigned),
+                // 派遣10名＝10名と数える（依頼中＋確定・2026-09-29）。⚠ 画面のJSは filledOf で同じ足し算をしている。
+                'filled' => count($assigned) + DispatchRows::liveCount($dispatchesByProject[$p->id] ?? []),
                 // お客様（参加者）の人数とチーム数（2026-09-07 baba要望）。
                 // ⚠ スタッフの運営人数（need）とは**別のもの**。取り違えると当日の規模を読み違える。
                 // ⚠ 「未定」は空欄で保存される（案件登録の「人数は未定」チェック）ので、
@@ -911,7 +912,10 @@ class AssignBoardController extends Controller
             return $map;
         });
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople) {
+        // 派遣で埋まっている人数（依頼中＋確定・派遣10名＝10名）。正本＝DispatchRows（2026-09-29）。
+        $dispatched = DispatchRows::liveCountsFor($projects->pluck('id'));
+
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
             $entryNotes = $noteByProject->get($p->id, []);         // [staff_id => 本人の応募メモ]
@@ -985,7 +989,7 @@ class AssignBoardController extends Controller
                 'need' => $p->required_count ?? 0,
                 // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
                 'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
-                'filled' => count($assignedIds),
+                'filled' => count($assignedIds) + ($dispatched[$p->id] ?? 0),   // 派遣10名＝10名（2026-09-29）
                 'status' => $p->status ?? '未着手',
                 'dayType' => $p->date_type ?? '本番',
                 'state' => $this->boardState($p),
@@ -1130,7 +1134,7 @@ class AssignBoardController extends Controller
                 'need' => $p->required_count ?? 0,
                 // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
                 'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
-                'filled' => count($assignedIds),
+                'filled' => count($assignedIds) + DispatchRows::liveCount($dispatchesByProject[$p->id] ?? []),   // 派遣10名＝10名（2026-09-29）
                 'meet' => $p->start_time ?? '—',
                 'leave' => $p->end_time ?? '—',
                 'place' => $p->location ?? '',

@@ -273,7 +273,9 @@ class AssignmentController extends Controller
             // 派遣依頼（2026-09-16 baba要望）。この画面は名簿から人を選ぶ画面なので、
             // 派遣は下の一覧には出てこない＝「何名は派遣で埋めたか」が分からなかった。
             // ⚠ ここは見るだけ。頼む・直すのは日別ボードの「＋派遣」と「派遣一覧」。
-            'dispatches' => DispatchRows::forProject($project->id),
+            'dispatches' => $dispatchRows = DispatchRows::forProject($project->id),
+            // 派遣で埋まっている人数（依頼中＋確定・派遣10名＝10名・2026-09-29）。選ぶ人数はこれを引いて数える。
+            'dspLive' => DispatchRows::liveCount($dispatchRows),
         ]);
     }
 

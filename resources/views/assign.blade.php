@@ -887,7 +887,12 @@
       c.assigned = candPool(c).slice(0, c.filled).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:'staff' }));
     });
   }
-  function filledOf(c){ return c.assigned.length; }
+  // 派遣で埋まっている人数＝キャンセル以外（依頼中＋確定）の合計。派遣10名＝10名（2026-09-29 baba決定）。
+  // ⚠ サーバーの正本＝App\Support\DispatchRows::liveCount と同じ数え方にする。
+  function dispatchLiveOf(c){
+    return (c.dispatches || []).reduce((s, d) => s + (d.cancelled ? 0 : Math.max(0, parseInt(d.count, 10) || 0)), 0);
+  }
+  function filledOf(c){ return c.assigned.length + dispatchLiveOf(c); }
   // メンバーの並び順＝上から D → (SD) → MC → OP → FC → CK → 軍師/サポ → 受付 → その他。
   const ECS_ROLE_RANK = { D:0, SD:1, MC:2, OP:3, FC:4, CK:5, SP:6, GUN:6, RP:7, UKE:7 };
   function roleRank(code){ return (code && (code in ECS_ROLE_RANK)) ? ECS_ROLE_RANK[code] : 99; }
@@ -2253,7 +2258,8 @@
   //   「仮」＝まだ声掛け中で決まっていないので、その枠は募集を続ける。
   //   （取込でシートのメンバーが仮で入った瞬間に締切になり、スタッフがエントリー
   //     できなくなっていたため。カードの「割当済」は今までどおり仮も入れて数える）。
-  function confirmedOf(c){ return c.assigned.filter(m => m.status === '確定').length; }
+  // ⚠ 派遣（依頼中＋確定）も足す＝会社に頼んだ枠にスタッフを重ねて募集しない（2026-09-29）。
+  function confirmedOf(c){ return c.assigned.filter(m => m.status === '確定').length + dispatchLiveOf(c); }
   function isFullForStaff(c){ return confirmedOf(c) >= needStaffOf(c); }
   function remainForStaff(c){ return Math.max(0, needStaffOf(c) - confirmedOf(c)); }
 
