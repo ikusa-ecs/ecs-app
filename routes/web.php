@@ -414,6 +414,10 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // まとめて削除（2026-08-31 baba要望）。案件CSVの取込で台帳に増えたコンテンツを一度に片づける。
     // ⚠ 案件で使われているコンテンツは消さない（コントローラ側でも断る）。削除はAdministratorのみ。
     Route::post('/masters/contents/bulk-delete', [MasterController::class, 'contentBulkDestroy'])->middleware('tier:admin');
+    // 取込で増えたコンテンツの片づけ（「A・B」のまとめ・書き方だけ違う同じ名前）。2026-09-29 baba要望。
+    // ⚠ 消す操作なので Administrator のみ（コンテンツの削除と同じ）。
+    Route::get('/masters/content-cleanup', [MasterController::class, 'contentCleanup'])->middleware('tier:admin');
+    Route::post('/masters/content-cleanup', [MasterController::class, 'contentCleanupApply'])->middleware('tier:admin');
     Route::post('/masters/office-options', [MasterController::class, 'officeOptionsSave']);   // 拠点ごとの選択肢（集合形式・音響・移動・運営場所）
     Route::post('/masters/offices', [MasterController::class, 'officeStore']);               // 新規追加
     Route::post('/masters/offices/bulk', [MasterController::class, 'officeBulkStore']);      // まとめて保存

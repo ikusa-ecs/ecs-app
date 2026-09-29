@@ -145,9 +145,11 @@ class ScheduleMarkImportTest extends TestCase
             'mode' => 'これから',
         ])->assertRedirect('/past-import');
 
+        // ⚠ 2026-09-29 から「これから」の取込でも台帳に足さない（baba「コンテンツは量産しないでほしい」）。
         $names = Content::pluck('content_name')->all();
         $this->assertNotContains('綱引き大会(リハ)', $names, 'リハつきの名前が台帳に増えている');
-        $this->assertContains('綱引き大会', $names);
+        $this->assertNotContains('綱引き大会', $names, '取込で台帳が増えている');
+        $this->assertSame('綱引き大会', Project::first()->project_name, '案件には印を外した名前で残る');
     }
 
     /**

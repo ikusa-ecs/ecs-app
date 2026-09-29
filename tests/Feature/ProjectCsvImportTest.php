@@ -101,7 +101,7 @@ class ProjectCsvImportTest extends TestCase
         $this->assertTrue((bool) $noCount->count_tentative);
     }
 
-    /** IT-CSV-03：コンテンツ名（案件名）から contents が発番/紐づけされ content_ids に入る。 */
+    /** IT-CSV-03：コンテンツ名（案件名）が台帳につながる（台帳に無ければ単発・取込では台帳を増やさない＝2026-09-29）。 */
     public function test_content_name_is_linked_to_content_id(): void
     {
         $user = PersonFactory::new()->create();
@@ -118,13 +118,22 @@ class ProjectCsvImportTest extends TestCase
             ->post('/project-import', ['csv' => $file])
             ->assertRedirect('/projects');
 
-        // コンテンツが新規発番されている。
-        $content = Content::where('content_name', '謎解き脱出ゲーム')->first();
-        $this->assertNotNull($content);
-
-        // その content.id が作成された project の content_ids に反映されている。
+        // ⚠ 2026-09-29 から、取込では台帳に足さない（baba「コンテンツは量産しないでほしい」）。
+        //   台帳に無い名前は「単発」として案件に文字で残る。
+        $this->assertNull(Content::where('content_name', '謎解き脱出ゲーム')->first(), '取込で台帳が増えている');
         $project = Project::where('project_name', '謎解き脱出ゲーム')->first();
         $this->assertNotNull($project);
-        $this->assertContains($content->id, $project->content_ids);
+        $this->assertSame(['謎解き脱出ゲーム'], $project->content_names);
+
+        // 台帳にあるコンテンツは、書き方が少し違っても・複数書いてあってもつながる。
+        $a = Content::create(['id' => 'CT-900', 'content_name' => '謎パ', 'active' => true]);
+        $b = Content::create(['id' => 'CT-901', 'content_name' => '格付けバトル', 'active' => true]);
+        $csv2 = $this->makeCsv(['案件名', '開催日', '運営人数'], [['謎パ・格付け バトル', '2026-07-21', '5']]);
+        $this->actingAsPerson($user)
+            ->post('/project-import', ['csv' => UploadedFile::fake()->createWithContent('cases2.csv', $csv2)])
+            ->assertRedirect('/projects');
+        $p2 = Project::whereDate('start_date', '2026-07-21')->first();
+        $this->assertSame([$a->id, $b->id], $p2->content_ids, '2つのコンテンツにつながる');
+        $this->assertSame(2, Content::count(), '台帳は増えない');
     }
 }

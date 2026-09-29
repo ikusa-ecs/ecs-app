@@ -14,6 +14,7 @@ use App\Support\ClientName;
 use App\Support\CsvText;
 use App\Support\DirectorSync;
 use App\Support\Headcount;
+use App\Support\ImportContents;
 use App\Support\OfficeOptions;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
@@ -1147,6 +1148,8 @@ class ProjectController extends Controller
         // 運営人数が空欄で「仮」を入れた行の説明（2026-09-08）。
         // ⚠ 黙って数字を入れない＝何名をどう出したかを必ず知らせる。
         $estimated = [];
+        $notInLedger = [];      // 台帳に無かったコンテンツ名（2026-09-29 から台帳に足さない）
+        $importContents = null; // 台帳の引き当て（読むのは1回だけ）
         $lineNo = 1;    // 見出しを除いた人間向けの行番号（1始まり）
 
         foreach ($lines as $line) {
@@ -1188,8 +1191,14 @@ class ProjectController extends Controller
             }
 
             // --- OK行を登録 ---
-            $contentName = collect([$name])->filter()->unique()->values();
-            $contentIds = $this->resolveContentIds($contentName);
+            // コンテンツ（複数可）。⚠ 取込では台帳に足さない（2026-09-29 baba「コンテンツは量産しないでほしい」）。
+            //   「謎パ・格付けバトル」のような欄は区切って1つずつ台帳につなぐ。正本＝App\Support\ImportContents。
+            $importContents ??= new ImportContents;
+            $contents = $importContents->resolve((string) $name);
+            $contentIds = $contents['ids'];
+            foreach ($contents['unknown'] as $u) {
+                $notInLedger[$u] = true;
+            }
 
             $guest = ctype_digit($get($row, 'お客様人数')) ? (int) $get($row, 'お客様人数') : null;
             $scale = $get($row, '案件規模') ?: null;
@@ -1210,8 +1219,9 @@ class ProjectController extends Controller
 
             Project::create([
                 'id' => $this->nextProjectId($date),
-                'project_name' => $name,
+                'project_name' => $contents['names'] !== [] ? implode('・', $contents['names']) : $name,
                 'content_ids' => $contentIds,
+                'content_names' => $contents['names'],
                 'category' => $get($row, '区分') ?: null,
                 // toC列に「toC/toc/あり/○/はい/1」があれば一般消費者向け＝true。空欄はtoB扱い。
                 'is_toc' => in_array($get($row, 'toC'), ['toC', 'toc', 'あり', '○', '◯', 'はい', '1'], true),
@@ -1276,6 +1286,11 @@ class ProjectController extends Controller
         }
         if ($errors) {
             $msg .= ' エラー'.count($errors).'件は取り込みませんでした：'.implode(' / ', $errors);
+        }
+        // 台帳に無かったコンテンツ名（足していない＝単発あつかい）。⚠ 黙って落とさない。
+        if (! empty($notInLedger)) {
+            $msg .= ' ℹ 次のコンテンツ名はコンテンツ台帳に無かったので、台帳には足さず「単発」で入れました'
+                .'（台帳に入れたいときはマスタ管理で足してください）：'.implode(' / ', array_keys($notInLedger)).'。';
         }
         // どの列を無視したかを必ず知らせる（アサイン表のCSVをそのまま入れたときに
         // 「入ったつもりで入っていない項目」に気づけるようにするため）。

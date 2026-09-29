@@ -6,6 +6,7 @@ use App\Models\Content;
 use App\Models\ContentRoleRequirement;
 use App\Models\Office;
 use App\Support\AssignmentRole;
+use App\Support\ContentCleanup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -129,6 +130,29 @@ class MasterController extends Controller
         }
 
         return redirect('/masters#contents')->with('status', $msg);
+    }
+
+    /**
+     * 取込で増えてしまったコンテンツの片づけ（2026-09-29 baba「コンテンツは量産しないでほしい」）。
+     * 候補を出すだけ。つなぎ直して消すのは人が選んで押したものだけ。正本＝App\Support\ContentCleanup。
+     */
+    public function contentCleanup()
+    {
+        return view('content_cleanup', ['candidates' => ContentCleanup::candidates()]);
+    }
+
+    public function contentCleanupApply(Request $request)
+    {
+        $ids = array_values(array_filter((array) $request->input('ids', []), 'is_string'));
+        if ($ids === []) {
+            return redirect('/masters/content-cleanup')->with('status', '片づけるコンテンツが選ばれていませんでした。');
+        }
+
+        $r = ContentCleanup::apply($ids);
+
+        return redirect('/masters/content-cleanup')->with('status',
+            count($r['done']).'件のコンテンツを片づけました（案件'.$r['projects'].'件をつなぎ直しました）'
+            .($r['done'] ? '：'.implode('／', $r['done']) : '').'。');
     }
 
     /**

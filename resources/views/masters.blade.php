@@ -194,7 +194,9 @@
         <div class="m-save-bar" style="border-top:1px solid var(--line); margin-top:4px;">
           <span class="m-note" style="margin:0;">
             案件CSVの取込などで増えた、いらないコンテンツを片づけられます。<br>
-            ⚠ <b>案件で使われているコンテンツは選べません</b>（消すと、その案件のコンテンツ名が分からなくなるため）。
+            ⚠ <b>案件で使われているコンテンツは選べません</b>（消すと、その案件のコンテンツ名が分からなくなるため）。<br>
+            案件で使われている「謎パ・格付けバトル」のような<b>まとめの名前</b>や、書き方だけ違う<b>同じ名前</b>は
+            <a href="/masters/content-cleanup">🧹 コンテンツの片づけ</a> から、案件をつなぎ直してから消せます。
           </span>
           <button type="submit" class="m-btn danger">選んだものを削除</button>
         </div>

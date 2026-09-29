@@ -11,6 +11,7 @@ use App\Support\AssignmentRole;
 use App\Support\AssignmentStamp;
 use App\Support\ClientName;
 use App\Support\CsvText;
+use App\Support\ImportContents;
 use App\Support\Headcount;
 use App\Support\MonthlySheetReader;
 use App\Support\OfficeScope;
@@ -64,6 +65,9 @@ class PastProjectImportController extends Controller
      * @var array<string, true>
      */
     private array $newContentNames = [];
+
+    /** シートのコンテンツ名 → 台帳（1回の取込で台帳を読むのは1回だけ）。 */
+    private ?ImportContents $importContents = null;
 
     public const MODE_PAST = '過去';
 
@@ -215,6 +219,8 @@ class PastProjectImportController extends Controller
                     // ブロックの左端の列（0はじまり）。ECSの案件IDをアサイン表へ
                     // 書き戻すときの目印（2026-09-15 baba要望）。取り込みには使わない。
                     'col' => $case['col'] ?? null,
+                    // そのブロックの100行目に書き戻してあるECSの案件ID（2026-09-29 から照合に使う）。
+                    'ecsId' => $this->ecsIdAt($rows, $case['col'] ?? null),
                 ];
             }
             $unmapped = $read['unknownLabels'];
@@ -472,7 +478,7 @@ class PastProjectImportController extends Controller
             // すでに入っている案件をさがすのは、この1回だけ（重なりの表示と差分の両方で使う）。
             $found = $info['errors']
                 ? ['exact' => null, 'similar' => null, 'similarCount' => 0]
-                : $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null);
+                : $this->findExisting($info['date'], $info['name'], $info['client'], $info['meetTime'] ?? null, $entry['ecsId'] ?? null);
 
             // 取込を押したら「ECSの中身が実際にどう変わるか」（2026-09-10 baba要望）。
             //
@@ -486,7 +492,8 @@ class PastProjectImportController extends Controller
                 $attrs = $this->projectAttributes($get, $info['name'], (string) $info['date'], $info['count'],
                     $info['client'], $info['meetTime'] ?? null, $office, $mode, $assignments !== [],
                     $this->countFor($get, $info['name'], $info['count']));
-                $diff = SheetDiff::forCase($attrs, SheetDiff::target($found, $edit), $assignments, $info['date']);
+                $target = SheetDiff::target($found, $edit);
+                $diff = SheetDiff::forCase($this->keepOnUpdate($target, $attrs, $info['name']), $target, $assignments, $info['date']);
             }
 
             $rows[] = [
@@ -642,11 +649,13 @@ class PastProjectImportController extends Controller
 
             // 同じ案件があるか。⚠ 探し方の正本は findExisting（下見とまったく同じものを使う）。
             //   「似ているだけ」の案件を上書きするかどうかは、下見で人が選んだ印（asNew）で決める。
-            $found = $this->findExisting($date, $name, $client, $meetTime);
+            $found = $this->findExisting($date, $name, $client, $meetTime, $entry['ecsId'] ?? null);
             // ⚠ どの案件に上書きするかの決め方は SheetDiff::target の1か所にまとめてある。
             //   下見（差分の表示）と取込がここで食い違うと、「変化なし」と出した案件を
             //   別の案件に上書きする、という最悪の事故になる。
             $existing = SheetDiff::target($found, $edit);
+            // 上書きのときに書き換えないもの（顧客名の書き方・台帳に無い名前のコンテンツ）を外す。
+            $attrs = $this->keepOnUpdate($existing, $attrs, $name);
 
             // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
             $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
@@ -967,16 +976,20 @@ class PastProjectImportController extends Controller
         // 運営人数（空欄なら「仮」で置く）。⚠ 出し方は countFor の1か所（画面にも書き写さない）。
         $head = $estimate ?? $this->countFor($get, $name, $count);
 
+        // コンテンツ（複数可・台帳には足さない・2026-09-29）。正本＝ImportContents。
+        $contents = $this->contentsOf($name);
+
         return [
-            'project_name' => $name,
+            // 案件名＝コンテンツ名を「・」でつないだもの（案件登録の画面と同じ作り方）。
+            'project_name' => implode('・', $contents['names']),
             // 登録拠点＝画面で選んだ拠点（既定は取り込んだ人の拠点）。
             // ⚠ ここが空だと案件一覧の拠点しぼりに引っかからず、誰にも見えない案件になる。
             // ⚠ 他拠点のアサイン表を代わりに取り込むことがあるので、取り込んだ人の拠点で
             //   決め打ちにしない（東北の案件が東京の案件として入ってしまう・2026-08-25 baba）。
             'office' => $office,
-            // ⚠ 台帳に足すのは「これからの案件」のときだけ（過去は足さない・2026-09-16 baba決定）。
-            'content_ids' => $this->resolveContentIds($name, $future),
-            'content_names' => [$name],
+            // ⚠ 取込では台帳に足さない（過去もこれからも・2026-09-29 baba）。台帳に無い名前は単発として names に残る。
+            'content_ids' => $contents['ids'],
+            'content_names' => $contents['names'],
             'category' => $get('区分') ?: null,
             'yomi' => $get('確度') ?: '確定',
             'scale' => $get('案件規模') ?: null,
@@ -1236,39 +1249,36 @@ class PastProjectImportController extends Controller
      *
      * @param  bool  $createMissing  台帳に無い名前を台帳に足すか（過去＝false／これから＝true）
      */
-    private function resolveContentIds(string $name, bool $createMissing = true): array
+    private function resolveContentIds(string $name): array
     {
-        $name = trim($name);
-        if ($name === '') {
-            return [];
+        return $this->contentsOf($name)['ids'];
+    }
+
+    /**
+     * シートのコンテンツ欄 → 台帳のコンテンツ（複数可）。正本＝App\Support\ImportContents。
+     *
+     * ⚠ **2026-09-29 から、取込では「これから」の案件でも台帳に足さない**（baba「コンテンツは量産しないでほしい」）。
+     *   「謎パ・格付けバトル」のように複数書いてある欄を、まるごと1つの新しいコンテンツにしていたため。
+     *   台帳に無い名前はその案件だけの単発として残し、取込のあとに一覧で知らせる（黙って落とさない）。
+     *
+     * @return array{ids: list<string>, names: list<string>, unknown: list<string>}
+     */
+    private function contentsOf(string $name, bool $remember = true): array
+    {
+        $this->importContents ??= new ImportContents;
+        // 「(リハ)」などの印は外してから探す（保存する案件名も外したもの＝比べるときも同じにする）。
+        $mark = ScheduleMark::detect($name);
+        if ($mark !== null) {
+            $name = $mark['clean'];
+        }
+        $r = $this->importContents->resolve($name);
+        if ($remember) {
+            foreach ($r['unknown'] as $u) {
+                $this->newContentNames[$u] = true;
+            }
         }
 
-        $existing = Content::where('content_name', $name)->first();
-        if ($existing) {
-            return [$existing->id];
-        }
-
-        if (! $createMissing) {
-            // 足さない。あとで「台帳に無かった名前」として画面に出す（黙って落とさない）。
-            $this->newContentNames[$name] = true;
-
-            return [];
-        }
-
-        $maxNum = (int) (Content::where('id', 'like', 'CT-%')->get()
-            ->map(fn ($c) => (int) preg_replace('/\D/', '', $c->id))
-            ->max() ?? 0);
-        $id = 'CT-'.str_pad((string) ($maxNum + 1), 3, '0', STR_PAD_LEFT);
-
-        Content::create([
-            'id' => $id,
-            'content_name' => $name,
-            'active' => true,
-            // 台帳の末尾に置く（並び順は数字が大きいほど後ろ）。
-            'sort_order' => (int) (Content::max('sort_order') ?? 0) + 10,
-        ]);
-
-        return [$id];
+        return $r;
     }
 
     /** 案件IDを発番（P-西暦-連番）。 */
@@ -1322,14 +1332,17 @@ class PastProjectImportController extends Controller
         }
 
         $old = $found['similar'];
-        $fmt = fn ($t, $n) => '集合 '.(trim((string) $t) !== '' ? $t : '未定')
+        // 何が違うのかが分かるように、案件名・顧客名も並べる（2026-09-29 から名前・顧客の書き方違いも「似ている」に入るため）。
+        $fmt = fn ($nm, $cl, $t, $n) => (trim((string) $nm) !== '' ? $nm : '（名称未定）')
+            .'／'.(trim((string) $cl) !== '' ? $cl : '顧客名なし')
+            .'／集合 '.(trim((string) $t) !== '' ? $t : '未定')
             .'／運営人数 '.(trim((string) $n) !== '' ? $n : '未入力');
 
         return [
             'kind' => 'similar',
             'asNew' => ! empty($edit['asNew']),
-            'was' => $fmt($old->start_time, $old->required_count),
-            'now' => $fmt($info['meetTime'] ?? '', $info['count']),
+            'was' => $fmt($old->project_name, $old->client, $old->start_time, $old->required_count),
+            'now' => $fmt($info['name'], $info['client'], $info['meetTime'] ?? '', $info['count']),
             'count' => $found['similarCount'],
         ];
     }
@@ -1350,21 +1363,35 @@ class PastProjectImportController extends Controller
      *   本物の別案件がありうる。潰すとアサインごと消えるので、人が選べるようにする。
      * ⚠ 似た案件が2件以上あるときは、いちばん古いもの（先に登録されたもの）を候補にする。
      *
+     * 【2026-09-29 に足したこと】（baba「差分取込で、案件登録してあるのに新しい案件になる」）
+     *  ・シートの100行目に**ECSの案件ID**があれば、まずそれで決める（毎朝書き戻しているのに使っていなかった）。
+     *    ⚠ ただし日付が違えば使わない（列を入れ替えたなどで別の案件のIDが残っていることがある）。
+     *  ・コンテンツ名と顧客名は**書き方の違いを無視して**比べる
+     *    （コンテンツ＝全角半角・空白・並び順／顧客＝株式会社・（株）・様・空白。正本＝ImportContents）。
+     *    ECSで先に登録した案件は「コンテンツ台帳の名前」「株式会社つきの顧客名」になっていて、
+     *    シートの書き方と1文字違うだけで新しい案件にしていた。
+     *  ・同じ日で「顧客が同じ＋コンテンツが一部重なる」「コンテンツが同じ＋どちらかの顧客が空」も
+     *    **似ている案件**として下見で人に聞く（黙って上書きしない＝午前・午後の2本立てがありうる）。
+     *
      * @return array{exact: ?Project, similar: ?Project, similarCount: int}
      */
-    private function findExisting(?string $date, string $name, ?string $client, ?string $meetTime): array
+    private function findExisting(?string $date, string $name, ?string $client, ?string $meetTime, ?string $ecsId = null): array
     {
         if (! $date || $name === '') {
             return ['exact' => null, 'similar' => null, 'similarCount' => 0];
         }
 
+        // ① シートに書き戻したECSの案件ID（100行目）。日付が合うときだけ信じる。
+        if ($ecsId !== null && $ecsId !== '') {
+            $byId = Project::find($ecsId);
+            if ($byId && optional($byId->start_date)->format('Y-m-d') === $date) {
+                return ['exact' => $byId, 'similar' => null, 'similarCount' => 0];
+            }
+        }
+
         // ⚠ 日付は「2026-01-20 00:00:00」の形で保存されるので、where ではなく whereDate で探す
         //   （where だと一致せず、取り込み直すたびに案件が増えてしまう。既知の罠）。
-        $sameDayList = Project::whereDate('start_date', $date)
-            ->where('project_name', $name)
-            ->where('client', $client)
-            ->orderBy('id')
-            ->get();
+        $sameDayList = Project::whereDate('start_date', $date)->orderBy('id')->get();
 
         // ⚠ 時間は「08:00」でも「8:00」でも同じものとして比べる。
         //   保存されるのは整えたあとの「8:00」なので、シートの「08:00」とそのまま比べると
@@ -1372,14 +1399,83 @@ class PastProjectImportController extends Controller
         $hm = fn ($t) => ProjectImportColumns::normalizeTime((string) $t);
         $want = $hm($meetTime);
 
-        $exact = $sameDayList->first(fn (Project $p) => $hm($p->start_time) === $want);
-        $others = $sameDayList->filter(fn (Project $p) => $hm($p->start_time) !== $want);
+        // コンテンツの中身（名前の集まり）と顧客名を、書き方の違いを無視した形にそろえる。
+        $keysOf = function (array $names): array {
+            $k = explode('|', ImportContents::namesKey($names));
+
+            return array_values(array_filter($k, fn ($s) => $s !== ''));
+        };
+        $wantNames = $keysOf($this->contentsOf($name, false)['names']);
+        $wantClient = ImportContents::clientKey($client);
+        $namesOfProject = function (Project $p) use ($keysOf): array {
+            $names = is_array($p->content_names) && $p->content_names !== []
+                ? $p->content_names
+                : $this->contentsOf((string) $p->project_name, false)['names'];
+
+            return $keysOf($names);
+        };
+
+        $same = [];     // コンテンツも顧客も同じ（書き方の違いだけ）
+        $near = [];     // 似ている（人に聞く）
+        foreach ($sameDayList as $p) {
+            $pNames = $namesOfProject($p);
+            $pClient = ImportContents::clientKey($p->client);
+            $namesEq = $pNames === $wantNames;
+            $overlap = array_intersect($pNames, $wantNames) !== [];
+            $clientEq = $pClient === $wantClient;
+
+            if ($namesEq && $clientEq) {
+                $same[] = $p;
+            } elseif (($clientEq && $wantClient !== '' && $overlap)
+                || ($namesEq && ($pClient === '' || $wantClient === ''))) {
+                $near[] = $p;
+            }
+        }
+        $same = collect($same);
+
+        $exact = $same->first(fn (Project $p) => $hm($p->start_time) === $want);
+        $others = $same->filter(fn (Project $p) => $hm($p->start_time) !== $want)
+            ->concat($near)->values();
 
         return [
             'exact' => $exact,
             'similar' => $exact ? null : $others->first(),
             'similarCount' => $others->count(),
         ];
+    }
+
+    /**
+     * すでにある案件に上書きするときに、**書き換えないもの**を外す（2026-09-29）。
+     *
+     *  ・顧客名：書き方の違いだけ（株式会社の有無など）なら、ECSの書き方を残す。
+     *  ・コンテンツ：シートに台帳に無い名前が混ざっているときは、ECSのコンテンツを残す
+     *    （ECSで正しく選んである案件を、シートの表記ゆれで単発に変えてしまわないため）。
+     * ⚠ 下見（差分の表示）と取込で必ずこれを通す＝「変化なし」と出たのに書き換わる事故を防ぐ。
+     */
+    private function keepOnUpdate(?Project $target, array $attrs, string $name): array
+    {
+        if ($target === null) {
+            return $attrs;
+        }
+        if (ImportContents::clientKey($target->client) === ImportContents::clientKey($attrs['client'] ?? null)) {
+            unset($attrs['client']);
+        }
+        if ($this->contentsOf($name, false)['unknown'] !== []) {
+            unset($attrs['project_name'], $attrs['content_ids'], $attrs['content_names']);
+        }
+
+        return $attrs;
+    }
+
+    /** シートの100行目（ECSが書き戻した案件ID）から、そのブロックのIDを読む。無ければ null。 */
+    private function ecsIdAt(array $rows, ?int $col): ?string
+    {
+        if ($col === null) {
+            return null;
+        }
+        $v = trim((string) ($rows[SheetSyncController::ID_ROW - 1][$col] ?? ''));
+
+        return preg_match('/^P-\d{4}-\d+$/', $v) === 1 ? $v : null;
     }
 
     /** 画面に出す結果のメッセージ。 */
