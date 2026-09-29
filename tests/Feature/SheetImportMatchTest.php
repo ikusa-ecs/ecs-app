@@ -201,6 +201,40 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame(1, Project::count(), '前回の対応表があるのに新しい案件が増えた');
     }
 
+    /** ECSで「前日設営」と登録した案件を、シートの取込で「本番」に戻さない（2026-09-29 11/2 板橋区の件）。 */
+    public function test_前日設営を本番に戻さない(): void
+    {
+        $me = $this->manager();
+        $p = $this->ecsProject(['id' => 'P-2026-0050', 'project_name' => '運動会', 'client' => '板橋区', 'date_type' => '前日設営']);
+
+        // 月ごとのアサイン表には日程種別の欄が無い＝何も書いていない。
+        $this->import($me, $this->rows('運動会', '板橋区', 'P-2026-0050'));
+
+        $this->assertSame(1, Project::count());
+        $this->assertSame('前日設営', $p->fresh()->date_type, '取込で本番に戻っている');
+    }
+
+    /** シートが空欄のところは、ECSで入れた値を消さない（2026-09-29 baba「ECSで登録してるものは？」）。 */
+    public function test_シートの空欄でECSの値を消さない(): void
+    {
+        $me = $this->manager();
+        $p = $this->ecsProject([
+            'id' => 'P-2026-0060', 'project_name' => '運動会', 'client' => '板橋区',
+            'format' => 'リアルロング', 'note' => 'ECSで書いた備考', 'yomi' => 'Aヨミ',
+            'prep_script' => true, 'is_recruiting' => false, 'status' => '確定', 'required_count' => 12,
+        ]);
+
+        $this->import($me, $this->rows('運動会', '板橋区', 'P-2026-0060'));
+
+        $p->refresh();
+        $this->assertSame('リアルロング', $p->format);
+        $this->assertSame('ECSで書いた備考', $p->note);
+        $this->assertSame('Aヨミ', $p->yomi, '空欄の確度で「確定」に上書きしている');
+        $this->assertTrue((bool) $p->prep_script, '準備のチェックが外れている');
+        $this->assertSame('確定', $p->status);
+        $this->assertSame(5, (int) $p->required_count, 'シートに書いてある人数（5名）は入る');
+    }
+
     /** 消した案件のIDが残っていたら、ふつうに名前で探す（落ちない）。 */
     public function test_消した案件のIDなら名前で探す(): void
     {

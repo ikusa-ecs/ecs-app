@@ -520,7 +520,7 @@ class PastProjectImportController extends Controller
                     $info['client'], $info['meetTime'] ?? null, $office, $mode, $assignments !== [],
                     $this->countFor($get, $info['name'], $info['count']));
                 $target = SheetDiff::target($found, $edit);
-                $diff = SheetDiff::forCase($this->keepOnUpdate($target, $attrs, $info['name']), $target, $assignments, $info['date']);
+                $diff = SheetDiff::forCase($this->keepOnUpdate($target, $attrs, $info['name'], $get), $target, $assignments, $info['date']);
             }
 
             $rows[] = [
@@ -697,7 +697,7 @@ class PastProjectImportController extends Controller
             //   別の案件に上書きする、という最悪の事故になる。
             $existing = SheetDiff::target($found, $edit);
             // 上書きのときに書き換えないもの（顧客名の書き方・台帳に無い名前のコンテンツ）を外す。
-            $attrs = $this->keepOnUpdate($existing, $attrs, $name);
+            $attrs = $this->keepOnUpdate($existing, $attrs, $name, $get);
 
             // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
             $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
@@ -1518,16 +1518,61 @@ class PastProjectImportController extends Controller
      *    （ECSで正しく選んである案件を、シートの表記ゆれで単発に変えてしまわないため）。
      * ⚠ 下見（差分の表示）と取込で必ずこれを通す＝「変化なし」と出たのに書き換わる事故を防ぐ。
      */
-    private function keepOnUpdate(?Project $target, array $attrs, string $name): array
+    private function keepOnUpdate(?Project $target, array $attrs, string $name, ?callable $get = null): array
     {
         if ($target === null) {
             return $attrs;
+        }
+
+        // ⚠ **シートが空欄のところは、ECSの値を消さない**（2026-09-29 baba「ECSで登録してるものは？」）。
+        //   月ごとのアサイン表には無い欄が多い（日程種別・実施形態・準備のチェック など）。空欄をそのまま
+        //   上書きすると、ECSで入れた値が取り込むたびに消えていた。消したいときはECSの画面で消す。
+        foreach ($attrs as $k => $v) {
+            if ($v === null || $v === '' || $v === []) {
+                unset($attrs[$k]);
+            }
+        }
+        // 「あり／済」のときだけ入る印は、シートに書いていない（false）ならECSのままにする。
+        foreach (['is_multi', 'is_repeat', 'prep_line_created', 'prep_line_sent', 'prep_line_double_check',
+            'prep_handover', 'prep_script'] as $k) {
+            if (($attrs[$k] ?? null) === false) {
+                unset($attrs[$k]);
+            }
+        }
+        // 取込が決めている既定の値（シートに書いてあるわけではない）は、すでにある案件では使わない：
+        //   状態・募集するか＝ECSの画面（日別ボード・公開ボード）で動かすもの／拠点＝巻き取り・ヘルプの案件がある。
+        unset($attrs['office']);
+        // ⚠ ただし「過去」で入れてしまった案件を「これから」で入れ直したときは、状態・募集を切り替える
+        //   （入れ直しで直せる、という今までの決まり。見分け方＝募集しない＋確定。公開の扱いと同じ）。
+        $wasPastImport = ! (bool) $target->is_recruiting && (string) $target->status === '確定';
+        $toFuture = in_array((string) ($attrs['status'] ?? ''), ['調整中', '未着手'], true);
+        if (! ($wasPastImport && $toFuture)) {
+            unset($attrs['is_recruiting']);
+            // 状態：これからの案件（調整中／未着手）はECSのまま。終わった案件の取込（確定）は、
+            //   まだ未着手・調整中のものだけ確定にする（ECSで「完了」にしたものを確定に戻さない）。
+            if (($attrs['status'] ?? null) !== '確定' || in_array((string) $target->status, ['確定', '完了'], true)) {
+                unset($attrs['status']);
+            }
+        }
+        // 確度＝シートに書いてあるときだけ（空欄だと「確定」になるため）。
+        if ($get !== null && trim((string) $get('確度')) === '') {
+            unset($attrs['yomi']);
+        }
+        // 運営人数＝シートが空欄で「仮」の数を出したときは、ECSに人数が入っていればそちらを残す。
+        if (! empty($attrs['count_tentative']) && $target->required_count !== null) {
+            unset($attrs['required_count'], $attrs['required_count_min'], $attrs['count_tentative']);
         }
         if (ImportContents::clientKey($target->client) === ImportContents::clientKey($attrs['client'] ?? null)) {
             unset($attrs['client']);
         }
         if ($this->contentsOf($name, false)['unknown'] !== []) {
             unset($attrs['project_name'], $attrs['content_ids'], $attrs['content_names']);
+        }
+        // 日程種別（本番／前日設営／予備日／リハ日）は、シートが「本番以外」と言っているときだけ直す（2026-09-29 baba報告）。
+        // ⚠ 月ごとのアサイン表には日程種別の欄が無い＝何も書いていなければ「本番」になる。そのまま上書きすると、
+        //   ECSで「前日設営」と登録した案件（例 11/2 板橋区）が取り込むたびに本番へ戻っていた。
+        if (($attrs['date_type'] ?? '本番') === '本番') {
+            unset($attrs['date_type']);
         }
 
         return $attrs;
