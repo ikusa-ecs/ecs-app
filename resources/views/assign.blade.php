@@ -1621,7 +1621,9 @@
       const where = busyWhere.get(pp.name);
       (where ? busy : free).push(Object.assign({}, pp, { busyWhere: where || null }));
     });
-    return free.concat(busy);
+    // 他拠点の社員（研修など・2026-09-29）は、それぞれの中で下へ回す＝いつもの人が上。
+    const mineFirst = arr => arr.filter(pp => !pp.otherOffice).concat(arr.filter(pp => pp.otherOffice));
+    return mineFirst(free).concat(mineFirst(busy));
   }
 
   function renderPicker(){
@@ -1668,6 +1670,7 @@
           + ' onchange="pickToggle(\'' + pp.id + '\', this.checked)">'
           + '<span>' + escHtml(pp.name) + '</span>'
           + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span>'
+          + (pp.otherOffice ? '<span class="lv">' + escHtml(pp.office || '') + '</span>' : '')
           + (where ? '<span class="busy-tag">⛔</span>' : '')
           + '</label>';
       }).join('');

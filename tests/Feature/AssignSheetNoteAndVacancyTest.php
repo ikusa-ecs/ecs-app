@@ -52,6 +52,8 @@ class AssignSheetNoteAndVacancyTest extends TestCase
         $this->assertStringContainsString('集合は<span class="rn-red">北口</span>', $html);
         $this->assertStringContainsString("ecsRichWrap(this,'red')", $html);
         $this->assertStringContainsString('window.ecsRichNote', $html);
+        // 印を入れたら、その場で保存の合図を出す（JSの書き換えでは change が起きず保存されなかった・2026-09-29）。
+        $this->assertStringContainsString("ta.dispatchEvent(new Event('change'", $html);
     }
 
     public function test_運営人数までの空き行だけ黄色(): void

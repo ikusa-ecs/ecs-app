@@ -56,7 +56,7 @@ class BoardBusySamedayTest extends TestCase
     {
         $html = $this->actingAsPerson($this->emp())->get('/assign')->assertOk()->getContent();
 
-        $this->assertStringContainsString('return free.concat(busy);', $html, '別案件の人を下へ回す並べ替えが消えています。');
+        $this->assertStringContainsString('return mineFirst(free).concat(mineFirst(busy));', $html, '別案件の人を下へ回す並べ替えが消えています。');
         $this->assertStringContainsString('ここから下は、この日すでに別の案件に入っている人です', $html);
         $this->assertStringContainsString('busy-tag', $html);
     }

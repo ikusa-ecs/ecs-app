@@ -59,6 +59,25 @@ class BoardRosterRealDataTest extends TestCase
         $this->assertStringContainsString('ECS_ROSTER', $html);
     }
 
+    /**
+     * 社員は他拠点の人も出す（新入社員が東京で研修に入るなど・2026-09-29 baba要望）。
+     * スタッフは今までどおり、いま見ている拠点の人だけ。
+     */
+    public function test_other_office_employee_is_offered_but_staff_is_not(): void
+    {
+        $me = $this->emp(['id' => 'E-001']);
+        PersonFactory::new()->create(['id' => 'E-OSK', 'role' => 'employee', 'office' => '大阪', 'active' => true]);
+        PersonFactory::new()->create(['id' => 'S-OSK', 'role' => 'staff', 'permission' => 'staff', 'office' => '大阪', 'active' => true]);
+
+        $roster = collect($this->actingAsPerson($me)->get('/assign?office=東京')->assertOk()->viewData('roster'))
+            ->keyBy('id');
+
+        $this->assertTrue($roster['E-OSK']['otherOffice'], '大阪の社員は「他拠点」として出る');
+        $this->assertSame('大阪', $roster['E-OSK']['office']);
+        $this->assertFalse($roster['E-001']['otherOffice']);
+        $this->assertFalse($roster->has('S-OSK'), '他拠点のスタッフは出さない');
+    }
+
     /** 退職した人は候補に出さない。 */
     public function test_retired_person_is_not_offered(): void
     {

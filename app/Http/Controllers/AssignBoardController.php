@@ -381,12 +381,21 @@ class AssignBoardController extends Controller
         // 区分（新人/中堅/ベテラン）は画面のバッジ用のコードに直す。
         $lvCode = ['新人' => 'new', '中堅' => 'mid', 'ベテラン' => 'vet'];
 
-        return OfficeScope::applyToPeople(Person::query(), $office)
+        // ⚠ 社員は拠点で絞らない＝他拠点の社員も入れられる（新入社員が東京で研修に入るなど・2026-09-29 baba要望）。
+        //   スタッフは今までどおり、いま見ている拠点の人だけ。
+        //   （全拠点表示＝$office が空のときは、もともと全員）
+        $query = Person::query();
+        if ($office) {
+            $query->where(fn ($w) => $w->where('role', 'employee')
+                ->orWhere(fn ($s) => OfficeScope::applyToPeople($s, $office)));
+        }
+
+        return $query
             ->where('active', true)   // 退職した人は候補に出さない
             ->byKana()
             ->with('roleEligibilities')
             ->get()
-            ->map(function (Person $p) use ($lvCode) {
+            ->map(function (Person $p) use ($lvCode, $office) {
                 // できるポジション → {D:true, OP:false, ...}（スタッフ名簿と同じ形）
                 $can = $p->roleEligibilities->pluck('position')->all();
                 $pos = [];
@@ -395,8 +404,13 @@ class AssignBoardController extends Controller
                 }
 
                 $lv = $lvCode[$p->skill_level ?? ''] ?? '';
+                // 拠点が空の人は東京あつかい（OfficeScope と同じ決まり）。
+                $pOffice = ($p->office ?? '') !== '' ? $p->office : OfficeScope::DEFAULT_OFFICE;
 
                 return [
+                    // 他拠点の社員＝選ぶ画面で下にまとめて拠点名を添える。
+                    'office' => $pOffice,
+                    'otherOffice' => $office && $pOffice !== $office,
                     'id' => $p->id,
                     'name' => $p->name,
                     'role' => $p->role,                 // employee / staff

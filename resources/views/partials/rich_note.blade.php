@@ -47,6 +47,9 @@
               out = open + sel + close;
             }
             ta.value = v.slice(0, a) + out + v.slice(b);
+            // ⚠ JSで書き換えた文字は、ブラウザが「人が直した」と思わず change が起きない＝保存されない
+            //   （2026-09-29 baba「押しても表示が変わらない」）。押した時点で保存の合図を自分で出す。
+            ta.dispatchEvent(new Event('change', { bubbles: true }));
             ta.focus();
             if (a === b && kind !== 'clear') {
               var p = a + (kind === 'red' ? 3 : 2);
