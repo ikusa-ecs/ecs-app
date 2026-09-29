@@ -584,6 +584,8 @@
       if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
       if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
       if (r.cancelled) { notes.unshift('キャンセルの印が付いているので取り込みません'); }
+      // 100行目のIDが別の案件を指していた（ブロックの並べ替えなどでずれた）。正しい案件は右の「IDでつなぐ」で選べる。
+      if (r.idMismatch) { notes.unshift(r.idMismatch); }
       var cls = (r._skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
       return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '">'
         + '<td>' + pjEsc(r.label) + '</td>'

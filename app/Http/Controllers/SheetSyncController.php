@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Project;
 use App\Models\SheetSync;
+use App\Support\ImportContents;
 use App\Support\MonthlySheetReader;
+use App\Support\SheetIdCheck;
 use App\Support\OfficeScope;
 use App\Support\SheetSyncNotice;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -147,12 +150,58 @@ class SheetSyncController extends Controller
             // GASはこれを受け取って、アサイン表の**100行目**の同じ列に書き込む。
             // ⚠ まだ一度も取り込んでいない月は空。取り込んだあと、次の朝から入る。
             // ⚠ 行を増やさない（100行目より下は空いている、という baba の指定）。
-            'projectIds' => (object) ($sync->project_ids ?? []),
+            // ⚠ 2026-09-29 から、**いまのシートのブロックと合うIDだけ**返す（baba「IDがばらばら」）。
+            //   取り込んだあとにブロックを足す・並べ替えると、前回の「列 → ID」がずれて隣のブロックに付いていた。
+            //   合わないIDが書かれている列には '' を返す＝GASがその欄を空にする（次の取込で正しいIDが入る）。
+            'projectIds' => (object) $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? [])),
             'idRow' => self::ID_ROW,
             'message' => $changed
                 ? '受け取りました（前回と中身が変わっています）。'
                 : '受け取りました（前回と同じ中身です）。',
         ]);
+    }
+
+    /**
+     * 書き戻すIDの表を、いまのシートの中身で確かめてから作る（2026-09-29）。
+     *
+     * ・前回の対応表の「列 → ID」が、その列のブロックと合う（日付かコンテンツ）→ そのIDを返す
+     * ・合わない／その列にブロックが無い → 返さない
+     * ・シートの100行目に、そのブロックと合わないIDが書いてある → '' を返す（GASが空にする）
+     * 正本の判定＝App\Support\SheetIdCheck。
+     *
+     * @param  array<int|string, string>  $mapped
+     * @return array<string, string>
+     */
+    private function idsForSheet(array $rows, array $period, array $mapped): array
+    {
+        $out = [];
+        $contents = new ImportContents;
+        foreach (MonthlySheetReader::read($rows)['cases'] as $case) {
+            $col = (int) ($case['col'] ?? -1);
+            if ($col < 0) {
+                continue;
+            }
+            $date = MonthlySheetReader::completeDate((string) ($case['fields']['日程'] ?? ''), $period);
+            $content = (string) ($case['fields']['コンテンツ'] ?? '');
+
+            $want = (string) ($mapped[(string) $col] ?? ($mapped[$col] ?? ''));
+            $wantP = $want !== '' ? Project::find($want) : null;
+            if ($wantP && SheetIdCheck::fits($wantP, $date, $content, $contents)) {
+                $out[(string) $col] = $wantP->id;
+
+                continue;
+            }
+
+            $onSheet = trim((string) ($rows[self::ID_ROW - 1][$col] ?? ''));
+            if ($onSheet !== '') {
+                $p = Project::find($onSheet);
+                if (! $p || ! SheetIdCheck::fits($p, $date, $content, $contents)) {
+                    $out[(string) $col] = '';
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**

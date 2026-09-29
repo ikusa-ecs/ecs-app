@@ -20,6 +20,7 @@ use App\Support\ProjectImportColumns;
 use App\Support\RequiredCountEstimate;
 use App\Support\ScheduleMark;
 use App\Support\SheetDiff;
+use App\Support\SheetIdCheck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -216,9 +217,21 @@ class PastProjectImportController extends Controller
                 // ⚠ IDがシートに書かれるのは「受け取ったあと」なので、書かれた朝に届いた中身にはまだ入っていない
                 //   （P-2026-0315 がこれで新しい案件に見えた）。
                 // ⚠ 対応表は列の位置で覚えているだけ（ブロックを入れ替えるとずれる）ので、日付が合うときだけ使う。
-                if ($ecsId === null && $sync !== null && isset($case['col'])) {
+                $blockDate = MonthlySheetReader::completeDate((string) ($case['fields']['日程'] ?? ''), $period);
+                $blockContent = (string) ($case['fields']['コンテンツ'] ?? '');
+                // ⚠ 100行目のIDが「このブロックの案件」として合っているか確かめる（2026-09-29 baba「IDがばらばら」）。
+                //   ブロックを足す・並べ替えると、IDが隣のブロックに付いていることがある＝合わないIDは使わない。
+                $idMismatch = '';
+                if ($ecsId !== null) {
+                    $byId = Project::find($ecsId);
+                    if ($byId && ! SheetIdCheck::fits($byId, $blockDate, $blockContent, $this->importContents ??= new ImportContents)) {
+                        $idMismatch = '⚠ シートの100行目のID「'.$ecsId.'」は別の案件（'
+                            .optional($byId->start_date)->format('n/j').'『'.$byId->project_name.'』）を指しているので使いませんでした';
+                        $ecsId = null;
+                    }
+                }
+                if ($ecsId === null && $idMismatch === '' && $sync !== null && isset($case['col'])) {
                     $mapped = (string) (($sync->project_ids ?? [])[(string) $case['col']] ?? (($sync->project_ids ?? [])[(int) $case['col']] ?? ''));
-                    $blockDate = MonthlySheetReader::completeDate((string) ($case['fields']['日程'] ?? ''), $period);
                     $mp = $mapped !== '' ? Project::find($mapped) : null;
                     if ($mp && optional($mp->start_date)->format('Y-m-d') === $blockDate) {
                         $ecsId = $mp->id;
@@ -243,6 +256,8 @@ class PastProjectImportController extends Controller
                     'col' => $case['col'] ?? null,
                     // そのブロックの100行目に書き戻してあるECSの案件ID（2026-09-29 から照合に使う）。
                     'ecsId' => $ecsId,
+                    // 100行目のIDが別の案件を指していて使わなかったとき、その知らせ（下見に出す）。
+                    'idMismatch' => $idMismatch,
                 ];
             }
             $unmapped = $read['unknownLabels'];
@@ -553,6 +568,7 @@ class PastProjectImportController extends Controller
                 'countGuess' => $info['countGuess'] ?? '',
                 'people' => count($assignments),
                 'missing' => array_keys($miss),
+                'idMismatch' => (string) ($entry['idMismatch'] ?? ''),
                 'ambiguous' => array_keys($dup),
                 'errors' => $info['errors'],
             ];

@@ -125,11 +125,13 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('P-2026-0042', Project::first()->id);
     }
 
-    /** IDがあれば日付が違っても同じ案件（baba「IDで管理してるなら同じものって紐づけたい」）。日程とアサインも新しい日に移る。 */
+    /** IDがあれば日付が違っても同じ案件（baba「IDで管理してるなら同じものって紐づけたい」）。日程とアサインも新しい日に移る。⚠ 日付もコンテンツも違うIDは使わない（test_ずれたIDは使わない）。 */
     public function test_IDがあれば日付が違っても同じ案件(): void
     {
         $me = $this->manager();
-        $p = $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => '別の日の案件', 'client' => 'X', 'start_date' => '2026-09-20']);
+        // 日程変更＝日付は違うが、コンテンツは同じ（＝同じ案件と分かる）。
+        $p = $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => '新しい名前', 'content_names' => ['新しい名前'],
+            'client' => 'X', 'start_date' => '2026-09-20']);
         $staff = PersonFactory::new()->create(['office' => '東京']);
         \App\Models\Assignment::create(['project_id' => $p->id, 'staff_id' => $staff->id, 'date' => '2026-09-20', 'role' => 'OP', 'status' => '確定']);
 
@@ -233,6 +235,47 @@ class SheetImportMatchTest extends TestCase
         $this->assertTrue((bool) $p->prep_script, '準備のチェックが外れている');
         $this->assertSame('確定', $p->status);
         $this->assertSame(5, (int) $p->required_count, 'シートに書いてある人数（5名）は入る');
+    }
+
+    /**
+     * 100行目のIDが別の案件を指していたら使わない（2026-09-29 baba「IDがばらばら」）。
+     * ブロックを足す・並べ替えると、IDが隣のブロックに付いていることがあるため。
+     */
+    public function test_ずれたIDは使わない(): void
+    {
+        $me = $this->manager();
+        // 別の日・別のコンテンツの案件のIDが、このブロックの100行目に付いている。
+        $other = $this->ecsProject(['id' => 'P-2026-0070', 'project_name' => 'マグロ解体ショー',
+            'content_names' => ['マグロ解体ショー'], 'client' => 'コカ', 'start_date' => '2026-09-15']);
+
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ', '金沢', 'P-2026-0070')])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id])->assertOk()->json('rows.0');
+        $this->assertStringContainsString('別の案件', $pre['idMismatch']);
+
+        $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id])->assertRedirect('/past-import');
+
+        $this->assertSame('マグロ解体ショー', $other->fresh()->project_name, '別の案件を上書きしている');
+        $this->assertSame(2, Project::count());
+    }
+
+    /** 毎朝の返事：いまのブロックと合わないIDは返さず、シートにずれたIDがあれば空にさせる。 */
+    public function test_毎朝の書き戻しはずれたIDを消す(): void
+    {
+        $this->ecsProject(['id' => 'P-2026-0070', 'project_name' => 'マグロ解体ショー',
+            'content_names' => ['マグロ解体ショー'], 'client' => 'コカ', 'start_date' => '2026-09-15']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $rows = $this->rows('チャンバラ', '金沢', 'P-2026-0070');
+
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        SheetSync::firstOrFail()->forceFill(['project_ids' => [(string) self::A => 'P-2026-0070']])->save();
+
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+
+        $this->assertSame('', $res->json('projectIds.'.self::A), 'ずれたIDを消させていない');
     }
 
     /** 消した案件のIDが残っていたら、ふつうに名前で探す（落ちない）。 */
