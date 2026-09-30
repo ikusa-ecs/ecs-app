@@ -97,7 +97,7 @@ class AssignBoardController extends Controller
             'boardAvailHidden' => $this->boardAvailHidden($anchor, $office),
             'boardMonth' => $this->boardMonthCount($anchor),  // 名前 → ボード期間のアサイン件数（上限バッジ用）
             'anchor' => $anchor->format('Y-m-d'),             // 画面の基準日（日付ピッカーの初期値・日付計算の起点）
-            'roleOptions' => AssignmentRole::positionLabels(), // ポジション編集プルダウンの選択肢（正本）
+            'roleOptions' => AssignmentRole::assignLabels(),   // ポジション編集プルダウンの選択肢（正本・SDも選べる＝2026-09-30）
             // 「登録が無くても、みんなできる」役割（2026-09-09 baba＝FC・CK）。自動アサインの判定に使う。
             // ⚠ 画面に役割名を直書きしない（正本＝AssignmentRole::ANYONE_CAN。月まとめ自動アサインも同じものを見る）。
             'anyoneRoles' => AssignmentRole::ANYONE_CAN,
@@ -262,7 +262,7 @@ class AssignBoardController extends Controller
         return view('pickup', [
             'staffPool' => $this->staffPool($office),
             'pickupCases' => $this->pickupCases($office),
-            'roleOptions' => AssignmentRole::positionLabels(),   // 担当役割プルダウンの選択肢（正本）
+            'roleOptions' => AssignmentRole::assignLabels(),     // 担当役割プルダウンの選択肢（正本・SDも選べる＝2026-09-30）
             'noteOptions' => $this->allNoteOptions(),            // 担当メモ入力の候補（軍師/サポ 等）
             'officeScope' => $office,
             'usingDb' => Project::exists(),

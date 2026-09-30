@@ -302,7 +302,7 @@ class AssignSheetController extends Controller
             'cards'         => $cards,
             'months'        => $months,
             'selectedMonth' => $selectedMonth,
-            'roleOptions'   => AssignmentRole::positionLabels(),
+            'roleOptions'   => AssignmentRole::assignLabels(),   // SDも選べる（2026-09-30 baba要望）
             'noteOptions'   => $noteOptions,
             // 「名前」の欄から入れられる社員（2026-09-28 baba要望）。
             // ⚠ 社員だけ。スタッフは日別ボード・案件別アサインから入れる（希望や上限を見ながら決める場所なので）。

@@ -100,6 +100,28 @@ class AssignmentRole
         return array_intersect_key(self::LABELS, array_flip(self::POSITIONS));
     }
 
+    /**
+     * アサインの画面（アサイン表の「P」・日別ボード）で選べる役割＝できる役割7種＋SD（2026-09-30 baba要望）。
+     *
+     * 【なぜ】「社員のポジション選択からSDが無くなった」。SDはD決めの画面で決めるもの、として
+     *   ここの選択肢から外していたが、アサイン表・日別ボードでもSDにしたい。
+     *   ⚠ 選択肢に無い役割の人がいると、プルダウンが「—」に見えて、触ると役割が消える。
+     * ⚠ 名簿の「できるポジション」（positionLabels）にはSDを足さない（本人の申告の話なので別）。
+     * 並び＝D の次に SD（アサイン表の並び順と同じ）。
+     */
+    public static function assignLabels(): array
+    {
+        $out = [];
+        foreach (self::positionLabels() as $code => $label) {
+            $out[$code] = $label;
+            if ($code === self::D) {
+                $out[self::SD] = self::LABELS[self::SD];
+            }
+        }
+
+        return $out;
+    }
+
     /** 正規の役割コードかどうか（空文字・null・別表記は false）。 */
     public static function isValid(?string $code): bool
     {
