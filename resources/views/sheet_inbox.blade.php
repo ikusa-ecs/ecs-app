@@ -32,7 +32,55 @@
   html[data-theme="dark"] .sx-flash.ok { background: var(--ok-soft); color: var(--ok-ink); border-color: var(--ok-line); }
   html[data-theme="dark"] .sx-need { color: var(--warn-ink); }
   html[data-theme="dark"] .sx-done { color: var(--muted-dim); }
+  .sx-diff .n-chg { font-weight: 700; color: #8a5a10; }
+  .sx-diff .n-new { font-weight: 700; color: #2c6ca0; }
+  html[data-theme="dark"] .sx-diff .n-chg { color: var(--warn-ink); }
+  html[data-theme="dark"] .sx-diff .n-new { color: var(--info-ink); }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+  // 差分の件数を1か月ずつ数える（2026-09-30）。⚠ 判定は取込の下見（/past-import/preview）そのもの。
+  //   一度に全部たのむとサーバーが重くなるので、上から順に1つずつ。
+  (function () {
+    var cells = Array.prototype.slice.call(document.querySelectorAll('td.sx-diff[data-sync]'));
+    var token = @json(csrf_token());
+    var office = @json($office);
+    function next() {
+      var td = cells.shift();
+      if (!td) return;
+      var fd = new FormData();
+      fd.append('sync', td.dataset.sync);
+      fd.append('mode', td.dataset.mode);
+      fd.append('office', office);
+      fetch('/past-import/preview', {
+        method: 'POST', body: fd, credentials: 'same-origin',
+        headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok) { td.innerHTML = '<span class="sx-when">数えられませんでした</span>'; return; }
+          var chg = 0, nw = 0, same = 0, ng = 0;
+          (d.rows || []).forEach(function (r) {
+            if (r.cancelled) return;
+            if (r.errors && r.errors.length) { ng++; return; }
+            var k = (r.diff && r.diff.kind) || '';
+            if (k === 'changed') chg++; else if (k === 'new') nw++; else if (k === 'same') same++;
+          });
+          var parts = [];
+          if (chg) parts.push('<span class="n-chg">✏️ 変わる ' + chg + '</span>');
+          if (nw) parts.push('<span class="n-new">🆕 新規 ' + nw + '</span>');
+          if (ng) parts.push('<span class="sx-need">⚠ エラー ' + ng + '</span>');
+          td.innerHTML = (parts.length ? parts.join('<br>') : '<span class="sx-done">差分なし</span>')
+            + '<br><span class="sx-when">✅ 変化なし ' + same + '</span>';
+        })
+        .catch(function () { td.innerHTML = '<span class="sx-when">数えられませんでした</span>'; })
+        .then(next);
+    }
+    next();
+  })();
+</script>
 @endpush
 
 @section('content')
@@ -67,6 +115,7 @@
           <tr>
             <th style="width:90px;">何月ぶん</th>
             <th style="width:70px;">案件数</th>
+            <th style="width:190px;">差分（取り込むと変わる件数）</th>
             <th>状態</th>
             <th style="width:150px;">最後に届いた</th>
             <th style="width:130px;"></th>
@@ -79,6 +128,12 @@
                 @if ($row->tab)<br><span class="sx-when">タブ {{ $row->tab }}</span>@endif
               </td>
               <td>{{ $row->case_count }} 件</td>
+              {{-- 差分の件数（2026-09-30 baba要望）。取込の下見と同じ判定を、画面を開いたあとに1か月ずつ数える
+                   （ここで数え直さない＝下見と食い違わないように）。扱いは下見の初めの選び方と同じ（先月以前＝過去）。 --}}
+              <td class="sx-diff" data-sync="{{ $row->id }}"
+                  data-mode="{{ (string) $row->period < now()->format('Y-m') ? '過去' : 'これから' }}">
+                <span class="sx-when">数えています…</span>
+              </td>
               <td>
                 @if ($row->needsAttention())
                   <span class="sx-need">

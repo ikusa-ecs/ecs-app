@@ -261,6 +261,26 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('P-2026-0042', $send()->json('projectIds.'.self::A), '手でつないだIDを書かせていない');
     }
 
+    /** 受信箱の一覧に「差分の件数」の欄があり、下見と同じ入口で数える（2026-09-30 baba要望）。 */
+    public function test_受信箱に差分の件数を出す(): void
+    {
+        $me = $this->manager();
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ', '金沢')])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        $html = $this->actingAsPerson($me)->get('/sheet-inbox?office=東京')->assertOk()->getContent();
+        $this->assertStringContainsString('差分（取り込むと変わる件数）', $html);
+        $this->assertStringContainsString('data-sync="'.$sync->id.'"', $html);
+        $this->assertStringContainsString("fetch('/past-import/preview'", $html);
+
+        // 数え方＝下見そのもの。まだECSに無いので「新規1件」。
+        $rows = $this->actingAsPerson($me)->post('/past-import/preview', ['sync' => $sync->id, 'mode' => '過去', 'office' => '東京'],
+            ['Accept' => 'application/json'])->assertOk()->json('rows');
+        $this->assertSame('new', $rows[0]['diff']['kind']);
+    }
+
     /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
     public function test_手で入れたIDが無ければ作らない(): void
     {
