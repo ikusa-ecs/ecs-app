@@ -281,6 +281,23 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('new', $rows[0]['diff']['kind']);
     }
 
+    /**
+     * 運営人数が空で、となりの「形式」に「募集」とあるとき、運営人数を「募集」と読まない
+     * （2026-09-30 baba「12/26 株式会社リアル・コアで運営人数が募集になってる」）。
+     */
+    public function test_運営人数が空で形式が募集でも運営人数にしない(): void
+    {
+        $rows = $this->rows('チャンバラ', 'リアル・コア');
+        $rows[8] = array_fill(0, count($rows[8]), '');
+        $rows[8][self::A] = '運営人数 / 形式';
+        $rows[8][self::A + 6] = '募集';   // 運営人数の欄は空・形式の欄に「募集」
+
+        $case = \App\Support\MonthlySheetReader::read($rows)['cases'][0];
+
+        $this->assertSame('', $case['fields']['運営人数'] ?? '', '「募集」を運営人数として読んでいる');
+        $this->assertSame('募集', $case['fields']['形式'] ?? '');
+    }
+
     /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
     public function test_手で入れたIDが無ければ作らない(): void
     {
