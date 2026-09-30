@@ -177,6 +177,30 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame(['13' => 'P-2026-0042'], array_map('strval', $sync->fresh()->project_ids), 'シートへ書き戻すIDになっていない');
     }
 
+    /** 「🆕 新しい案件」の行に、同じ日のECSの案件が選べる候補として出る（2026-09-30 baba要望）。 */
+    public function test_同じ日のECSの案件が候補に出る(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0101', 'project_name' => '別の書き方の案件', 'client' => '板橋区', 'date_type' => '前日設営']);
+        $this->ecsProject(['id' => 'P-2026-0102', 'project_name' => '違う日', 'client' => 'X', 'start_date' => '2026-09-02']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('まったく違う名前', '別の顧客')])->assertOk();
+
+        $row = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => SheetSync::firstOrFail()->id])
+            ->assertOk()->json('rows.0');
+
+        $this->assertSame('new', $row['diff']['kind']);
+        $this->assertSame(['P-2026-0101'], array_column($row['sameDay'], 'id'), '同じ日の案件だけ出る');
+        $this->assertStringContainsString('前日設営', $row['sameDay'][0]['label']);
+
+        $page = $this->actingAsPerson($me)->get('/past-import')->assertOk()->getContent();
+        $this->assertStringContainsString('function pjPickSameDay', $page);
+        // 少しずつ取り込むための「まとめてチェック」（2026-09-30 baba要望）。
+        $this->assertStringContainsString("pjBulk('none')", $page);
+        $this->assertStringContainsString('function pjBulkSetup', $page);
+    }
+
     /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
     public function test_手で入れたIDが無ければ作らない(): void
     {

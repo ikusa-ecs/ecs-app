@@ -570,6 +570,19 @@ class PastProjectImportController extends Controller
                         'project' => $t ? $t->id.'『'.$t->project_name.'』'.optional($t->start_date)->format('n/j') : '',
                     ];
                 })(),
+                // 同じ日にECSにある案件（「🆕 新しい案件」の行で、選ぶだけでつなげるように・2026-09-30 baba要望）。
+                // ⚠ 選んだものは linkId と同じ扱い（手でIDを入れたのと同じ）。候補を出すだけで勝手にはつながない。
+                'sameDay' => $info['errors'] || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $info['date']) ? [] :
+                    Project::whereDate('start_date', $info['date'])->orderBy('start_time')->orderBy('id')->limit(30)
+                        ->get(['id', 'project_name', 'client', 'start_time', 'office', 'date_type'])
+                        ->map(fn (Project $p) => [
+                            'id' => $p->id,
+                            'label' => $p->id.'『'.$p->project_name.'』'
+                                .(trim((string) $p->client) !== '' ? $p->client : '顧客名なし')
+                                .(trim((string) $p->start_time) !== '' ? '・集合'.$p->start_time : '')
+                                .(($p->date_type ?? '本番') !== '本番' ? '・'.$p->date_type : '')
+                                .(($p->office ?? '') !== '' ? '・'.$p->office : ''),
+                        ])->values()->all(),
                 // 取込で書き換わる項目・人（new＝新規／changed＝変わる／same＝変化なし）。
                 'diff' => $diff,
                 'label' => $entry['label'],

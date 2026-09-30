@@ -400,6 +400,19 @@
       <span class="muted">直したら<b>「② 直した内容で確かめ直す」</b>を押すと、判定をやり直します（押さずに取り込んでも、直した内容で入ります）。
         <b>元のCSVファイルは変わりません。</b></span>
     </p>
+    {{-- 少しずつ取り込むための「まとめてチェック」（2026-09-30 baba要望「全部1度に確認するのが難しい」）。
+         ⚠ ここで変えるのは「取込」のチェックだけ。押しても何も保存されない（取り込むのは下の「この内容で取り込む」）。 --}}
+    <div class="pj-bulk" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 2px 8px; font-size:12px;">
+      <b>取込のチェックをまとめて：</b>
+      <button type="button" class="btn" onclick="pjBulk('all')">☑ 全部つける</button>
+      <button type="button" class="btn" onclick="pjBulk('none')">☐ 全部外す</button>
+      <button type="button" class="btn" onclick="pjBulk('new')">🆕 新しい案件だけ</button>
+      <button type="button" class="btn" onclick="pjBulk('changed')">✏️ 変わりますだけ</button>
+      <select id="pjBulkDate" onchange="if (this.value) { pjBulk('date', this.value); }" style="font-size:12px;">
+        <option value="">📅 この日だけ…</option>
+      </select>
+      <span id="pjBulkCount" class="muted"></span>
+    </div>
     <div class="pj-scroll">
       <table class="pj-table">
         <thead>
@@ -587,7 +600,9 @@
       // 100行目のIDが別の案件を指していた（ブロックの並べ替えなどでずれた）。正しい案件は右の「IDでつなぐ」で選べる。
       if (r.idMismatch) { notes.unshift(r.idMismatch); }
       var cls = (r._skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
-      return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '">'
+      // data-kind / data-date＝上の「まとめてチェック」で使う（new／changed／same・日程）。
+      return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '"'
+        + ' data-kind="' + pjEsc((r.diff && r.diff.kind) || '') + '" data-date="' + pjEsc(r.date || '') + '">'
         + '<td>' + pjEsc(r.label) + '</td>'
         + '<td style="text-align:center;">'
           + '<input type="checkbox" data-f="skip" onchange="pjToggleSkip(this)"'
@@ -604,6 +619,7 @@
     }).join('');
 
     pjMarkEdited();
+    pjBulkSetup(rows);
 
     var result = document.getElementById('pjResult');
     result.style.display = '';
@@ -713,7 +729,20 @@
         + '<br><span style="font-size:10.5px;">取り込むと、次の朝このIDがシートに書かれて、以後はIDでつながります。違う案件なら下にIDを入れてください。</span></div>';
     }
     var v = pjEsc(l.id || '');
-    return now + '<div class="pj-dup-note" style="margin-top:4px;">'
+    // 「🆕 新しい案件」のときは、同じ日にECSにある案件を選ぶだけでつなげる（2026-09-30 baba要望）。
+    // 選ぶと下のID欄に入り、そのまま確かめ直す＝どの案件に上書きされるかがすぐ出る。
+    var pick = '';
+    var d = r.diff || {};
+    if ((d.kind === 'new' || l.by === 'manual') && r.sameDay && r.sameDay.length) {
+      pick = '<div class="pj-dup-note" style="margin-top:4px;">'
+        + '<select onchange="pjPickSameDay(this)" style="max-width:260px; font-size:11px;">'
+        + '<option value="">📋 同じ日のECSの案件から選ぶ（' + r.sameDay.length + '件）</option>'
+        + r.sameDay.map(function (s) {
+            return '<option value="' + pjEsc(s.id) + '"' + (s.id === l.id ? ' selected' : '') + '>' + pjEsc(s.label) + '</option>';
+          }).join('')
+        + '</select></div>';
+    }
+    return now + pick + '<div class="pj-dup-note" style="margin-top:4px;">'
       + '<input type="text" data-f="linkId" value="' + v + '" placeholder="例 P-2026-0315" style="width:120px;"'
       + ' title="すでにECSにある案件につなぐときは、その案件IDを入れて「② 直した内容で確かめ直す」を押してください">'
       + ' <span style="font-size:11px;">← ECSの案件IDでつなぐ</span></div>';
@@ -743,6 +772,59 @@
     //（変化なしの自動チェック外しが、人の判断を上書きしないように）。
     pjSkipDecided[tr.dataset.index] = true;
     tr.classList.toggle('row-skip', !el.checked);
+    pjBulkCount();
+  }
+
+  // ===== 取込のチェックをまとめて変える（2026-09-30 baba要望「少しずつ取り込みたい」）=====
+  // ⚠ チェックを変えるだけ。人が決めたものとして覚える（確かめ直しても勝手に戻さない）。
+  function pjBulk(mode, val) {
+    var trs = document.querySelectorAll('#pjBody tr[data-index]');
+    Array.prototype.forEach.call(trs, function (tr) {
+      var cb = tr.querySelector('[data-f="skip"]');
+      if (!cb) return;
+      var on;
+      if (mode === 'all') { on = true; }
+      else if (mode === 'none') { on = false; }
+      else if (mode === 'new') { on = tr.dataset.kind === 'new'; }
+      else if (mode === 'changed') { on = tr.dataset.kind === 'changed'; }
+      else if (mode === 'date') { on = tr.dataset.date === val; }
+      else { return; }
+      cb.checked = on;
+      pjSkipDecided[tr.dataset.index] = true;
+      tr.classList.toggle('row-skip', !on);
+    });
+    pjSyncEdits();
+    pjBulkCount();
+  }
+  // 日付の選択肢を、表にある日程から作る。
+  function pjBulkSetup(rows) {
+    var sel = document.getElementById('pjBulkDate');
+    if (sel) {
+      var dates = [];
+      rows.forEach(function (r) { if (r.date && dates.indexOf(r.date) < 0) { dates.push(r.date); } });
+      dates.sort();
+      sel.innerHTML = '<option value="">📅 この日だけ…</option>' + dates.map(function (d) {
+        var n = rows.filter(function (r) { return r.date === d; }).length;
+        return '<option value="' + pjEsc(d) + '">' + pjEsc(d) + '（' + n + '件）</option>';
+      }).join('');
+    }
+    pjBulkCount();
+  }
+  function pjBulkCount() {
+    var el = document.getElementById('pjBulkCount');
+    if (!el) return;
+    var all = document.querySelectorAll('#pjBody tr[data-index] [data-f="skip"]');
+    var on = Array.prototype.filter.call(all, function (cb) { return cb.checked; }).length;
+    el.textContent = 'いま取り込む：' + on + '件 ／ ' + all.length + '件';
+  }
+
+  // 同じ日のECSの案件を選んだ → その行のID欄に入れて、すぐ確かめ直す（2026-09-30）。
+  function pjPickSameDay(sel) {
+    var tr = sel.closest('tr');
+    var inp = tr && tr.querySelector('[data-f="linkId"]');
+    if (!inp) return;
+    inp.value = sel.value;
+    pjRecheck();
   }
 
   // いま表に入っている「直した内容」を pjEdits にためる。
