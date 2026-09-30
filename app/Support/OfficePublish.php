@@ -23,12 +23,11 @@ final class OfficePublish
         if (! $p->staff_published) {
             return false;
         }
-        $list = $p->published_offices;
-        if (! is_array($list) || $office === null || $office === '') {
+        if ($office === null || $office === '') {
             return true;
         }
 
-        return in_array($office, $list, true);
+        return in_array($office, self::currentList($p), true);
     }
 
     /**
@@ -69,17 +68,26 @@ final class OfficePublish
             return [];
         }
         $owner = trim((string) ($p->office ?? '')) !== '' ? (string) $p->office : OfficeScope::DEFAULT_OFFICE;
+        $shares = ProjectShare::where('project_id', $p->id)->get(['office', 'kind', 'origin_helps']);
+        // ⚠ ほかの拠点に巻き取られていて「自拠点からも人を出す」が無ければ、登録した拠点は入れない（2026-09-30）。
+        $takenAway = $shares->contains(fn ($s) => $s->kind === '巻き取り' && $s->office !== $owner && ! $s->origin_helps);
 
         return array_values(array_unique(array_merge(
-            [$owner],
-            ProjectShare::where('project_id', $p->id)->pluck('office')->filter()->all()
+            $takenAway ? [] : [$owner],
+            $shares->pluck('office')->filter()->all()
         )));
     }
 
-    /** 案件の問い合わせを「その拠点のスタッフに公開中」に絞る（null＝これまでの形は公開中なら通す）。 */
+    /**
+     * 案件の問い合わせを「その拠点のスタッフに公開中」に絞る。
+     * null（これまでの形）は「関わる全拠点」＝ただし**ほかの拠点に巻き取られた案件は、登録した拠点のスタッフには出さない**
+     * （「自拠点からも人を出す」が付いていれば出す）。2026-09-30 baba「スタッフの画面に他拠点巻き取りの案件も出てる」。
+     * ⚠ 決まりは OfficeScope::hideTakenOver と同じにする（日別ボード・公開ボードと食い違わないように）。
+     */
     public static function scopePublishedFor($query, string $office)
     {
         return $query->where('staff_published', true)
-            ->where(fn ($q) => $q->whereNull('published_offices')->orWhereJsonContains('published_offices', $office));
+            ->where(fn ($q) => $q->where(fn ($legacy) => OfficeScope::hideTakenOver($legacy->whereNull('published_offices'), $office, true))
+                ->orWhereJsonContains('published_offices', $office));
     }
 }

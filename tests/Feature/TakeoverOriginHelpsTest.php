@@ -111,6 +111,30 @@ class TakeoverOriginHelpsTest extends TestCase
             ->contains(fn ($j) => ($j['id'] ?? null) === $p->id));
     }
 
+    /**
+     * 9/30より前に公開した（拠点の指定なし）案件でも、ほかの拠点に巻き取られていれば、登録した拠点のスタッフには出さない
+     * （2026-09-30 baba「スタッフの画面に他拠点巻き取りにしてる案件も出てる」）。「自拠点からも人を出す」なら出す。
+     */
+    public function test_これまでの公開でも巻き取られた案件は登録拠点のスタッフに出さない(): void
+    {
+        $p = ProjectFactory::new()->published()->create([
+            'office' => '東京', 'start_date' => Carbon::today()->addDays(5)->format('Y-m-d'), 'is_recruiting' => true, 'status' => '調整中',
+        ]);
+        $share = ProjectShare::create(['project_id' => $p->id, 'office' => '名古屋', 'kind' => '巻き取り']);
+        $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京', 'must_onboard' => false]);
+        $nagoyaStaff = PersonFactory::new()->staff()->create(['office' => '名古屋', 'must_onboard' => false]);
+        $sees = fn ($who) => collect($this->actingAsPerson($who)->get('/staff-portal')->assertOk()->viewData('recruitJobs'))
+            ->contains(fn ($j) => ($j['id'] ?? null) === $p->id);
+
+        $this->assertNull($p->fresh()->published_offices);
+        $this->assertFalse($sees($tokyoStaff), '巻き取られた案件が登録した拠点のスタッフに出ている');
+        $this->assertTrue($sees($nagoyaStaff));
+        $this->assertFalse(\App\Support\OfficePublish::isPublishedFor($p->fresh(), '東京'), '日別ボードの公開中も同じ決まり');
+
+        $share->update(['origin_helps' => true]);
+        $this->assertTrue($sees($tokyoStaff), '自拠点からも人を出すなら出す');
+    }
+
     public function test_付け外しは登録した拠点だけ(): void
     {
         $p = $this->takenOver(false);
