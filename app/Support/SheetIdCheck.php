@@ -18,19 +18,53 @@ use App\Models\Project;
  */
 final class SheetIdCheck
 {
+    /** 区切り記号（ImportContents と同じ）。 */
+    private const SEPARATORS = '/[・･＋+／\/、,，＆&×\r\n]+/u';
+
     public static function fits(Project $p, ?string $date, string $contentRaw, ?ImportContents $contents = null): bool
     {
         if ($date !== null && $date !== '' && optional($p->start_date)->format('Y-m-d') === $date) {
             return true;
         }
 
-        $contents ??= new ImportContents;
-        $want = self::keys($contents->resolve(self::clean($contentRaw))['names']);
-        $have = self::keys(is_array($p->content_names) && $p->content_names !== []
-            ? $p->content_names
-            : $contents->resolve((string) $p->project_name)['names']);
+        return self::overlap($p, $contentRaw, $contents ?? new ImportContents);
+    }
+
+    /**
+     * 日付**と**コンテンツの両方が合うか（「前回の列 → ID」の古い記録を使うときの、きびしいほうの確かめ）。
+     * ⚠ 記録は列の位置で覚えているだけなので、同じ日のブロックを入れ替えると日付だけでは見分けられない。
+     */
+    public static function fitsStrict(Project $p, ?string $date, string $contentRaw, ?ImportContents $contents = null): bool
+    {
+        if ($date === null || $date === '' || optional($p->start_date)->format('Y-m-d') !== $date) {
+            return false;
+        }
+
+        return self::overlap($p, $contentRaw, $contents ?? new ImportContents);
+    }
+
+    /** コンテンツが1つでも重なるか。台帳に無い名前でも、区切り記号で分けた1つずつも比べる。 */
+    private static function overlap(Project $p, string $contentRaw, ImportContents $contents): bool
+    {
+        $want = self::namesOf(self::clean($contentRaw), $contents);
+        $have = [];
+        foreach (is_array($p->content_names) && $p->content_names !== [] ? $p->content_names : [(string) $p->project_name] as $n) {
+            $have = array_merge($have, self::namesOf((string) $n, $contents));
+        }
 
         return $want !== [] && array_intersect($want, $have) !== [];
+    }
+
+    /** 名前 → 比べる形の一覧（台帳でつないだ名前＋区切り記号で分けたそのままの名前）。 */
+    private static function namesOf(string $raw, ImportContents $contents): array
+    {
+        $parts = preg_split(self::SEPARATORS, $raw) ?: [];
+
+        return array_values(array_unique(array_merge(
+            self::keys($contents->resolve($raw)['names']),
+            self::keys($parts),
+            self::keys([$raw])
+        )));
     }
 
     /** 「(リハ)」などの印を外す（保存する案件名も外したものなので、比べるときも同じにする）。 */

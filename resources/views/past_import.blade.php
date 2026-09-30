@@ -707,6 +707,10 @@
       now = '<div class="pj-dup-note">🔗 シートのIDでつながっています：' + pjEsc(l.project) + '</div>';
     } else if (l.by === 'manual' && l.project) {
       now = '<div class="pj-dup-note">🔗 手でつなぎます：' + pjEsc(l.project) + '</div>';
+    } else if (l.by === 'name' && l.project) {
+      // 名前（コンテンツ・顧客名）で見つけた案件。取り込むと、次の朝このIDがシートの100行目に書かれる。
+      now = '<div class="pj-dup-note">🔎 名前で見つけた案件：' + pjEsc(l.project)
+        + '<br><span style="font-size:10.5px;">取り込むと、次の朝このIDがシートに書かれて、以後はIDでつながります。違う案件なら下にIDを入れてください。</span></div>';
     }
     var v = pjEsc(l.id || '');
     return now + '<div class="pj-dup-note" style="margin-top:4px;">'

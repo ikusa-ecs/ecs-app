@@ -22,6 +22,8 @@ class SheetSync extends Model
             'rows' => 'array',
             // 「シートの何列目 → ECSの案件ID」。アサイン表の100行目へ書き戻すために使う。
             'project_ids' => 'array',
+            // 取込でシートの100行目と違う案件につないだ記録 {列: {from, to}}（2026-09-30）。
+            'id_changes' => 'array',
             'case_count' => 'integer',
             'received_at' => 'datetime',
             'changed_at' => 'datetime',

@@ -153,7 +153,7 @@ class SheetSyncController extends Controller
             // ⚠ 2026-09-29 から、**いまのシートのブロックと合うIDだけ**返す（baba「IDがばらばら」）。
             //   取り込んだあとにブロックを足す・並べ替えると、前回の「列 → ID」がずれて隣のブロックに付いていた。
             //   合わないIDが書かれている列には '' を返す＝GASがその欄を空にする（次の取込で正しいIDが入る）。
-            'projectIds' => (object) $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? [])),
+            'projectIds' => (object) $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? []), (array) ($sync->id_changes ?? [])),
             'idRow' => self::ID_ROW,
             'message' => $changed
                 ? '受け取りました（前回と中身が変わっています）。'
@@ -172,7 +172,7 @@ class SheetSyncController extends Controller
      * @param  array<int|string, string>  $mapped
      * @return array<string, string>
      */
-    private function idsForSheet(array $rows, array $period, array $mapped): array
+    private function idsForSheet(array $rows, array $period, array $mapped, array $changes = []): array
     {
         $out = [];
         $contents = new ImportContents;
@@ -184,20 +184,34 @@ class SheetSyncController extends Controller
             $date = MonthlySheetReader::completeDate((string) ($case['fields']['日程'] ?? ''), $period);
             $content = (string) ($case['fields']['コンテンツ'] ?? '');
 
-            $want = (string) ($mapped[(string) $col] ?? ($mapped[$col] ?? ''));
-            $wantP = $want !== '' ? Project::find($want) : null;
-            if ($wantP && SheetIdCheck::fits($wantP, $date, $content, $contents)) {
-                $out[(string) $col] = $wantP->id;
+            // ⚠ **シートに書いてあるIDが合っていれば、それが正**（触らない）。
+            //   ブロック（列）を並べ替えると、IDはブロックと一緒に動く。一方「前回の列 → ID」の記録は古い位置のまま。
+            //   同じ日のブロックどうしを入れ替えると、古い記録のIDも「日付が同じ＝合っている」に見えるので、
+            //   記録を先に使うと正しいIDを隣のIDで上書きしてしまう（2026-09-30 に見つけた）。
+            $onSheet = trim((string) ($rows[self::ID_ROW - 1][$col] ?? ''));
+            // 取込で「このIDから別の案件へ」つなぎ直した列（手でつないだ等）。まだ古いIDが書いてあれば書き換える。
+            // ⚠ 古いIDがもう無い（ブロックが動いた）ときは触らない。
+            $chg = $changes[(string) $col] ?? ($changes[$col] ?? null);
+            if (is_array($chg) && $onSheet !== '' && $onSheet === (string) ($chg['from'] ?? '')
+                && Project::whereKey((string) ($chg['to'] ?? ''))->exists()) {
+                $out[(string) $col] = (string) $chg['to'];
+
+                continue;
+            }
+            if ($onSheet !== '') {
+                $p = Project::find($onSheet);
+                if (! $p || ! SheetIdCheck::fits($p, $date, $content, $contents)) {
+                    $out[(string) $col] = '';   // ずれたID・消した案件のID＝空にさせる
+                }
 
                 continue;
             }
 
-            $onSheet = trim((string) ($rows[self::ID_ROW - 1][$col] ?? ''));
-            if ($onSheet !== '') {
-                $p = Project::find($onSheet);
-                if (! $p || ! SheetIdCheck::fits($p, $date, $content, $contents)) {
-                    $out[(string) $col] = '';
-                }
+            // 100行目が空のときだけ、前回の記録で埋める（日付とコンテンツの両方が合うときだけ）。
+            $want = (string) ($mapped[(string) $col] ?? ($mapped[$col] ?? ''));
+            $wantP = $want !== '' ? Project::find($want) : null;
+            if ($wantP && SheetIdCheck::fitsStrict($wantP, $date, $content, $contents)) {
+                $out[(string) $col] = $wantP->id;
             }
         }
 

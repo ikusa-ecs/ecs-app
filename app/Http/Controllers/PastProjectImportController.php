@@ -213,6 +213,7 @@ class PastProjectImportController extends Controller
             $seenIds = [];
             foreach ($read['cases'] as $i => $case) {
                 $ecsId = $this->ecsIdAt($rows, $case['col'] ?? null);
+                $sheetId = $ecsId;   // 100行目に書いてあったそのままのID（あとで「別の案件につなぎ直した」かを見る）
                 // 100行目が空なら、ECSが前回の取込で残した「列 → ID」の対応表も使う（2026-09-29）。
                 // ⚠ IDがシートに書かれるのは「受け取ったあと」なので、書かれた朝に届いた中身にはまだ入っていない
                 //   （P-2026-0315 がこれで新しい案件に見えた）。
@@ -233,7 +234,8 @@ class PastProjectImportController extends Controller
                 if ($ecsId === null && $idMismatch === '' && $sync !== null && isset($case['col'])) {
                     $mapped = (string) (($sync->project_ids ?? [])[(string) $case['col']] ?? (($sync->project_ids ?? [])[(int) $case['col']] ?? ''));
                     $mp = $mapped !== '' ? Project::find($mapped) : null;
-                    if ($mp && optional($mp->start_date)->format('Y-m-d') === $blockDate) {
+                    // ⚠ 日付とコンテンツの両方が合うときだけ（同じ日のブロックを入れ替えると、日付だけでは見分けられない）。
+                    if ($mp && SheetIdCheck::fitsStrict($mp, $blockDate, $blockContent, $this->importContents)) {
                         $ecsId = $mp->id;
                     }
                 }
@@ -258,6 +260,7 @@ class PastProjectImportController extends Controller
                     'ecsId' => $ecsId,
                     // 100行目のIDが別の案件を指していて使わなかったとき、その知らせ（下見に出す）。
                     'idMismatch' => $idMismatch,
+                    'sheetId' => $sheetId,
                 ];
             }
             $unmapped = $read['unknownLabels'];
@@ -550,13 +553,23 @@ class PastProjectImportController extends Controller
                 // ⚠ 判定は findExisting の1か所（下見と取込で同じ）。画面で判定し直さない。
                 'dup' => $this->dupInfo($info, $found, $edit),
                 // ECSの案件IDでつながっているか（sheet＝シートの100行目／manual＝下見で手で入れた）。
-                'link' => [
-                    'by' => ($edit['linkId'] ?? '') !== '' ? 'manual'
-                        : (($entry['ecsId'] ?? null) !== null && $found['exact'] && $found['exact']->id === $entry['ecsId'] ? 'sheet' : ''),
-                    'id' => (string) ($edit['linkId'] ?? ''),
-                    'project' => $found['exact'] ? $found['exact']->id.'『'.$found['exact']->project_name.'』'
-                        .optional($found['exact']->start_date)->format('n/j') : '',
-                ],
+                // どのECSの案件につながったか・何でつながったか（2026-09-30 baba「変わりますなのにIDでつながってない？」）。
+                //   manual＝下見で手で入れたID／sheet＝シートの100行目のID／name＝名前（コンテンツ・顧客名）で見つけた。
+                //   ⚠ name のときは、取り込むと次の朝そのIDがシートの100行目に書かれる＝次からは sheet になる。
+                'link' => (function () use ($edit, $entry, $found, $info) {
+                    $t = $info['errors'] ? null : SheetDiff::target($found, $edit);
+                    $by = '';
+                    if ($t !== null) {
+                        $by = ($edit['linkId'] ?? '') !== '' ? 'manual'
+                            : ((($entry['ecsId'] ?? null) !== null && $t->id === $entry['ecsId']) ? 'sheet' : 'name');
+                    }
+
+                    return [
+                        'by' => $by,
+                        'id' => (string) ($edit['linkId'] ?? ''),
+                        'project' => $t ? $t->id.'『'.$t->project_name.'』'.optional($t->start_date)->format('n/j') : '',
+                    ];
+                })(),
                 // 取込で書き換わる項目・人（new＝新規／changed＝変わる／same＝変化なし）。
                 'diff' => $diff,
                 'label' => $entry['label'],
@@ -642,6 +655,7 @@ class PastProjectImportController extends Controller
         // ⚠ これをアサイン表へ書き戻すと、次の朝からは同じ案件だと機械が確実に分かる
         //   （いまは日付・コンテンツ・お客様名で当てているので、書き直されるとズレる）。
         $idsByColumn = [];
+        $idChanges = [];   // 100行目のIDと違う案件につないだ列 {列: {from, to}}（2026-09-30）
         // リハ・予備日・前日設営のうち、これから本番を探す案件のID。
         $needParent = [];
 
@@ -726,9 +740,10 @@ class PastProjectImportController extends Controller
             // ECSの案件IDをアサイン表へ書き戻すための目印（2026-09-15 baba要望）。
             // 「どの列の案件が、ECSのどのIDになったか」をここで拾って、あとで受信箱に残す。
             $seriesCol = $entry['col'] ?? null;
+            $sheetIdHere = $entry['sheetId'] ?? null;
 
             DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus, $isFuture,
-                $crossKind, $shareOffice, $office, $seriesCol, &$created, &$updated, &$assignCount, &$shared,
+                $crossKind, $shareOffice, $office, $seriesCol, $sheetIdHere, &$idChanges, &$created, &$updated, &$assignCount, &$shared,
                 &$idsByColumn, &$needParent) {
                 if ($existing) {
                     // ⚠ 公開の状態（staff_published）は、読み込み直しでは触らない（2026-08-28 baba報告）。
@@ -769,6 +784,11 @@ class PastProjectImportController extends Controller
                 //   探し直すと「似ている別の案件」のIDを書き戻してしまうことがある。
                 if ($seriesCol !== null) {
                     $idsByColumn[(int) $seriesCol] = $project->id;
+                    // シートの100行目とは違う案件につないだ（手でつなぎ直した・ずれたIDを使わなかった）。
+                    // ⚠ 毎朝の書き戻しは「シートのIDが合っていれば触らない」ので、ここで記録しないと書き換わらない。
+                    if ($sheetIdHere !== null && $sheetIdHere !== $project->id) {
+                        $idChanges[(string) $seriesCol] = ['from' => $sheetIdHere, 'to' => $project->id];
+                    }
                 }
 
                 // リハ・予備日・前日設営は、全部入れ終わってから本番に紐づける（下のまとめ処理）。
@@ -876,6 +896,7 @@ class PastProjectImportController extends Controller
                 // **100行目**（表の下の空いているところ）に書き込む。
                 // ⚠ 行を増やさない＝既存のレイアウトを壊さない、という baba の指定。
                 'project_ids' => $idsByColumn ?: null,
+                'id_changes' => $idChanges ?: null,
             ])->save();
         }
 

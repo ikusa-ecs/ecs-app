@@ -105,6 +105,15 @@ class SheetImportMatchTest extends TestCase
         ]);
 
         // シートは「ヒラメキ・クエスト」「テスト様」（書き方だけ違う）。
+        // 下見では「名前で見つけた案件」としてどの案件かが出る（2026-09-30 baba「変わりますなのにIDでつながってない？」）。
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('ヒラメキ・クエスト', 'テスト様')])->assertOk();
+        $link = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => SheetSync::firstOrFail()->id])
+            ->assertOk()->json('rows.0.link');
+        $this->assertSame('name', $link['by']);
+        $this->assertStringContainsString('P-2026-0001', $link['project']);
+
         $this->import($me, $this->rows('ヒラメキ・クエスト', 'テスト様'));
 
         $this->assertSame(1, Project::count(), '新しい案件が増えている');
@@ -190,7 +199,8 @@ class SheetImportMatchTest extends TestCase
     public function test_100行目が空でも前回の対応表でつなぐ(): void
     {
         $me = $this->manager();
-        $this->ecsProject(['id' => 'P-2026-0315', 'project_name' => '名古屋巻き取りの案件', 'client' => '別の書き方']);
+        // ⚠ 前回の記録を使うのは「日付とコンテンツが両方合う」ときだけ（同じ日のブロックの入れ替えに備える）。
+        $this->ecsProject(['id' => 'P-2026-0315', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'], 'client' => '別の書き方']);
 
         config(['ecs.sheet_sync_token' => self::TOKEN]);
         $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
@@ -276,6 +286,45 @@ class SheetImportMatchTest extends TestCase
         $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
 
         $this->assertSame('', $res->json('projectIds.'.self::A), 'ずれたIDを消させていない');
+    }
+
+    /**
+     * 同じ日のブロックを並べ替えても、正しいIDを上書きしない（2026-09-30 baba「順番入れかえたらおかしくなる？」）。
+     * IDはブロックと一緒に動く。前回の「列 → ID」の記録は古い位置のまま＝記録を先に使ってはいけない。
+     */
+    public function test_同じ日のブロックを入れ替えても正しいIDを上書きしない(): void
+    {
+        $this->ecsProject(['id' => 'P-2026-0081', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'], 'client' => 'A']);
+        $this->ecsProject(['id' => 'P-2026-0082', 'project_name' => '謎パ', 'content_names' => ['謎パ'], 'client' => 'B']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+
+        // このブロック（13列目）はいまチャンバラで、100行目にも正しく P-2026-0081。記録は古い位置の P-2026-0082。
+        $rows = $this->rows('チャンバラ', 'A', 'P-2026-0081');
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        SheetSync::firstOrFail()->forceFill(['project_ids' => [(string) self::A => 'P-2026-0082']])->save();
+
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+
+        $this->assertNull($res->json('projectIds.'.self::A), '正しいIDを古い記録で書き換えようとしている');
+    }
+
+    /** 下見で別の案件につなぎ直したら、次の朝シートの古いIDを書き換える。 */
+    public function test_手でつなぎ直したIDは次の朝シートに書かれる(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0091', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'], 'client' => 'A']);
+        $this->ecsProject(['id' => 'P-2026-0092', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'], 'client' => 'A2', 'start_time' => '13:00']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $rows = $this->rows('チャンバラ', 'A', 'P-2026-0091');
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'sync' => $sync->id, 'edits' => json_encode(['0' => ['linkId' => 'P-2026-0092']]),
+        ])->assertRedirect('/past-import');
+
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $this->assertSame('P-2026-0092', $res->json('projectIds.'.self::A));
     }
 
     /** 消した案件のIDが残っていたら、ふつうに名前で探す（落ちない）。 */
