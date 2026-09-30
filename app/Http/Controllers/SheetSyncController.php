@@ -176,7 +176,36 @@ class SheetSyncController extends Controller
     {
         $out = [];
         $contents = new ImportContents;
-        foreach (MonthlySheetReader::read($rows)['cases'] as $case) {
+        $cases = MonthlySheetReader::read($rows)['cases'];
+
+        // 同じIDが2か所以上に書いてある＝ブロックをコピーしてIDまで写った（2026-09-30）。
+        // 日付とコンテンツが両方合うブロックが1つだけならそこが元＝他（コピー）のIDは消させる。
+        // 決められなければ、どれも消さない（取込の下見で人が決める＝取り込むと id_changes で直る）。
+        $colsById = [];
+        foreach ($cases as $case) {
+            $v = trim((string) ($rows[self::ID_ROW - 1][(int) ($case['col'] ?? -1)] ?? ''));
+            if ($v !== '') {
+                $colsById[$v][] = $case;
+            }
+        }
+        $copyCols = [];
+        foreach ($colsById as $id => $list) {
+            if (count($list) < 2 || ! ($p = Project::find($id))) {
+                continue;
+            }
+            $fit = array_values(array_filter($list, fn ($c) => SheetIdCheck::fitsStrict($p,
+                MonthlySheetReader::completeDate((string) ($c['fields']['日程'] ?? ''), $period),
+                (string) ($c['fields']['コンテンツ'] ?? ''), $contents)));
+            if (count($fit) === 1) {
+                foreach ($list as $c) {
+                    if (($c['col'] ?? null) !== ($fit[0]['col'] ?? null)) {
+                        $copyCols[(int) $c['col']] = true;
+                    }
+                }
+            }
+        }
+
+        foreach ($cases as $case) {
             $col = (int) ($case['col'] ?? -1);
             if ($col < 0) {
                 continue;
@@ -195,6 +224,11 @@ class SheetSyncController extends Controller
             if (is_array($chg) && $onSheet !== '' && $onSheet === (string) ($chg['from'] ?? '')
                 && Project::whereKey((string) ($chg['to'] ?? ''))->exists()) {
                 $out[(string) $col] = (string) $chg['to'];
+
+                continue;
+            }
+            if ($onSheet !== '' && isset($copyCols[$col])) {
+                $out[(string) $col] = '';   // コピーで写ったID＝消させる（元のブロックのIDは残る）
 
                 continue;
             }

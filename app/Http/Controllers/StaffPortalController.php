@@ -12,6 +12,7 @@ use App\Support\StaffProjectNews;
 use App\Support\ActiveBonus;
 use App\Support\AssignmentRole;
 use App\Support\DispatchRows;
+use App\Support\OfficePublish;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectSeries;
@@ -609,8 +610,13 @@ class StaffPortalController extends Controller
         $projects = Project::where('is_recruiting', true)
             ->notCancelled()   // キャンセルになった案件は募集もしない（2026-08-26）
             ->whereNotIn('status', ['完了', '下書き'])
-            ->where(function ($q) use ($appliedIds) {
-                $q->where('staff_published', true);
+            ->where(function ($q) use ($appliedIds, $office) {
+                // ⚠ 公開は拠点ごと（2026-09-30）＝**自分の拠点で公開された**案件だけ（正本＝OfficePublish）。
+                if ($office) {
+                    OfficePublish::scopePublishedFor($q, $office);
+                } else {
+                    $q->where('staff_published', true);
+                }
                 if ($appliedIds) {
                     $q->orWhereIn('id', $appliedIds);
                 }

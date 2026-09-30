@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Support\Headcount;
 use App\Models\ProjectShare;
+use App\Support\OfficePublish;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ShareTags;
@@ -40,9 +41,12 @@ class AssignPublishController extends Controller
         // ⚠ **ほかの拠点に巻き取られた案件は出さない**（2026-09-16 baba要望）。
         //   巻き取り＝相手の拠点が運営する＝こちらのスタッフに募集を出してはいけない。
         //   ⚠ 消すのはこの画面と日別ボードだけ。案件一覧には残す＝「解除」の入口が要るため。
+        //   ⚠ 2026-09-30 から公開は拠点ごと（OfficePublish）。巻き取りでも「登録した拠点からも人を出す」なら、
+        //     登録した拠点の公開ボードにも出す（その拠点のスタッフにだけ公開できる）。
         $cases = OfficeScope::hideTakenOver(
             OfficeScope::applyToProjects(Project::query(), $office),
-            $office
+            $office,
+            true
         )
             ->notCancelled()   // キャンセルになった案件は公開の対象にしない（2026-08-26）
             ->orderBy('start_date')->get();
@@ -85,7 +89,8 @@ class AssignPublishController extends Controller
                 'staffLeave' => $p->staff_leave_time,          // スタッフ向け解散（未設定=null→社員と同じ）
                 'place'     => $p->location ?? '',
                 'meetPlace' => $p->assembly_type ?? '',
-                'published' => (bool) $p->staff_published,      // 公開状態（DBの背骨）
+                // 公開状態＝**この拠点のスタッフに**公開しているか（2026-09-30 から拠点ごと・正本＝OfficePublish）。
+                'published' => OfficePublish::isPublishedFor($p, $office),
                 // スタッフ募集をするか（案件登録の「募集しない」の裏返し）。2026-09-18 baba指摘
                 // 「メンバー募集しないにしてるのにスタッフ公開ボードに出ている」。
                 // ⚠ 募集しない案件も**一覧からは消さない**。公開はスタッフ画面の「確定アサイン」も
@@ -148,10 +153,19 @@ class AssignPublishController extends Controller
             if (! OfficeScope::belongsTo($project, $scope)) {
                 continue;   // 画面で見ていた拠点と違う＝まとめて公開する事故を防ぐ
             }
-            if ((bool) $project->staff_published === (bool) $data['publish']) {
-                continue;   // すでにその状態＝履歴を汚さない
+            // ⚠ 公開は拠点ごと（2026-09-30 baba要望）＝**この拠点のスタッフにだけ**公開する／やめる。
+            //   他の拠点の公開はそのまま（名古屋が公開していても、東京で非公開にできる・その逆も）。
+            if ($scope !== '') {
+                if (! OfficePublish::set($project, $scope, (bool) $data['publish'])) {
+                    continue;   // すでにその状態＝履歴を汚さない
+                }
+            } else {
+                if ((bool) $project->staff_published === (bool) $data['publish']) {
+                    continue;
+                }
+                $project->staff_published = $data['publish'];
+                $project->published_offices = null;   // 拠点の指定が無い＝関わる全拠点（これまでの形）
             }
-            $project->staff_published = $data['publish'];
             $project->save();
             $updated++;
         }

@@ -351,6 +351,76 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('P-2026-0092', $res->json('projectIds.'.self::A));
     }
 
+    /**
+     * 2ブロック並んだ表（左＝13列目・右＝23列目）。各ブロック [日程の文字, コンテンツ, 顧客, 100行目のID]。
+     */
+    private function twoBlocks(array $left, array $right): array
+    {
+        $b = self::BLOCK_WIDTH;
+        $rows = [];
+        foreach ([[self::A, $left], [self::A + $b, $right]] as [$col, $blk]) {
+            $one = $this->rows($blk[1], $blk[2], $blk[3] ?? null);
+            foreach ($one as $r => $line) {
+                $rows[$r] ??= array_fill(0, self::A + $b * 2 + 2, '');
+                for ($i = 0; $i < $b; $i++) {
+                    $rows[$r][$col + $i] = $line[self::A + $i] ?? '';
+                }
+            }
+            $rows[3][$col + 3] = $blk[0];   // 日程
+        }
+
+        return array_values($rows);
+    }
+
+    /**
+     * セールスがブロックをコピーして作り、100行目のIDまで写った（2026-09-30 baba）。
+     * ⚠ コピーを元より左に置いても、コピーが元の案件を上書きしないこと。
+     */
+    public function test_コピーで同じIDが2か所にあっても元の案件を上書きしない(): void
+    {
+        $me = $this->manager();
+        $orig = $this->ecsProject(['id' => 'P-2026-0200', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'],
+            'client' => '元の顧客', 'start_date' => '2026-09-01']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+
+        // 左＝コピー（9/8・同じコンテンツ・別の顧客）／右＝元（9/1）。どちらも100行目は P-2026-0200。
+        $rows = $this->twoBlocks(['9月8日(火)', 'チャンバラ', 'コピーの顧客', 'P-2026-0200'],
+            ['9月1日(火)', 'チャンバラ', '元の顧客', 'P-2026-0200']);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id])->assertOk()->json('rows');
+        $this->assertStringContainsString('2か所以上', $pre[0]['idMismatch'], 'コピーのほうに知らせが出ていない');
+        $this->assertSame('', $pre[1]['idMismatch']);
+
+        $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id])->assertRedirect('/past-import');
+
+        $orig->refresh();
+        $this->assertSame('2026-09-01', $orig->start_date->format('Y-m-d'), 'コピーの日程で元の案件を上書きしている');
+        $this->assertSame(2, Project::count(), 'コピーは別の案件として入る');
+
+        // 次の朝：コピーのブロックの100行目は、新しくできた案件のIDに書き換わる。
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $newId = Project::where('id', '!=', 'P-2026-0200')->value('id');
+        $this->assertSame($newId, $res->json('projectIds.'.self::A));
+        $this->assertNull($res->json('projectIds.'.(self::A + self::BLOCK_WIDTH)), '元のブロックのIDは触らない');
+    }
+
+    /** 取り込む前でも、元が決まればコピーのIDは毎朝の書き戻しで消す。 */
+    public function test_毎朝の書き戻しでコピーのIDを消す(): void
+    {
+        $this->ecsProject(['id' => 'P-2026-0200', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'],
+            'client' => '元の顧客', 'start_date' => '2026-09-01']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $rows = $this->twoBlocks(['9月8日(火)', 'チャンバラ', 'コピーの顧客', 'P-2026-0200'],
+            ['9月1日(火)', 'チャンバラ', '元の顧客', 'P-2026-0200']);
+
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+
+        $this->assertSame('', $res->json('projectIds.'.self::A), 'コピーのIDを消させていない');
+        $this->assertNull($res->json('projectIds.'.(self::A + self::BLOCK_WIDTH)));
+    }
+
     /** 消した案件のIDが残っていたら、ふつうに名前で探す（落ちない）。 */
     public function test_消した案件のIDなら名前で探す(): void
     {

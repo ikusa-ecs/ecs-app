@@ -101,7 +101,8 @@ final class StaffProjectNews
         $office = trim((string) ($person->office ?? '')) ?: OfficeScope::DEFAULT_OFFICE;
 
         $open = OfficeScope::applyToProjects(
-            Project::where('staff_published', true)
+            // ⚠ 公開は拠点ごと（2026-09-30）＝自分の拠点で公開された案件だけ（正本＝OfficePublish）。
+            OfficePublish::scopePublishedFor(Project::query(), $office)
                 ->whereNotNull('start_date')
                 ->whereDate('start_date', '>=', $today->format('Y-m-d'))
                 ->notCancelled(),

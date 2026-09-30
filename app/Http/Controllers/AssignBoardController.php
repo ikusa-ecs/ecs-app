@@ -18,6 +18,7 @@ use App\Support\Headcount;
 use App\Support\LineGroupText;
 use App\Support\RecruitAgainText;
 use App\Support\Lodging;
+use App\Support\OfficePublish;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
@@ -438,9 +439,11 @@ class AssignBoardController extends Controller
         // ⚠ ただし**ほかの拠点に巻き取られた案件は出さない**（2026-09-16 baba要望）。
         //   巻き取り＝相手の拠点が運営する＝こちらは人を入れないので、並んでいると邪魔になる。
         //   ⚠ 消すのはこの画面（と公開ボード）だけ。案件一覧には残す＝「解除」の入口が要るため。
+        //   ⚠ 「登録した拠点からも人を出す」印が付いた巻き取りは、登録した拠点にも出す（2026-09-30 baba要望）。
         $projects = OfficeScope::hideTakenOver(
             OfficeScope::applyToProjects(Project::query(), $office),
-            $office
+            $office,
+            true
         )
             ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
@@ -609,7 +612,7 @@ class AssignBoardController extends Controller
                 //   stat＝案件の進み具合だけ／pubOn＝スタッフに公開して募集中かどうか。
                 //   別のことなので別々に持つ（2026-08-28 baba指摘）。
                 'stat' => $this->boardStatus($p),
-                'pubOn' => (bool) $p->staff_published,
+                'pubOn' => OfficePublish::isPublishedFor($p, $office),   // ⚠ 公開は拠点ごと（2026-09-30）＝この拠点のスタッフに公開しているか（正本＝OfficePublish）
                 // スタッフ募集を続けているか。⚠ 「公開しているか」とは別。
                 //   確定にすると締まる（正本＝RecruitStatus::closeOnConfirmed）。
                 //   これを渡していなかったので、募集を止めた案件でも「募集中 あと◯名」と出ていた。

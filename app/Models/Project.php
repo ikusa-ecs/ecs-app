@@ -44,6 +44,8 @@ class Project extends Model
             'prep_handover' => 'boolean',
             'prep_script' => 'boolean',
             'staff_published' => 'boolean',
+            // どの拠点のスタッフに公開しているか（null＝これまでどおり関わる全拠点）。正本＝App\Support\OfficePublish（2026-09-30）
+            'published_offices' => 'array',
             'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）
             // イベント数に数えるか（null=自動判定／true=数える／false=数えない・先-2）
             'count_as_event' => 'boolean',

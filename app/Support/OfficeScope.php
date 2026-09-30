@@ -202,11 +202,19 @@ class OfficeScope
      *   ・巻き取った拠点から見ると、その行は自分あてなので外れない（＝ちゃんと出る）。
      *   ・ヘルプの行は見ない（ヘルプは運営が変わらないので、登録拠点にも出したまま）。
      */
-    public static function hideTakenOver($query, ?string $office)
+    public static function hideTakenOver($query, ?string $office, bool $showWhenOriginHelps = false)
     {
         return $query->when($office, fn ($q) => $q->whereDoesntHave(
             'shares',
-            fn ($s) => $s->where('kind', '巻き取り')->where('office', '!=', $office)
+            function ($s) use ($office, $showWhenOriginHelps) {
+                $s->where('kind', '巻き取り')->where('office', '!=', $office);
+                // 「登録した拠点からも人を出す」印（2026-09-30 baba要望）が付いていて、いま見ているのが
+                // 登録した拠点なら、外さない（＝日別ボードに出す）。⚠ 拠点が空の案件は東京あつかい。
+                if ($showWhenOriginHelps) {
+                    $s->where(fn ($w) => $w->where('origin_helps', false)->orWhereNull('origin_helps')
+                        ->orWhereRaw("COALESCE(NULLIF(projects.office, ''), ?) <> ?", [self::DEFAULT_OFFICE, $office]));
+                }
+            }
         ));
     }
 

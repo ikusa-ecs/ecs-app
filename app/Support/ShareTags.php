@@ -61,7 +61,8 @@ final class ShareTags
             if ($office === '' || $kind === '') {
                 continue;
             }
-            $rows[] = ['office' => $office, 'kind' => $kind];
+            // 巻き取りでも「登録した拠点からも人を出す」印（2026-09-30）。札に「（東京からも応援）」と添える。
+            $rows[] = ['office' => $office, 'kind' => $kind, 'help' => $kind === '巻き取り' && ! empty($s->origin_helps)];
         }
 
         if ($rows === []) {
@@ -74,7 +75,7 @@ final class ShareTags
         if ($scope !== null && $owner !== $scope) {
             foreach ($rows as $r) {
                 if ($r['office'] === $scope) {
-                    $tags[] = ['label' => self::fromOwner($owner, $r['kind']), 'kind' => $r['kind']];
+                    $tags[] = ['label' => self::fromOwner($owner, $r['kind']).($r['help'] ? '（'.$owner.'からも応援）' : ''), 'kind' => $r['kind']];
                 }
             }
         }
@@ -85,7 +86,7 @@ final class ShareTags
             if ($scope !== null && $r['office'] === $scope) {
                 continue;   // 自分の拠点ぶんは①で出している
             }
-            $tags[] = ['label' => self::toOffice($r['office'], $r['kind']), 'kind' => $r['kind']];
+            $tags[] = ['label' => self::toOffice($r['office'], $r['kind']).($r['help'] ? '（'.$owner.'からも応援）' : ''), 'kind' => $r['kind']];
         }
 
         return $tags;

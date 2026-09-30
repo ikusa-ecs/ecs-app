@@ -608,6 +608,8 @@
   .of-share { font-size: 10.5px; font-weight: 700; color: var(--brand-dark, #6d4526); background: var(--brand-soft, #f6e9dd); border: 1px solid var(--line, #e6d8c8); border-radius: 6px; padding: 2px 8px; }
   /* 巻き取り＝相手の拠点が運営する。うちは手を出さない案件なので、ヘルプより目立たせる。 */
   .of-share.takeover { color: #9a3412; background: #ffedd5; border-color: #fdba74; font-weight: 800; }
+  /* 「自拠点からも人を出す」（2026-09-30） */
+  .of-help { font-size: 10.5px; font-weight: 700; color: var(--ink); display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; cursor: pointer; }
   .of-mine { font-size: 10.5px; font-weight: 800; color: #166534; background: #e6f5ec; border: 1px solid #b7e0c2; border-radius: 6px; padding: 2px 8px; }
   .ops .copy-ctl { display: inline-flex; align-items: center; gap: 4px; }
   .ops .copy-ctl select { font-size: 11px; padding: 1px 4px; }
@@ -914,6 +916,8 @@
       // 拠点の札も「自拠点にコピー」も出なくなる（ケータリングで同じ抜けをやった＝注意）。
       office:c.office || '', sharedOffices:c.sharedOffices || [], isOwn:!!c.isOwn,
       sharedToMe:!!c.sharedToMe, myKind:c.myKind || 'ヘルプ', canCopy:!!c.canCopy,
+      // 巻き取ってもらった自拠点の案件＝「自拠点からも人を出す」（2026-09-30）。⚠ ここで詰め替えないと画面に出ない。
+      takenOverBy:c.takenOverBy || '', originHelps:!!c.originHelps,
       // 「名古屋巻き取り」の札。⚠ ここに書き写さないと画面側では空になる（詰め替え漏れ）。
       shareTags:c.shareTags || [],
       // 詳細プルダウンの現在値（社員ID）。担当なしは null。音響(sound)は上で設定済み。
@@ -1300,6 +1304,12 @@
         extra += `<span class="of-share${t.kind === '巻き取り' ? ' takeover' : ''}">${t.label}</span>`;
       });
       if (p.sharedToMe) extra += `<span class="of-mine">自拠点にコピー済(${p.myKind})</span>`;
+      // 巻き取ってもらった自拠点の案件＝「自拠点からも人を出す」（2026-09-30 baba要望）。
+      // 付けると、この拠点の日別ボードにもこの案件が出る（あと◯名を見ながら自拠点のスタッフを詰められる）。
+      if (window.ECS_CAN_SHARE && p.isOwn && p.takenOverBy) {
+        extra += `<label class="of-help" onclick="event.stopPropagation()" title="付けると、この拠点の日別ボードにもこの案件が出ます（公開・非公開は${escHtml(p.takenOverBy)}が決めます）">`
+          + `<input type="checkbox"${p.originHelps ? ' checked' : ''} onchange="ecsOriginHelps('${p.id}', this)"> 自拠点からも人を出す</label>`;
+      }
 
       let officeBadge = '';
       if (window.ECS_SHOW_OFFICE && p.office) {
@@ -2223,6 +2233,21 @@
     if (kind) f.querySelector('input[name="kind"]').value = kind;
     document.body.appendChild(f);
     f.submit();
+  }
+  // 「自拠点からも人を出す」の付け外し（2026-09-30）。⚠ 失敗したらチェックを元に戻して知らせる。
+  function ecsOriginHelps(id, cb) {
+    fetch('/projects/origin-helps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ id: id, on: cb.checked })
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok && j && j.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok) { cb.checked = !cb.checked; alert((j && j.message) || '保存できませんでした。'); return; }
+        const p = (typeof projects !== 'undefined' ? projects : []).find(x => x.id === id);   // 描き直しで元に戻らないように
+        if (p) p.originHelps = cb.checked;
+      })
+      .catch(() => { cb.checked = !cb.checked; alert('通信エラーで保存できませんでした。'); });
   }
   function ecsProjCopy(id, kind) { ecsProjPost('/assign-sheet/share', id, kind || 'ヘルプ'); }
   function ecsProjRemoveShare(id) {

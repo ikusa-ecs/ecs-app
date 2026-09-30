@@ -179,6 +179,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // キャンセルの切り替え（2026-08-26）。記録は消さず、実施形態の表示を「キャンセル」にして
     // イベント数・アサイン系の画面・スタッフ画面から外す。
     Route::post('/projects/cancel', [ProjectController::class, 'setCancelled']);
+    // 巻き取ってもらった案件に「自拠点からも人を出す」（2026-09-30 baba要望）。付けると登録拠点の日別ボードにも出る。
+    Route::post('/projects/origin-helps', [ProjectController::class, 'setOriginHelps'])->middleware('tier:manager');
     // 案件の削除（キャンセルになった案件を消す）。案件の削除＝社員以上でOK（baba 2026-07-14）。関連アサインも一緒に消す。
     Route::post('/projects/{id}/delete', [ProjectController::class, 'destroy']);
     // 案件の編集履歴（先-1・2026-08-18）。誰がいつ何を何に変えたかを見るだけの画面。

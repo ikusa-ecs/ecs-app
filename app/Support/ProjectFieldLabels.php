@@ -116,6 +116,8 @@ class ProjectFieldLabels
         // ── 状態 ──
         'status'             => 'アサイン状況',
         'staff_published'    => 'スタッフへの公開',
+        // 公開している拠点（2026-09-30 から公開は拠点ごと。正本＝OfficePublish）。
+        'published_offices'  => '公開している拠点',
         'publish_memo'       => '公開ボードの備考',
         'extra_published_at' => '追加案件の公開日',
         'is_archived'        => 'アーカイブ',

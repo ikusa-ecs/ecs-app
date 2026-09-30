@@ -192,6 +192,11 @@ class ProjectController extends Controller
                     ->map(fn ($s) => ['label' => ShareTags::short($s->office, $s->kind), 'kind' => $s->kind])
                     ->values()->all(),
                 'isOwn' => ($p->office ?? '') === $myOffice,
+                // 他の拠点に巻き取ってもらっている（自拠点の案件）＝「自拠点からも人を出す」の印を付けられる（2026-09-30）。
+                'takenOverBy' => optional($sharesByProject->get($p->id, collect())
+                    ->first(fn ($s) => $s->kind === '巻き取り' && $s->office !== $myOffice))->office ?? '',
+                'originHelps' => (bool) optional($sharesByProject->get($p->id, collect())
+                    ->first(fn ($s) => $s->kind === '巻き取り' && $s->office !== $myOffice))->origin_helps,
                 'sharedToMe' => (bool) $sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice),
                 'myKind' => optional($sharesByProject->get($p->id, collect())->firstWhere('office', $myOffice))->kind ?? 'ヘルプ',
                 'canCopy' => $canManageShare && ($p->office ?? '') !== '' && ($p->office ?? '') !== $myOffice
@@ -1058,6 +1063,35 @@ class ProjectController extends Controller
 
         $project->is_cancelled = $request->boolean('cancelled');
         $project->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 巻き取ってもらった案件に「自拠点からも人を出す」を付ける／外す（2026-09-30 baba要望）。
+     * 付けると、登録した拠点の日別ボードにもこの案件が出る（OfficeScope::hideTakenOver）。
+     * ⚠ 付け外しできるのは登録した拠点（ProjectAccess::canEdit）。スタッフ公開ボードには出さない（公開は引き取った拠点が決める）。
+     */
+    public function setOriginHelps(Request $request)
+    {
+        $request->validate([
+            'id' => ['required', 'string', 'exists:projects,id'],
+            'on' => ['required', 'boolean'],
+        ]);
+
+        $project = Project::findOrFail($request->input('id'));
+        // ⚠ 引き取った拠点も案件は直せる（canEdit）が、この印は「登録した拠点が人を出すか」なので登録した拠点だけ。
+        $owner = ($project->office ?? '') !== '' ? $project->office : OfficeScope::DEFAULT_OFFICE;
+        $mine = (Auth::user()->office ?? '') !== '' ? Auth::user()->office : OfficeScope::DEFAULT_OFFICE;
+        if (! ProjectAccess::canEdit($project) || $owner !== $mine) {
+            return response()->json(['ok' => false, 'message' => 'この印は、案件を登録した拠点（'.$owner.'）だけが付けられます。'], 403);
+        }
+
+        $n = ProjectShare::where('project_id', $project->id)->where('kind', '巻き取り')
+            ->update(['origin_helps' => $request->boolean('on')]);
+        if ($n === 0) {
+            return response()->json(['ok' => false, 'message' => 'この案件は他の拠点に巻き取られていません。'], 422);
+        }
 
         return response()->json(['ok' => true]);
     }

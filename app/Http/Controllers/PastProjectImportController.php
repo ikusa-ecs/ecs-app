@@ -209,8 +209,29 @@ class PastProjectImportController extends Controller
         if ($isMonthly) {
             // 月シート＝項目名を探して読む（拠点で位置が少し違っても当たるように）。
             $read = MonthlySheetReader::read($rows);
-            // 100行目のECSの案件IDは、1つのシートで1回だけ使う（ブロックをコピーしてIDまで写った、などに備える）。
-            $seenIds = [];
+            // ⚠ 同じIDが2か所以上にある＝ブロックをコピーしてIDまで写った（2026-09-30 baba「セールスが行をコピーして作ったら？」）。
+            //   左にあるほうを使う、だと、コピーを元より左に置いたときに**コピーが元の案件を上書きする**。
+            //   そこで「日付とコンテンツが両方合うブロック」が1つだけならそれが元＝そのブロックだけIDを使う。
+            //   決められない（両方合う・どれも合わない）ときは、どのブロックもIDを使わない。
+            $this->importContents ??= new ImportContents;
+            $colsById = [];
+            foreach ($read['cases'] as $case) {
+                $sid = $this->ecsIdAt($rows, $case['col'] ?? null);
+                if ($sid !== null) {
+                    $colsById[$sid][] = $case;
+                }
+            }
+            $dupOwner = [];   // 重なっているID => 使ってよいブロックの列（null＝どこも使わない）
+            foreach ($colsById as $sid => $cases) {
+                if (count($cases) < 2) {
+                    continue;
+                }
+                $p = Project::find($sid);
+                $fit = $p ? array_values(array_filter($cases, fn ($c) => SheetIdCheck::fitsStrict($p,
+                    MonthlySheetReader::completeDate((string) ($c['fields']['日程'] ?? ''), $period),
+                    (string) ($c['fields']['コンテンツ'] ?? ''), $this->importContents))) : [];
+                $dupOwner[$sid] = count($fit) === 1 ? ($fit[0]['col'] ?? null) : null;
+            }
             foreach ($read['cases'] as $i => $case) {
                 $ecsId = $this->ecsIdAt($rows, $case['col'] ?? null);
                 $sheetId = $ecsId;   // 100行目に書いてあったそのままのID（あとで「別の案件につなぎ直した」かを見る）
@@ -223,6 +244,11 @@ class PastProjectImportController extends Controller
                 // ⚠ 100行目のIDが「このブロックの案件」として合っているか確かめる（2026-09-29 baba「IDがばらばら」）。
                 //   ブロックを足す・並べ替えると、IDが隣のブロックに付いていることがある＝合わないIDは使わない。
                 $idMismatch = '';
+                if ($ecsId !== null && array_key_exists($ecsId, $dupOwner) && $dupOwner[$ecsId] !== ($case['col'] ?? null)) {
+                    $idMismatch = '⚠ 同じID「'.$ecsId.'」がシートの2か所以上にあります（行をコピーしたのかもしれません）。'
+                        .'このブロックではIDを使わず、名前で探しました';
+                    $ecsId = null;
+                }
                 if ($ecsId !== null) {
                     $byId = Project::find($ecsId);
                     if ($byId && ! SheetIdCheck::fits($byId, $blockDate, $blockContent, $this->importContents ??= new ImportContents)) {
@@ -233,17 +259,11 @@ class PastProjectImportController extends Controller
                 }
                 if ($ecsId === null && $idMismatch === '' && $sync !== null && isset($case['col'])) {
                     $mapped = (string) (($sync->project_ids ?? [])[(string) $case['col']] ?? (($sync->project_ids ?? [])[(int) $case['col']] ?? ''));
-                    $mp = $mapped !== '' ? Project::find($mapped) : null;
+                    // ⚠ そのIDがシートの別のブロックにもう書いてあれば使わない（同じIDを2つのブロックに付けない）。
+                    $mp = $mapped !== '' && ! isset($colsById[$mapped]) ? Project::find($mapped) : null;
                     // ⚠ 日付とコンテンツの両方が合うときだけ（同じ日のブロックを入れ替えると、日付だけでは見分けられない）。
                     if ($mp && SheetIdCheck::fitsStrict($mp, $blockDate, $blockContent, $this->importContents)) {
                         $ecsId = $mp->id;
-                    }
-                }
-                if ($ecsId !== null) {
-                    if (isset($seenIds[$ecsId])) {
-                        $ecsId = null;
-                    } else {
-                        $seenIds[$ecsId] = true;
                     }
                 }
                 $entries[] = [
