@@ -1589,8 +1589,9 @@
         .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
         .sort((a,b) => {
           const pa = anchorJob(a), pb = anchorJob(b);
-          // 追加案件を先頭に
-          const ax = pa.extra ? 1 : 0, bx = pb.extra ? 1 : 0;
+          // 追加案件を先頭に。⚠ ただし募集が終わった（締切・満員）追加案件は先頭にしない＝日付の位置に並べる
+          //   （2026-09-30 baba要望）。もうエントリーできないのに一番上に居座ると、募集中の案件が埋もれるため。
+          const ax = (pa.extra && pa.state !== 'closed') ? 1 : 0, bx = (pb.extra && pb.state !== 'closed') ? 1 : 0;
           if (ax !== bx) return bx - ax;
           // 本番の日付の近い順（予備日・リハは親の本番に合わせて並ぶ）
           if (pa.date - pb.date !== 0) return pa.date - pb.date;
@@ -1601,7 +1602,8 @@
         });
 
       // 追加募集のお知らせバナー（表示中の追加案件の件数）
-      const extraCount = list.filter(j => j.extra).length;
+      // ⚠ 募集が終わった追加案件は数えない（2026-09-30）＝「急ぎでエントリーを」と呼びかける件数なので。
+      const extraCount = list.filter(j => j.extra && j.state !== 'closed').length;
       const en = document.getElementById('extraNotice');
       if (extraCount > 0) {
         en.style.display = '';

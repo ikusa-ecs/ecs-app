@@ -654,6 +654,7 @@
           <option value="adj">調整中のみ</option>
           <option value="fix">確定のみ</option>
           <option value="pub">募集中のみ（スタッフに公開ずみ）</option>
+          <option value="short">まだ足りない募集中のみ（再募集の文章と同じ）</option>
           <option value="unpub">まだ募集していないもののみ</option>
         </select>
         <label class="chk"><input type="checkbox" id="mineOnly" onchange="render()"> 自分の担当のみ</label>
@@ -2123,6 +2124,7 @@
       // ⚠ 「募集中か」と「案件の進み具合」は別々に見る。
       //   前は1つの状態にまとめていたので、公開ずみの案件は「確定のみ」で絞っても出てこなかった。
       const pubOn = (c.pubOn !== undefined) ? !!c.pubOn : (c.state === 'pub');
+      if (sf === 'short') return isShortRecruiting(c);   // 公開ずみ・募集中・あと◯名あり・今日以降（2026-09-30）
       if (sf === 'pub')   return pubOn;
       if (sf === 'unpub') return !pubOn;
       return (c.stat || c.state) === sf;
@@ -2655,13 +2657,17 @@
   // ⚠ 「あと◯名」はスタッフ画面と同じ数（remainForStaff＝確定の人だけ数える）。
   let recruitOpen = false;
 
+  // 「まだ足りない募集中」＝公開ずみ・募集中・あと◯名がある・今日以降（2026-09-30）。
+  // ⚠ 再募集の文章と、状態の絞り込み「まだ足りない募集中のみ」の両方がこれを使う（条件を2か所に書かない）。
+  function isShortRecruiting(c){
+    const today = new Date(); today.setHours(0,0,0,0);
+    return bPubOn(c) && bRecruit(c) && remainForStaff(c) > 0 && addDays(c.off) >= today;
+  }
   function recruitTargets(){
     const mine = document.getElementById('mineOnly').checked;
-    const today = new Date(); today.setHours(0,0,0,0);
     return cases
       .filter(c => !mine || c.mine)
-      .filter(c => bPubOn(c) && bRecruit(c) && remainForStaff(c) > 0)
-      .filter(c => addDays(c.off) >= today)
+      .filter(c => isShortRecruiting(c))
       .sort((a,b) => a.off - b.off);
   }
 

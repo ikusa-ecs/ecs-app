@@ -83,4 +83,15 @@ class BoardRecruitAgainTest extends TestCase
         $this->assertStringContainsString('📣 再募集の文章', $html);
         $this->assertStringContainsString('window.ECS_RECRUIT_HEADER', $html);
     }
+
+    /** 状態の絞り込みに「まだ足りない募集中のみ」があり、再募集の文章と同じ条件を使う（2026-09-30 baba要望）。 */
+    public function test_state_filter_has_short_recruiting(): void
+    {
+        $this->project();
+        $html = $this->actingAsPerson($this->manager())->get('/assign')->assertOk()->getContent();
+
+        $this->assertStringContainsString('<option value="short">', $html);
+        $this->assertStringContainsString("if (sf === 'short') return isShortRecruiting(c);", $html);
+        $this->assertStringContainsString('.filter(c => isShortRecruiting(c))', $html, '再募集の文章も同じ判定を使う');
+    }
 }
