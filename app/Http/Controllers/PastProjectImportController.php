@@ -824,8 +824,10 @@ class PastProjectImportController extends Controller
                     $idsByColumn[(int) $seriesCol] = $project->id;
                     // シートの100行目とは違う案件につないだ（手でつなぎ直した・ずれたIDを使わなかった）。
                     // ⚠ 毎朝の書き戻しは「シートのIDが合っていれば触らない」ので、ここで記録しないと書き換わらない。
-                    if ($sheetIdHere !== null && $sheetIdHere !== $project->id) {
-                        $idChanges[(string) $seriesCol] = ['from' => $sheetIdHere, 'to' => $project->id];
+                    // ⚠ 100行目が空の列も記録する（from＝''）。空の列は毎朝「日付とコンテンツが両方合うか」で確かめるので、
+                    //   名前が違う（＝手でつないだ）案件のIDが書かれないままだった（2026-09-30 baba「IDでつないだのに書かれない」）。
+                    if (($sheetIdHere ?? '') !== $project->id) {
+                        $idChanges[(string) $seriesCol] = ['from' => (string) ($sheetIdHere ?? ''), 'to' => $project->id];
                     }
                 }
 
@@ -933,8 +935,10 @@ class PastProjectImportController extends Controller
                 // 「シートの何列目 → ECSのID」。毎朝GASが受け取って、アサイン表の
                 // **100行目**（表の下の空いているところ）に書き込む。
                 // ⚠ 行を増やさない＝既存のレイアウトを壊さない、という baba の指定。
-                'project_ids' => $idsByColumn ?: null,
-                'id_changes' => $idChanges ?: null,
+                // ⚠ 前回の記録に**足していく**（2026-09-30）。取り込まなかった行（「✅ 変化なし」でチェックが外れた行など）の
+                //   記録まで消していたので、チェック0件で取り込むと、手でつないだIDが全部わからなくなっていた。
+                'project_ids' => array_replace((array) ($read['sync']->project_ids ?? []), array_map('strval', $idsByColumn)) ?: null,
+                'id_changes' => array_replace((array) ($read['sync']->id_changes ?? []), $idChanges) ?: null,
             ])->save();
         }
 

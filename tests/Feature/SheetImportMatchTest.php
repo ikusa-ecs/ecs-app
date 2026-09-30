@@ -233,6 +233,34 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('P-2026-0042', $sync->fresh()->rows[99][self::A], 'ECSが持つ中身にIDが入っていない');
     }
 
+    /**
+     * 100行目が空の行を手でつないだら、次の送信でそのIDを書かせる。チェック0件で取り込んでも記録は消えない
+     * （2026-09-30 baba「IDでつなげるにしてるのにスプシに書かれてない」）。
+     */
+    public function test_手でつないだIDは空の100行目にも書かれチェック0件でも消えない(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => 'ECSでの名前', 'content_names' => ['ECSでの名前'], 'client' => '別']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $rows = $this->rows('シートの名前', '金沢');
+        $send = fn () => $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $send();
+        $sync = SheetSync::firstOrFail();
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'sync' => $sync->id, 'edits' => json_encode(['0' => ['linkId' => 'P-2026-0042']]),
+        ])->assertRedirect('/past-import');
+
+        // チェックを全部外して取り込み直す（「確認が要る」の印を消すだけ）。記録は残ること。
+        $this->actingAsPerson($me)->post('/past-import', [
+            'sync' => $sync->id, 'edits' => json_encode(['0' => ['skip' => true]]),
+        ])->assertRedirect('/past-import');
+        $this->assertSame('P-2026-0042', (string) ($sync->fresh()->project_ids[self::A] ?? ''), 'チェック0件の取込で記録が消えた');
+
+        // 次の送信（シートの100行目はまだ空）→ 手でつないだIDを書かせる。
+        $this->assertSame('P-2026-0042', $send()->json('projectIds.'.self::A), '手でつないだIDを書かせていない');
+    }
+
     /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
     public function test_手で入れたIDが無ければ作らない(): void
     {

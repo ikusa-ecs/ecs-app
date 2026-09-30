@@ -134,7 +134,10 @@ class SheetSyncController extends Controller
         // 100行目に書いてもらうID（GASは「送る → 返したIDを書く」の順）。
         // ⚠ 受け取った中身はIDを書く「前」のもの。ECSが持つ中身にも、返したIDをその場で書き込んでおく
         //   （2026-09-30）＝次に取り込むとき、GASがIDを書いた後のシートと同じ中身で判定できる。
-        $ids = $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? []), (array) ($sync->id_changes ?? []));
+        // 前回取り込んでからシートの中身（100行目を除く）が変わっていなければ、ブロックは動いていない＝前回の記録をそのまま使ってよい。
+        $sheetSame = $sync->exists && $sync->applied_at !== null && ! $changed
+            && ($sync->changed_at === null || ! $sync->changed_at->greaterThan($sync->applied_at));
+        $ids = $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? []), (array) ($sync->id_changes ?? []), $sheetSame);
         $stored = $rows;
         if ($ids !== []) {
             $stored[self::ID_ROW - 1] = array_pad($stored[self::ID_ROW - 1] ?? [], max(array_map('intval', array_keys($ids))) + 1, '');
@@ -203,7 +206,7 @@ class SheetSyncController extends Controller
      * @param  array<int|string, string>  $mapped
      * @return array<string, string>
      */
-    private function idsForSheet(array $rows, array $period, array $mapped, array $changes = []): array
+    private function idsForSheet(array $rows, array $period, array $mapped, array $changes = [], bool $sheetSame = false): array
     {
         $out = [];
         $contents = new ImportContents;
@@ -252,11 +255,14 @@ class SheetSyncController extends Controller
             // 取込で「このIDから別の案件へ」つなぎ直した列（手でつないだ等）。まだ古いIDが書いてあれば書き換える。
             // ⚠ 古いIDがもう無い（ブロックが動いた）ときは触らない。
             $chg = $changes[(string) $col] ?? ($changes[$col] ?? null);
-            if (is_array($chg) && $onSheet !== '' && $onSheet === (string) ($chg['from'] ?? '')
-                && Project::whereKey((string) ($chg['to'] ?? ''))->exists()) {
-                $out[(string) $col] = (string) $chg['to'];
+            if (is_array($chg) && $onSheet === (string) ($chg['from'] ?? '')
+                && ($toP = Project::find((string) ($chg['to'] ?? '')))) {
+                // ⚠ 空だった列（from＝''）は、ブロックが動いて別のブロックになっていないか、日付かコンテンツで確かめる。
+                if ($onSheet !== '' || SheetIdCheck::fits($toP, $date, $content, $contents)) {
+                    $out[(string) $col] = $toP->id;
 
-                continue;
+                    continue;
+                }
             }
             if ($onSheet !== '' && isset($copyCols[$col])) {
                 $out[(string) $col] = '';   // コピーで写ったID＝消させる（元のブロックのIDは残る）
@@ -275,7 +281,9 @@ class SheetSyncController extends Controller
             // 100行目が空のときだけ、前回の記録で埋める（日付とコンテンツの両方が合うときだけ）。
             $want = (string) ($mapped[(string) $col] ?? ($mapped[$col] ?? ''));
             $wantP = $want !== '' ? Project::find($want) : null;
-            if ($wantP && SheetIdCheck::fitsStrict($wantP, $date, $content, $contents)) {
+            // ⚠ シートが前回の取込から変わっていないなら、記録をそのまま信じる（手でつないだ＝名前が違う行も書く）。
+            if ($wantP && ! isset($colsById[$wantP->id])
+                && ($sheetSame || SheetIdCheck::fitsStrict($wantP, $date, $content, $contents))) {
                 $out[(string) $col] = $wantP->id;
             }
         }
