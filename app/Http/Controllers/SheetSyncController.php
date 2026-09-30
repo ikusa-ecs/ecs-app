@@ -118,18 +118,41 @@ class SheetSyncController extends Controller
         ));
 
         $ym = sprintf('%04d-%02d', $period['year'], $period['month']);
-        $fingerprint = hash('sha256', json_encode($rows, JSON_UNESCAPED_UNICODE));
+        // ⚠ 100行目（ECSが書き戻す案件ID）は「中身が変わったか」に数えない（2026-09-30 baba
+        //   「全部取り込んだのにまた差分が出てる」）。取り込んだあとGASがIDを書くと、次の朝それだけで
+        //   「変わった」になり、受信箱が同じ月をまた「確認が要る」に戻していた。
+        $fingerprint = $this->fingerprintOf($rows);
         $now = Carbon::now();
 
         $sync = SheetSync::firstOrNew(['office' => $office, 'period' => $ym]);
         // 前回と同じ中身なら「変わった日時」は動かさない（＝人に見せる用が無い）。
-        $changed = $sync->fingerprint !== $fingerprint;
+        // ⚠ 前回の中身そのもの（rows）からも同じ決まりで計算して比べる＝9/30より前に残した
+        //   fingerprint（100行目込み）でも、IDを書いただけの月を「変わった」にしない。
+        $changed = $sync->fingerprint !== $fingerprint
+            && ! (is_array($sync->rows) && $this->fingerprintOf($sync->rows) === $fingerprint);
+
+        // 100行目に書いてもらうID（GASは「送る → 返したIDを書く」の順）。
+        // ⚠ 受け取った中身はIDを書く「前」のもの。ECSが持つ中身にも、返したIDをその場で書き込んでおく
+        //   （2026-09-30）＝次に取り込むとき、GASがIDを書いた後のシートと同じ中身で判定できる。
+        $ids = $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? []), (array) ($sync->id_changes ?? []));
+        $stored = $rows;
+        if ($ids !== []) {
+            $stored[self::ID_ROW - 1] = array_pad($stored[self::ID_ROW - 1] ?? [], max(array_map('intval', array_keys($ids))) + 1, '');
+            foreach ($ids as $col => $id) {
+                $stored[self::ID_ROW - 1][(int) $col] = (string) $id;
+            }
+            for ($r = 0; $r < self::ID_ROW - 1; $r++) {
+                $stored[$r] ??= [];   // 100行目より上の行が足りないときの穴埋め（読み取りは行の並びで見るため）
+            }
+            ksort($stored);
+            $stored = array_values($stored);
+        }
 
         $sync->fill([
             'source' => 'gas',
             'book' => $data['book'] ?? null,
             'tab' => $data['tab'],
-            'rows' => $rows,
+            'rows' => $stored,
             'case_count' => $this->countCases($rows),
             'fingerprint' => $fingerprint,
             'received_at' => $now,
@@ -153,12 +176,20 @@ class SheetSyncController extends Controller
             // ⚠ 2026-09-29 から、**いまのシートのブロックと合うIDだけ**返す（baba「IDがばらばら」）。
             //   取り込んだあとにブロックを足す・並べ替えると、前回の「列 → ID」がずれて隣のブロックに付いていた。
             //   合わないIDが書かれている列には '' を返す＝GASがその欄を空にする（次の取込で正しいIDが入る）。
-            'projectIds' => (object) $this->idsForSheet($rows, $period, (array) ($sync->project_ids ?? []), (array) ($sync->id_changes ?? [])),
+            'projectIds' => (object) $ids,
             'idRow' => self::ID_ROW,
             'message' => $changed
                 ? '受け取りました（前回と中身が変わっています）。'
                 : '受け取りました（前回と同じ中身です）。',
         ]);
+    }
+
+    /** シートの中身の指紋（100行目＝ECSが書き戻す案件IDは除く）。 */
+    private function fingerprintOf(array $rows): string
+    {
+        unset($rows[self::ID_ROW - 1]);
+
+        return hash('sha256', json_encode(array_values($rows), JSON_UNESCAPED_UNICODE));
     }
 
     /**

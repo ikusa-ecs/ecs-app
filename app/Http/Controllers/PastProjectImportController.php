@@ -262,7 +262,12 @@ class PastProjectImportController extends Controller
                     // ⚠ そのIDがシートの別のブロックにもう書いてあれば使わない（同じIDを2つのブロックに付けない）。
                     $mp = $mapped !== '' && ! isset($colsById[$mapped]) ? Project::find($mapped) : null;
                     // ⚠ 日付とコンテンツの両方が合うときだけ（同じ日のブロックを入れ替えると、日付だけでは見分けられない）。
-                    if ($mp && SheetIdCheck::fitsStrict($mp, $blockDate, $blockContent, $this->importContents)) {
+                    // ⚠ ただし**前回取り込んでからシートが変わっていない**なら、ブロックは動いていない＝記録をそのまま信じる
+                    //   （2026-09-30 baba「IDでつないだのに、また新しい案件と出る」＝手でつないだ行は名前が違うので
+                    //    確かめ直すと合わない。IDが100行目に書かれる次の朝までの間も、つないだままにする）。
+                    $sheetSame = $sync->applied_at !== null
+                        && ($sync->changed_at === null || ! $sync->changed_at->greaterThan($sync->applied_at));
+                    if ($mp && ($sheetSame || SheetIdCheck::fitsStrict($mp, $blockDate, $blockContent, $this->importContents))) {
                         $ecsId = $mp->id;
                     }
                 }

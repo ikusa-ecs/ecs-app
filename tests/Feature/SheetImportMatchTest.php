@@ -201,6 +201,38 @@ class SheetImportMatchTest extends TestCase
         $this->assertStringContainsString('function pjBulkSetup', $page);
     }
 
+    /**
+     * 取り込んだあと、GASがIDを書いただけでは「シートが変わった」にしない＋手でつないだ行は開き直しても新規に戻らない
+     * （2026-09-30 baba「全部取り込んだのにまた差分が出てる」）。
+     */
+    public function test_取り込んだあとIDを書いただけでは差分にならない(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => 'ECSでの名前', 'content_names' => ['ECSでの名前'], 'client' => '別の書き方']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $rows = $this->rows('シートの名前', '金沢');
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        // 名前が違うので手でつないで取り込む。
+        $this->actingAsPerson($me)->post('/past-import', [
+            'sync' => $sync->id, 'edits' => json_encode(['0' => ['linkId' => 'P-2026-0042']]),
+        ])->assertRedirect('/past-import');
+        $this->assertFalse($sync->fresh()->needsAttention());
+
+        // ① 開き直しても（GASがIDを書く前でも）新しい案件には戻らない。
+        $row = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id])->assertOk()->json('rows.0');
+        $this->assertNotSame('new', $row['diff']['kind'], '手でつないだのに、開き直すと新しい案件に戻っている');
+
+        // ② 次の朝＝GASがIDを書いたシートが届く。IDが増えただけなので「確認が要る」に戻らない。
+        $rows[99][0] = 'ECS案件ID（自動・編集しないでください）';
+        $rows[99][self::A] = 'P-2026-0042';
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $this->assertFalse($res->json('changed'));
+        $this->assertFalse($sync->fresh()->needsAttention(), 'IDを書いただけで受信箱が「確認が要る」に戻った');
+        $this->assertSame('P-2026-0042', $sync->fresh()->rows[99][self::A], 'ECSが持つ中身にIDが入っていない');
+    }
+
     /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
     public function test_手で入れたIDが無ければ作らない(): void
     {
@@ -287,8 +319,10 @@ class SheetImportMatchTest extends TestCase
             'rows' => $this->rows('チャンバラ', '金沢', 'P-2026-0070')])->assertOk();
         $sync = SheetSync::firstOrFail();
 
+        // ⚠ 受信箱が受け取った時点で、ずれたIDはECSが持つ中身から消える（GASに消させるのと同じ・2026-09-30）。
+        $this->assertSame('', $sync->rows[99][self::A], 'ずれたIDがECSの持つ中身に残っている');
         $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id])->assertOk()->json('rows.0');
-        $this->assertStringContainsString('別の案件', $pre['idMismatch']);
+        $this->assertSame('new', $pre['diff']['kind'], 'ずれたIDの案件に上書きしようとしている');
 
         $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id])->assertRedirect('/past-import');
 
@@ -389,9 +423,9 @@ class SheetImportMatchTest extends TestCase
         $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
         $sync = SheetSync::firstOrFail();
 
-        $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id])->assertOk()->json('rows');
-        $this->assertStringContainsString('2か所以上', $pre[0]['idMismatch'], 'コピーのほうに知らせが出ていない');
-        $this->assertSame('', $pre[1]['idMismatch']);
+        // ⚠ 受信箱が受け取った時点で、コピーのほうのIDはECSが持つ中身から消える（元のほうは残る）。
+        $this->assertSame('', $sync->rows[99][self::A], 'コピーのIDが残っている');
+        $this->assertSame('P-2026-0200', $sync->rows[99][self::A + self::BLOCK_WIDTH], '元のIDが消えた');
 
         $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id])->assertRedirect('/past-import');
 
@@ -399,7 +433,8 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('2026-09-01', $orig->start_date->format('Y-m-d'), 'コピーの日程で元の案件を上書きしている');
         $this->assertSame(2, Project::count(), 'コピーは別の案件として入る');
 
-        // 次の朝：コピーのブロックの100行目は、新しくできた案件のIDに書き換わる。
+        // 次の朝：（GASが前の返事どおりコピーのIDを消したシートが届く）→ コピーのブロックに新しい案件のIDを書かせる。
+        $rows[99][self::A] = '';
         $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
         $newId = Project::where('id', '!=', 'P-2026-0200')->value('id');
         $this->assertSame($newId, $res->json('projectIds.'.self::A));
