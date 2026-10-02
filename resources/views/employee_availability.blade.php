@@ -156,7 +156,12 @@
     .ea-float-save:hover { background: var(--brand-fill-hover); }
 
     /* 全社員一覧テーブル */
-    .ov-wrap { overflow-x: auto; }
+    /* 日付の見出しを固定（2026-10-02 baba要望）。下へスクロールしても日付の行が上に残る。
+       ⚠ 横スクロールの入れ物の中では、ページのスクロールに対して貼り付けられない。
+         そこで入れ物に高さの上限を付けて、表の中で縦にもスクロールさせる（見出しは入れ物の上に貼り付く）。 */
+    .ov-wrap { overflow: auto; max-height: calc(100vh - 150px); }
+    table.ov-tbl thead th { position: sticky; top: 0; z-index: 2; box-shadow: inset 0 -1px 0 var(--line); }
+    table.ov-tbl thead th.namecol { z-index: 3; }   /* 左上の「社員」は、縦にも横にも残る */
     table.ov-tbl { border-collapse: collapse; font-size: 13px; min-width: 600px; }
     table.ov-tbl th, table.ov-tbl td { border: 1px solid var(--line); padding: 6px 8px; text-align: center; white-space: nowrap; }
     table.ov-tbl thead th { background: #f3ece2; color: #5a4a38; font-weight: 700; }
