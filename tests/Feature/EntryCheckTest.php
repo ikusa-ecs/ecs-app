@@ -81,6 +81,55 @@ class EntryCheckTest extends TestCase
         $this->assertSame(['P-GONE'], array_column($r['missing'], 'project_id'));
     }
 
+    public function test_案件名がガラッと変わったかの見分け(): void
+    {
+        $this->assertTrue(EntryCheck::bigNameChange('【11/8】A社 運動会', '【11/15】ベータ商事 謎解き'));
+        $this->assertFalse(EntryCheck::bigNameChange('A社 運動会', 'A社 運動会（雨天時は体育館）'), '付け足しだけ');
+        $this->assertFalse(EntryCheck::bigNameChange('A社　運動会', 'Ａ社 運動会'), '書き方の違いだけ');
+        $this->assertFalse(EntryCheck::bigNameChange('', 'A社 運動会'), '空から入っただけ');
+    }
+
+    public function test_ガラッとだけに絞れる(): void
+    {
+        $manager = PersonFactory::new()->manager()->create(['office' => '東京', 'must_onboard' => false]);
+        PersonFactory::new()->staff()->create(['id' => 'S-1', 'name' => '名前が変わった人']);
+        PersonFactory::new()->staff()->create(['id' => 'S-2', 'name' => '日付だけ変わった人']);
+
+        Carbon::setTestNow('2026-09-20 10:00');
+        $a = $this->project('P-A', '2026-11-08', 'アルファ社 運動会');
+        $b = $this->project('P-B', '2026-11-09', 'ガンマ社 謎解き');
+        $this->entry('S-1', 'P-A', '2026-09-20 10:00');
+        $this->entry('S-2', 'P-B', '2026-09-20 10:00');
+        Carbon::setTestNow('2026-09-30 09:00');
+        $a->update(['project_name' => 'ベータ商事 脱出ゲーム']);
+        $b->update(['start_date' => '2026-11-10']);
+        Carbon::setTestNow();
+
+        $this->actingAsPerson($manager)->get('/entry-check?from=2026-09-01')
+            ->assertSee('名前が変わった人')->assertSee('日付だけ変わった人');
+        $this->actingAsPerson($manager)->get('/entry-check?from=2026-09-01&big=1')
+            ->assertSee('名前が変わった人')->assertDontSee('日付だけ変わった人');
+    }
+
+    public function test_同じ日に同じ企業と同じコンテンツの案件を組で出す(): void
+    {
+        $mk = fn ($id, $date, $client, $content) => Project::create([
+            'id' => $id, 'project_name' => $client.' '.$content, 'client' => $client, 'content_names' => [$content],
+            'start_date' => $date, 'office' => '東京', 'status' => '未着手',
+        ]);
+        $mk('P-1', '2026-11-08', 'A社', '謎パ');
+        $mk('P-2', '2026-11-08', 'Ａ社 ', '謎パ');      // 書き方違いの同じ企業
+        $mk('P-3', '2026-11-08', 'A社', '運動会');     // コンテンツが違う
+        $mk('P-4', '2026-11-09', 'A社', '謎パ');       // 日が違う
+        $mk('P-5', '2026-08-01', 'A社', '謎パ');
+        $mk('P-6', '2026-08-01', 'A社', '謎パ');       // 期間より前
+
+        $d = EntryCheck::sameDayDuplicates(Carbon::parse('2026-09-01'));
+
+        $this->assertCount(1, $d);
+        $this->assertSame(['P-1', 'P-2'], array_column($d[0]['projects'], 'id'));
+    }
+
     public function test_管理者だけが開けて_データは変えない(): void
     {
         $employee = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);

@@ -17,6 +17,9 @@
   .ec-new { font-weight: 700; color: var(--warn-ink); }
   .ec-none { font-size: 13px; color: var(--ok-ink); }
   .ec-scroll { overflow-x: auto; }
+  .ec-big { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: var(--warn-soft); color: var(--warn-ink); }
+  .ec-grp { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+  .ec-grp-h { font-weight: 800; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
 </style>
 @endpush
 
@@ -30,11 +33,13 @@
   </p>
   <form method="GET" action="/entry-check" class="ec-form">
     <label>この日より後の変更を見る：<input type="date" name="from" value="{{ $from }}"></label>
+    <label><input type="checkbox" name="big" value="1" {{ $bigOnly ? 'checked' : '' }}> ①は案件名がガラッと変わったものだけ</label>
     <button type="submit" class="btn">表示</button>
   </form>
 
   <div class="ec-h">① エントリーしたあとに、案件の中身が書き換わった<span class="ec-count">{{ count($changed) }}件</span></div>
-  <p class="ec-note">開催日・案件名・クライアント・コンテンツのどれかが、エントリーより後に変わったもの。</p>
+  <p class="ec-note">開催日・案件名・クライアント・コンテンツのどれかが、エントリーより後に変わったもの。
+    <span class="ec-big">案件名ガラッと</span>＝付け足し・言い回しの違いではなく、別の案件の名前になっているもの。</p>
   @if (count($changed) === 0)
     <p class="ec-none">ありません。</p>
   @else
@@ -47,6 +52,9 @@
             <td>{{ $r['start_date'] }} {{ $r['project_name'] }}<div class="ec-note">{{ $r['project_id'] }}</div></td>
             <td>{{ $r['applied_at'] }}</td>
             <td>
+              @if ($r['big_name'])
+                <span class="ec-big">案件名ガラッと</span>
+              @endif
               @foreach ($r['diffs'] as $d)
                 <div>{{ $d['label'] }}：<span class="ec-old">{{ $d['old'] }}</span> → <span class="ec-new">{{ $d['new'] }}</span>
                   <span class="ec-note">（{{ $d['at'] }}・{{ $d['by'] }}）</span></div>
@@ -94,6 +102,34 @@
         @endforeach
       </tbody>
     </table></div>
+  @endif
+
+  <div class="ec-h">④ 同じ日に、同じ企業・同じコンテンツの案件が2つ以上ある<span class="ec-count">{{ count($dups) }}組</span></div>
+  <p class="ec-note">{{ $from }} 以降に開催する案件から探します（エントリーの有無は問いません）。午前・午後の2回公演などもここに出るので、時間と人数を見て見分けてください。</p>
+  @if (count($dups) === 0)
+    <p class="ec-none">ありません。</p>
+  @else
+    @foreach ($dups as $g)
+      <div class="ec-grp">
+        <div class="ec-grp-h">{{ $g['date'] }}　{{ $g['client'] }}　／　{{ $g['content'] }}</div>
+        <div class="ec-scroll"><table class="ec-table">
+          <thead><tr><th>案件</th><th>拠点</th><th>集合・開始</th><th>状態</th><th>登録した日時</th><th>エントリー</th><th>アサイン</th></tr></thead>
+          <tbody>
+            @foreach ($g['projects'] as $p)
+              <tr>
+                <td>{{ $p['name'] }}<div class="ec-note">{{ $p['id'] }}</div></td>
+                <td>{{ $p['office'] }}</td>
+                <td>{{ $p['time'] }}</td>
+                <td>{{ $p['status'] }}</td>
+                <td>{{ $p['created'] }}</td>
+                <td>{{ $p['entries'] }}人</td>
+                <td>{{ $p['assigns'] }}人</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table></div>
+      </div>
+    @endforeach
   @endif
 </div>
 @endsection

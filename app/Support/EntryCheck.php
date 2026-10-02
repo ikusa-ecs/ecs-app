@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\Application;
+use App\Models\Assignment;
+use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ProjectHistory;
@@ -88,6 +90,7 @@ class EntryCheck
                     continue;   // エントリーより前の変更＝本人は変わったあとを見て押している
                 }
                 $diffs[] = [
+                    'field' => $h->field,
                     'label' => $h->field_label ?? $h->field,
                     'old'   => (string) $h->old_value,
                     'new'   => (string) $h->new_value,
@@ -96,7 +99,11 @@ class EntryCheck
                 ];
             }
             if ($diffs !== []) {
-                $changed[] = $base + ['diffs' => $diffs];
+                // 案件名が何度か変わっていても、「押したときの名前」と「最後の名前」で比べる。
+                $nameDiffs = array_values(array_filter($diffs, fn ($d) => $d['field'] === 'project_name'));
+                $bigName = $nameDiffs !== []
+                    && self::bigNameChange($nameDiffs[0]['old'], end($nameDiffs)['new']);
+                $changed[] = $base + ['diffs' => $diffs, 'big_name' => $bigName];
             }
 
             // ③ 同じ日に、あとから別IDでできた同じ案件
@@ -129,6 +136,94 @@ class EntryCheck
         usort($twins, $sort);
 
         return ['changed' => $changed, 'missing' => $missing, 'twins' => $twins];
+    }
+
+    /**
+     * 案件名が「ガラッと」変わったか（2026-10-02 baba「ガラッと変わってるものだけ」）。
+     * 数字・記号・空白を外した文字で比べ、片方がもう片方を含む（付け足し・削っただけ）なら小さな変更。
+     * 使っている文字の重なりが半分に満たなければ「別の案件の名前」とみなす。
+     * 例：「A社 運動会」→「A社 運動会（雨天）」＝小さい／「A社 運動会」→「B社 謎解き」＝ガラッと。
+     */
+    public static function bigNameChange(string $old, string $new): bool
+    {
+        $letters = fn ($s) => preg_replace('/[^\p{L}]+/u', '', mb_convert_kana($s, 'asKV'));
+        $a = $letters($old);
+        $b = $letters($new);
+        if ($a === '' || $b === '' || $a === $b) {
+            return false;   // 空→入った・入った→空は「書き換わり」ではない
+        }
+        if (str_contains($a, $b) || str_contains($b, $a)) {
+            return false;
+        }
+        $ca = array_unique(mb_str_split($a));
+        $cb = array_unique(mb_str_split($b));
+        $common = count(array_intersect($ca, $cb));
+        $all = count(array_unique(array_merge($ca, $cb)));
+
+        return $all > 0 && $common / $all < 0.5;
+    }
+
+    /**
+     * 同じ日・同じクライアント・同じコンテンツの案件が2件以上ある組（重複の疑い）。
+     * 2026-10-02 baba「同日に同じ企業名でコンテンツ名なのがないか調べたい」。
+     * クライアントかコンテンツが空の案件は比べようがないので外す。午前・午後の2回公演もここに出るので、
+     * 時間・エントリー数を並べて人が見分ける。
+     *
+     * @return list<array{date: string, client: string, content: string, projects: list<array>}>
+     */
+    public static function sameDayDuplicates(Carbon $fromDate): array
+    {
+        $projects = Project::query()
+            ->whereDate('start_date', '>=', $fromDate->format('Y-m-d'))
+            ->orderBy('start_date')->orderBy('id')
+            ->get();
+        $master = Content::pluck('content_name', 'id');
+
+        $groups = [];
+        foreach ($projects as $p) {
+            $content = ProjectContentName::of($p, $master, '');
+            if (! $p->start_date || trim((string) $p->client) === '' || $content === '') {
+                continue;
+            }
+            $key = $p->start_date->format('Y-m-d').'|'.self::norm($p->client).'|'.self::norm($content);
+            $groups[$key][] = [$p, $content];
+        }
+
+        $ids = $projects->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $entries = Application::whereIn('project_id', $ids)->selectRaw('project_id, count(*) as n')
+            ->groupBy('project_id')->pluck('n', 'project_id');
+        $assigns = Assignment::whereIn('project_id', $ids)->selectRaw('project_id, count(*) as n')
+            ->groupBy('project_id')->pluck('n', 'project_id');
+
+        $out = [];
+        foreach ($groups as $rows) {
+            if (count($rows) < 2) {
+                continue;
+            }
+            [$first, $content] = $rows[0];
+            $out[] = [
+                'date'     => $first->start_date->format('Y-m-d'),
+                'client'   => (string) $first->client,
+                'content'  => $content,
+                'projects' => array_map(fn ($r) => [
+                    'id'      => (string) $r[0]->id,
+                    'name'    => (string) $r[0]->project_name,
+                    'office'  => (string) $r[0]->office,
+                    'time'    => trim(($r[0]->start_time ?? '').' '.($r[0]->event_start_time ? 'イベント'.$r[0]->event_start_time : '')),
+                    'status'  => (string) $r[0]->status,
+                    'created' => $r[0]->created_at?->format('Y-m-d H:i'),
+                    'entries' => (int) ($entries[(string) $r[0]->id] ?? 0),
+                    'assigns' => (int) ($assigns[(string) $r[0]->id] ?? 0),
+                ], $rows),
+            ];
+        }
+
+        return $out;
+    }
+
+    private static function norm(?string $s): string
+    {
+        return preg_replace('/\s+|様$|株式会社|（株）|\(株\)/u', '', mb_convert_kana((string) $s, 'asKV'));
     }
 
     /** 書き方の違い（空白・全角半角）を無視して同じ名前か。 */

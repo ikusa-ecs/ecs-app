@@ -21,8 +21,18 @@ class EntryCheckController extends Controller
             $since = Carbon::parse('2026-09-01');
         }
 
+        $rows = EntryCheck::rows($since);
+        // 「案件名がガラッと変わったものだけ」（2026-10-02 baba）。チェックを付けたときだけ絞る。
+        $bigOnly = $request->boolean('big');
+        if ($bigOnly) {
+            $rows['changed'] = array_values(array_filter($rows['changed'], fn ($r) => $r['big_name']));
+        }
+
         return view('entry_check', [
             'from' => $since->format('Y-m-d'),
-        ] + EntryCheck::rows($since));
+            'bigOnly' => $bigOnly,
+            // 重複の疑いは「この日以降に開催する案件」で探す（変更の日付と同じ入力を使う）。
+            'dups' => EntryCheck::sameDayDuplicates($since),
+        ] + $rows);
     }
 }
