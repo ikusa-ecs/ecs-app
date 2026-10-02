@@ -92,5 +92,8 @@ class EntryCheckTest extends TestCase
         $this->actingAsPerson($manager)->get('/entry-check?from=2026-09-01')
             ->assertOk()->assertSee('エントリーの点検');
         $this->assertSame(1, Application::count());
+
+        // 入口＝CSV一括取込のハブにカードがある（URL直打ちでしか行けなかった・2026-10-02 baba）
+        $this->actingAsPerson($manager)->get('/imports')->assertOk()->assertSee('href="/entry-check"', false);
     }
 }

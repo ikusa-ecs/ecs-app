@@ -65,6 +65,14 @@
       <a class="btn primary" href="/past-import">開く</a>
     </div>
 
+    {{-- エントリーの点検（2026-10-02 baba）。取込で案件の番号がずれた件のあと片づけ。見るだけ。 --}}
+    <div class="im-card">
+      <div class="im-icon">🔍</div>
+      <h2>エントリーの点検（見るだけ）</h2>
+      <p>取込で案件の中身が書き換わったせいで、スタッフのエントリーが<b>押したときとは別の案件</b>を指していないかを探します。ここに出た人だけ本人に確かめれば足ります。データは変えません。</p>
+      <a class="btn primary" href="/entry-check">開く</a>
+    </div>
+
     {{-- 出勤可能日の取込（2026-08-31 baba要望）。月別シートを待たずにまとめて入れる。 --}}
     <div class="im-card">
       <div class="im-icon">📅</div>
