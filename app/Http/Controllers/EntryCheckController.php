@@ -22,6 +22,8 @@ class EntryCheckController extends Controller
         }
 
         $rows = EntryCheck::rows($since);
+        // 全体LINEに貼る一覧は、絞り込みの前のものから作る（ガラッとの案件だけ）。
+        $announce = EntryCheck::announceText($rows['changed']);
         // 「案件名がガラッと変わったものだけ」（2026-10-02 baba）。チェックを付けたときだけ絞る。
         $bigOnly = $request->boolean('big');
         if ($bigOnly) {
@@ -31,6 +33,7 @@ class EntryCheckController extends Controller
         return view('entry_check', [
             'from' => $since->format('Y-m-d'),
             'bigOnly' => $bigOnly,
+            'announce' => $announce,
             // 重複の疑いは「この日以降に開催する案件」で探す（変更の日付と同じ入力を使う）。
             'dups' => EntryCheck::sameDayDuplicates($since),
         ] + $rows);

@@ -109,6 +109,11 @@ class EntryCheckTest extends TestCase
             ->assertSee('名前が変わった人')->assertSee('日付だけ変わった人');
         $this->actingAsPerson($manager)->get('/entry-check?from=2026-09-01&big=1')
             ->assertSee('名前が変わった人')->assertDontSee('日付だけ変わった人');
+
+        // 全体LINEに貼る一覧：ガラッとの案件だけ・元と今の日付／案件名／クライアントだけ・スタッフ名は出さない
+        $text = EntryCheck::announceText(EntryCheck::rows(Carbon::parse('2026-09-01'))['changed']);
+        $this->assertSame("元）11/8(日) アルファ社 運動会／A社\n今）11/8(日) ベータ商事 脱出ゲーム／A社", $text);
+        $this->assertStringNotContainsString('名前が変わった人', $text);
     }
 
     public function test_同じ日に同じ企業と同じコンテンツの案件を組で出す(): void

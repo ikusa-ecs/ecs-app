@@ -18,6 +18,7 @@
   .ec-none { font-size: 13px; color: var(--ok-ink); }
   .ec-scroll { overflow-x: auto; }
   .ec-big { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: var(--warn-soft); color: var(--warn-ink); }
+  .ec-announce { width: 100%; min-height: 180px; font-size: 13px; line-height: 1.6; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font-family: inherit; margin-bottom: 6px; box-sizing: border-box; }
   .ec-grp { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
   .ec-grp-h { font-weight: 800; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
 </style>
@@ -36,6 +37,16 @@
     <label><input type="checkbox" name="big" value="1" {{ $bigOnly ? 'checked' : '' }}> ①は案件名がガラッと変わったものだけ</label>
     <button type="submit" class="btn">表示</button>
   </form>
+
+  {{-- 全体LINEに貼る一覧（2026-10-02 baba）。作り方の正本＝EntryCheck::announceText。 --}}
+  <div class="ec-h">📱 全体LINEに貼る一覧（案件名ガラッとの案件だけ）<span class="ec-count">{{ $announce === '' ? 0 : substr_count($announce, "\n\n") + 1 }}件</span></div>
+  @if ($announce === '')
+    <p class="ec-none">ありません。</p>
+  @else
+    <p class="ec-note">元＝エントリーしたときの中身／今＝いまの中身。日付・案件名・クライアントだけです（スタッフ名は出しません）。前後の文章は自由に書き足してください。</p>
+    <textarea id="ecAnnounce" class="ec-announce" readonly>{{ $announce }}</textarea>
+    <button type="button" class="btn primary" onclick="copyAnnounce(this)">📋 コピー</button>
+  @endif
 
   <div class="ec-h">① エントリーしたあとに、案件の中身が書き換わった<span class="ec-count">{{ count($changed) }}件</span></div>
   <p class="ec-note">開催日・案件名・クライアント・コンテンツのどれかが、エントリーより後に変わったもの。
@@ -132,4 +143,22 @@
     @endforeach
   @endif
 </div>
+<script>
+  // 一覧をクリップボードへ。navigator.clipboard は https か 127.0.0.1 でしか使えないので、古いやり方を控えに用意する。
+  function copyAnnounce(btn){
+    var el = document.getElementById('ecAnnounce');
+    if (!el) return;
+    var label = btn.textContent;
+    var done = function(){ btn.textContent = '✓ コピーしました'; setTimeout(function(){ btn.textContent = label; }, 1600); };
+    var fallback = function(){
+      try { el.focus(); el.select(); if (document.execCommand('copy')) { done(); return; } } catch (e) {}
+      alert('コピーできませんでした。枠の中を選んで、手でコピーしてください。');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.value).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+</script>
 @endsection

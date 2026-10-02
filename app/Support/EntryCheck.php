@@ -164,6 +164,76 @@ class EntryCheck
     }
 
     /**
+     * 全体LINEに貼る一覧（2026-10-02 baba「ガラッとの人が多いので全体グループで流す」）。
+     * 案件名がガラッと変わった案件だけを1案件1回にまとめ、元と今の「日付・案件名・クライアント」だけ出す。
+     * 元の値＝期間内でいちばん早い変更の「変更前」。その項目が変わっていなければ今の値のまま。
+     * 並び＝元の日付順。⚠ スタッフ名・社内の数字は出さない（全体に流すため）。
+     *
+     * @param  list<array>  $changed  rows() の changed（絞り込む前のもの）
+     */
+    public static function announceText(array $changed): string
+    {
+        $byProject = [];
+        foreach ($changed as $r) {
+            if (! $r['big_name']) {
+                continue;
+            }
+            $byProject[$r['project_id']]['now'] = [
+                'start_date' => (string) ($r['start_date'] ?? ''),
+                'project_name' => (string) ($r['project_name'] ?? ''),
+                'client' => (string) ($r['client'] ?? ''),
+            ];
+            foreach ($r['diffs'] as $d) {
+                $cur = $byProject[$r['project_id']]['old'][$d['field']] ?? null;
+                if ($cur === null || (string) $d['at'] < $cur['at']) {
+                    $byProject[$r['project_id']]['old'][$d['field']] = ['at' => (string) $d['at'], 'v' => $d['old']];
+                }
+            }
+        }
+
+        $items = [];
+        foreach ($byProject as $x) {
+            $now = $x['now'];
+            $old = $now;
+            foreach (['start_date', 'project_name', 'client'] as $f) {
+                if (isset($x['old'][$f])) {
+                    $v = $x['old'][$f]['v'];
+                    $old[$f] = $v === '（空）' ? '' : $v;
+                }
+            }
+            $items[] = [self::sortDate($old['start_date']), self::line('元', $old), self::line('今', $now)];
+        }
+        usort($items, fn ($a, $b) => $a[0] <=> $b[0]);
+
+        return implode("\n\n", array_map(fn ($i) => $i[1]."\n".$i[2], $items));
+    }
+
+    private static function line(string $head, array $v): string
+    {
+        $date = '日付未定';
+        if ($v['start_date'] !== '') {
+            try {
+                $c = Carbon::parse(str_replace('/', '-', $v['start_date']));
+                $date = $c->format('n/j').'('.['日', '月', '火', '水', '木', '金', '土'][$c->dayOfWeek].')';
+            } catch (\Throwable $e) {
+                $date = $v['start_date'];
+            }
+        }
+        $client = trim($v['client']) !== '' ? '／'.trim($v['client']) : '';
+
+        return $head.'）'.$date.' '.trim($v['project_name']).$client;
+    }
+
+    private static function sortDate(string $d): string
+    {
+        try {
+            return $d === '' ? '9999' : Carbon::parse(str_replace('/', '-', $d))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return $d;
+        }
+    }
+
+    /**
      * 同じ日・同じクライアント・同じコンテンツの案件が2件以上ある組（重複の疑い）。
      * 2026-10-02 baba「同日に同じ企業名でコンテンツ名なのがないか調べたい」。
      * クライアントかコンテンツが空の案件は比べようがないので外す。午前・午後の2回公演もここに出るので、
