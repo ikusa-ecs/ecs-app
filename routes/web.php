@@ -35,6 +35,7 @@ use App\Http\Controllers\PaperStockController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PastProjectImportController;
+use App\Http\Controllers\EntryCheckController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonImportController;
 use App\Http\Controllers\ProfileController;
@@ -203,6 +204,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/past-import', [PastProjectImportController::class, 'show'])->middleware('tier:manager');
     Route::post('/past-import/preview', [PastProjectImportController::class, 'preview'])->middleware('tier:manager');
     Route::post('/past-import', [PastProjectImportController::class, 'import'])->middleware('tier:manager');
+    // エントリーの点検（2026-10-02 baba）。取込でIDがずれ、エントリーが別の案件を指していないか。見るだけ。
+    Route::get('/entry-check', [EntryCheckController::class, 'index'])->middleware('tier:manager');
     // 社員の出勤可能日のまとめて取込（2026-08-31 baba要望）。月別シートをそのまま流し込む。
     // ⚠ 必ずプレビューを見せてから保存する（誰の何日がどう入るかを見てから確定）。
     Route::get('/availability-import', [AvailabilityImportController::class, 'show'])->middleware('tier:manager');
