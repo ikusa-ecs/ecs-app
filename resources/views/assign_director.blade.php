@@ -278,9 +278,13 @@
 
     /* 担当ピッカー（社員名クリックで開く小窓） */
     .dpick-pop {
-      position: fixed; z-index: 200; width: 260px; background: #fff; border: 1px solid var(--line);
+      position: fixed; z-index: 200; width: 300px; max-width: calc(100vw - 16px); background: #fff; border: 1px solid var(--line);
       border-radius: 12px; box-shadow: 0 12px 34px rgba(60,40,20,.24); padding: 11px 12px; font-size: 12px;
+      /* 案件が多い日に、小窓が画面の下にはみ出して下の案件が押せなかった（2026-10-02 FB）。
+         画面の高さに収めて、中でスクロールさせる。 */
+      max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain;
     }
+    .dpick-pop .dp-count { font-size: 10.5px; color: var(--muted); font-weight: 700; margin: -4px 0 4px; }
     .dpick-pop h4 { margin: 0 0 8px; font-size: 13px; }
     /* 押す直前に「この人の所属」が見えるようにする（2026-09-16・FBシート No.20）。
        ⚠ 名前の文字色は上の dep-◯◯ と同じ決まり。ここに色を書かない。 */
@@ -288,7 +292,8 @@
     .dpick-pop .dp-case { display: flex; align-items: center; gap: 7px; padding: 6px 0; border-bottom: 1px solid var(--line); }
     .dpick-pop .dp-case:last-of-type { border-bottom: none; }
     .dpick-pop .dp-info { flex: 1; min-width: 0; }
-    .dpick-pop .dp-nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 案件名は「…」で切らずに折り返して全部見せる（2026-10-02 FB「見切れていて、続きがあるのか分からない」）。 */
+    .dpick-pop .dp-nm { font-weight: 700; overflow-wrap: anywhere; line-height: 1.35; }
     .dpick-pop .dp-ct { font-size: 10px; color: var(--brand-dark); }
     .dpick-pop .dp-btns { display: flex; gap: 5px; flex-shrink: 0; }
     .dpick-pop .dp-btn { border: 1px solid var(--line); background: #fbf8f2; color: var(--ink); border-radius: 7px; padding: 4px 9px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
@@ -1096,7 +1101,7 @@
       el.addEventListener('click', e => e.stopPropagation());
       document.body.appendChild(el);
     }
-    if (!PICK) { el.style.display = 'none'; return; }
+    if (!PICK) { el.style.display = 'none'; el.dataset.key = ''; el.dataset.scroll = ''; return; }
     const emp = empById[PICK.empId];
     const dcs = dayCases(PICK.dateKey);
     const mine = dcs.filter(c => c.dirId === PICK.empId || (c.sdIds || []).includes(PICK.empId) || (c.fcIds || []).includes(PICK.empId)).length;
@@ -1121,12 +1126,21 @@
     const pickDepTag = (emp && emp.department) ? `<span class="dp-dept">${emp.department}</span>` : '';
     el.innerHTML = `<h4 class="${pickDep}"><span class="e-nm">${emp ? emp.name : PICK.empId}</span> を担当に${pickDepTag}</h4>`
       + personNoteHtml(PICK.empId, PICK.realKey)
+      + (dcs.length ? `<div class="dp-count">この日の案件 ${dcs.length}件${dcs.length >= 6 ? '（下へスクロールできます）' : ''}</div>` : '')
       + rows
       + (mine >= 2 ? `<div class="dp-warn">⚠ この日 ${mine} 件の掛け持ちです</div>` : '')
       + `<div class="dp-close"><button onclick="closePick()">閉じる</button></div>`;
     el.style.display = 'block';
-    el.style.left = Math.max(8, Math.min(PICK.x, window.innerWidth  - 276)) + 'px';
-    el.style.top  = Math.max(8, Math.min(PICK.y, window.innerHeight - 280)) + 'px';
+    el.style.left = Math.max(8, Math.min(PICK.x, window.innerWidth  - el.offsetWidth - 8)) + 'px';
+    // 高さは中身しだい（案件が多い日は高い）。実際の高さを測って、画面の下にはみ出さない位置に置く。
+    // ⚠ D・SD・FCを押すと描き直しになる。同じ人×同じ日のままならスクロール位置を保つ（押すたびに上へ戻らない）。
+    const pickKey = PICK.empId + '|' + PICK.dateKey;
+    const keepScroll = el.dataset.key === pickKey ? el.dataset.scroll : null;
+    el.dataset.key = pickKey;
+    el.style.top = '8px';
+    el.style.top  = Math.max(8, Math.min(PICK.y, window.innerHeight - el.offsetHeight - 8)) + 'px';
+    el.scrollTop = keepScroll ? Number(keepScroll) : 0;
+    el.onscroll = () => { el.dataset.scroll = String(el.scrollTop); };
   }
   document.addEventListener('click', closePick);   // 外側クリックで閉じる
 
