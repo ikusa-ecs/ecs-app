@@ -130,6 +130,11 @@
   .mrow.mblk .m-addname { display: none; width: 100%; font-size: 10px; padding: 1px 2px;
     border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
   .acard.editing .mrow.mblk .m-addname { display: block; }
+  /* 名前の入れ替え・外す（2026-10-05）。編集モードだけ、名前の表示を選ぶ欄に差し替える。 */
+  .mrow.mblk .m-swapname { display: none; width: 100%; font-size: 10px; padding: 1px 2px;
+    border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
+  .acard.editing .mrow.mblk .m-swapname { display: block; }
+  .acard.editing .mrow.mblk .m-swappable .m-nm-read { display: none; }
   .mblk-foot { display: none; padding: 3px 6px; border-bottom: 1px solid var(--line); }
   .acard.editing .mblk-foot { display: block; }
   .dslot-btn { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px;
@@ -275,6 +280,7 @@
     .acard.editing .m-role,
     .acard.editing .m-note,
     .acard.editing .m-remark,
+    .acard.editing .m-swapname,
     .acard.editing .m-patrol { font-size: 16px; padding: 4px 6px; }
     .acard.editing .pe-in { width: 100%; }
     .acard.editing .pe-in.num { width: 72px; }
@@ -328,6 +334,7 @@
   html[data-theme="dark"] .mrow .m-note,
   html[data-theme="dark"] .mrow .m-patrol,
   html[data-theme="dark"] .mrow .m-remark,
+  html[data-theme="dark"] .mrow .m-swapname,
   html[data-theme="dark"] .pe-in { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
   html[data-theme="dark"] .pe-sep { color: var(--muted); }
 
@@ -693,10 +700,29 @@
             @php $m = $line['m']; @endphp
             <div class="mrow mblk" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
               <span class="c-no">{{ $line['no'] }}</span>
-              <span class="c-nm">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
+              @php $mSwap = ($m['roleCode'] !== 'D'); @endphp
+              <span class="c-nm {{ $mSwap ? 'm-swappable' : '' }}"><span class="m-nm-read">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
                 @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
                 @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
                 @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
+                </span>
+                {{-- 編集モードでは名前も直せる（2026-10-05 baba要望「名前を入れたら変更できない」）。
+                     別の社員を選ぶ＝入れ替え（役割・担当・巡回・備考は引き継ぐ）／「外す」＝この人を外す。
+                     ⚠ 入れ替え先は空き行と同じく社員だけ（スタッフは日別ボードで希望を見ながら入れる）。
+                     ⚠ Dの行は出さない＝DはD決めの画面が正本（案件側にも写しがあり、ここで外すと元のDが戻ってくる）。 --}}
+                @if ($mSwap)
+                <select class="m-swapname" title="別の社員に入れ替える／外す" onchange="ecsSheetSwapMember(this)">
+                  <option value="" selected>{{ $m['name'] }}</option>
+                  <option value="__remove">✕ 外す</option>
+                  @foreach ($employeeGroups as $g)
+                    <optgroup label="{{ $g['office'] }}">
+                      @foreach ($g['people'] as $e)
+                        @if ($e['id'] !== $m['staffId'])<option value="{{ $e['id'] }}">{{ $e['name'] }}</option>@endif
+                      @endforeach
+                    </optgroup>
+                  @endforeach
+                </select>
+                @endif
               </span>
               <span class="c-p">
                 <span class="pos-badge {{ $m['roleCode'] === 'D' ? 'd' : ($m['pos'] === '—' ? 'none' : '') }}">{{ $m['pos'] }}</span>
@@ -847,6 +873,65 @@
         location.reload();
       })
       .catch(function () { sel.disabled = false; sel.value = ''; alert('通信エラーで入れられませんでした。'); });
+  }
+
+  // 名前の入れ替え・外す（2026-10-05 baba要望）。
+  // ⚠ 入れ替えは「新しい人を入れる → 元の人を外す」の順（先に外すと、失敗したとき誰もいなくなる）。
+  // ⚠ 役割・担当・巡回・備考は行の入力欄から引き継ぐ。新しい人は「仮」から始める（本人に確かめていないため）。
+  // ⚠ 並び順が変わるので、保存できたら画面を開き直す。
+  function ecsSheetSwapMember(sel) {
+    var row = sel.closest('.mrow');
+    var val = sel.value;
+    if (!row || !val) return;
+    var pid = row.getAttribute('data-project');
+    var oldId = row.getAttribute('data-staff');
+    var oldName = sel.options[0].text;
+    var reset = function () { sel.disabled = false; sel.value = ''; };
+    var post = function (body) {
+      return fetch(window.ECS_QUICK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function (r) { return r.json(); });
+    };
+    var unassignOld = function () {
+      return post({ project_id: pid, staff_id: oldId, action: 'unassign' });
+    };
+
+    if (val === '__remove') {
+      if (!confirm(oldName + ' さんをこの案件から外します。よろしいですか？')) { reset(); return; }
+      sel.disabled = true;
+      unassignOld()
+        .then(function (res) {
+          if (!(res && res.ok)) { reset(); alert('外せませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
+          location.reload();
+        })
+        .catch(function () { reset(); alert('通信エラーで外せませんでした。'); });
+      return;
+    }
+
+    var newName = sel.options[sel.selectedIndex].text;
+    // すでにこの案件に入っている人を選んだら止める（そのまま進むと、その人の役割が上書きされる）。
+    var card = row.closest('.acard');
+    if (card && card.querySelector('.mrow[data-staff="' + val + '"]')) {
+      reset(); alert(newName + ' さんは、この案件にもう入っています。'); return;
+    }
+    if (!confirm(oldName + ' さん → ' + newName + ' さんに入れ替えます。よろしいですか？')) { reset(); return; }
+
+    var pick = function (cls) { var el = row.querySelector(cls); return el ? el.value : ''; };
+    sel.disabled = true;
+    post({
+      project_id: pid, staff_id: val, action: 'assign', status: '仮',
+      role: pick('.m-role'), note: pick('.m-note'), patrol: pick('.m-patrol'), remark: pick('.m-remark')
+    })
+      .then(function (res) {
+        if (!(res && res.ok)) { reset(); alert('入れ替えられませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
+        return unassignOld().then(function (res2) {
+          if (!(res2 && res2.ok)) alert(newName + ' さんは入りましたが、' + oldName + ' さんを外せませんでした。画面を開き直して確かめてください。');
+          location.reload();
+        });
+      })
+      .catch(function () { reset(); alert('通信エラーで入れ替えられませんでした。画面を開き直して確かめてください。'); });
   }
 
   // 「D枠を作る（イベプラ）」＝Dの枠だけ先に立てる。人はD決めの画面で決める。

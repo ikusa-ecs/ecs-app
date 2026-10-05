@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Support\AssignMtg;
 use App\Support\AssignmentRole;
+use App\Support\BoardBulkDelete;
 use App\Support\ChatworkMentions;
 use App\Support\ChatworkRooms;
 use App\Support\DangerCalendar;
@@ -241,6 +242,19 @@ class SettingsController extends Controller
             $saved === ''
                 ? '定型文を空にしました。概要文には何も付きません。'
                 : 'LINEの概要に付ける定型文を保存しました。'
+        );
+    }
+
+    /** 日別ボードの「🗑 まとめて削除」を出す／隠す（POST /settings/board-bulk-delete・Administratorだけ）。 */
+    public function saveBoardBulkDelete(Request $request)
+    {
+        $on = $request->boolean('enabled');
+        BoardBulkDelete::setEnabled($on);
+
+        return back()->with(
+            'board_bulk_delete_status',
+            $on ? '日別ボードに「🗑 まとめて削除」を出しました（Administratorにだけ見えます）。'
+                : '日別ボードの「🗑 まとめて削除」を隠しました。'
         );
     }
 

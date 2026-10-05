@@ -184,6 +184,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/projects/origin-helps', [ProjectController::class, 'setOriginHelps'])->middleware('tier:manager');
     // 案件の削除（キャンセルになった案件を消す）。案件の削除＝社員以上でOK（baba 2026-07-14）。関連アサインも一緒に消す。
     Route::post('/projects/{id}/delete', [ProjectController::class, 'destroy']);
+    // 日別ボードの「🗑 まとめて削除」（2026-10-05 baba要望・IDのずれでダブった案件の片づけ用）。
+    // ⚠ Administratorだけ＋共通設定のスイッチが入っているときだけ（正本＝App\Support\BoardBulkDelete）。
+    Route::post('/projects/bulk-delete', [ProjectController::class, 'bulkDestroy'])->middleware('tier:admin');
     // 案件の編集履歴（先-1・2026-08-18）。誰がいつ何を何に変えたかを見るだけの画面。
     Route::get('/project-history', [ProjectHistoryController::class, 'index']);
     Route::get('/project-import', function () {
@@ -407,6 +410,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // LINEの概要に付ける定型文を settings に保存。2026-09-16 baba要望。
     // ⚠ 正本＝App\Support\LineGroupText（アサインボードの「📱 LINE」が読む）。
     Route::post('/settings/line-notice', [SettingsController::class, 'saveLineNotice']);
+    // 日別ボードの「🗑 まとめて削除」を出す／隠す（2026-10-05）。正本＝App\Support\BoardBulkDelete。
+    Route::post('/settings/board-bulk-delete', [SettingsController::class, 'saveBoardBulkDelete'])->middleware('tier:admin');
 
     // マスタ管理（コンテンツ・拠点＝追加/編集/削除、ポジション＝表示のみ）。
     Route::get('/masters', [MasterController::class, 'index']);

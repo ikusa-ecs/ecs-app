@@ -138,6 +138,17 @@
       background: var(--danger-soft); color: #b91c1c; border-radius: 6px; padding: 3px 6px; }
 
     .cc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    /* 長い備考は、アサイン表と同じ高さ（68px）で止めて、中だけスクロールする（2026-10-05 baba要望）。
+       ⚠ 備考の帯は他の画面と共通の部品（partials/project_note）なので、日別ボードの中だけに効かせる。 */
+    #boardBody .pnote .pn-body { max-height: 68px; overflow-y: auto; }
+    /* 🗑 まとめて削除（2026-10-05・一時的）。共通設定で出しているときだけ描かれる。 */
+    .bulk-del-chk { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: var(--danger, #b91c1c); cursor: pointer;
+      padding: 2px 6px; border: 1px solid var(--danger-line, #fca5a5); border-radius: 6px; background: var(--danger-soft, #fef2f2); }
+    .bulk-del-bar { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--danger-line, #fca5a5); border-radius: 8px;
+      background: var(--danger-soft, #fef2f2); color: var(--ink); font-size: 12.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .bulk-del-btn { font-weight: 700; padding: 5px 12px; border-radius: 6px; border: 1px solid #b91c1c;
+      background: #b91c1c; color: #fff; cursor: pointer; font-family: inherit; }
+    .bulk-del-btn[disabled] { opacity: .45; cursor: default; }
     .cc-headmain { flex: 1 1 auto; min-width: 0; }
     /* コンテンツ名の横に、実施形態（リアル／ロング／オンライン）と札（前泊など）を並べる（2026-09-18 baba要望）。
        ⚠ 名前だけを縮めて「…」にし、札は縮めない（札が切れると付いている意味がなくなる）。 */
@@ -664,6 +675,8 @@
       </div>
       <!-- 再募集の文章（2026-09-28 baba要望）。中身はJSの recruitBoxHtml が作る。 -->
       <div id="recruitBox"></div>
+      <!-- 🗑 まとめて削除（2026-10-05・一時的）。共通設定で出しているときだけ、JSの renderBulkBar が中身を作る。 -->
+      <div id="bulkDelBar"></div>
 
       <!-- 希望者の色の凡例 -->
       <div class="legend">
@@ -737,6 +750,8 @@
   {{-- 再募集の文章の見出しと締め（2026-09-28）。正本＝App\Support\RecruitAgainText。 --}}
   window.ECS_RECRUIT_HEADER = @json($recruitHeader ?? '');
   window.ECS_RECRUIT_FOOTER = @json($recruitFooter ?? '');
+  {{-- 「🗑 まとめて削除」を出すか（2026-10-05・一時的）。正本＝App\Support\BoardBulkDelete。 --}}
+  window.ECS_BULK_DELETE = @json($bulkDelete ?? false);
   window.ECS_CSRF = '{{ csrf_token() }}';
 </script>
 @verbatim
@@ -2207,6 +2222,63 @@
         }
       });
     });
+    renderBulkBar();
+  }
+
+  // ===== 🗑 まとめて削除（2026-10-05 baba要望・一時的）=====
+  // アサイン表の取込でIDがずれ、ダブった案件を片づけるためのもの。共通設定で出しているときだけ動く。
+  // ⚠ 消す前に必ずサーバーへ「下見」（preview）を頼み、入っている人・エントリーの件数を見せて確認する。
+  // ⚠ 消し方は案件一覧の1件削除と同じ（子案件・アサインも一緒に消える／エントリーは残る）。
+  const BULK_SEL = new Set();
+  function bulkDelBoxHtml(c){
+    if (!window.ECS_BULK_DELETE) return '';
+    return `<label class="bulk-del-chk" title="まとめて削除の対象にする"><input type="checkbox" ${BULK_SEL.has(c.id) ? 'checked' : ''}
+              onchange="toggleBulkSel('${c.id}', this.checked)"> 🗑</label>`;
+  }
+  function toggleBulkSel(id, on){
+    if (on) BULK_SEL.add(id); else BULK_SEL.delete(id);
+    renderBulkBar();
+  }
+  function renderBulkBar(){
+    const bar = document.getElementById('bulkDelBar');
+    if (!bar || !window.ECS_BULK_DELETE) return;
+    const n = BULK_SEL.size;
+    bar.innerHTML = `<div class="bulk-del-bar">
+        <b>🗑 まとめて削除</b>（一時的・Administratorだけ）：案件カードの左上の 🗑 にチェックを入れて選びます。
+        <button type="button" class="bulk-del-btn" ${n ? '' : 'disabled'} onclick="doBulkDelete()">選んだ ${n} 件を削除…</button>
+        ${n ? `<button type="button" class="btn sm" onclick="BULK_SEL.clear(); render();">選択を外す</button>` : ''}
+      </div>`;
+  }
+  function doBulkDelete(){
+    const ids = Array.from(BULK_SEL);
+    if (!ids.length) return;
+    const post = (body) => fetch('/projects/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(r => r.json());
+
+    post({ ids: ids, preview: true })
+      .then(res => {
+        if (!(res && res.ok)) { alert('確認できませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
+        const rows = res.rows || [];
+        if (!rows.length) { alert('消せる案件がありませんでした（他の拠点の案件は消せません）。'); return; }
+        const lines = rows.map(r => '・' + (r.date || '日付なし') + ' ' + r.name
+          + '（入っている人 ' + r.members + '名／エントリー ' + r.entries + '件'
+          + (r.children ? '／予備日など ' + r.children + '件も一緒に消えます' : '') + '）');
+        const withPeople = rows.filter(r => r.members > 0 || r.entries > 0).length;
+        const msg = '次の ' + rows.length + ' 件を削除します。元に戻せません。\n\n' + lines.join('\n')
+          + (withPeople ? '\n\n⚠ 人が入っている／エントリーがある案件が ' + withPeople + ' 件あります。残すほうの案件とまちがえていないか確かめてください。' : '')
+          + (res.blocked ? '\n\n※ 他の拠点の案件 ' + res.blocked + ' 件は消しません。' : '')
+          + '\n\n削除してよいですか？';
+        if (!confirm(msg)) return;
+        return post({ ids: rows.map(r => r.id) }).then(res2 => {
+          if (!(res2 && res2.ok)) { alert('削除できませんでした。' + (res2 && res2.message ? '\n' + res2.message : '')); return; }
+          alert(res2.deleted + ' 件を削除しました。' + (res2.children ? '（予備日など ' + res2.children + ' 件も）' : ''));
+          location.reload();
+        });
+      })
+      .catch(() => alert('通信エラーで削除できませんでした。画面を開き直して確かめてください。'));
   }
 
   /** カードを作れなかった案件の代わりに出す札。⚠ 黙って消さない（消えると誰も気づけない）。 */
@@ -2921,6 +2993,7 @@
 
     card.innerHTML = `
       <div class="cc-head">
+        ${bulkDelBoxHtml(c)}
         <div class="cc-headmain">
           ${titleBlockHtml(c, scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)}
           <div class="cc-client">${c.client}</div>

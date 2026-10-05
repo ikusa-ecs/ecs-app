@@ -387,6 +387,34 @@
         </p>
       </div>
 
+      {{-- 日別ボードの「まとめて削除」を出す／隠す（2026-10-05 baba要望）。Administratorにだけ見せる。
+           正本＝App\Support\BoardBulkDelete。IDのずれでダブった案件を片づける間だけ出す。
+           ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
+      @if ((auth()->user()->permission ?? '') === 'admin')
+      <div class="panel settings-wrap" style="margin-top:20px;">
+        <div class="panel-head"><h2>日別ボードの「🗑 まとめて削除」</h2></div>
+        @if (session('board_bulk_delete_status'))
+          <div class="flash" style="margin:8px 0;">{{ session('board_bulk_delete_status') }}</div>
+        @endif
+        <p class="muted" style="font-size:12.5px; margin:0 0 8px;">
+          ダブって登録された案件を片づけるための一時的なボタンです。出すと、日別ボードの案件ごとにチェック欄が付き、選んだ案件をまとめて消せます。
+          見えるのは<b>Administratorだけ</b>です。<b>片づけが終わったら「隠す」に戻してください。</b>
+        </p>
+        <form method="POST" action="/settings/board-bulk-delete">
+          @csrf
+          @if (\App\Support\BoardBulkDelete::enabled())
+            <input type="hidden" name="enabled" value="0">
+            <span style="font-weight:700; color:#b91c1c; margin-right:10px;">いま：出している</span>
+            <button type="submit" class="btn">隠す</button>
+          @else
+            <input type="hidden" name="enabled" value="1">
+            <span style="font-weight:700; margin-right:10px;">いま：隠している</span>
+            <button type="submit" class="btn primary">出す</button>
+          @endif
+        </form>
+      </div>
+      @endif
+
       {{-- LINEの概要に付ける定型文（2026-09-16 baba要望）。
            ⚠ アサインボード（日別）の「📱 LINE」で出る概要文の、いちばん下に付く文章。
            ⚠ URLが変わるのでDBに持たせる（コードを直さなくても自分で変えられるように）。

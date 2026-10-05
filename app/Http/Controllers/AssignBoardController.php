@@ -115,6 +115,8 @@ class AssignBoardController extends Controller
             // 「📣 再募集の文章」の見出しと締め（2026-09-28）。正本＝App\Support\RecruitAgainText。
             'recruitHeader' => RecruitAgainText::HEADER,
             'recruitFooter' => RecruitAgainText::footer(),
+            // 「🗑 まとめて削除」を出すか（2026-10-05・一時的）。Administratorだけ＋共通設定のスイッチ。
+            'bulkDelete' => \App\Support\BoardBulkDelete::visibleFor($request->user()),
         ]);
     }
 

@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectHistory;
 use App\Models\ProjectShare;
 use App\Support\AssignMtg;
+use App\Support\BoardBulkDelete;
 use App\Support\ClientName;
 use App\Support\CsvText;
 use App\Support\DirectorSync;
@@ -1128,6 +1129,68 @@ class ProjectController extends Controller
         });
 
         return redirect('/projects')->with('status', "案件「{$name}」を削除しました。");
+    }
+
+    /**
+     * 日別ボードの「🗑 まとめて削除」（POST /projects/bulk-delete）。2026-10-05 baba要望。
+     * アサイン表の取込でIDがずれ、ダブって登録された案件をまとめて片づけるための一時的な入口。
+     *
+     * ・preview=1 のときは**消さずに**、案件ごとの「入っている人／エントリー」の件数だけ返す
+     *   （画面はこれを見せて確認してから、preview なしでもう一度呼ぶ）。
+     * ・消し方は1件ずつの削除（destroy）と同じ＝子案件（予備日・リハ日）とアサインも一緒に消す。
+     *   ⚠ エントリー（applications）は消さない（1件ずつの削除と同じ。エントリーの点検の③で追える）。
+     * ・⚠ Administratorだけ（ルートの tier:admin）＋共通設定のスイッチが入っているときだけ。
+     * ・拠点で書き換えてよい案件だけ（他拠点の案件は外して件数だけ知らせる）。
+     */
+    public function bulkDestroy(Request $request)
+    {
+        if (! BoardBulkDelete::enabled()) {
+            return response()->json(['ok' => false, 'message' => 'まとめて削除は、いま共通設定で止めています。'], 403);
+        }
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['string'],
+            'preview' => ['nullable', 'boolean'],
+        ]);
+
+        $targets = Project::whereIn('id', array_values(array_unique($data['ids'])))->get();
+        $allowed = $targets->filter(fn (Project $p) => ProjectAccess::canEdit($p))->values();
+        $blocked = $targets->count() - $allowed->count();
+        $ids = $allowed->pluck('id')->all();
+        $childIds = $ids ? Project::whereIn('parent_project_id', $ids)->pluck('id')->all() : [];
+        $all = array_values(array_unique(array_merge($ids, $childIds)));
+
+        if ($request->boolean('preview')) {
+            $asg = Assignment::whereIn('project_id', $all)->where('status', '!=', 'キャンセル')
+                ->selectRaw('project_id, count(*) as n')->groupBy('project_id')->pluck('n', 'project_id');
+            $app = \App\Models\Application::whereIn('project_id', $all)
+                ->selectRaw('project_id, count(*) as n')->groupBy('project_id')->pluck('n', 'project_id');
+            $children = $childIds ? Project::whereIn('id', $childIds)->get(['id', 'parent_project_id'])->groupBy('parent_project_id') : collect();
+
+            $rows = $allowed->map(function (Project $p) use ($asg, $app, $children) {
+                $kids = ($children->get($p->id) ?? collect())->pluck('id')->all();
+                $mine = array_merge([$p->id], $kids);
+
+                return [
+                    'id' => $p->id,
+                    'name' => $p->project_name ?: '（名称未定）',
+                    'date' => optional($p->start_date)->format('Y-m-d'),
+                    'members' => array_sum(array_map(fn ($i) => (int) ($asg[$i] ?? 0), $mine)),
+                    'entries' => array_sum(array_map(fn ($i) => (int) ($app[$i] ?? 0), $mine)),
+                    'children' => count($kids),
+                ];
+            })->all();
+
+            return response()->json(['ok' => true, 'rows' => $rows, 'blocked' => $blocked]);
+        }
+
+        DB::transaction(function () use ($all) {
+            // 1件ずつの削除と同じ順＝先にアサイン、そのあと案件本体（子案件も含む）。
+            Assignment::whereIn('project_id', $all)->delete();
+            Project::whereIn('id', $all)->delete();
+        });
+
+        return response()->json(['ok' => true, 'deleted' => count($ids), 'children' => count($childIds), 'blocked' => $blocked]);
     }
 
     /**
