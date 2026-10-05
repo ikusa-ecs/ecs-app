@@ -118,8 +118,12 @@ class StaffPortalVisibilityTest extends TestCase
         $this->assertSame(8, $jobs[$filled->id]['need'], '入っている数はそのまま');
     }
 
-    /** 確定アサインタブ：status=確定 かつ 公開ON のときだけ本人に出る。 */
-    public function test_confirmed_tab_requires_confirmed_status_and_publish(): void
+    /**
+     * 確定アサインタブ：status=確定 なら本人に出る。仮は出さない。
+     * ⚠ 2026-10-05 baba決定で、**案件が非公開でも確定した人には出す**ようにした
+     *   （公開＝募集を始めるスイッチ／確定＝その人のアサインが決まった、は別もの）。
+     */
+    public function test_confirmed_tab_shows_confirmed_even_if_unpublished(): void
     {
         $me = PersonFactory::new()->staff()->create(['office' => '東京']);
 
@@ -144,7 +148,9 @@ class StaffPortalVisibilityTest extends TestCase
 
         $this->assertContains($ok->id, $ids);
         $this->assertNotContains($tentative->id, $ids, '仮（調整中）は本人に見せない');
-        $this->assertNotContains($unpublished->id, $ids, '公開していない案件は本人にも見せない');
+        $this->assertContains($unpublished->id, $ids, '非公開でも、確定した人には確定アサインを見せる');
+        // 募集タブには出さない（公開は募集タブだけのスイッチ）。
+        $this->assertNotContains($unpublished->id, collect($this->recruitJobs($me))->pluck('id')->all());
     }
 
     /** 確定アサインタブ：他人のアサインは出ない／下書き・完了・過去も出ない。 */

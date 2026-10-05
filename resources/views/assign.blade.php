@@ -1493,7 +1493,10 @@
   function markPub(id){
     const c = cases.find(x => x.id === id);
     if (!c) return;
-    const kari = c.assigned.filter(m => m.status === '仮').length;
+    // ⚠ 案件が確定ずみのときだけ、公開と同時にメンバーを確定にする（2026-08-26の決めごと）。
+    //   確定にする前の公開（2026-10-05〜）は募集を出すだけ＝仮の人は仮のまま（確定は「✓ 確定にする」で）。
+    const isFix = (c.stat || c.state) === 'fix';
+    const kari = isFix ? c.assigned.filter(m => m.status === '仮').length : 0;
     const short = filledOf(c) < c.need
       ? '\n（必要 ' + c.need + '名に対して ' + filledOf(c) + '名です。人数が足りなくても公開できます）' : '';
     if (!confirm('「' + c.name + '」をスタッフに公開します。' + short
@@ -1514,7 +1517,8 @@
         if (!res || !res.updated){ alert('公開できませんでした（他の拠点の案件か、すでに公開済みです）。'); return; }
         // 公開と同時にメンバーも全員「確定」にする（2026-08-26 baba要望）。
         // ⚠ 公開しても仮の人は本人の画面に出ないため、ここで揃える。
-        confirmAllMembers(c).then(n => {
+        (isFix ? confirmAllMembers(c) : Promise.resolve(0)).then(n => {
+          if (!isFix) { c.pubOn = true; render(); alert('📣 スタッフに公開しました（募集として出ています）。\nメンバーはまだ「仮」のままです。決まったら「✓ 確定にする」を押してください。'); return; }
           c.state = 'pub';
           c.pubOn = true;
           render();
@@ -2961,8 +2965,11 @@
     let stateBtn = '';
     if (stat === 'todo' || stat === 'adj') {
       stateBtn += `<button class="edit-btn" onclick="markFix('${c.id}')" title="案件を確定にし、あわせてメンバー全員を「確定」にします">✓ 確定にする</button>`;
-    } else if (!pubOn) {
-      // 確定ずみ・まだ募集をかけていない＝ここから公開できる。
+    }
+    // まだ募集をかけていない＝ここから公開できる。
+    // ⚠ 2026-10-05 baba要望で、確定にする前でも出すようにした（前は確定ずみのときだけ＝
+    //   公開ボードへ行かないと公開できなかった）。確定前の公開ではメンバーを確定にしない（markPub）。
+    if (!pubOn) {
       stateBtn += `<button class="auto-btn" onclick="markPub('${c.id}')">📣 スタッフに公開</button>`;
     }
     // 確定ずみでも、あとから足した人は「仮」で入る。まとめて確定にできるようにする。

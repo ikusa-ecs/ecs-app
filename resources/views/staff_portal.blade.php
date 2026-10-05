@@ -1276,7 +1276,7 @@
       return x;
     };
   </script>
-  <!-- DBから渡された「公開ON（staff_published=true）」の案件。確定アサイン表示の元データ。 -->
+  <!-- DBから渡された、本人が「確定」の案件（2026-10-05から非公開でも出す）。確定アサイン表示の元データ。 -->
   <script>window.ECS_PUBLISHED = @json($published);</script>
   {{-- 終わった案件（新しい順・約13か月ぶん）。請求書を作るときに見返すためのもの。 --}}
   <script>window.ECS_PAST_JOBS = @json($pastJobs ?? []);</script>
