@@ -1244,6 +1244,18 @@
     const open = v && v.value !== '確定';
     document.getElementById('yomiBox').classList.toggle('open', open);
   }
+  // 新規登録のときは、開いた時点で必ず「確定」に選び直す（2026-10-05 baba報告「Aヨミで出る」）。
+  // ⚠ HTMLでは最初から「確定」だが、ブラウザが再読み込みや「戻る」のときに、前に選んだラジオを
+  //   覚えていて戻してしまう。編集・複製・CSVから来たとき（ECS_EDIT あり）は元の値を使うので触らない。
+  function resetYomiForNew() {
+    if (window.ECS_EDIT) return;
+    const k = document.querySelector('input[name="yomi"][value="確定"]');
+    if (k) k.checked = true;
+    toggleYomi();
+  }
+  resetYomiForNew();
+  // 「戻る」で開き直したとき（ページがそのまま残っていて、上のスクリプトが走らない場合）。
+  window.addEventListener('pageshow', function (e) { if (e.persisted) resetYomiForNew(); });
   toggleYomi(); // 初期表示
 
   // ===== 実施形態：オンラインならツール選択欄を開く =====
