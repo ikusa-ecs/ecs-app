@@ -223,4 +223,35 @@ class SheetSyncReceiveTest extends TestCase
             ->assertOk()->json('rows.0.diff');
         $this->assertSame('same', $diff2['kind']);
     }
+
+    /**
+     * 縮めて送る（rows_gz＝gzip＋base64）でも、rows で送ったのと同じに受け取る（2026-10-05）。
+     * ⚠ 11月のタブが大きく、本番の受付（nginx）に「大きすぎる」（413）で弾かれていた。
+     */
+    public function test_compressed_rows_are_accepted_like_plain_rows(): void
+    {
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $payload = $this->payload();
+        $packed = base64_encode(gzencode(json_encode($payload['rows'])));
+        unset($payload['rows']);
+        $payload['rows_gz'] = $packed;
+
+        $res = $this->postJson('/sheet-sync', $payload)->assertOk()->json();
+
+        $this->assertTrue($res['ok']);
+        $this->assertSame('2026-10', $res['period']);
+        $this->assertSame($this->rows(), SheetSync::first()->rows, '元に戻した中身が、rows で送ったのと同じであること');
+    }
+
+    /** 壊れた rows_gz は、機械が読める形（JSON）で断る。 */
+    public function test_broken_compressed_rows_are_refused_as_json(): void
+    {
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $payload = $this->payload();
+        unset($payload['rows']);
+        $payload['rows_gz'] = 'これは壊れている';
+
+        $this->postJson('/sheet-sync', $payload)->assertStatus(422)->assertJson(['ok' => false]);
+        $this->assertSame(0, SheetSync::count());
+    }
 }

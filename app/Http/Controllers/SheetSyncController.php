@@ -78,6 +78,21 @@ class SheetSyncController extends Controller
             return $this->handleReport($request);
         }
 
+        // 縮めて送られてきたとき（rows_gz）は、ここで元の rows に戻す（2026-10-05）。
+        // ⚠ 11月のタブが大きく、本番の受付（nginx）が「大きすぎる」（413）で門前払いしていた。
+        //   GASは rows を gzip＋base64 にして送る。ここより下は、今までどおり rows を見るだけ。
+        // ⚠ rows のまま送ってくる古いGASも、そのまま受け取れる（貼り替えが遅れても止まらない）。
+        if ($request->filled('rows_gz') && ! $request->has('rows')) {
+            $rows = self::unpackRows((string) $request->input('rows_gz'));
+            if ($rows === null) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => '縮めて送られてきた中身（rows_gz）を元に戻せませんでした。GASのコードが新しい版か確かめてください。',
+                ], 422);
+            }
+            $request->merge(['rows' => $rows]);
+        }
+
         $data = $this->check($request, [
             'book' => ['nullable', 'string', 'max:200'],
             'tab' => ['required', 'string', 'max:40'],
@@ -305,6 +320,27 @@ class SheetSyncController extends Controller
      * @param  array<string, mixed>  $rules
      * @return array<string, mixed>
      */
+    /**
+     * 縮めた rows（gzip＋base64）を元の配列に戻す。戻せなければ null。
+     * ⚠ 元に戻したあとの大きさに上限を付ける（小さい中身を送って巨大にふくらませる悪さを防ぐ）。
+     */
+    public const UNPACKED_MAX_BYTES = 30 * 1024 * 1024;
+
+    public static function unpackRows(string $packed): ?array
+    {
+        $bin = base64_decode($packed, true);
+        if ($bin === false || $bin === '') {
+            return null;
+        }
+        $json = @gzdecode($bin, self::UNPACKED_MAX_BYTES);
+        if ($json === false) {
+            return null;
+        }
+        $rows = json_decode($json, true);
+
+        return is_array($rows) ? $rows : null;
+    }
+
     private function check(Request $request, array $rules): array
     {
         $validator = Validator::make($request->all(), $rules);
