@@ -439,6 +439,12 @@
       font-size: 13px; cursor: pointer; user-select: none; background: #fff;
     }
     .cell.empty { border: none; background: none; cursor: default; }
+    /* その日のイベント件数（2026-10-07 スタッフ要望）。右上の小さな札。
+       ⚠ 位置を浮かせているのは、NGの日の取り消し線が件数にまでかからないようにするため。 */
+    .cell { position: relative; }
+    .cell .cnt { position: absolute; top: 2px; right: 3px; font-size: 8.5px; font-weight: 700; line-height: 1;
+      color: var(--muted); text-decoration: none; }
+    .cell.s-event .cnt { color: #fff; opacity: .85; }
     .cell .st { font-size: 9px; margin-top: 1px; }
     .cell.s-ok   { background: var(--ok-soft);    border-color: #bbe3c6; color: #15803d; }
     .cell.s-ng   { background: var(--danger-soft); border-color: #f4c2c2; color: #b91c1c; text-decoration: line-through; }
@@ -995,7 +1001,7 @@
 
           <div class="m-card">
             <h3>稼働できる日を選んでください</h3>
-            <p class="sub">日付をタップ（クリック）するたびに「終日〇 → NG → 未定」と切り替わります。「終日〇」はその日は一日じゅう稼働できる（どの案件にも入れる）という意味です。「★エントリー中」はエントリーした案件がある日、「イベント」は確定アサインが入っている日です（どちらもタップでは変えられません）。</p>
+            <p class="sub">日付をタップ（クリック）するたびに「終日〇 → NG → 未定」と切り替わります。「終日〇」はその日は一日じゅう稼働できる（どの案件にも入れる）という意味です。「★エントリー中」はエントリーした案件がある日、「イベント」は確定アサインが入っている日です（どちらもタップでは変えられません）。マスの右上の「◯件」は、その日に予定されているイベントの数です（まだ募集していないものも含みます）。お休みの調整の目安にしてください。</p>
             <div class="cal-head"><div class="mon">{{ $prefMeta['year'] }}年 {{ $prefMeta['month'] }}月</div></div>
             <div class="cal-grid" id="calGrid">
               @foreach (\App\Support\WeekStart::order() as $__dw)<div class="dow{{ $__dw === 0 ? ' sun' : ($__dw === 6 ? ' sat' : '') }}">{{ ['日','月','火','水','木','金','土'][$__dw] }}</div>@endforeach
@@ -1007,6 +1013,7 @@
               <span><i class="dot"></i>未定</span>
               <span><i class="dot entry"></i>★エントリー中</span>
               <span><i class="dot event"></i>イベント（確定）</span>
+              <span>右上の「◯件」＝その日のイベント数</span>
             </div>
           </div>
 
@@ -1294,6 +1301,7 @@
     window.ECS_PREF_PERIOD = @json($prefPeriod ?? '');
     window.ECS_MY_PREF_MEMO = @json($myPrefMemo ?? '');
     window.ECS_PREF_META = @json($prefMeta ?? null);
+    window.ECS_DAY_EVENT_COUNTS = @json((object) ($dayEventCounts ?? []));
     {{-- プロフィールの選択肢（運転・英語）。正本＝App\Support\ProfileOptions。
          ⚠ 必ずここ（下の「そのまま出す」区間の外）で渡すこと。
            下の script はその区間の中なので、Blade の書き方をしても処理されず、
@@ -2210,6 +2218,13 @@
     });
     // 本人がDBに保存済みの希望（date "Y-M-D" => ok/ng/maybe）。無ければ空＝全部「未定」で開く。
     const savedPrefs = window.ECS_MY_PREFS || {};
+    // その日のイベント件数（2026-10-07 スタッフ要望）。未公開の案件も数える・件数だけ（正本＝StaffDayEventCount）。
+    // ⚠ 最初の div には入れない＝dayCellByNum が最初の div の数字で日を探しているため。
+    const dayEventCounts = window.ECS_DAY_EVENT_COUNTS || {};
+    function dayCountHtml(d) {
+      const n = dayEventCounts[d] || 0;
+      return n > 0 ? '<span class="cnt" title="この日のイベント ' + n + '件">' + n + '件</span>' : '';
+    }
     // 1つの日セルを「編集可（終日〇→NG→未定を切替）」に描く。保存済み希望を初期状態に。
     function paintEditable(cell, d) {
       cell.className = 'cell';
@@ -2217,7 +2232,7 @@
       const pv = savedPrefs[PREF_Y + '-' + PREF_M + '-' + d];
       if (pv === 'ok') s = 1; else if (pv === 'ng') s = 2;
       cell.dataset.state = s;
-      cell.innerHTML = '<div>' + d + '</div><div class="st"></div>';
+      cell.innerHTML = '<div>' + d + '</div><div class="st"></div>' + dayCountHtml(d);
       applyCellState(cell);
       cell.onclick = () => {
         cell.dataset.state = (parseInt(cell.dataset.state) + 1) % 3;
@@ -2229,14 +2244,14 @@
       cell.className = 'cell s-event';
       delete cell.dataset.state; cell.onclick = null;
       cell.title = '確定アサイン：' + title;
-      cell.innerHTML = '<div>' + d + '</div><div class="st">イベント</div>';
+      cell.innerHTML = '<div>' + d + '</div><div class="st">イベント</div>' + dayCountHtml(d);
     }
     // エントリー中の案件がある日＝★（押して変更できない）。
     function paintEntry(cell, d, title) {
       cell.className = 'cell s-entry';
       delete cell.dataset.state; cell.onclick = null;
       cell.title = 'エントリー中：' + title;
-      cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>';
+      cell.innerHTML = '<div>' + d + ' ★</div><div class="st">エントリー</div>' + dayCountHtml(d);
     }
     // 1日の前の空きマス（曜日合わせ）を対象月から作る。
     for (let i = 0; i < ECS_WEEK_LEAD(PREF_FIRST_DOW); i++) {

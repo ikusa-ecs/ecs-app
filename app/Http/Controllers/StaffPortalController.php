@@ -20,6 +20,7 @@ use App\Support\ProfileOptions;
 use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
 use App\Support\RecruitStatus;
+use App\Support\StaffDayEventCount;
 use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
@@ -200,6 +201,8 @@ class StaffPortalController extends Controller
             'myProfile' => $this->myProfile($me),           // 設定タブの初期表示（本人のDB値）
             'prefPeriod' => $prefPeriod,                     // 稼働希望カレンダーの対象月（当月）
             'prefMeta' => $this->prefMeta($prefPeriod),      // その月の見出し・締切・日数・1日の曜日
+            // その日のイベント件数（2026-10-07 スタッフ要望）。未公開も数える・件数だけ。正本＝StaffDayEventCount。
+            'dayEventCounts' => StaffDayEventCount::forMonth($prefPeriod, OfficeScope::filter(request())),
             'myPrefs' => $this->myPrefs($me),               // 本人の希望（カレンダー初期表示）
             'myPrefMemo' => $this->myPrefMemo($me, $prefPeriod), // 希望のコメント（初期表示）
             'staffLinks' => StaffLinks::all(),               // 便利リンク集（共通設定で社員が編集）
