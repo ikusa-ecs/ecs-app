@@ -43,8 +43,11 @@ class AssignmentScorer
     /** @var array<int,string> この案件のコンテンツ名 */
     private array $projectContentNames;
 
-    /** @var array<int,string> この案件にすでに入っているスタッフの氏名一覧（NGペア判定用） */
-    private array $projectMemberNames = [];
+    /** @var array<int,string> この案件にすでに入っているスタッフの staff_id（NGペア判定用） */
+    private array $projectMemberIds = [];
+
+    /** NGペアの判定（両方向・id で比べる）。正本＝App\Support\NgPairs。null＝判定しない。 */
+    private ?NgPairs $ngPairs = null;
 
     /**
      * @var array<int,string> 連日イベントの「ほかの日」にもエントリーしている staff_id
@@ -196,29 +199,28 @@ class AssignmentScorer
 
     /**
      * この案件にすでに入っているスタッフの中に、この人のNG相手がいれば その名前 を返す。
-     * ＄project->assignments を都度引かないよう、判定に必要な「同案件の氏名一覧」は
-     * setProjectMemberNames() で外から渡せる。渡されていなければ判定しない（null）。
+     * ⚠ 判定は両方向（相手の側にだけ書いてあっても効く）・id で比べる。正本＝App\Support\NgPairs。
+     *   （2026-10-07 までは氏名の文字そのまま・本人の側からだけ比べていて、すり抜けていた）
      */
     private function ngConflict(Person $p): ?string
     {
-        if (empty($this->projectMemberNames)) {
+        if ($this->ngPairs === null || empty($this->projectMemberIds)) {
             return null;
         }
-        $ngNames = $p->relationLoaded('ngRelations')
-            ? $p->ngRelations->pluck('partner_name')->all()
-            : [];
-        foreach ($ngNames as $n) {
-            if ($n !== '' && in_array($n, $this->projectMemberNames, true)) {
-                return $n;
-            }
-        }
-        return null;
+
+        return $this->ngPairs->conflict((string) $p->id, $this->projectMemberIds);
     }
 
-    /** この案件にすでに入っているスタッフの氏名一覧を渡す（NGペア同席の判定に使う）。 */
-    public function setProjectMemberNames(array $names): static
+    /**
+     * この案件にすでに入っているスタッフ（staff_id）と、NGペアの判定を渡す。
+     *
+     * @param  array<int,string>  $memberIds
+     */
+    public function setProjectMembers(array $memberIds, NgPairs $ngPairs): static
     {
-        $this->projectMemberNames = array_values(array_filter($names));
+        $this->projectMemberIds = array_values(array_map('strval', array_filter($memberIds)));
+        $this->ngPairs = $ngPairs;
+
         return $this;
     }
 

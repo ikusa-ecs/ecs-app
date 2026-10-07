@@ -16,6 +16,7 @@ use App\Support\DispatchRows;
 use App\Support\PositionTemplate;
 use App\Support\AssignmentStamp;
 use App\Support\Headcount;
+use App\Support\NgPairs;
 use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
@@ -140,8 +141,8 @@ class AssignmentController extends Controller
         $contentNames = $contentIds
             ? Content::whereIn('id', $contentIds)->pluck('content_name')->all()
             : [];
-        // NGペア同席の判定に使う「この案件にすでに入っている人の氏名」。
-        $memberNames = Person::whereIn('id', array_keys($existing))->pluck('name')->all();
+        // NGペアの判定（両方向・id で比べる）。正本＝App\Support\NgPairs（2026-10-07）。
+        $ngPairs = NgPairs::load();
 
         // 連日イベント（同じ案件を何日かに分けて開催）の「ほかの日」にエントリーしている人。
         // 2026-09-15 baba「複数出れる方を優先します」（FBシート No.16）。
@@ -154,7 +155,7 @@ class AssignmentController extends Controller
         $scorer = (new AssignmentScorer(
             $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP,
             $seriesEntryIds
-        ))->setProjectMemberNames($memberNames);
+        ))->setProjectMembers(array_keys($existing), $ngPairs);
 
         // ── 候補スタッフを拠点で絞る（全拠点運用・2026-08-05 baba確定＝アサイン画面は第1弾）──
         // 管理者以上はスイッチで選んだ拠点（未選択＝全拠点）、一般社員は自拠点固定。null＝絞らない。
@@ -170,7 +171,7 @@ class AssignmentController extends Controller
             ->with(['roleEligibilities', 'ngRelations'])
             ->orderByDesc('experience_count')
             ->get()
-            ->map(function (Person $p) use ($wish, $entries, $scorer) {
+            ->map(function (Person $p) use ($wish, $entries, $scorer, $ngPairs) {
                 $can = $p->roleEligibilities->pluck('position')->all();
                 // 「できる役割」バッジは D・MC・OP・軍師 だけ表示（FC・CK等は全員できるので出さない／baba 2026-07-17）。
                 $canShown = array_values(array_filter($can, fn ($k) => in_array($k, self::CAN_SHOWN, true)));
@@ -196,7 +197,9 @@ class AssignmentController extends Controller
                     'spot' => (bool) $p->is_spot,
                     'posLabels' => $posLabels,
                     'posCodes' => $can,   // 自動仮置きで「この役割ができる人か」を判定するため
-                    'ng' => $p->ngRelations->pluck('partner_name')->all(),
+                    // NGの相手の氏名（両方向＝相手の側にだけ書いてあっても入る・名簿の氏名にそろえてある）。
+                    // ⚠ 画面の「選んだ人どうしのNG」と「✨自動で仮置き」は、この氏名と data-name を比べる。
+                    'ng' => $ngPairs->partnerNames((string) $p->id),
                     'wish' => $wish[$p->id] ?? null,
                     // この案件にエントリーしたか（＋本人の一言）。
                     'entry' => array_key_exists($p->id, $entries),

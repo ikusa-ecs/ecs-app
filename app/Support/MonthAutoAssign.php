@@ -55,6 +55,9 @@ class MonthAutoAssign
 
     private Carbon $monthEnd;
 
+    /** NGペアの判定（両方向・id で比べる）。正本＝App\Support\NgPairs。plan() のはじめに1回だけ読む。 */
+    private ?NgPairs $ngPairs = null;
+
     /**
      * @param  array<int, string>  $skipDays      自動アサインしない日（'Y-m-d' の並び・2026-09-07 baba要望）
      * @param  array<int, string>  $skipProjects  自動アサインしない案件（案件IDの並び・2026-09-07 baba要望）
@@ -92,6 +95,7 @@ class MonthAutoAssign
 
         // ── 材料をまとめて引く（案件ごとに問い合わせない）──────────────
         $people = $this->candidatePeople();
+        $this->ngPairs = NgPairs::load();
         $apps = Application::whereIn('project_id', $projects->pluck('id'))
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
@@ -197,6 +201,13 @@ class MonthAutoAssign
                 foreach ($scored as $s) {
                     $sid = $s['id'];
                     if (isset($used[$sid])) {
+                        continue;
+                    }
+                    // ⚠ NGペア：**この回でいっしょに入れた人**とも比べる（2026-10-07 baba「NGが効いていない」）。
+                    //   採点（evaluate）は入れる前に1回だけなので、案件にもともといた人としか比べていない。
+                    //   空の案件にまとめて入れると、NGどうしが2人とも入っていた。
+                    //   $memberOf は入れるたびに足されるので、ここで見れば同じ回の人も含まれる。
+                    if ($this->ngPairs?->conflict($sid, array_keys($memberOf[$p->id] ?? [])) !== null) {
                         continue;
                     }
                     // ⚠ 役割の決まった枠には「その役割ができる人」だけ。
@@ -571,11 +582,9 @@ class MonthAutoAssign
                 ->pluck('staff_id')->unique()->values()->all();
         }
 
-        $memberNames = $people->only(array_keys($memberOf[$p->id] ?? []))->pluck('name')->all();
-
         return (new AssignmentScorer(
             $p, $p->start_date, $wish, $sameDay, $monthCount, $repeatIds, $contentNames, self::MONTH_CAP
-        ))->setProjectMemberNames($memberNames);
+        ))->setProjectMembers(array_keys($memberOf[$p->id] ?? []), $this->ngPairs ?? NgPairs::load());
     }
 
     /**

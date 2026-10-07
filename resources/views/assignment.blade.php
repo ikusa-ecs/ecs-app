@@ -727,6 +727,15 @@
 
     const slots = Array.from(document.querySelectorAll('.pos-slot'));
     let placed = 0;
+    // ⚠ NGペア：もう選んである人（仮置きした人も含む）とNGの人は飛ばす（2026-10-07 baba「NGが効いていない」）。
+    //   前は除外（blocked）しか見ておらず、いっしょに仮置きする人どうしのNGは素通りだった。
+    //   data-ng はサーバーが両方向ぶん入れてある（正本＝App\Support\NgPairs）。
+    const ngWithUsed = tr => {
+      const partners = (tr.dataset.ng || '').split('|').filter(Boolean);
+      if (!partners.length) return false;
+      for (const u of used) { if (partners.includes(u.dataset.name)) return true; }
+      return false;
+    };
 
     if (slots.length) {
       // ポジション枠がある案件：役割ごとに、その役割ができるおすすめ上位で埋める
@@ -744,6 +753,7 @@
           if (used.has(tr)) continue;
           const canDo = (tr.dataset.pos || '').split('|').filter(Boolean);
           if (!canDo.includes(role)) continue;   // その役割ができない人は飛ばす
+          if (ngWithUsed(tr)) continue;          // もう選んである人とNGの人は飛ばす
           const cb = tr.querySelector('input[name="staff_ids[]"]');
           const sel = tr.querySelector('select.role-sel:not(.role2-sel)');
           if (cb) cb.checked = true;
@@ -759,6 +769,7 @@
       for (const tr of rows) {
         if (used.size >= need) break;
         if (used.has(tr)) continue;
+        if (ngWithUsed(tr)) continue;          // もう選んである人とNGの人は飛ばす
         const cb = tr.querySelector('input[name="staff_ids[]"]');
         if (cb) { cb.checked = true; used.add(tr); placed++; }
       }
