@@ -11,6 +11,7 @@ use App\Support\OfficeSettings;
 use App\Support\ShareTags;
 use App\Support\ProjectAccess;
 use App\Support\RecruitStatus;
+use App\Support\StaffExtra;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -78,7 +79,9 @@ class AssignPublishController extends Controller
                 'name'      => $p->project_name,
                 'client'    => $p->client ?? '',
                 'cat'       => $p->site_category ?? '通常',   // 現場種別（バッジ用）
-                'category'  => $p->category ?? '',            // 案件区分（通常案件/追加案件）
+                'category'  => $p->category ?? '',            // 案件区分（通常案件/追加案件）＝集計用・ここでは変えない
+                // スタッフ画面で「追加」として上に出すか（区分とは別・2026-10-07）。正本＝StaffExtra。
+                'staffExtra' => StaffExtra::is($p),
                 // 「6〜8」のような範囲もそのまま出す（2026-08-25 baba）。
                 'need'      => Headcount::label($p->required_count_min, $p->required_count) ?: '—',
                 'off'       => $off,
@@ -340,8 +343,8 @@ class AssignPublishController extends Controller
     }
 
     /**
-     * 案件を「追加案件」にする／戻す（バッジの手動オン/オフ）。
-     * 受け取り：id（案件ID）＋ is_extra（true=追加案件・false=通常案件）。
+     * スタッフ画面の「追加」を付ける／外す（バッジの手動オン/オフ）。⚠ 案件の区分は変えない（2026-10-07）。
+     * 受け取り：id（案件ID）＋ is_extra（true=追加として出す・false=出さない）。
      * 追加にした時は「公開した日」extra_published_at を今日で記録（締切=公開日+3日の起点）。
      * 通常に戻した時は extra_published_at を空（null）に戻す。
      */
@@ -357,16 +360,9 @@ class AssignPublishController extends Controller
         if ($deny = ProjectAccess::denyJson($project)) {
             return $deny;
         }
-        if ($data['is_extra']) {
-            $project->category = '追加案件';
-            // すでに公開日があればそのまま（付け直しで締切がずれないように）、無ければ今日を記録。
-            if (empty($project->extra_published_at)) {
-                $project->extra_published_at = Carbon::today();
-            }
-        } else {
-            $project->category = '通常案件';
-            $project->extra_published_at = null;
-        }
+        // ⚠ 2026-10-07 baba要望：**案件の区分（category）は書き換えない**。スタッフ画面の「追加」だけを切り替える。
+        //   前は区分そのものを変えていたので、外すと集計の「追加で何件増えたか」からも消えていた。正本＝StaffExtra。
+        StaffExtra::set($project, (bool) $data['is_extra']);
         $project->save();
 
         return response()->json(['ok' => true]);
@@ -389,15 +385,8 @@ class AssignPublishController extends Controller
         $projects = Project::whereIn('id', $data['ids'])->get()
             ->filter(fn (Project $p) => ProjectAccess::canEdit($p));
         foreach ($projects as $project) {
-            if ($data['is_extra']) {
-                $project->category = '追加案件';
-                if (empty($project->extra_published_at)) {
-                    $project->extra_published_at = Carbon::today();
-                }
-            } else {
-                $project->category = '通常案件';
-                $project->extra_published_at = null;
-            }
+            // ⚠ 区分（category）は書き換えない（1件版と同じ・2026-10-07）。正本＝StaffExtra。
+            StaffExtra::set($project, (bool) $data['is_extra']);
             $project->save();
         }
 

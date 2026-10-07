@@ -402,7 +402,8 @@
         <p class="muted" style="font-size:11.5px; margin:8px 0 0;">
           ※ この締切は<b>{{ $officeScope }}のスタッフにだけ</b>出ます（拠点ごとに別の日にできます・2026-08-25）。<br>
           ※ 締切は<b>表示だけ</b>です（過ぎても応募は受け付けます）。<br>
-          ※「追加」にした案件は、この日付ではなく<b>公開した日＋3日（土日なら月曜）</b>が自動で締切になります。
+          ※「追加」にした案件は、この日付ではなく<b>公開した日＋3日（土日なら月曜）</b>が自動で締切になります。<br>
+          ※ ここの「＋追加／追加解除」は<b>スタッフ画面の見え方だけ</b>を変えます。案件一覧の区分（追加案件）は変わらないので、集計の追加案件の数は減りません（2026-10-07）。
         </p>
       </div>
 @verbatim
@@ -510,6 +511,8 @@
   const CASES = (window.ECS_PUBLISH_CASES || []).map(function(c){
     return {
       id: c.id, name: c.name, client: c.client, cat: c.cat, category: c.category, need: c.need, off: c.off,
+      // スタッフ画面の「追加」（区分とは別・2026-10-07）。⚠ 書き写さないと「追加」札が全部消える。
+      staffExtra: !!c.staffExtra,
       added: c.added, meet: c.meet, leave: c.leave, place: c.place, meetPlace: c.meetPlace, published: c.published,
       // スタッフ募集をするか（2026-09-18）。⚠ ここに書き写さないと画面では undefined になり、
       //   「募集なし」の札も「募集なしを隠す」も効かない（この画面もカードを作り直すつくり）。
@@ -740,14 +743,15 @@
     return `${c.gm}/${c.date.getDate()}<span class="dow ${cls}">(${DOW[dy]})</span>`;
   }
 
-  // ===== 追加案件バッジの手動オン/オフ（DBの category と extra_published_at を更新）=====
-  // 追加にすると「追加」バッジが付き、スタッフ画面の締切が「公開日＋3日（土日は月曜）」になる。
+  // ===== スタッフ画面の「追加」の手動オン/オフ（DBの staff_extra と extra_published_at を更新）=====
+  // 追加にすると「追加」バッジが付き、スタッフ画面で上に出て、締切が「公開日＋3日（土日は月曜）」になる。
+  // ⚠ 2026-10-07 から**案件の区分（通常案件／追加案件）は変えない**＝集計の追加案件の数は減らない。
   function toggleCategory(id){
     const c = CASES.find(x => x.id === id);
     if (!c) return;
-    const makeExtra = (c.category !== '追加案件');
-    const prev = c.category;
-    c.category = makeExtra ? '追加案件' : '通常案件';
+    const makeExtra = !c.staffExtra;
+    const prev = c.staffExtra;
+    c.staffExtra = makeExtra;
     render();
     fetch('/assign-publish/category', {
       method: 'POST',
@@ -755,17 +759,17 @@
       body: JSON.stringify({ id: id, is_extra: makeExtra })
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); })
-    .catch(() => { c.category = prev; render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
+    .catch(() => { c.staffExtra = prev; render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
 
   // ===== 追加案件バッジを「まとめて」外す（チェックした案件が対象）=====
   function bulkCategory(makeExtra){
     if (checkedIds.size === 0){ alert('チェックボックスで案件を選んでください。'); return; }
-    const word = makeExtra ? '「追加案件」に' : '「追加」を';
-    if (!confirm(`選んだ ${checkedIds.size} 件の${word}まとめて${makeExtra ? 'します' : '外します'}。\n\nよろしいですか？`)) return;
+    const word = makeExtra ? 'スタッフ画面の「追加」に' : 'スタッフ画面の「追加」を';
+    if (!confirm(`選んだ ${checkedIds.size} 件の${word}まとめて${makeExtra ? 'します' : '外します'}。\n（案件一覧の区分＝追加案件は変わりません）\n\nよろしいですか？`)) return;
     const ids = Array.from(checkedIds);
     const prev = {};
-    ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c){ prev[id] = c.category; c.category = makeExtra ? '追加案件' : '通常案件'; } });
+    ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c){ prev[id] = c.staffExtra; c.staffExtra = makeExtra; } });
     checkedIds.clear();
     render();
     fetch('/assign-publish/category-bulk', {
@@ -774,7 +778,7 @@
       body: JSON.stringify({ ids: ids, is_extra: makeExtra })
     })
     .then(r => { if (!r.ok) throw new Error('save failed'); })
-    .catch(() => { ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c) c.category = prev[id]; }); render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
+    .catch(() => { ids.forEach(id => { const c = CASES.find(x => x.id === id); if (c) c.staffExtra = prev[id]; }); render(); alert('保存に失敗しました。通信を確認してもう一度お試しください。'); });
   }
 
   // ===== 通常案件の一斉締切日（拠点ごとに1つ・DBの settings に保存）=====
@@ -811,7 +815,7 @@
     const sl = getStaffLeave(c);
     const diffM = (sm !== c.meet);
     const diffL = (sl !== c.leave);
-    const extra = (c.category === '追加案件');
+    const extra = !!c.staffExtra;   // スタッフ画面の「追加」（区分とは別）
 
     const tr = document.createElement('tr');
     // 他の画面から「この案件」を名指しで開けるようにする（2026-08-28 baba要望）。
@@ -845,7 +849,7 @@
         ${pub
           ? `<button class="pub-toggle undo" onclick="toggle('${c.id}')" title="スタッフ画面から外します（案件は消えません）">非公開にする</button>`
           : `<button class="pub-toggle go" onclick="toggle('${c.id}')">公開する</button>`}
-        <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します">${extra ? '追加解除' : '＋追加'}</button>
+        <button class="cat-toggle ${extra ? 'is-extra' : ''}" onclick="toggleCategory('${c.id}')" title="スタッフ画面に「追加」バッジを付けます／外します（案件一覧の区分は変わりません）">${extra ? '追加解除' : '＋追加'}</button>
         <a class="detail-link" href="/project-assign?project=${c.id}">アサイン画面 →</a>
         <button class="note-btn${String(c.memo || '').trim() !== '' ? ' has' : ''}" id="notebtn-${c.id}"
                 onclick="toggleNote('${c.id}')"

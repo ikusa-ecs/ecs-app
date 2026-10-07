@@ -132,7 +132,7 @@ class EntryFeed
                 'client'     => $p->client ?? '',
                 'date'       => $p->start_date ? $p->start_date->format('n/j') : '日付未定',
                 'dow'        => $p->start_date ? ['日', '月', '火', '水', '木', '金', '土'][(int) $p->start_date->dayOfWeek] : '',
-                'isExtra'    => ($p->category ?? '') === '追加案件',
+                'isExtra'    => StaffExtra::is($p),   // スタッフ画面の「追加」（区分とは別・2026-10-07）
                 'office'     => $p->office ?? '',
                 'published'  => (bool) $p->staff_published,
                 'assignStatus' => $status,             // 確定 / 仮 / null（未対応）

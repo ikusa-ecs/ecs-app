@@ -44,6 +44,7 @@ class Project extends Model
             'prep_handover' => 'boolean',
             'prep_script' => 'boolean',
             'staff_published' => 'boolean',
+            'staff_extra' => 'boolean',   // null に意味がある（区分に合わせる）。正本＝StaffExtra
             // どの拠点のスタッフに公開しているか（null＝これまでどおり関わる全拠点）。正本＝App\Support\OfficePublish（2026-09-30）
             'published_offices' => 'array',
             'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）

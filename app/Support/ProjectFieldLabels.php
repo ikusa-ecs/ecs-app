@@ -118,6 +118,8 @@ class ProjectFieldLabels
         'staff_published'    => 'スタッフへの公開',
         // 公開している拠点（2026-09-30 から公開は拠点ごと。正本＝OfficePublish）。
         'published_offices'  => '公開している拠点',
+        // スタッフ画面の「追加」札（区分とは別・2026-10-07）。正本＝StaffExtra。
+        'staff_extra'        => 'スタッフ画面の「追加」',
         'publish_memo'       => '公開ボードの備考',
         'extra_published_at' => '追加案件の公開日',
         'is_archived'        => 'アーカイブ',
@@ -159,6 +161,8 @@ class ProjectFieldLabels
      */
     private const TRISTATE_WORDS = [
         'count_as_event' => ['自動', '数える', '数えない'],
+        // スタッフ画面の「追加」（2026-10-07）。null＝区分に合わせる。正本＝StaffExtra。
+        'staff_extra'    => ['区分に合わせる', '追加として出す', '追加として出さない'],
     ];
 
     /** 社員のIDで持っている列（表示は氏名に直す）。 */

@@ -1343,7 +1343,9 @@
         //   full＝満員（人数が埋まった）／adj＝担当が調整中／applied＝自分が応募済み。
         full:(c.filled >= c.need), adj:(c.state === 'adj'),
         applied:!!c.applied, myNote:(c.myNote || ''), myIntent:(c.myIntent || '希望'),
-        extra:(c.category === '追加案件')
+        // ⚠ 「追加」は区分ではなくスタッフ画面用の印で決める（2026-10-07・正本＝StaffExtra）。
+        //   公開ボードで「追加解除」した案件は、区分が追加案件のままでも上に出さない。
+        extra:!!c.staffExtra
       };
     });
 

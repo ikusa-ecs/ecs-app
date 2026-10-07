@@ -21,6 +21,7 @@ use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
 use App\Support\RecruitStatus;
 use App\Support\StaffDayEventCount;
+use App\Support\StaffExtra;
 use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
@@ -713,6 +714,8 @@ class StaffPortalController extends Controller
                 // 募集中のカードにも「備考」として出す（2026-08-21 baba）。
                 'staffNotes' => (string) ($p->staff_notes ?? ''),
                 'category' => $p->category ?? '通常案件',
+                // スタッフ画面で「追加」として上に出すか（区分とは別・2026-10-07）。正本＝StaffExtra。
+                'staffExtra' => StaffExtra::is($p),
                 'deadline' => $this->deadlineLabel($p, $bulkDeadline),
                 'recruit' => true,
                 'archived' => $off < 0,   // 過去のイベントは募集タブに出さない
@@ -732,7 +735,8 @@ class StaffPortalController extends Controller
      */
     private function deadlineLabel(Project $p, string $bulkDeadline): string
     {
-        if (($p->category ?? '通常案件') === '追加案件') {
+        // ⚠ 区分ではなく「スタッフ画面の追加」で決める（2026-10-07・正本＝StaffExtra）。
+        if (StaffExtra::is($p)) {
             $base = $p->extra_published_at ?? $p->created_at;
             if (! $base) {
                 return '';
