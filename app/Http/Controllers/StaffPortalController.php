@@ -597,41 +597,36 @@ class StaffPortalController extends Controller
     private function recruitJobs(Carbon $today, $me)
     {
         // 本人の応募（案件ID → 行）。テスト/未ログインは空＝応募状態なし。
-        // ※ 拠点で絞るときに「すでに応募した案件」を落とさないよう、先に引いておく。
         $myApps = ($me && ! TestAccounts::isMockOnly($me))
             ? Application::where('staff_id', $me->id)->get()->keyBy('project_id')
             : collect();
 
         // 募集は自分の拠点の案件だけ見せる（全拠点運用・2026-08-05 baba確定＝公開ボードと合わせる）。
         // スタッフは権限 staff なので OfficeScope は常に「自分の拠点」を返す（切替は無い）。
-        // ⚠ すでに応募した案件は、他拠点でも残す（応募したのに一覧から消えると取り消せなくなる）。
         $office = OfficeScope::filter(request());
-        $appliedIds = $myApps->keys()->all();
 
         // ⚠ 公開ボードで「公開する」を押した案件だけを募集タブに出す（staff_published）。
         //   ここを is_recruiting だけで判定すると、セールスが登録した瞬間（＝まだ調整中）に
         //   クライアント名・会場までスタッフ全員に見えてしまう。公開の入口は公開ボードの1つだけにする。
-        //   ※すでに応募した案件は、非公開に戻されても残す（一覧から消えると取り消せなくなるため）。
+        // ⚠ 2026-10-07 baba要望で変更：**エントリーした人にも、非公開になった案件は見せない**。
+        //   以前は「応募したのに消えると取り消せない」ので、非公開・他拠点になっても応募した人には残していた。
+        //   そのため、他拠点に巻き取られた（＝この拠点のスタッフは要らなくなった）案件や、
+        //   非公開に戻した案件が、エントリーした人にだけ見え続けていた。
+        //   応募の記録（applications）は消さない＝社員側のエントリー一覧には残る。
+        //   確定した人は、非公開でも「確定アサイン」タブで見える（こちらは別の決まり・2026-10-05）。
         $projects = Project::where('is_recruiting', true)
             ->notCancelled()   // キャンセルになった案件は募集もしない（2026-08-26）
             ->whereNotIn('status', ['完了', '下書き'])
-            ->where(function ($q) use ($appliedIds, $office) {
+            ->where(function ($q) use ($office) {
                 // ⚠ 公開は拠点ごと（2026-09-30）＝**自分の拠点で公開された**案件だけ（正本＝OfficePublish）。
+                //   巻き取られた案件もここで外れる（scopePublishedFor が見る）。
                 if ($office) {
                     OfficePublish::scopePublishedFor($q, $office);
                 } else {
                     $q->where('staff_published', true);
                 }
-                if ($appliedIds) {
-                    $q->orWhereIn('id', $appliedIds);
-                }
             })
-            ->when($office, fn ($q) => $q->where(function ($qq) use ($office, $appliedIds) {
-                OfficeScope::applyToProjects($qq, $office);
-                if ($appliedIds) {
-                    $qq->orWhereIn('id', $appliedIds);
-                }
-            }))
+            ->when($office, fn ($q) => OfficeScope::applyToProjects($q, $office))
             ->orderBy('start_date')
             ->get();
 

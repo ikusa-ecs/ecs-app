@@ -250,11 +250,15 @@ class OfficeScopeBoardTest extends TestCase
         $this->assertNotContains($osakaEmp->name, $rows->pluck('name')->all());
     }
 
-    /** スタッフ画面の募集中タブ＝自分の拠点の募集だけ。ただし応募済みの案件は残す。 */
+    /**
+     * スタッフ画面の募集中タブ＝自分の拠点の募集だけ。
+     * ⚠ 2026-10-07 baba要望で変更：**応募済みでも、非公開・他拠点の案件は出さない**
+     *   （以前は取り消せるように残していた＝巻き取られた案件がエントリーした人にだけ見え続けていた）。
+     */
     public function test_staff_portal_recruiting_tab_is_limited_to_my_office(): void
     {
         // ※募集タブに出るのは「公開ボードで公開ON（staff_published）」の案件だけ。
-        //   応募済みの案件は非公開でも残す（取り消せなくなるため）＝ここは公開ONにしない。
+        //   応募済みでも非公開の他拠点案件は出さない＝ここは公開ONにしない。
         $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京']);
         $tokyoJob = ProjectFactory::new()->create([
             'office' => '東京', 'start_date' => $this->soon(), 'is_recruiting' => true,
@@ -277,7 +281,7 @@ class OfficeScopeBoardTest extends TestCase
         )->pluck('id')->all();
 
         $this->assertContains($tokyoJob->id, $ids);
-        $this->assertContains($osakaApplied->id, $ids, '応募済みの案件は他拠点でも残す');
+        $this->assertNotContains($osakaApplied->id, $ids, '応募済みでも、非公開の他拠点案件は出さない');
         $this->assertNotContains($osakaJob->id, $ids, '関係のない他拠点の募集は出さない');
     }
 

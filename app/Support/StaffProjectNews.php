@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
@@ -83,12 +82,14 @@ final class StaffProjectNews
         $today = Carbon::today();
         $since = $today->copy()->subDays(self::DAYS);
 
-        // ① 自分が関わる案件（アサイン＋エントリー）。キャンセルは除く。
+        // ① 自分が関わる案件＝**確定**のアサイン。
         //    ⚠ こちらは**拠点で絞らない**。他拠点の案件に入っている人は、その変更を知る必要がある。
+        //    ⚠ 2026-10-07 baba要望：エントリーしただけの案件は、ここでは拾わない（下の②＝公開中の案件で拾う）。
+        //      前はエントリーした案件をここで拾っていたので、非公開に戻した・他拠点に巻き取られた案件の変更が
+        //      エントリーした人にだけ出続けていた。仮のアサインも同じ理由で拾わない（スタッフに見せるのは確定だけ）。
         $mine = Assignment::where('staff_id', $person->id)
-            ->where('status', '!=', 'キャンセル')
+            ->where('status', '確定')
             ->pluck('project_id')
-            ->merge(Application::where('staff_id', $person->id)->pluck('project_id'))
             ->unique();
 
         // ② 公開中の案件（募集としてスタッフに見えているもの）。
