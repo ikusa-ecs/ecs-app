@@ -828,8 +828,11 @@ class AssignBoardController extends Controller
     {
         $today = Carbon::today();
 
-        // 拠点で絞るのは「案件」だけ。応募者（applications）は本人が手を挙げた記録なので、
-        // 他拠点のスタッフが応募していてもそのまま出す（隠すと応募が無かったように見えてしまう）。
+        // ⚠ 2026-10-07 baba要望で変更：**応募者も、見ている拠点のスタッフだけ**を出す。
+        //   他拠点にヘルプを頼んで向こうのスタッフにも公開すると、その拠点のスタッフの応募がこちらの一覧に混ざっていた。
+        //   向こうのスタッフは、向こうの拠点で見たときに出る（案件はヘルプで向こうの一覧にも出ている）。
+        //   ※ すでにこの案件に入っている人は、他拠点でも出す（誰が入っているか分からなくなるため）。
+        //   ※ 全拠点で見ているときは全員出す。拠点の見分けの正本＝OfficeScope::personIn。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
             ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
@@ -920,7 +923,7 @@ class AssignBoardController extends Controller
         // 派遣で埋まっている人数（依頼中＋確定・派遣10名＝10名）。正本＝DispatchRows（2026-09-29）。
         $dispatched = DispatchRows::liveCountsFor($projects->pluck('id'));
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office) {
             $assignedIds = $assignedByProject->get($p->id, []);
             $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
             $entryNotes = $noteByProject->get($p->id, []);         // [staff_id => 本人の応募メモ]
@@ -929,7 +932,11 @@ class AssignBoardController extends Controller
 
             // 応募者リスト（applications → 表示用 {no, name, lv, pos, assigned, status, entryNote, remark}）。
             $entrants = ($appsByProject->get($p->id) ?? collect())
-                ->pluck('staff_id')->unique()->values()
+                ->pluck('staff_id')->unique()
+                // 見ている拠点のスタッフだけ（すでにこの案件に入っている人は他拠点でも残す）。
+                ->filter(fn ($sid) => in_array($sid, $assignedIds, true)
+                    || OfficeScope::personIn($people->get($sid), $office))
+                ->values()
                 ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p) {
                     $person = $people->get($sid);
 

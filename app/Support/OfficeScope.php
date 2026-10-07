@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Office;
+use App\Models\Person;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -241,5 +242,24 @@ class OfficeScope
                 $qq->orWhereIn('id', $keepIds);
             }
         }));
+    }
+
+    /**
+     * その人は「いま見ている拠点」の人か（1人ずつ判定する版）。
+     * ⚠ applyToPeople（一覧で絞る条件）と必ず同じ答えにすること＝拠点が空の人は東京あつかい。
+     *
+     * @param  string|null  $office  いま見ている拠点（null＝全拠点＝いつでも true）
+     */
+    public static function personIn(?Person $person, ?string $office): bool
+    {
+        if (! $office) {
+            return true;
+        }
+        if (! $person) {
+            return false;
+        }
+        $mine = (string) ($person->office ?? '');
+
+        return $mine === $office || ($mine === '' && $office === self::DEFAULT_OFFICE);
     }
 }

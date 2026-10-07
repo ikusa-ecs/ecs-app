@@ -53,7 +53,7 @@ class EntryFeed
      */
     public static function build(?string $office, bool $onlyExtra = false, bool $onlyNew = false, int $days = self::DEFAULT_DAYS): array
     {
-        // 拠点で絞るのは「案件」だけ（応募は本人が手を挙げた記録なので、他拠点のスタッフでも出す）。
+        // 拠点で絞るのは案件と、応募したスタッフの両方（スタッフの絞り込みは下＝2026-10-07 baba要望）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
             ->notCancelled()   // キャンセルになった案件は出さない（2026-08-26）
             ->get()
@@ -75,6 +75,22 @@ class EntryFeed
         }
 
         $people = Person::whereIn('id', $apps->pluck('staff_id')->unique())->get()->keyBy('id');
+
+        // すでにアサイン済みか（キャンセル以外）＝「対応済み」の目印に使う。
+        $assigned = Assignment::whereIn('project_id', $projects->keys())
+            ->where('status', '!=', 'キャンセル')
+            ->get(['project_id', 'staff_id', 'status'])
+            ->groupBy(fn ($a) => $a->project_id . '|' . $a->staff_id);
+
+        // ⚠ 2026-10-07 baba要望：**見ている拠点のスタッフの応募だけ**を出す（エントリー一覧の案件タブと同じ決まり）。
+        //   他拠点にヘルプを頼むと、その拠点のスタッフの応募がこちらに混ざっていた。
+        //   すでにその案件に入っている人は他拠点でも残す。全拠点で見ているときは全員。正本＝OfficeScope::personIn。
+        $apps = $apps->filter(fn (Application $a) => $assigned->has($a->project_id . '|' . $a->staff_id)
+            || OfficeScope::personIn($people->get($a->staff_id), $office))->values();
+        if ($apps->isEmpty()) {
+            return self::pack(collect());
+        }
+
         $contentNames = Content::pluck('content_name', 'id');
 
         // その人が、その案件の日に「終日〇」を出しているか（2026-09-03 baba要望）。
@@ -84,13 +100,7 @@ class EntryFeed
             $projects->pluck('start_date')->filter()->map(fn ($d) => $d->format('Y-m-d'))->all()
         );
 
-        // すでにアサイン済みか（キャンセル以外）＝「対応済み」の目印に使う。
-        $assigned = Assignment::whereIn('project_id', $projects->keys())
-            ->where('status', '!=', 'キャンセル')
-            ->get(['project_id', 'staff_id', 'status'])
-            ->groupBy(fn ($a) => $a->project_id . '|' . $a->staff_id);
-
-        $rows = $apps->map(function (Application $a) use ($projects, $people, $contentNames, $assigned, $wishByKey) {
+        $rows =$apps->map(function (Application $a) use ($projects, $people, $contentNames, $assigned, $wishByKey) {
             $p = $projects->get($a->project_id);
             $person = $people->get($a->staff_id);
 

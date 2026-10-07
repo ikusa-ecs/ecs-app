@@ -164,23 +164,42 @@ class OfficeScopeBoardTest extends TestCase
         $this->assertContains($osakaHelper->id, $members, '他拠点のメンバーが消えると保存で担当が外れてしまう');
     }
 
-    /** エントリー一覧：他拠点のスタッフの応募も、自拠点の案件なら見える。 */
-    public function test_entries_keeps_applicants_from_other_offices(): void
+    /**
+     * エントリー一覧：**見ている拠点のスタッフの応募だけ**出す（2026-10-07 baba要望で変更）。
+     * 他拠点にヘルプを頼んで向こうのスタッフにも公開すると、向こうの応募がこちらに混ざっていた。
+     * ただし、すでにこの案件に入っている人は他拠点でも出す（誰が入っているか分からなくなるため）。
+     * ※ 以前（〜2026-10-06）は「応募は本人の意思表示なので隠さない」で、他拠点の応募も出していた。
+     */
+    public function test_entries_hides_applicants_from_other_offices_unless_assigned(): void
     {
         $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
+        $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京']);
         $osakaStaff = PersonFactory::new()->staff()->create(['office' => '大阪']);
+        $osakaMember = PersonFactory::new()->staff()->create(['office' => '大阪']);
         $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
-        Application::create([
-            'project_id' => $project->id, 'staff_id' => $osakaStaff->id,
-            'intent' => '希望', 'applied_at' => now(),
+        foreach ([$tokyoStaff, $osakaStaff, $osakaMember] as $s) {
+            Application::create([
+                'project_id' => $project->id, 'staff_id' => $s->id,
+                'intent' => '希望', 'applied_at' => now(),
+            ]);
+        }
+        \App\Models\Assignment::create([
+            'project_id' => $project->id, 'staff_id' => $osakaMember->id,
+            'date' => $this->soon(), 'role' => '', 'status' => '仮',
         ]);
 
-        $cases = collect(
-            $this->actingAsPerson($tokyoEmp)->get('/entries')->assertOk()->original->getData()['entriesCases']
-        );
+        $data = $this->actingAsPerson($tokyoEmp)->get('/entries')->assertOk()->original->getData();
 
-        $entrants = collect($cases->firstWhere('id', $project->id)['entrants'])->pluck('id')->all();
-        $this->assertContains($osakaStaff->id, $entrants, '応募は本人の意思表示なので隠さない');
+        $entrants = collect(collect($data['entriesCases'])->firstWhere('id', $project->id)['entrants'])->pluck('id')->all();
+        $this->assertContains($tokyoStaff->id, $entrants);
+        $this->assertNotContains($osakaStaff->id, $entrants, '他拠点のスタッフの応募は出さない');
+        $this->assertContains($osakaMember->id, $entrants, 'すでに入っている人は他拠点でも出す');
+
+        // 新着タブも同じ決まり。
+        $feedIds = collect($data['feedRows'])->pluck('staffId')->all();
+        $this->assertContains($tokyoStaff->id, $feedIds);
+        $this->assertNotContains($osakaStaff->id, $feedIds);
+        $this->assertContains($osakaMember->id, $feedIds);
     }
 
     /** 日別ボードの「希望者（その日稼働可）」は自拠点のスタッフだけ。 */
