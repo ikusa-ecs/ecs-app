@@ -1087,6 +1087,18 @@
               : 'この月はまだエントリーがありません。')
           + '</div></div>';
       }
+      // その月まるごとの応募数（2026-10-07 baba要望）。日付で絞っていると上の「応募数」は
+      // 選んだ日の分だけになるので、**その月ぜんぶでいくつエントリーしてくれたか**も並べて出す。
+      // ⚠ 日付以外の絞り込み（キーワード・募集状態など）も外して、その月の案件ぜんぶで数える。
+      // ⚠ 日付で絞っていないときは「応募数」とほぼ同じになるので、列は出さない。
+      const showMonthAll = daysFilter().size > 0;
+      const monthAll = {};
+      if (showMonthAll) {
+        targetCases().filter(c => ymKey(c.off) === g.key).forEach(c => entrantsOf(c).forEach(e => {
+          if ((e.src || 'entry') === 'entry') monthAll[e.name] = (monthAll[e.name] || 0) + 1;
+        }));
+      }
+
       // 応募数の多い順（同数はアサイン数の多い順）
       staffOrder.sort((a,b) => staffMap[b].ent - staffMap[a].ent || staffMap[b].asg - staffMap[a].asg || staffMap[b].cal - staffMap[a].cal);
 
@@ -1108,7 +1120,10 @@
       });
 
       // ヘッダー（案件を横に）
-      let head = '<thead><tr><th class="staffcol">スタッフ</th><th class="entcol">応募<br>数</th>';
+      let head = '<thead><tr><th class="staffcol">スタッフ</th>'
+        + (showMonthAll
+            ? '<th class="entcol" title="選んだ日の応募数">選んだ日<br>の応募</th><th class="entcol" title="その月ぜんぶの案件への応募数（日付の絞り込みに関係なく数えます）">月の<br>応募</th>'
+            : '<th class="entcol">応募<br>数</th>');
       cases.forEach(c => {
         const all = entrantsOf(c);
         const entCnt = all.filter(e => (e.src || 'entry') === 'entry').length;
@@ -1127,7 +1142,8 @@
       staffOrder.forEach(name => {
         const s = staffMap[name];
         body += `<tr><td class="staffcol">${esc(name)} <span class="e-lv ${s.lv}">${lvLabel[s.lv]}</span></td>`
-          + `<td class="cell entcol"><b>${s.ent}</b></td>`;
+          + `<td class="cell entcol"><b>${s.ent}</b></td>`
+          + (showMonthAll ? `<td class="cell entcol"><b>${monthAll[name] || 0}</b></td>` : '');
         caseStatus.forEach((m, ci) => {
           const c = cases[ci];
           const e = m[name];
@@ -1163,7 +1179,8 @@
       body += '</tbody>';
 
       // フッター（案件ごとの アサイン/応募 数）
-      let foot = '<tfoot><tr><td class="staffcol">アサイン / 応募</td><td class="cell entcol"></td>';
+      let foot = '<tfoot><tr><td class="staffcol">アサイン / 応募</td><td class="cell entcol"></td>'
+        + (showMonthAll ? '<td class="cell entcol"></td>' : '');
       cases.forEach(c => {
         const ents = entrantsOf(c);
         const asg = ents.filter(e => e.assigned).length;
