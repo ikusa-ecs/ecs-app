@@ -762,7 +762,9 @@ class PastProjectImportTest extends TestCase
         $p = Project::firstOrFail();
         $this->assertSame('調整中', $p->status);
         $this->assertFalse((bool) $p->staff_published);
-        $this->assertSame('仮', Assignment::where('staff_id', 'S-001')->firstOrFail()->status);
+        // ⚠ 2026-10-08 baba「確定してた人も仮になっちゃうのはやめてほしい」＝アサインは確定のまま。
+        //   （案件の状態・公開は「これから」に切り替わる。人を仮に戻したいときはアサイン画面で直す）
+        $this->assertSame('確定', Assignment::where('staff_id', 'S-001')->firstOrFail()->status);
     }
 
     /** 月シートを取り込み直しても、案件もアサインも二重にならない。 */

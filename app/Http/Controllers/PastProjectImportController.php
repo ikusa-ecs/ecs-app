@@ -853,11 +853,18 @@ class PastProjectImportController extends Controller
                 // ⚠ 消すのは「この取込が入れる役割」で、しかも「この日」だけ。
                 //   他の画面で入れた役割や、同じ案件の別の日は消さない。
                 $roles = array_values(array_unique(array_column($assignments, 'role')));
+                // 消す前に「確定していた人」を覚えておく（2026-10-08 baba「確定してた人も仮になっちゃうのはやめてほしい」）。
+                // ⚠ 作り直すと、ECSで確定にした人までシートの取込で「仮」に戻っていた。
+                //   シートにまだ並んでいる人は、確定と「誰がいつ確定したか」をそのまま引き継ぐ。
+                $wasConfirmed = [];
                 if ($roles) {
-                    Assignment::where('project_id', $project->id)
+                    $old = Assignment::where('project_id', $project->id)
                         ->whereDate('date', $date)
-                        ->whereIn('role', $roles)
-                        ->delete();
+                        ->whereIn('role', $roles);
+                    foreach ((clone $old)->where('status', '確定')->get() as $o) {
+                        $wasConfirmed[(string) $o->staff_id] = $o->only(['assigned_by', 'assigned_at', 'confirmed_by', 'confirmed_at']);
+                    }
+                    $old->delete();
                 }
 
                 foreach ($assignments as $a) {
@@ -871,8 +878,18 @@ class PastProjectImportController extends Controller
                         ->whereDate('date', $date)
                         ->first();
                     if ($row) {
-                        $row->update(['role' => $a['role'], 'status' => $assignStatus]
-                            + AssignmentStamp::forUpdate($row, $assignStatus));
+                        // 確定している人は仮に戻さない（役割だけシートに合わせる）。
+                        $status = $row->status === '確定' ? '確定' : $assignStatus;
+                        $row->update(['role' => $a['role'], 'status' => $status]
+                            + AssignmentStamp::forUpdate($row, $status));
+                    } elseif (isset($wasConfirmed[(string) $a['id']])) {
+                        Assignment::create([
+                            'project_id' => $project->id,
+                            'staff_id' => $a['id'],
+                            'date' => $date,
+                            'role' => $a['role'],
+                            'status' => '確定',
+                        ] + $wasConfirmed[(string) $a['id']]);
                     } else {
                         Assignment::create([
                             'project_id' => $project->id,

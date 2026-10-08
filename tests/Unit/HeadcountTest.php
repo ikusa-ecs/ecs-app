@@ -68,4 +68,12 @@ class HeadcountTest extends TestCase
         $this->assertFalse(Headcount::isRange(null, 8));
         $this->assertFalse(Headcount::isRange(8, 8));
     }
+
+    /** かっこの中の添え書きは読まない（2026-10-08 アサイン表の「17(IKUSA10名)」を1710と読んでいた）。 */
+    public function test_note_in_parentheses_is_ignored(): void
+    {
+        $this->assertSame(['min' => null, 'max' => 17], Headcount::parse('17(IKUSA10名)'));
+        $this->assertSame(['min' => null, 'max' => 17], Headcount::parse('17名（IKUSA10名）'));
+        $this->assertSame(['min' => 6, 'max' => 8], Headcount::parse('6〜8(うちIKUSA3)'));
+    }
 }

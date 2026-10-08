@@ -243,4 +243,44 @@ class SheetDiffPreviewTest extends TestCase
         $this->assertSame([], $diff['people']['add'], '入れ替わりなのに「増える」とも出ています。');
         $this->assertSame([], $diff['people']['remove'], '入れ替わりなのに「外れる」とも出ています。');
     }
+
+    /** 改行・空白だけの違いは「変わります」にしない（2026-10-08 住所・備考で71項目出ていた）。 */
+    public function test_whitespace_only_difference_is_not_a_change(): void
+    {
+        $me = $this->manager();
+        $this->actingAsPerson($me)->post('/past-import', ['csv' => $this->csv([$this->row([46 => '前日設営 リハあり'])])])
+            ->assertRedirect('/past-import');
+        // ECSの画面で直すと改行の書き方（CRLF）や全角スペースが変わる＝中身は同じ。
+        \App\Models\Project::query()->update(['note' => "前日設営
+　リハあり 
+"]);
+
+        $diff = $this->actingAsPerson($me)->post('/past-import/preview', ['csv' => $this->csv([$this->row([46 => '前日設営 リハあり'])])])
+            ->assertOk()->json('rows.0.diff');
+
+        $this->assertSame('same', $diff['kind'],
+            '空白・改行だけの違いで「変わります」と出ています：'.json_encode($diff['changes'], JSON_UNESCAPED_UNICODE));
+    }
+
+    /** 「これから」で取り込み直しても、ECSで確定にした人は仮に戻さない（2026-10-08 baba）。 */
+    public function test_reimport_keeps_confirmed_people(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '山田太郎');
+        $this->staff('S-002', '鈴木花子');
+
+        $this->actingAsPerson($me)->post('/past-import', ['csv' => $this->csv([$this->row([50 => '山田太郎, 鈴木花子'])]), 'mode' => 'これから'])
+            ->assertRedirect('/past-import');
+        $a = \App\Models\Assignment::where('staff_id', 'S-001')->firstOrFail();
+        $this->assertSame('仮', $a->status);
+        $a->update(['status' => '確定', 'confirmed_by' => 'E-001', 'confirmed_at' => '2026-10-01 10:00:00']);
+
+        $this->actingAsPerson($me)->post('/past-import', ['csv' => $this->csv([$this->row([50 => '山田太郎, 鈴木花子', 13 => '09:00'])]), 'mode' => 'これから'])
+            ->assertRedirect('/past-import');
+
+        $a = \App\Models\Assignment::where('staff_id', 'S-001')->firstOrFail();
+        $this->assertSame('確定', $a->status, '取り込み直したら、確定していた人が仮に戻りました。');
+        $this->assertSame('E-001', (string) $a->confirmed_by, '「誰が確定したか」の記録が消えました。');
+        $this->assertSame('仮', \App\Models\Assignment::where('staff_id', 'S-002')->firstOrFail()->status);
+    }
 }

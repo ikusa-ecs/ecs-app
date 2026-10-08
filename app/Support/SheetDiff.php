@@ -256,10 +256,10 @@ final class SheetDiff
             return implode('｜', $parts);
         }
 
-        $text = trim((string) $value);
-
-        // 0/1 で持っている列（DBから来る側）と true/false（これから入れる側）をそろえる。
-        return $text;
+        // 空白・改行（全角スペースも）を除いて比べる（2026-10-08）。
+        // 住所や備考で改行の書き方（CRLF／LF）や空白だけが違うものが「変わります」と出て、
+        // 10月〜2月で71項目あった＝本当の差分が埋もれていた。
+        return (string) preg_replace('/[\s\x{3000}]+/u', '', (string) $value);
     }
 
     /** IDから氏名。名簿に無いIDはそのまま出す（黙って消さない）。 */
