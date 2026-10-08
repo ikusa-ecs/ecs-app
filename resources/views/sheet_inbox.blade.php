@@ -61,15 +61,18 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (!d || !d.ok) { td.innerHTML = '<span class="sx-when">数えられませんでした</span>'; return; }
-          var chg = 0, nw = 0, same = 0, ng = 0;
+          var chg = 0, nw = 0, same = 0, ng = 0, who = 0;
           (d.rows || []).forEach(function (r) {
             if (r.cancelled) return;
             if (r.errors && r.errors.length) { ng++; return; }
             var k = (r.diff && r.diff.kind) || '';
             if (k === 'changed') chg++; else if (k === 'new') nw++; else if (k === 'same') same++;
+            // 人が変わる案件の数（2026-10-08）
+            var p = (r.diff && r.diff.people) || {};
+            if ((p.add || []).length || (p.remove || []).length || (p.role || []).length || (p.swap || []).length) who++;
           });
           var parts = [];
-          if (chg) parts.push('<span class="n-chg">✏️ 変わる ' + chg + '</span>');
+          if (chg) parts.push('<span class="n-chg">✏️ 変わる ' + chg + (who ? '（👤人が変わる ' + who + '）' : '') + '</span>');
           if (nw) parts.push('<span class="n-new">🆕 新規 ' + nw + '</span>');
           if (ng) parts.push('<span class="sx-need">⚠ エラー ' + ng + '</span>');
           td.innerHTML = (parts.length ? parts.join('<br>') : '<span class="sx-done">差分なし</span>')

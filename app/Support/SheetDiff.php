@@ -110,11 +110,11 @@ final class SheetDiff
      * @param  list<array{id: string, role: string}>  $assignments  これから入れる人
      * @param  ?string  $date                     開催日（Y-m-d）
      * @return array{kind: string, changes: list<array{label: string, was: string, now: string}>,
-     *               people: array{add: list<string>, remove: list<string>, role: list<string>}}
+     *               people: array{add: list<string>, remove: list<string>, role: list<string>, swap: list<string>}}
      */
     public static function forCase(array $attrs, ?Project $existing, array $assignments, ?string $date): array
     {
-        $empty = ['add' => [], 'remove' => [], 'role' => []];
+        $empty = ['add' => [], 'remove' => [], 'role' => [], 'swap' => []];
 
         if ($existing === null) {
             return ['kind' => 'new', 'changes' => [], 'people' => $empty];
@@ -143,7 +143,7 @@ final class SheetDiff
             ? $empty
             : self::peopleDiff((string) $existing->id, $date, $assignments);
 
-        $moved = $changes !== [] || $people['add'] !== [] || $people['remove'] !== [] || $people['role'] !== [];
+        $moved = $changes !== [] || $people['add'] !== [] || $people['remove'] !== [] || $people['role'] !== [] || $people['swap'] !== [];
 
         return ['kind' => $moved ? 'changed' : 'same', 'changes' => $changes, 'people' => $people];
     }
@@ -157,7 +157,7 @@ final class SheetDiff
      *   ここで全部の役割をくらべると「この人が消えます」と嘘の警告を出してしまう。
      *
      * @param  list<array{id: string, role: string}>  $assignments
-     * @return array{add: list<string>, remove: list<string>, role: list<string>}
+     * @return array{add: list<string>, remove: list<string>, role: list<string>, swap: list<string>}
      */
     private static function peopleDiff(string $projectId, string $date, array $assignments): array
     {
@@ -169,7 +169,7 @@ final class SheetDiff
         $roles = array_values(array_unique(array_values($now)));
         if ($roles === []) {
             // シートに人が1人も並んでいない＝取込は誰も消さないし入れない。
-            return ['add' => [], 'remove' => [], 'role' => []];
+            return ['add' => [], 'remove' => [], 'role' => [], 'swap' => []];
         }
 
         $was = [];
@@ -181,23 +181,48 @@ final class SheetDiff
             $was[(string) $row->staff_id] = (string) $row->role;
         }
 
-        $add = [];
-        $remove = [];
+        // 役割ごとに「入る人」「抜ける人」を集める。
+        $addBy = [];
+        $removeBy = [];
         $role = [];
         foreach ($now as $id => $r) {
             if (! isset($was[$id])) {
-                $add[] = self::personLabel($id).'（'.AssignmentRole::label($r).'）';
+                $addBy[$r][] = self::personLabel($id);
             } elseif ($was[$id] !== $r) {
                 $role[] = self::personLabel($id).'：'.AssignmentRole::label($was[$id]).' → '.AssignmentRole::label($r);
             }
         }
         foreach ($was as $id => $r) {
             if (! isset($now[$id])) {
-                $remove[] = self::personLabel($id).'（'.AssignmentRole::label($r).'）';
+                $removeBy[$r][] = self::personLabel($id);
             }
         }
 
-        return ['add' => $add, 'remove' => $remove, 'role' => $role];
+        // 同じ役割で抜ける人と入る人が両方いる＝入れ替わり。
+        // 「OP：田中 → 佐藤」の1行にまとめる（2026-10-08 baba「アサインされてる人が変わるのも表示してほしい」）。
+        // ⚠ 何人ずつでも1役割1行＝誰と誰が入れ替わったかの組み合わせは決めつけない。
+        $swap = [];
+        foreach ($removeBy as $r => $names) {
+            if (! empty($addBy[$r])) {
+                $swap[] = AssignmentRole::label($r).'：'.implode('・', $names).' → '.implode('・', $addBy[$r]);
+                unset($removeBy[$r], $addBy[$r]);
+            }
+        }
+
+        $add = [];
+        foreach ($addBy as $r => $names) {
+            foreach ($names as $n) {
+                $add[] = $n.'（'.AssignmentRole::label($r).'）';
+            }
+        }
+        $remove = [];
+        foreach ($removeBy as $r => $names) {
+            foreach ($names as $n) {
+                $remove[] = $n.'（'.AssignmentRole::label($r).'）';
+            }
+        }
+
+        return ['add' => $add, 'remove' => $remove, 'role' => $role, 'swap' => $swap];
     }
 
     /** 2つの値を「同じ中身」と見るか。 */

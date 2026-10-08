@@ -226,4 +226,21 @@ class SheetDiffPreviewTest extends TestCase
         $this->assertSame([], $diff['people']['add'], '入れ替えなのに「増える」と出ています。');
         $this->assertSame([], $diff['people']['remove'], '入れ替えなのに「外れる」と出ています。');
     }
+
+    /** 同じポジションで人が替わったら「前 → 後」の1行で出す（2026-10-08 baba要望）。 */
+    public function test_a_replaced_person_is_shown_as_one_line(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '山田太郎');
+        $this->staff('S-002', '鈴木花子');
+
+        $diff = $this->importThenPreview($me,
+            $this->row([50 => '山田太郎']), $this->row([50 => '鈴木花子']));
+
+        $this->assertSame('changed', $diff['kind']);
+        $this->assertCount(1, $diff['people']['swap']);
+        $this->assertStringContainsString('山田太郎 → 鈴木花子', $diff['people']['swap'][0]);
+        $this->assertSame([], $diff['people']['add'], '入れ替わりなのに「増える」とも出ています。');
+        $this->assertSame([], $diff['people']['remove'], '入れ替わりなのに「外れる」とも出ています。');
+    }
 }

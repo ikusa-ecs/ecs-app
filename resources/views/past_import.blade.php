@@ -753,14 +753,18 @@
     var items = (d.changes || []).map(function (c) {
       return '<li>' + pjEsc(c.label) + '：' + pjEsc(c.was) + ' → <b>' + pjEsc(c.now) + '</b></li>';
     });
+    // 人の変化は別にして、打ち切らずに全部出す（2026-10-08 baba要望）。
+    // 項目の変化と同じ列に並べて4件で切ると、人の変化が「ほか◯件」に隠れていた。
     var p = d.people || {};
-    (p.add || []).forEach(function (n) { items.push('<li>人が増える：<b>' + pjEsc(n) + '</b></li>'); });
-    (p.remove || []).forEach(function (n) { items.push('<li>人が外れる：<b>' + pjEsc(n) + '</b></li>'); });
-    (p.role || []).forEach(function (n) { items.push('<li>ポジション変更：<b>' + pjEsc(n) + '</b></li>'); });
-    if (!items.length) { return ''; }
+    var who = [];
+    (p.swap || []).forEach(function (n) { who.push('<li>👤 入れ替わり：<b>' + pjEsc(n) + '</b></li>'); });
+    (p.add || []).forEach(function (n) { who.push('<li>👤 増える：<b>' + pjEsc(n) + '</b></li>'); });
+    (p.remove || []).forEach(function (n) { who.push('<li>👤 外れる：<b>' + pjEsc(n) + '</b></li>'); });
+    (p.role || []).forEach(function (n) { who.push('<li>👤 ポジション変更：<b>' + pjEsc(n) + '</b></li>'); });
+    if (!items.length && !who.length) { return ''; }
 
     var rest = items.length - 4;
-    return '<ul class="pj-diff-list">' + items.slice(0, 4).join('')
+    return '<ul class="pj-diff-list">' + who.join('') + items.slice(0, 4).join('')
       + (rest > 0 ? '<li>ほか ' + rest + '件</li>' : '') + '</ul>';
   }
 
