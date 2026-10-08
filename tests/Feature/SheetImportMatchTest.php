@@ -298,6 +298,27 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('募集', $case['fields']['形式'] ?? '');
     }
 
+    /**
+     * 「ロゴ [ ] カメ [ ] 記事 [ ] 動画 [ ]」の行で、ロゴが空でも見出しの「カメ」をロゴにしない
+     * （2026-10-08 baba「シート『カメ』は何も埋まってないだけ」）。カメラの値はカメラに入る。
+     */
+    public function test_ロゴが空でもカメをロゴにしない(): void
+    {
+        $rows = $this->rows('チャンバラ', 'ロゴ確認');
+        $rows[8] = array_fill(0, count($rows[8]), '');
+        $rows[8][self::A] = 'ロゴ';
+        $rows[8][self::A + 2] = 'カメ';
+        $rows[8][self::A + 3] = 'OK';
+        $rows[8][self::A + 4] = '記事';
+        $rows[8][self::A + 6] = '動画';
+
+        $fields = \App\Support\MonthlySheetReader::read($rows)['cases'][0]['fields'];
+
+        $this->assertSame('', $fields['ロゴ'] ?? '', '見出しの「カメ」をロゴとして読んでいる');
+        $this->assertSame('OK', $fields['カメラ'] ?? '');
+        $this->assertSame('', $fields['記事'] ?? '');
+    }
+
     /** 手で入れたIDが見つからなければ、新しく作らずに止める（打ち間違いで二重にしない）。 */
     public function test_手で入れたIDが無ければ作らない(): void
     {
