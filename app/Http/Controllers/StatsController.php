@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Support\Departments;
+use App\Support\DispatchRows;
 use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Support\EventCount;
@@ -118,6 +119,8 @@ class StatsController extends Controller
         }
         $rows[] = ['のべ出勤数', $data['totalAttendance'],
             $yoyCell($data['yoyAttendance']), $diffCell($data['yoyAttendance'])];
+        $rows[] = ['※ 内訳（派遣を足した合計）', $data['attendanceStaff'] + $data['attendanceEmployee'] + $data['attendanceDispatch'],
+            '', 'スタッフ ' . $data['attendanceStaff'] . '／社員 ' . $data['attendanceEmployee'] . '／派遣 ' . $data['attendanceDispatch']];
         $rows[] = [];
         $rows[] = ['■ 他拠点依頼数'];
         foreach ($data['otherBase'] as $o) {
@@ -457,6 +460,21 @@ class StatsController extends Controller
         //（絞ったのに数字が全社のままだと、どこの数字か分からなくなるため）。
         $totalAttendance = $scopeDept !== '' ? $members->sum('count') : $countByStaff->sum();
 
+        // のべ人数の内訳＝スタッフ／社員／派遣（2026-10-08 baba「全員に渡すお水の量を事前に知りたい」）。
+        // ⚠ 派遣は名簿に入らない＝assignmentsに出てこないので、project_dispatches から人数ぶん足す（正本＝DispatchRows）。
+        // ⚠ のべ出勤数（上の数・昨対比）には派遣を混ぜない＝これまでの数字が変わらないように、内訳で別に出す。
+        $attendanceStaff = 0;
+        $attendanceEmployee = 0;
+        foreach ($countByStaff as $sid => $n) {
+            if (($people[$sid]->role ?? null) === 'employee') {
+                $attendanceEmployee += $n;
+            } else {
+                // 名簿に無いIDもスタッフ側に数える（黙って落とさない）。
+                $attendanceStaff += $n;
+            }
+        }
+        $attendanceDispatch = array_sum(DispatchRows::liveCountsFor($projectIds));
+
         // 部署ごとの社員数（＝平均の分母。所属が設定された社員だけ）。
         // 集計の単位は4グループ（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
         // 所属で絞っているときは、その所属のカードだけ出す（他は0名0件になり、絞ったのか0なのか分からないため）。
@@ -547,6 +565,9 @@ class StatsController extends Controller
             'otherBase'       => $otherBase,
             'totalAttendance' => $totalAttendance,
             'yoyAttendance'   => $this->yoy($totalAttendance, $lastYear['attendance'], $lastYear['hasData']),
+            'attendanceStaff'    => $attendanceStaff,
+            'attendanceEmployee' => $attendanceEmployee,
+            'attendanceDispatch' => $attendanceDispatch,
             'byDept'          => $byDept,
             'members'         => $members,
         ];

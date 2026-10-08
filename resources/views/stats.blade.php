@@ -317,6 +317,13 @@
     <div class="k-label">のべ出勤数（{{ $scopeDept !== '' ? $scopeDept : '全員' }}）</div>
     <div class="k-num">{{ $totalAttendance }}<small>回</small></div>
     @include('partials.yoy', ['y' => $yoyAttendance, 'unit' => '回'])
+    {{-- 内訳（お水など全員に渡す物の数を前もって知るため・2026-10-08）。所属で絞ると社員だけの数になるので出さない。 --}}
+    @if ($scopeDept === '')
+      <div class="k-yoy" title="のべ人数＝1人が2日入れば2と数えます。仮のアサインも含みます（キャンセルは除く）。派遣は依頼中＋確定の人数。">
+        スタッフ {{ $attendanceStaff }}／社員 {{ $attendanceEmployee }}／派遣 {{ $attendanceDispatch }}<br>
+        <span class="prev">派遣を足した合計 {{ $attendanceStaff + $attendanceEmployee + $attendanceDispatch }}人</span>
+      </div>
+    @endif
   </div>
 </div>
 
