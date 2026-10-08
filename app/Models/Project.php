@@ -78,6 +78,8 @@ class Project extends Model
 
         static::created(fn (Project $project) => ProjectHistoryRecorder::recordCreated($project));
         static::updated(fn (Project $project) => ProjectHistoryRecorder::recordUpdated($project));
+        // 開催日を変えたら、アサインの日付も一緒に移す（2026-10-09）。中身は AssignmentDateFollow。
+        static::updated(fn (Project $project) => \App\Support\AssignmentDateFollow::follow($project));
         static::deleted(fn (Project $project) => ProjectHistoryRecorder::recordDeleted($project));
 
         // Googleカレンダーの「直す必要がある」印（2026-08-27）。中身は CalendarSyncQueue に置く。
