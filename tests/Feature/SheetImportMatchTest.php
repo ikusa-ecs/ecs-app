@@ -177,6 +177,47 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame(['13' => 'P-2026-0042'], array_map('strval', $sync->fresh()->project_ids), 'シートへ書き戻すIDになっていない');
     }
 
+    /**
+     * シートのIDでつながった案件が別物のとき「ECSに無い＝新しく登録する」を選べる（2026-10-09 baba
+     * 「10/25 鷹狩のリハが 10/26 謎パにシートのIDでつながっている」）。つながっていた案件は書き換えない。
+     */
+    public function test_シートのIDでつながっていても新しく登録できる(): void
+    {
+        $me = $this->manager();
+        $other = $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => 'チャンバラ', 'content_names' => ['チャンバラ'], 'client' => '別の顧客']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ', '本当の顧客', 'P-2026-0042')])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id])->assertOk()->json('rows.0');
+        $this->assertSame('sheet', $pre['link']['by']);
+        $this->assertStringContainsString('P-2026-0042', $pre['link']['base'], '選び直せるよう、つながる先を出す');
+
+        $edits = json_encode(['0' => ['forceNew' => true]]);
+        $pre = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id, 'edits' => $edits])->assertOk()->json('rows.0');
+        $this->assertSame('new', $pre['diff']['kind']);
+        $this->assertTrue($pre['link']['forceNew']);
+
+        $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id, 'edits' => $edits])->assertRedirect('/past-import');
+
+        $this->assertSame(2, Project::count(), '新しく登録されていない');
+        $this->assertSame('別の顧客', $other->fresh()->client, 'つながっていた案件を書き換えた');
+        $newId = Project::where('id', '!=', 'P-2026-0042')->value('id');
+        $this->assertSame($newId, (string) ($sync->fresh()->id_changes['13']['to'] ?? ''), '新しいIDがシートへ書き戻されない');
+    }
+
+    /** リハのブロックは、日付の違う本番の案件にシートのIDでつながない（2026-10-09 baba報告）。 */
+    public function test_リハのブロックを別の日の本番にIDでつながない(): void
+    {
+        $honban = $this->ecsProject(['id' => 'P-2026-0050', 'project_name' => '鷹狩', 'content_names' => ['鷹狩'],
+            'start_date' => '2026-09-02', 'date_type' => '本番']);
+
+        $this->assertFalse(\App\Support\SheetIdCheck::fits($honban, '2026-09-01', '鷹狩(リハ)'));
+        $this->assertTrue(\App\Support\SheetIdCheck::fits($honban, '2026-09-01', '鷹狩'), '本番どうしの日程変更はこれまでどおり');
+        $this->assertTrue(\App\Support\SheetIdCheck::fits($honban, '2026-09-02', '鷹狩(リハ)'), '同じ日ならこれまでどおり');
+    }
+
     /** 「🆕 新しい案件」の行に、同じ日のECSの案件が選べる候補として出る（2026-09-30 baba要望）。 */
     public function test_同じ日のECSの案件が候補に出る(): void
     {

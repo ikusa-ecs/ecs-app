@@ -26,6 +26,13 @@ final class SheetIdCheck
         if ($date !== null && $date !== '' && optional($p->start_date)->format('Y-m-d') === $date) {
             return true;
         }
+        // 日付が違うときは、日程種別（本番／リハ日／前日設営／予備日）も合っていること（2026-10-09 baba報告）。
+        // ⚠ 10/25「鷹狩(リハ)」のブロックが、コンテンツが重なるだけで 10/26 の本番の案件に
+        //   「シートのIDでつながっています」になっていた。リハと本番は別の案件。
+        $blockKind = ScheduleMark::detect($contentRaw)['kind'] ?? '本番';
+        if ($blockKind !== (($p->date_type ?? '') ?: '本番')) {
+            return false;
+        }
 
         return self::overlap($p, $contentRaw, $contents ?? new ImportContents);
     }

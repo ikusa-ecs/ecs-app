@@ -95,6 +95,11 @@ final class SheetDiff
      */
     public static function target(array $found, array $edit = []): ?Project
     {
+        // 「ECSに無い案件＝新しく登録する」を選んだ（2026-10-09 baba「別の案件がECS IDで紐づいちゃってる」）。
+        // ⚠ 100行目のIDや名前でつながった案件があっても、上書きせずに新しく作る。
+        if (! empty($edit['forceNew'])) {
+            return null;
+        }
         if ($found['exact']) {
             return $found['exact'];
         }

@@ -728,6 +728,19 @@
       now = '<div class="pj-dup-note">🔎 名前で見つけた案件：' + pjEsc(l.project)
         + '<br><span style="font-size:10.5px;">取り込むと、次の朝このIDがシートに書かれて、以後はIDでつながります。違う案件なら下にIDを入れてください。</span></div>';
     }
+    // つながった案件が別物のとき「ECSに無い＝新しく登録する」を選べる（2026-10-09 baba
+    // 「10/25 鷹狩のリハが 10/26 謎パにシートのIDでつながっている」）。選んだら ② で確かめ直す。
+    // 取り込むと新しい案件ができ、次の朝そのIDがシートの100行目に上書きされる。
+    if (l.base) {
+      now += '<div class="pj-dup-note" style="margin-top:4px;">'
+        + '<select data-f="forceNew" onchange="pjSyncEdits()" style="max-width:260px; font-size:11px;">'
+        + '<option value=""' + (l.forceNew ? '' : ' selected') + '>この案件に上書きする（' + pjEsc(l.base) + '）</option>'
+        + '<option value="1"' + (l.forceNew ? ' selected' : '') + '>別の案件＝ECSに無いので新しく登録する</option>'
+        + '</select></div>';
+      if (l.forceNew) {
+        now += '<div class="pj-dup-note">🆕 新しく登録します（つながっていた ' + pjEsc(l.base) + ' は書き換えません）</div>';
+      }
+    }
     var v = pjEsc(l.id || '');
     // 「🆕 新しい案件」のときは、同じ日にECSにある案件を選ぶだけでつなげる（2026-09-30 baba要望）。
     // 選ぶと下のID欄に入り、そのまま確かめ直す＝どの案件に上書きされるかがすぐ出る。
@@ -847,6 +860,9 @@
       // 似た案件のとき「別の案件として登録する」を選んだか。
       var an = tr.querySelector('[data-f="asNew"]');
       if (an) { if (an.value === '1') { cur.asNew = true; } else { delete cur.asNew; } }
+      // つながった案件は別物＝ECSに無いので新しく登録する（2026-10-09）。
+      var fn = tr.querySelector('[data-f="forceNew"]');
+      if (fn) { if (fn.value === '1') { cur.forceNew = true; } else { delete cur.forceNew; } }
       // 手でつなぐECSの案件ID（空なら外す）。
       var li = tr.querySelector('[data-f="linkId"]');
       if (li) { var lv = li.value.trim(); if (lv) { cur.linkId = lv; } else { delete cur.linkId; } }

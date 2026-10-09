@@ -589,10 +589,15 @@ class PastProjectImportController extends Controller
                             : ((($entry['ecsId'] ?? null) !== null && $t->id === $entry['ecsId']) ? 'sheet' : 'name');
                     }
 
+                    // 「新しく登録する」を選ばなければ、どの案件につながるか（選び直せるように出す・2026-10-09）。
+                    $base = $info['errors'] ? null : SheetDiff::target($found, array_diff_key($edit, ['forceNew' => true]));
+
                     return [
                         'by' => $by,
                         'id' => (string) ($edit['linkId'] ?? ''),
                         'project' => $t ? $t->id.'『'.$t->project_name.'』'.optional($t->start_date)->format('n/j') : '',
+                        'forceNew' => ! empty($edit['forceNew']),
+                        'base' => $base ? $base->id.'『'.$base->project_name.'』'.optional($base->start_date)->format('n/j') : '',
                     ];
                 })(),
                 // 同じ日にECSにある案件（「🆕 新しい案件」の行で、選ぶだけでつなげるように・2026-09-30 baba要望）。
@@ -1288,6 +1293,10 @@ class PastProjectImportController extends Controller
             // ⚠ 印が無いときは上書き＝二重登録を増やさない側に倒す。
             if (! empty($edit['asNew'])) {
                 $clean['asNew'] = true;
+            }
+            // 「つながった案件は別物＝ECSに無いので新しく登録する」（2026-10-09 baba）。正本＝SheetDiff::target。
+            if (! empty($edit['forceNew'])) {
+                $clean['forceNew'] = true;
             }
             // 手でつなぐECSの案件ID（2026-09-29）。
             // ⚠ 形がおかしくても捨てない＝linkIdFor で「見つかりません」と止める（黙って新しい案件にしない）。
