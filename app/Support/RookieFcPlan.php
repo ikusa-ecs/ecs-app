@@ -182,76 +182,129 @@ final class RookieFcPlan
         return ['total' => count($units), 'done' => $done, 'readyD' => $readyD, 'left' => $left];
     }
 
-    /** FCに入れる案。 */
+    /**
+     * FCに入れる案。
+     *
+     * 本番・リハ日・前日設営・予備日がある案件は、**同じ新人を、出られる日は全部**に入れる
+     * （2026-10-09 baba「参加できそうなら全部参加にしてほしい」）。まとまり＝parent_project_id ?: id（ProjectSeries と同じ）。
+     *   ・まず本番（無ければいちばん早い日）で新人を選び、ほかの日にも同じ人を入れる。
+     *   ・ほかの日に入れないのは、その日もう入っている・出勤可能日が×／希望休・空きが無い・新人の上限のときだけ。
+     *   ・ほかの日は、その月の目標を超えても入れる（同じイベントの流れを経験してもらうため）。
+     *   ・ほかの日が月の外・今日より前なら入れない（ここに出すのは今日から月末まで＋同じイベントの先の日）。
+     */
     private static function picks(Carbon $month, ?string $office, array $state, array $map, array $names): array
     {
         if ($state === []) {
             return [];
         }
+        $today = Carbon::today()->format('Y-m-d');
         $from = Carbon::today()->max($month)->format('Y-m-d');
         $to = $month->copy()->endOfMonth()->format('Y-m-d').' 23:59:59';
 
-        $cases = OfficeScope::hideTakenOver(OfficeScope::applyToProjects(Project::query(), $office), $office, true)
-            ->notCancelled()->needsAssign()
-            ->whereNotNull('start_date')->whereBetween('start_date', [$from, $to])
-            ->whereNotIn('status', ['完了', '下書き'])
-            ->orderBy('start_date')->orderBy('start_time')->get();
+        $base = fn () => OfficeScope::hideTakenOver(OfficeScope::applyToProjects(Project::query(), $office), $office, true)
+            ->notCancelled()->needsAssign()->whereNotNull('start_date')->whereNotIn('status', ['完了', '下書き']);
+        $cases = $base()->whereBetween('start_date', [$from, $to])->orderBy('start_date')->orderBy('start_time')->get()
+            ->reject(fn ($c) => self::isArenaRental($c, $names))->values();
         if ($cases->isEmpty()) {
             return [];
         }
 
-        $assigned = Assignment::whereIn('project_id', $cases->pluck('id'))->where('status', '!=', 'キャンセル')->get()->groupBy('project_id');
-        $dispatch = DispatchRows::liveCountsFor($cases->pluck('id'));
+        // 同じイベントのほかの日（月の外でも、今日より先なら入れる）。
+        $roots = $cases->map(fn ($c) => ProjectSeries::rootId($c))->unique()->values()->all();
+        $related = $base()->where('start_date', '>=', $today)
+            ->where(fn ($q) => $q->whereIn('id', $roots)->orWhereIn('parent_project_id', $roots))
+            ->get()->reject(fn ($c) => self::isArenaRental($c, $names));
+        $all = $cases->concat($related)->unique('id')->keyBy('id');
+        $groups = $all->groupBy(fn ($c) => ProjectSeries::rootId($c))
+            ->map(fn ($g) => $g->sortBy(fn ($c) => $c->start_date->format('Y-m-d').(string) $c->start_time)->values());
+
+        $assigned = Assignment::whereIn('project_id', $all->keys())->where('status', '!=', 'キャンセル')->get()->groupBy('project_id');
+        $dispatch = DispatchRows::liveCountsFor($all->keys());
+        $lastDay = $all->max(fn ($c) => $c->start_date->format('Y-m-d'));
         $avail = ShiftPreference::whereIn('staff_id', array_keys($state))
-            ->whereBetween('date', [$from, $to])->get()
+            ->whereBetween('date', [$from, $lastDay.' 23:59:59'])->get()
             ->mapWithKeys(fn ($s) => [$s->staff_id.'|'.Carbon::parse($s->date)->format('Y-m-d') => $s->availability]);
         $mustIds = ContentDifficulty::whereNotNull('content_id')
             ->where(fn ($q) => $q->where('must', true)->orWhere('recommend', true))->pluck('content_id')->flip()->all();
 
-        $out = [];
-        foreach ($cases as $c) {
-            if (self::isArenaRental($c, $names)) {
-                continue;   // ARENA場所貸しは新人を入れない（2026-10-09 baba）
-            }
-            $day = $c->start_date->format('Y-m-d');
+        // 案件ごとの空き（選ぶたびに減らす）。
+        $room = [];
+        $cap = [];
+        foreach ($all as $c) {
             $rows = $assigned->get($c->id, collect());
-            $filled = $rows->pluck('staff_id')->unique()->count() + ($dispatch[$c->id] ?? 0);
             $need = RecruitStatus::need($c->required_count);
-            $already = $rows->filter(fn ($a) => isset($state[$a->staff_id]))->pluck('staff_id')->unique()->count();
-            $cap = self::capFor($c, $need) - $already;
-            if ($filled >= $need || $cap <= 0) {
-                continue;   // 空きが無い／新人がもう上限まで入っている
-            }
-            $cids = is_array($c->content_ids) ? array_map('strval', $c->content_ids) : [];
-            $diff = RookieDifficulty::ofProject($c, $map);
+            $room[$c->id] = $need - ($rows->pluck('staff_id')->unique()->count() + ($dispatch[$c->id] ?? 0));
+            $cap[$c->id] = self::capFor($c, $need) - $rows->filter(fn ($a) => isset($state[$a->staff_id]))->pluck('staff_id')->unique()->count();
+        }
+        $canGo = function (string $id, string $day, $c) use (&$state, &$room, &$cap, $avail) {
+            return $room[$c->id] > 0 && $cap[$c->id] > 0 && ! isset($state[$id]['busy'][$day])
+                && ! in_array($avail[$id.'|'.$day] ?? '', ['NG', '希望休'], true);
+        };
 
-            // 空きと上限の数だけ、1人ずつ選ぶ（選んだ人はその日もう入れない）。
-            for ($slot = 0; $slot < min($cap, $need - $filled); $slot++) {
-                $pick = self::pickOne($state, $day, $avail, $cids, $mustIds, $diff);
+        $out = [];
+        $put = function ($c, string $id, array $why, array $others) use (&$out, &$state, &$room, &$cap, $names, $map) {
+            $day = $c->start_date->format('Y-m-d');
+            $state[$id]['remain']--;
+            $state[$id]['busy'][$day] = true;
+            foreach ((array) $c->content_ids as $x) {
+                $state[$id]['fcDone'][(string) $x] = ($state[$id]['fcDone'][(string) $x] ?? 0) + 1;
+            }
+            $out[] = [
+                'date' => $day,
+                'projectId' => $c->id,
+                'name' => ProjectContentName::of($c, $names, (string) $c->project_name),
+                'client' => (string) ($c->client ?? ''),
+                'dayType' => (string) ($c->date_type ?? '本番'),
+                'difficulty' => RookieDifficulty::ofProject($c, $map),
+                'room' => $room[$c->id],
+                'rookie' => $state[$id]['person']->name,
+                'rookieId' => $id,
+                'why' => implode('・', $why),
+                'others' => $others,
+            ];
+            $room[$c->id]--;
+            $cap[$c->id]--;
+        };
+
+        $handled = [];
+        foreach ($cases as $c) {
+            $root = ProjectSeries::rootId($c);
+            if (isset($handled[$root])) {
+                continue;
+            }
+            $handled[$root] = true;
+            $group = $groups->get($root, collect([$c]));
+            // 選ぶ日＝本番（無ければいちばん早い日）。ただし今日から月末のうちの日。
+            // ⚠ 本番が満員なら、空きのあるほかの日（リハ等）から選ぶ。
+            $inMonth = $group->filter(fn ($g) => $cases->contains('id', $g->id) && $room[$g->id] > 0 && $cap[$g->id] > 0);
+            $lead = $inMonth->first(fn ($g) => ($g->date_type ?? '本番') === '本番') ?? $inMonth->first();
+            if ($lead === null) {
+                continue;
+            }
+            $others = $group->reject(fn ($g) => $g->id === $lead->id);
+            $leadDay = $lead->start_date->format('Y-m-d');
+            $cids = array_map('strval', (array) $lead->content_ids);
+            $diff = RookieDifficulty::ofProject($lead, $map);
+
+            while ($room[$lead->id] > 0 && $cap[$lead->id] > 0) {
+                $pick = self::pickOne($state, $leadDay, $avail, $cids, $mustIds, $diff);
                 if ($pick === null) {
                     break;
                 }
                 [$best, $cands] = $pick;
-                $state[$best['id']]['remain']--;
-                $state[$best['id']]['busy'][$day] = true;
-                foreach ($cids as $x) {
-                    $state[$best['id']]['fcDone'][$x] = ($state[$best['id']]['fcDone'][$x] ?? 0) + 1;
+                $id = $best['id'];
+                $sameDays = $others->filter(fn ($g) => $canGo($id, $g->start_date->format('Y-m-d'), $g));
+                $why = $best['why'];
+                if ($sameDays->isNotEmpty()) {
+                    $why[] = '同じイベントの'.$sameDays->map(fn ($g) => $g->start_date->format('n/j').'（'.($g->date_type ?? '本番').'）')->implode('・').'にも入る';
                 }
-
-                $out[] = [
-                    'date' => $day,
-                    'projectId' => $c->id,
-                    'name' => ProjectContentName::of($c, $names, (string) $c->project_name),
-                    'client' => (string) ($c->client ?? ''),
-                    'difficulty' => $diff,
-                    'room' => $need - $filled - $slot,
-                    'rookie' => $state[$best['id']]['person']->name,
-                    'rookieId' => $best['id'],
-                    'why' => implode('・', $best['why']),
-                    'others' => array_map(fn ($o) => $state[$o['id']]['person']->name, array_slice($cands, 1, 2)),
-                ];
+                $put($lead, $id, $why, array_map(fn ($o) => $state[$o['id']]['person']->name, array_slice($cands, 1, 2)));
+                foreach ($sameDays as $g) {
+                    $put($g, $id, ['同じイベントの'.$lead->start_date->format('n/j').'（'.($lead->date_type ?? '本番').'）と同じ人'], []);
+                }
             }
         }
+        usort($out, fn ($a, $b) => strcmp($a['date'], $b['date']) ?: strcmp($a['projectId'], $b['projectId']));
 
         return $out;
     }

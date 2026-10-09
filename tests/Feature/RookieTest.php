@@ -132,6 +132,34 @@ class RookieTest extends TestCase
         $this->assertCount(2, array_filter($picks, fn ($x) => $x['projectId'] === $big->id), '8名を超える案件は2人まで');
     }
 
+    /** 本番とリハ日・前日設営があるイベントは、出られる日は全部同じ新人（2026-10-09 baba）。 */
+    public function test_同じイベントの日は全部同じ新人(): void
+    {
+        $d1 = Carbon::today()->addDays(1);
+        $d2 = Carbon::today()->addDays(2);
+        if (! $d2->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        $rookie = PersonFactory::new()->create(['name' => '新人D', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+        $main = ProjectFactory::new()->create(['id' => 'P-MAIN', 'office' => '東京', 'start_date' => $d2->format('Y-m-d'),
+            'required_count' => 5, 'status' => '調整中', 'date_type' => '本番']);
+        $prep = ProjectFactory::new()->create(['id' => 'P-PREP', 'office' => '東京', 'start_date' => $d1->format('Y-m-d'),
+            'required_count' => 3, 'status' => '調整中', 'date_type' => '前日設営', 'parent_project_id' => 'P-MAIN']);
+        // 翌月の予備日（月の外でも同じイベントなら入れる）。
+        $spare = ProjectFactory::new()->create(['id' => 'P-SPARE', 'office' => '東京', 'start_date' => Carbon::today()->addMonth()->format('Y-m-d'),
+            'required_count' => 3, 'status' => '調整中', 'date_type' => '予備日', 'parent_project_id' => 'P-MAIN']);
+
+        $picks = RookieFcPlan::build(Carbon::today(), '東京')['picks'];
+        $this->assertEqualsCanonicalizing(['P-MAIN', 'P-PREP', 'P-SPARE'], array_column($picks, 'projectId'));
+        $this->assertSame(['新人D'], array_values(array_unique(array_column($picks, 'rookie'))));
+
+        // 前日設営の日が×なら、その日だけ外す。
+        ShiftPreference::create(['staff_id' => $rookie->id, 'period' => $d1->format('Y-m'), 'date' => $d1->format('Y-m-d'), 'availability' => 'NG']);
+        $picks = RookieFcPlan::build(Carbon::today(), '東京')['picks'];
+        $this->assertEqualsCanonicalizing(['P-MAIN', 'P-SPARE'], array_column($picks, 'projectId'));
+    }
+
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
     public function test_ARENA場所貸しは外す(): void
     {

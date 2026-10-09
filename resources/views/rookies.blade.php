@@ -143,7 +143,7 @@
 <div class="rk-card">
   <h3>👟 FCに入れる案（{{ $month->format('n月') }}・今日から月末まで）</h3>
   <p class="sub">運営人数に空きがある案件に、その月のFC目標に届いていない新人を当てた案です。
-    1案件に入れる新人は、ふつう1人・運営人数が8名を超える案件は2人・大型で12名以上なら空きの数まで。ARENA場所貸しには入れません。
+    1案件に入れる新人は、ふつう1人・運営人数が8名を超える案件は2人・大型で12名以上なら空きの数まで。ARENA場所貸しには入れません。本番とリハ日・前日設営・予備日があるイベントは、出られる日は全部同じ新人を入れます。
     その日すでに入っている人・出勤可能日が×／希望休の人は入れません。まだFCでやっていないコンテンツ（必修・推奨を優先）・難易度が低い・イベプラを優先します。</p>
   @if ($unlinked)
     <p class="rk-warn">⚠ 台帳につながっていない難易度の行が{{ $unlinked }}件あります（下の「難易度表」でつなぐと、難易度・必修が案に効きます）。</p>
@@ -153,7 +153,7 @@
     <tr><th>日付</th><th>案件</th><th>難易度</th><th>空き</th><th>新人</th><th>理由</th><th>ほかの候補</th></tr>
     @forelse ($picks as $p)
       <tr>
-        <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($p['date'])->format('n/j') }}</td>
+        <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($p['date'])->format('n/j') }}@if (($p['dayType'] ?? '本番') !== '本番')<div class="rk-small">{{ $p['dayType'] }}</div>@endif</td>
         <td><a href="/project-assign?project={{ $p['projectId'] }}">{{ $p['name'] }}</a><div class="rk-small">{{ $p['client'] }}</div></td>
         <td class="rk-num">{{ $p['difficulty'] ?? '—' }}</td>
         <td class="rk-num">{{ $p['room'] }}名</td>
