@@ -53,11 +53,21 @@ final class RookieFcPlan
             $busy = [];
             $monthEvents = 0;
             $monthD = 0;
+            $monthCases = [];   // この月に入っている案件（2026-10-09 baba「新人一覧で案件一覧が出るように」）
             foreach ($mine as $a) {
                 $date = Carbon::parse($a->date);
                 $busy[$date->format('Y-m-d')] = true;
                 $pr = $projects->get($a->project_id);
                 if ($date->isSameMonth($month)) {
+                    $monthCases[] = [
+                        'date' => $date->format('Y-m-d'),
+                        'projectId' => $a->project_id,
+                        'name' => $pr ? ProjectContentName::of($pr, $contentNames, (string) $pr->project_name) : $a->project_id,
+                        'client' => $pr ? (string) ($pr->client ?? '') : '',
+                        'dayType' => $pr ? (string) ($pr->date_type ?? '本番') : '',
+                        'role' => (string) ($a->role ?: '—'),
+                        'status' => (string) $a->status,
+                    ];
                     $monthEvents++;
                     if ($a->role === 'D') {
                         $monthD++;
@@ -123,6 +133,9 @@ final class RookieFcPlan
                 'monthFc' => $fcThisMonth,
                 'progress' => $progress,
                 'exp' => $exp,
+                'cases' => collect($monthCases)->sortBy('date')->values()->all(),
+                // アサインチャットに貼ってOJTに見てもらう文（2026-10-09 baba）。表や罫線は使わない。
+                'copyText' => self::copyText($p, $month, collect($monthCases)->sortBy('date')->values()->all()),
             ];
             $state[$p->id] = [
                 'person' => $p,
@@ -133,8 +146,42 @@ final class RookieFcPlan
             ];
         }
 
-        return ['rookies' => $out, 'picks' => self::picks($month, $office, $state, $map, $contentNames),
+        $picks = self::picks($month, $office, $state, $map, $contentNames);
+        // 案のとおりに入れたら何件になるか（2026-10-09 baba）。数えるのはこの月の日だけ（月の外の同じイベントの日は別）。
+        foreach ($out as &$r) {
+            $mine = array_filter($picks, fn ($x) => $x['rookieId'] === $r['id']);
+            $r['pickInMonth'] = count(array_filter($mine, fn ($x) => Carbon::parse($x['date'])->isSameMonth($month)));
+            $r['pickOutside'] = count($mine) - $r['pickInMonth'];
+            $r['afterFc'] = $r['monthFc'] + $r['pickInMonth'];
+        }
+        unset($r);
+
+        return ['rookies' => $out, 'picks' => $picks,
             'unlinked' => ContentDifficulty::whereNull('content_id')->count()];
+    }
+
+    /**
+     * 新人の「この月の案件」を、アサインチャットに貼る文にする（2026-10-09 baba「コピペしてOJTに見てもらいたい」）。
+     * 例：【新人】大霜 知弘（OJT：◯◯）10月の案件 3件
+     *     10/12(土) 戦国運動会／株式会社◯◯　FC（仮）
+     */
+    private static function copyText(Person $p, Carbon $month, array $cases): string
+    {
+        $ojt = $p->rookie_ojt_id ? (string) Person::whereKey($p->rookie_ojt_id)->value('name') : '';
+        $week = ['日', '月', '火', '水', '木', '金', '土'];
+        $lines = ['【新人】'.$p->name.($ojt !== '' ? '（OJT：'.$ojt.'）' : '').' '.$month->format('n月').'の案件 '.count($cases).'件'];
+        foreach ($cases as $c) {
+            $d = Carbon::parse($c['date']);
+            $lines[] = $d->format('n/j').'('.$week[$d->dayOfWeek].') '.$c['name']
+                .($c['client'] !== '' ? '／'.$c['client'] : '')
+                .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')
+                .'　'.$c['role'].'（'.$c['status'].'）';
+        }
+        if (! $cases) {
+            $lines[] = '（まだ入っていません）';
+        }
+
+        return implode("\n", $lines);
     }
 
     /** 手で直した印を当てる（done＝やった／none＝やっていない）。 */

@@ -189,6 +189,32 @@ class RookieTest extends TestCase
         $this->assertStringContainsString('function rkAssign(rows)', $this->actingAsPerson($me)->get('/rookies')->getContent());
     }
 
+    /** 新人ごとの月の案件一覧・コピー用の文・案のとおり入れたら何件か（2026-10-09 baba）。 */
+    public function test_案件一覧とコピーと入れたら何件(): void
+    {
+        $d1 = Carbon::today()->addDays(1);
+        $d2 = Carbon::today()->addDays(2);
+        if (! $d2->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        $ojt = PersonFactory::new()->create(['name' => '先輩OJT', 'role' => 'employee', 'office' => '東京']);
+        $rookie = PersonFactory::new()->create(['name' => '新人F', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'rookie_ojt_id' => $ojt->id]);
+        $done = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $d1->format('Y-m-d'), 'required_count' => 1,
+            'status' => '調整中', 'project_name' => '水合戦', 'content_names' => ['水合戦'], 'client' => 'A社']);
+        Assignment::create(['project_id' => $done->id, 'staff_id' => $rookie->id, 'role' => 'FC', 'status' => '仮', 'date' => $d1->format('Y-m-d')]);
+        ProjectFactory::new()->create(['office' => '東京', 'start_date' => $d2->format('Y-m-d'), 'required_count' => 5, 'status' => '調整中']);
+
+        $r = collect(RookieFcPlan::build(Carbon::today(), '東京')['rookies'])->firstWhere('id', $rookie->id);
+        $this->assertCount(1, $r['cases']);
+        $this->assertSame('水合戦', $r['cases'][0]['name']);
+        $this->assertStringContainsString('【新人】新人F（OJT：先輩OJT）', $r['copyText']);
+        $this->assertStringContainsString('水合戦／A社　FC（仮）', $r['copyText']);
+        $this->assertSame(1, $r['monthFc']);
+        $this->assertSame(1, $r['pickInMonth']);
+        $this->assertSame(2, $r['afterFc'], 'いま1件＋案1件');
+    }
+
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
     public function test_ARENA場所貸しは外す(): void
     {

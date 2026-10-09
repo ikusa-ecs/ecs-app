@@ -36,7 +36,7 @@
 @endif
 
 <p class="rk-intro">
-  新人ごとの進み具合と、<b>FCに入れる案</b>を出します（案は見るだけ・ここからは保存しません。入れるときは日別ボードやアサイン画面で）。
+  新人ごとの進み具合と、<b>FCに入れる案</b>を出します（よければ「入れる」でFC・仮のアサインになります）。
   Dは今までどおりD決め画面で決めてください。「D準備OK」＝FCではやったがDはまだのコンテンツです。
 </p>
 
@@ -98,6 +98,29 @@
       </tr>
       <tr>
         <td colspan="8" style="border-top:0; padding-top:0;">
+          {{-- この月に入っている案件（2026-10-09 baba「新人一覧で案件一覧が出るようにしてほしい」）。 --}}
+          <details class="rk-exp">
+            <summary class="rk-small" style="cursor:pointer;">📋 {{ $month->format('n月') }}の案件（{{ count($r['cases']) }}件）</summary>
+            <div class="rk-bar" style="margin:6px 0;">
+              <textarea class="rk-in rk-copy" readonly rows="{{ min(8, count($r['cases']) + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
+              <button class="rk-btn" type="button" onclick="rkCopy(this)" title="アサインチャットに貼って、OJTに見てもらう文をコピーします">📋 コピー</button><span class="rk-small rk-copied"></span>
+            </div>
+            @if ($r['cases'])
+              <table class="rk" style="max-width:720px;">
+                <tr><th>日付</th><th>案件</th><th>役割</th><th>状態</th></tr>
+                @foreach ($r['cases'] as $cs)
+                  <tr>
+                    <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($cs['date'])->format('n/j') }}@if ($cs['dayType'] && $cs['dayType'] !== '本番')<div class="rk-small">{{ $cs['dayType'] }}</div>@endif</td>
+                    <td><a href="/project-assign?project={{ $cs['projectId'] }}">{{ $cs['name'] }}</a><div class="rk-small">{{ $cs['client'] }}</div></td>
+                    <td>{{ $cs['role'] }}</td>
+                    <td>{{ $cs['status'] }}</td>
+                  </tr>
+                @endforeach
+              </table>
+            @else
+              <p class="rk-small">この月はまだ入っていません。</p>
+            @endif
+          </details>
           <details class="rk-exp">
             <summary class="rk-small" style="cursor:pointer;">📒 経験を見る・手で直す（{{ count($r['exp']) }}件）</summary>
             <p class="rk-small">「自動」＝アサインから数えた回数（開催済みだけ）。大型で受付だった、など実は経験していないときは「やっていない」、アサインに残っていないが経験したときは「やった」にしてください。</p>
@@ -147,6 +170,32 @@
     その日すでに入っている人・出勤可能日が×／希望休の人は入れません。まだFCでやっていないコンテンツ（必修・推奨を優先）・難易度が低い・イベプラを優先します。</p>
   @if ($unlinked)
     <p class="rk-warn">⚠ 台帳につながっていない難易度の行が{{ $unlinked }}件あります（下の「難易度表」でつなぐと、難易度・必修が案に効きます）。</p>
+  @endif
+  {{-- 案のとおりに入れたら何件になるか（2026-10-09 baba）。この月の日だけ数える。 --}}
+  @if ($picks)
+    <div class="rk-wrap" style="margin-bottom:12px;">
+    <table class="rk" style="max-width:620px;">
+      <tr><th>新人</th><th>いまのFC</th><th>案</th><th>入れたら</th><th>FC目標</th></tr>
+      @foreach ($rookies as $r)
+        @if ($r['pickInMonth'] || $r['pickOutside'])
+          <tr>
+            <td><b>{{ $r['name'] }}</b></td>
+            <td class="rk-num">{{ $r['monthFc'] }}件</td>
+            <td class="rk-num">＋{{ $r['pickInMonth'] }}件@if ($r['pickOutside'])<div class="rk-small">（ほかの月にも{{ $r['pickOutside'] }}件）</div>@endif</td>
+            <td class="rk-num"><b>{{ $r['afterFc'] }}件</b></td>
+            <td class="rk-num">
+              @if ($r['target'])
+                {{ $r['target']['fc'] }}件
+                <span class="{{ $r['afterFc'] < $r['target']['fc'] ? 'rk-short' : 'rk-okc' }}">{{ $r['afterFc'] < $r['target']['fc'] ? 'あと'.($r['target']['fc'] - $r['afterFc']) : '達成' }}</span>
+              @else
+                —
+              @endif
+            </td>
+          </tr>
+        @endif
+      @endforeach
+    </table>
+    </div>
   @endif
   <div class="rk-wrap">
   <table class="rk">
@@ -260,6 +309,18 @@
   // FCの案を実際にアサインする（2026-10-09 baba「案件でOKってなったらアサイン入るようにしたい」）。
   // ⚠ 入口は日別ボードなどと同じ /entries/assign（誰がアサインされているかの正本は assignments ひとつ）。
   //   FC・仮で入れる。1件ずつ順に送り、終わったら読み込み直して表を作り直す（入れた人は案から消える）。
+  // 新人の案件一覧をコピー（アサインチャットに貼ってOJTに見てもらう・2026-10-09 baba）。
+  // 文はサーバーが作ったもの（RookieFcPlan::copyText）をそのまま使う＝画面で組み立てない。
+  function rkCopy(btn) {
+    var box = btn.parentNode.querySelector('.rk-copy');
+    var mark = btn.parentNode.querySelector('.rk-copied');
+    var done = function () { if (mark) mark.textContent = ' ✓ コピーしました'; };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(box.value).then(done, function () { box.select(); document.execCommand('copy'); done(); });
+    } else {
+      box.select(); document.execCommand('copy'); done();
+    }
+  }
   function rkCheckAll(box) {
     document.querySelectorAll('.rk-pick-cb').forEach(function (cb) { cb.checked = box.checked; });
   }
