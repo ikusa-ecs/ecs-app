@@ -8,6 +8,7 @@ use App\Models\ProjectShare;
 use App\Support\OfficeCounts;
 use App\Support\OfficePublish;
 use App\Support\OfficeScope;
+use App\Support\RecentWindow;
 use App\Support\OfficeSettings;
 use App\Support\ShareTags;
 use App\Support\ProjectAccess;
@@ -45,8 +46,9 @@ class AssignPublishController extends Controller
         //   ⚠ 消すのはこの画面と日別ボードだけ。案件一覧には残す＝「解除」の入口が要るため。
         //   ⚠ 2026-09-30 から公開は拠点ごと（OfficePublish）。巻き取りでも「登録した拠点からも人を出す」なら、
         //     登録した拠点の公開ボードにも出す（その拠点のスタッフにだけ公開できる）。
+        // ⚠ 2026-10-09：3か月より前は読まない（アーカイブのタブは3か月ぶん・それより前は /past-projects）。
         $cases = OfficeScope::hideTakenOver(
-            OfficeScope::applyToProjects(Project::query(), $office),
+            RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office)),
             $office,
             true
         )

@@ -53,6 +53,7 @@ class CountDeadlineReminderService
         $employeeNames = Person::employees()->pluck('name', 'id');
         $directorByProject = Assignment::where('role', 'D')
             ->where('status', '!=', 'キャンセル')
+            ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))   // 3か月より前は使わない（2026-10-09）
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
             ->map(fn ($rows) => $employeeNames[$rows->first()->staff_id] ?? null);
@@ -61,7 +62,8 @@ class CountDeadlineReminderService
         $sentKeys = CountDeadlineReminderLog::pluck('dedup_key')->flip();
 
         $cases = [];
-        $projects = Project::orderBy('start_date')->get();
+        // ⚠ 3か月より前は読まない（対象は2週間先の案件だけ・過去の取込で何千件にもなるため）。
+        $projects = RecentWindow::apply(Project::query())->orderBy('start_date')->get();
         foreach ($projects as $p) {
             // アーカイブ・下書きは対象外
             if (in_array($p->status, ['完了', '下書き'], true)) {

@@ -55,12 +55,30 @@ class PersonalCases
         ];
     }
 
-    /** 全案件を cases.js と同じ形に詰め替えて返す。 */
-    public static function cases(Carbon $today): Collection
+    /**
+     * 案件を cases.js と同じ形に詰め替えて返す。
+     *
+     * ⚠ 2026-10-09：全部の案件は読まない（過去のアサイン表の取込で何千件にもなるため）。
+     *   ふだんは3か月より前を外す（範囲の正本＝RecentWindow）。
+     *   $me を渡すと（マイページ）、古くても**自分が入った案件**と**営業担当が入っている案件**は残す
+     *   ＝マイページの「自分の履歴」を消さないため（過去の取込の案件には営業担当が入っていない）。
+     */
+    public static function cases(Carbon $today, ?Person $me = null): Collection
     {
         $contentNames = Content::pluck('content_name', 'id');
 
+        $myIds = $me ? array_keys(self::myAssign($me)) : [];
+
         return Project::with(['director:id,name'])
+            ->where(function ($q) use ($me, $myIds) {
+                RecentWindow::apply($q);
+                if ($me) {
+                    if ($myIds) {
+                        $q->orWhereIn('id', $myIds);
+                    }
+                    $q->orWhere(fn ($w) => $w->whereNotNull('sales_owners')->whereNotIn('sales_owners', ['[]', '']));
+                }
+            })
             ->orderBy('start_date')
             ->get()
             ->map(fn (Project $p) => self::toCase($p, $today, $contentNames))

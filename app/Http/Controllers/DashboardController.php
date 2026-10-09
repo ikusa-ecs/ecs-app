@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Support\DangerDays;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
+use App\Support\RecentWindow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -38,7 +39,8 @@ class DashboardController extends Controller
 
         // cases.js と同じ項目名に詰め替える（既存の表示JSをそのまま動かすため）。
         // KPI とカレンダーが使う項目だけに絞る：off / scale / fmt / need / name / 下書き・完了。
-        $cases = OfficeScope::applyToProjects(Project::query(), $office)
+        // ⚠ 2026-10-09：3か月より前は読まない（過去の取込は「確定」で入るので、完了で外す仕組みでは落ちない）。
+        $cases = RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))
             ->orderBy('start_date')
             ->get()
             ->map(function (Project $p) use ($today) {

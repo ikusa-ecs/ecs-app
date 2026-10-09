@@ -38,7 +38,7 @@ class MyPageController extends Controller
 
         return view('mypage', [
             'me' => PersonalCases::meInfo($me),
-            'cases' => PersonalCases::cases($today),
+            'cases' => PersonalCases::cases($today, $me),
             'myAssign' => PersonalCases::myAssign($me),
             'notify' => $notify,
         ]);

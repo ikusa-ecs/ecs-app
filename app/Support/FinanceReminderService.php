@@ -50,6 +50,7 @@ class FinanceReminderService
         // 案件ごとのD（キャンセル除く）。
         $directorByProject = Assignment::where('role', 'D')
             ->where('status', '!=', 'キャンセル')
+            ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))   // 3か月より前は使わない（2026-10-09）
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
             ->map(fn ($rows) => $employeeNames[$rows->first()->staff_id] ?? null);
@@ -60,7 +61,8 @@ class FinanceReminderService
         $sentKeys = FinanceReminderLog::pluck('dedup_key')->flip();
 
         $cases = [];
-        foreach (Project::orderBy('start_date')->get() as $p) {
+        // ⚠ 3か月より前は読まない（さかのぼるのは LOOKBACK_DAYS＝60日だけ・過去の取込で何千件にもなるため）。
+        foreach (RecentWindow::apply(Project::query())->orderBy('start_date')->get() as $p) {
             // 下書きは対象外。キャンセルも催促しない（収支が発生しないため）。
             if (in_array($p->status, ['下書き', 'キャンセル'], true)) {
                 continue;

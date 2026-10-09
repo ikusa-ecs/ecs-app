@@ -40,9 +40,12 @@ class BroadcastListController extends Controller
         $today = Carbon::today();
 
         // 候補をざっくり引く（ARENAはJSONの中を見ないと分からないのでSQLでは落とさない）。
+        // ⚠ 2026-10-09：「過去も」を選んでいないときは、今日より前をDBから読まない（下の filter と同じ範囲）。
         $projects = BroadcastKind::candidates(
             OfficeScope::applyToProjects(Project::query(), $office)
         )
+            ->when(! $withPast, fn ($q) => $q->where(fn ($w) => $w->whereNull('start_date')
+                ->orWhereDate('start_date', '>=', $today->format('Y-m-d'))))
             ->orderBy('start_date')
             ->get()
             // ここが本当のふるい。⚠ 判定は BroadcastKind の1か所だけ。

@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\RecentWindow;
 use App\Support\AssignmentStamp;
 use App\Support\DispatchRows;
 use App\Support\EntryFeed;
@@ -449,6 +450,11 @@ class AssignBoardController extends Controller
             true
         )
             ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
+            // ⚠ 2026-10-09：並べる期間（基準日〜BOARD_DAYS日先）だけをDBから読む（過去の取込で何千件にもなるため）。
+            //   下の filter と同じ範囲＝表示は変わらない。
+            ->whereNotNull('start_date')
+            ->whereDate('start_date', '>=', $anchor->format('Y-m-d'))
+            ->whereDate('start_date', '<=', $anchor->copy()->addDays(self::BOARD_DAYS)->format('Y-m-d'))
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
@@ -852,7 +858,8 @@ class AssignBoardController extends Controller
         //   向こうのスタッフは、向こうの拠点で見たときに出る（案件はヘルプで向こうの一覧にも出ている）。
         //   ※ すでにこの案件に入っている人は、他拠点でも出す（誰が入っているか分からなくなるため）。
         //   ※ 全拠点で見ているときは全員出す。拠点の見分けの正本＝OfficeScope::personIn。
-        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+        // ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
+        $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))
             ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
@@ -1045,11 +1052,24 @@ class AssignBoardController extends Controller
 
         // 拠点で絞るのは「案件」だけ。候補者＝応募者∪現メンバー＝その案件に紐づく人なので、
         // 他拠点の人でもそのまま出す（メンバーが消えると保存＝上書きで担当が外れてしまう）。
-        $projects = OfficeScope::applyToProjects(Project::with('director:id,name'), $office)
+        // ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
+        $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::with('director:id,name'), $office))
             ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));
+
+        // ⚠ リハ・予備日の「↳ 本番：◯◯」は、つながる本番を一覧の中から探す（pickup.blade の getCase）。
+        //   本番が3か月より前だと読まれず空になるので、つながる本番だけは古くても足す
+        //   （過去なので画面ではアーカイブ扱いで隠れる＝並びは変わらない）。
+        $missingParents = $projects->pluck('parent_project_id')->filter()->unique()
+            ->diff($projects->pluck('id'))->values();
+        if ($missingParents->isNotEmpty()) {
+            $projects = $projects->concat(
+                Project::with('director:id,name')->whereIn('id', $missingParents->all())->get()
+                    ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))
+            )->values();
+        }
 
         if ($projects->isEmpty()) {
             return collect();

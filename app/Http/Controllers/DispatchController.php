@@ -44,7 +44,10 @@ class DispatchController extends Controller
         }
 
         // 拠点で絞るのは案件（＝派遣は案件にぶら下がるもの）。
+        // ⚠ 2026-10-09：派遣を頼んだ案件だけ読む（全部の案件を読むと、過去の取込で何千件にもなるため）。
+        //   派遣はECSの日別ボードからしか入らないので件数は少ない＝「過去も」のときも軽いまま。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->whereIn('id', ProjectDispatch::query()->select('project_id'))
             ->get()
             ->keyBy('id');
 

@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\OfficeScope;
+use App\Support\RecentWindow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,13 +40,15 @@ class AssignDashboardController extends Controller
 
         // 案件ごとの「決まっている人数」＝assignments のうちキャンセル以外の実人数（同じ人が
         // 複数日に出ても1人と数える）。案件IDごとに一度だけ集計して引けるようにする。
+        // ⚠ 3か月より前のアサインは読まない（この画面で使うのはこれからの案件だけ・過去の取込で何万行にもなる）。
         $filledByProject = Assignment::where('status', '!=', 'キャンセル')
+            ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))
             ->select('project_id', DB::raw('COUNT(DISTINCT staff_id) AS cnt'))
             ->groupBy('project_id')
             ->pluck('cnt', 'project_id');
 
         // 案件ID → date_type（本番/予備日/リハ等）。稼働率は本番のみ数えるため。
-        $projectType = Project::pluck('date_type', 'id');
+        $projectType = RecentWindow::apply(Project::query())->pluck('date_type', 'id');
 
         // ── アサインが必要な案件（未着手・調整中・これから先の開催）──────────────
         $needProjects = OfficeScope::applyToProjects(
@@ -85,10 +88,14 @@ class AssignDashboardController extends Controller
 
         // ── 数値サマリ：募集中の案件 ──────────────────────────────────────
         // 募集中＝スタッフに公開中（staff_published=ON）。うち「未確定」＝決定人数<必要人数。
+        // ⚠ 2026-10-09：**これからの案件だけ**数える。過去の取込は「公開ずみ」で入るので、
+        //   開催日で切らないと終わった案件が全部「募集中」に数えられる。
         $published = OfficeScope::applyToProjects(
             Project::where('staff_published', true)->notCancelled()->needsAssign(),
             $office
-        )->get();
+        )
+            ->where(fn ($q) => $q->whereNull('start_date')->orWhereDate('start_date', '>=', $today->format('Y-m-d')))
+            ->get();
         $recruitCount = $published->count();
         $recruitUndecided = $published->filter(function (Project $p) use ($filledByProject) {
             $need = (int) $p->required_count;
@@ -116,7 +123,9 @@ class AssignDashboardController extends Controller
 
         // ── 数値サマリ：希望0件 ＆ 平均稼働率 ＆ 要注意スタッフ ──────────────
         // 稼働状況画面と同じ定義：稼働率＝今月の本番アサイン数 ÷ 対象月の希望日数（希望0件は対象外）。
-        $assignsByStaff = Assignment::all()->groupBy('staff_id');
+        // 今月のぶんだけ読む（使うのは今月の本番アサイン数だけ）。
+        $assignsByStaff = Assignment::whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
+            ->get()->groupBy('staff_id');
         $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
 
         $rates = [];
@@ -160,10 +169,11 @@ class AssignDashboardController extends Controller
         // ── 直近の確定アサイン（確定したものを案件ごとにまとめ、確定日時の新しい順）──────
         // ⚠ 拠点で絞るときは「その拠点の案件のアサイン」だけを見る。
         $officeProjectIds = $office
-            ? OfficeScope::applyToProjects(Project::query(), $office)->pluck('id')->all()
+            ? RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))->pluck('id')->all()
             : null;
 
         $confirmedByProject = Assignment::where('status', '確定')
+            ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))
             ->when($officeProjectIds !== null, fn ($q) => $q->whereIn('project_id', $officeProjectIds))
             ->get()
             ->groupBy('project_id')
@@ -250,7 +260,9 @@ class AssignDashboardController extends Controller
         $today = Carbon::today();
 
         // index() と同じ「決まっている人数」（キャンセル以外の実人数）を案件IDごとに集計。
+        // ⚠ 3か月より前のアサインは読まない（この画面で使うのはこれからの案件だけ・過去の取込で何万行にもなる）。
         $filledByProject = Assignment::where('status', '!=', 'キャンセル')
+            ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))
             ->select('project_id', DB::raw('COUNT(DISTINCT staff_id) AS cnt'))
             ->groupBy('project_id')
             ->pluck('cnt', 'project_id');

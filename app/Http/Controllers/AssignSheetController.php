@@ -73,19 +73,16 @@ class AssignSheetController extends Controller
 
         // 対象になり得る案件＝完了/下書き以外で、開催日がある案件。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有（ヘルプ/巻き取り）された案件」も含める。
-        $projects = OfficeScope::applyToProjects(
-            Project::with(['director:id,name', 'goodsOwner:id,name']),
-            $officeScope
-        )
+        // ⚠ 2026-10-09：中身を読むのは**選んだ月だけ**（過去のアサイン表の取込で何千件にもなるため）。
+        //   月の選択肢は開催日だけ読んで作る＝過去の月も選べるまま。
+        $base = fn () => OfficeScope::applyToProjects(Project::query(), $officeScope)
             ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
-            ->orderBy('start_date')
-            ->get()
-            ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
-            ->values();
+            ->whereNotNull('start_date')
+            ->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['完了', '下書き']));
 
         // 月の選択肢（案件のある年月だけ）。value='2026-07' / label='2026年7月'。
-        $months = $projects
-            ->map(fn (Project $p) => $p->start_date->format('Y-m'))
+        $months = $base()->pluck('start_date')
+            ->map(fn ($d) => Carbon::parse($d)->format('Y-m'))
             ->unique()
             ->sort()
             ->values()
@@ -107,8 +104,12 @@ class AssignSheetController extends Controller
         }
 
         // 選んだ月の案件だけに絞る。
-        $monthProjects = $projects
-            ->filter(fn (Project $p) => $p->start_date->format('Y-m') === $selectedMonth)
+        $monthFrom = Carbon::createFromFormat('Y-m-d', $selectedMonth.'-01')->startOfDay();
+        $monthProjects = $base()->with(['director:id,name', 'goodsOwner:id,name'])
+            ->whereDate('start_date', '>=', $monthFrom->format('Y-m-d'))
+            ->whereDate('start_date', '<=', $monthFrom->copy()->endOfMonth()->format('Y-m-d'))
+            ->orderBy('start_date')
+            ->get()
             ->values();
 
         // メンバー（assignments・キャンセル除く）をまとめて引く。

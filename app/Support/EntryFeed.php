@@ -54,7 +54,8 @@ class EntryFeed
     public static function build(?string $office, bool $onlyExtra = false, bool $onlyNew = false, int $days = self::DEFAULT_DAYS): array
     {
         // 拠点で絞るのは案件と、応募したスタッフの両方（スタッフの絞り込みは下＝2026-10-07 baba要望）。
-        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+        // ⚠ 2026-10-09：3か月より前の案件は読まない（範囲の正本＝RecentWindow・過去の取込で何千件にもなるため）。
+        $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))
             ->notCancelled()->needsAssign()   // キャンセルになった案件は出さない（2026-08-26）
             ->get()
             ->keyBy('id');

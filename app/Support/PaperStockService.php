@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  *   ・必要枚数＝ceil(チーム数) × コンテンツの sheets_per_team（基本1枚）。
  *   ・開催日が今日以降＝「必要数(今後)」、過去＝「消費数(開催済み)」に振り分け。
  *   ・オンライン開催は紙が要らないので除外。下書きは対象外。
+ *   ・開催済みの消費は、そのコンテンツの入庫数を**はじめて保存した日**以降の案件だけ数える（2026-10-09）。
  */
 class PaperStockService
 {
@@ -49,7 +50,17 @@ class PaperStockService
             ->keyBy('id');
 
         // 入庫数（手入力）を content_id で引けるように
-        $received = ContentPaperStock::pluck('received_count', 'content_id');
+        $stockRows = ContentPaperStock::get(['content_id', 'received_count', 'created_at']);
+        $received = $stockRows->pluck('received_count', 'content_id');
+
+        // 消費を数えはじめる日＝そのコンテンツの入庫数を**はじめて保存した日**（2026-10-09 baba決定）。
+        // ⚠ 過去のアサイン表（2023年〜）を取り込むと、昔の案件の消費まで引かれて在庫が大きく減って見えるため。
+        //   入庫数をまだ入れていないコンテンツは「今日から」＝開催済みの消費を引かない。
+        $countFrom = [];
+        foreach ($stockRows as $r) {
+            $countFrom[(string) $r->content_id] = $r->created_at ? $r->created_at->copy()->startOfDay() : $today;
+        }
+        $earliest = $countFrom ? min($countFrom) : $today;
 
         // 集計の入れ物
         $stock = [];            // [cid] => ['future'=>, 'past'=>]
@@ -64,7 +75,9 @@ class PaperStockService
         //   入庫数は content_paper_stocks に**コンテンツごとに1行**しか持っておらず、
         //   紙そのものを拠点で分けて管理していないため、入庫・在庫は常に全社の数字になる。
         //   （画面側で、拠点を選んでいるときは在庫の列を出さないようにしてある）
+        // ⚠ 数えはじめる日より前の案件は読まない（過去の取込で何千件にもなるため）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
+            ->where(fn ($q) => $q->whereNull('start_date')->orWhereDate('start_date', '>=', $earliest->format('Y-m-d')))
             ->orderBy('start_date')->get();
         foreach ($projects as $p) {
             if ($p->status === '下書き') {
@@ -101,6 +114,10 @@ class PaperStockService
             foreach ($cids as $cid) {
                 if (! isset($paperContents[$cid])) {
                     continue;   // 紙が要らないコンテンツは対象外
+                }
+                // 開催済みでも、そのコンテンツの数えはじめる日より前なら数えない（明細にも出さない）。
+                if (! $isFuture && $ev && $ev->lt($countFrom[(string) $cid] ?? $today)) {
+                    continue;
                 }
                 $c = $paperContents[$cid];
                 $perTeam = max(1, (int) ($c->sheets_per_team ?? 1));

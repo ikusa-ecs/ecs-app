@@ -52,8 +52,18 @@ class PaperStockServiceTest extends TestCase
             'format' => '対面',
         ]);
 
-        // 入庫 15枚（手入力）。
-        ContentPaperStock::create(['content_id' => 'CT-P01', 'received_count' => 15]);
+        // 入庫 15枚（手入力）。入れはじめたのは30日前＝10日前の案件の消費は数える。
+        $s = ContentPaperStock::create(['content_id' => 'CT-P01', 'received_count' => 15]);
+        $s->forceFill(['created_at' => now()->subDays(30)])->save();
+
+        // 入れはじめる前（60日前）の案件は消費に数えない（2026-10-09 過去の取込で在庫が減って見えないように）。
+        ProjectFactory::new()->create([
+            'content_ids' => ['CT-P01'],
+            'start_date' => now()->subDays(60)->format('Y-m-d'),
+            'team_count' => 50,
+            'status' => '確定',
+            'format' => '対面',
+        ]);
 
         $result = (new PaperStockService())->compute();
         $row = collect($result['stock'])->firstWhere('id', 'CT-P01');

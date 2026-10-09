@@ -18,6 +18,7 @@ use App\Support\Headcount;
 use App\Support\ImportContents;
 use App\Support\OfficeOptions;
 use App\Support\OfficeScope;
+use App\Support\RecentWindow;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
@@ -62,10 +63,12 @@ class ProjectController extends Controller
 
         // ディレクター・SD・物品担当の名前は people を一緒に読む（毎回引かないようにする）。
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」も含める（アサイン表と同じ）。
-        $projects = OfficeScope::applyToProjects(
+        // ⚠ 2026-10-09：**3か月より前の案件は読まない**（過去のアサイン表の取込で何千件にもなるため）。
+        //   それより前は「🗂 過去案件」（/past-projects）で月ごとに見る。範囲の正本＝RecentWindow。
+        $projects = RecentWindow::apply(OfficeScope::applyToProjects(
             Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name']),
             $officeScope
-        )
+        ))
             ->orderBy('start_date')
             ->get();
 
@@ -208,13 +211,16 @@ class ProjectController extends Controller
 
         // リピート（常連）クライアント＝同じクライアント名で案件が2件以上あるお客様。
         // クライアント名（前後空白は落とす）→ true の連想にして渡す（一覧でバッジ＋履歴リンクに使う）。
-        $repeatClients = $projects
-            ->map(fn (Project $p) => trim((string) $p->client))
-            ->filter(fn ($c) => $c !== '')
-            ->countBy()
-            ->filter(fn ($n) => $n >= 2)
-            ->keys()
-            ->mapWithKeys(fn ($c) => [$c => true])
+        // ⚠ 一覧は3か月ぶんしか読まないので、リピートの判定は**過去も含めて**DBで数える
+        //   （読んだ案件だけで数えると、昔からの常連にバッジが付かなくなる）。
+        $repeatClients = OfficeScope::applyToProjects(Project::query(), $officeScope)
+            ->whereNotNull('client')
+            ->selectRaw('TRIM(client) AS c, COUNT(*) AS n')
+            ->groupByRaw('TRIM(client)')
+            ->havingRaw('COUNT(*) >= 2')
+            ->pluck('c')
+            ->filter(fn ($c) => (string) $c !== '')
+            ->mapWithKeys(fn ($c) => [(string) $c => true])
             ->all();
 
         // 詳細のプルダウン（D／SD／物品担当）に出す「本物の社員一覧」。
@@ -401,8 +407,19 @@ class ProjectController extends Controller
 
         // 「紐づく本番案件」の選択肢＝本物の本番案件（date_type=本番）。新規でも編集でも渡す。
         // 自分自身は除く（予備日が自分を親にしないように）。
+        // ⚠ 3か月より前の本番は出さない（過去の取込で何千件にもなる）。ただし、いまつながっている本番は
+        //   古くても必ず残す＝選択肢から消えると、保存したときにつながりが外れてしまう。
+        $keepParentId = $projectId ? Project::whereKey($projectId)->value('parent_project_id') : null;
+        $copyId = (string) $request->query('copy', '');
+        $keepParentId = $keepParentId ?: ($copyId !== '' ? Project::whereKey($copyId)->value('parent_project_id') : null);
         $parentProjects = Project::where('date_type', '本番')
             ->when($projectId, fn ($q) => $q->where('id', '!=', $projectId))
+            ->where(function ($q) use ($keepParentId) {
+                RecentWindow::apply($q);
+                if ($keepParentId) {
+                    $q->orWhere('id', $keepParentId);
+                }
+            })
             ->orderBy('start_date')
             ->get()
             ->map(function (Project $p) {

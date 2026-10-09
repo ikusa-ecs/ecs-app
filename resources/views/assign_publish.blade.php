@@ -438,6 +438,8 @@
       <div class="view-tabs">
         <button class="view-tab active" id="tab-active"  onclick="setView('active')">スタッフ公開ボード<span class="vt-count" id="cntActive"></span></button>
         <button class="view-tab"        id="tab-archive" onclick="setView('archive')">🗄 アーカイブ（過去）<span class="vt-count" id="cntArchive"></span></button>
+        <!-- 2026-10-09：アーカイブは3か月前まで。それより前は過去案件の画面で見る（この画面を重くしないため）。 -->
+        <a class="view-tab" href="/past-projects" style="margin-left:auto; text-decoration:none;">🗂 3か月より前は「過去案件」へ</a>
       </div>
 
       <!-- 日付を押すとその日の案件へ飛ぶ（2026-09-08 baba要望「公開ボードも日付で飛べるように」）。

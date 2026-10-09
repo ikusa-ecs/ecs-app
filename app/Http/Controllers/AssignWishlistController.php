@@ -53,14 +53,20 @@ class AssignWishlistController extends Controller
         $monthEnd = $month->copy()->endOfMonth();
 
         // 案件ID → date_type（本番のみ数えるため）。
-        $projectType = Project::pluck('date_type', 'id');
+        // ⚠ 2026-10-09：使うのは対象月のぶんだけ＝その月の案件・アサインだけ読む（過去の取込で何万行にもなるため）。
+        $projectType = Project::whereNotNull('start_date')
+            ->whereDate('start_date', '>=', $monthStart->copy()->subMonth()->format('Y-m-d'))
+            ->whereDate('start_date', '<=', $monthEnd->format('Y-m-d'))
+            ->pluck('date_type', 'id');
 
         // 「希望数」＝その月に入れる枠の数。⚠ 数え方の正本は App\Support\WishCount 1か所だけ。
         //   ここで数え直すと、月まとめ自動アサインの充足率と食い違う（実際に食い違っていた）。
         $wishCount = WishCount::forMonth($period);
 
         // スタッフごとに一度だけ材料を引いておく（人数分のクエリを避ける）。
-        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
+        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')
+            ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
+            ->get()->groupBy('staff_id');
         $posByStaff = StaffRoleEligibility::all()->groupBy('staff_id');
 
         // 拠点で絞る（2026-09-15 baba要望＝この画面だけ切替が無かった）。既定＝自分の拠点。

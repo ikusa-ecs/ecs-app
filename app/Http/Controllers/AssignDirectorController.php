@@ -8,6 +8,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\RecentWindow;
 use App\Support\AssignSlots;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
@@ -47,7 +48,8 @@ class AssignDirectorController extends Controller
 
         // この画面に出す案件＝完了/下書き以外。拠点で絞るときは「登録拠点」＋「共有された案件」。
         // ※ 先に案件を確定させてから、その案件のD/SD/FCだけを引く（他拠点の分まで数えない）。
-        $projects = OfficeScope::applyToProjects(Project::query(), $officeScope)
+        // ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
+        $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $officeScope))
             ->notCancelled()->needsAssign()   // キャンセルになった案件はDを決めない（2026-08-26）
             ->orderBy('start_date')
             ->get()
@@ -194,6 +196,7 @@ class AssignDirectorController extends Controller
         Assignment::whereIn('staff_id', $employees->pluck('id')->all())
             ->whereNotIn('role', [AssignmentRole::D, AssignmentRole::SD, AssignmentRole::FC])
             ->where('status', '!=', 'キャンセル')
+            ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))   // 3か月より前の予定は使わない
             ->get(['staff_id', 'date', 'role'])
             ->each(function ($a) use (&$empBusy) {
                 $key = Carbon::parse($a->date)->format('Y-m-d');

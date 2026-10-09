@@ -40,6 +40,7 @@ class AssignDetailController extends Controller
         $projects = Project::with('director:id,name')
             ->whereNotNull('start_date')
             ->whereNotIn('status', ['完了', '下書き'])
+            ->whereDate('start_date', '>=', $today->format('Y-m-d'))   // 下の filter と同じ＝DBで先に絞る（2026-10-09）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && $p->start_date->gte($today))
