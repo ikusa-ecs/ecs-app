@@ -52,6 +52,11 @@ class ContentReorgTest extends TestCase
         $d = $this->p('P-2026-0298', ['CT-172'], ['前日設営'], ['date_type' => '予備日']);
         $e = $this->p('P-5', ['CT-054'], ['ちがう名前']);
         $staff = PersonFactory::new()->create(['experienced_contents' => ['格付けバトル', '水合戦']]);
+        // 鷹狩りリハーサル＝鷹狩り行列のリハ日（2026-10-09 baba）→ 本番につなぐ。
+        $this->c('CT-196', '鷹狩り行列');
+        $this->c('CT-114', '鷹狩りリハーサル');
+        $honban = $this->p('P-2026-0074', ['CT-196'], ['鷹狩り行列']);
+        $reha = $this->p('P-2026-0139', ['CT-114'], ['鷹狩りリハーサル'], ['date_type' => 'リハ日']);
 
         $r = ContentReorg::apply();
 
@@ -78,7 +83,12 @@ class ContentReorgTest extends TestCase
         $this->assertSame(1, ContentRoleRequirement::where('content_id', 'CT-045')->count(), '必要人数は格付けへ移る');
         $this->assertSame(['格付け', '水合戦'], $staff->fresh()->experienced_contents, '名簿の経験も付け替える');
 
-        $this->assertSame(5, Project::count(), '案件は消えない');
+        $this->assertSame([], $reha->fresh()->content_ids, '鷹狩りリハーサルは単発');
+        $this->assertSame(['鷹狩りリハーサル'], $reha->fresh()->content_names);
+        $this->assertSame('リハ日', $reha->fresh()->date_type);
+        $this->assertSame('P-2026-0074', $reha->fresh()->parent_project_id, 'リハは本番につながる');
+
+        $this->assertSame(7, Project::count(), '案件は消えない');
         $this->assertGreaterThan(0, $r['done']);
 
         // 二度目は何も起きない。

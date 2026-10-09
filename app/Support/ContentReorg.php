@@ -59,7 +59,6 @@ final class ContentReorg
         ['CT-132', '縁日イベント', ['縁日']],
         ['CT-134', 'マッチングイベント（電脳謎パ）', ['電脳謎パ']],
         ['CT-103', 'オリジナル25Hunt（雨天時運動会）', ['25HUNT']],
-        ['CT-114', '鷹狩りリハーサル', ['鷹狩り行列']],
         ['CT-154', '前日設営SDGsWL', ['SDGsWL']],
         ['CT-128', 'ARENA貸し出し', ['ARENA場所貸し(用途記入)']],
         ['CT-050', '縁日ケータリング', ['縁日']],
@@ -99,6 +98,13 @@ final class ContentReorg
     /** 日程種別を「前日設営」に直す案件（前日設営なのに本番・予備日になっていた）。 */
     public const PREP_DATE_TYPE = ['P-2026-0223', 'P-2026-0298', 'P-2026-0462'];
 
+    /**
+     * リハ日を本番につなぐ（2026-10-09 baba「鷹狩りリハーサルは鷹狩のリハーサル日」）。
+     * [リハの案件ID => 本番の案件ID]。リハ日で、まだ本番につながっていないときだけ。
+     * 10/18 鷹狩りリハーサル → 11/3 鷹狩り行列（9/27 のリハはもうつながっている）。
+     */
+    public const PARENT_LINKS = ['P-2026-0139' => 'P-2026-0074'];
+
     /** 台帳からは消すが、案件の名前は残す（単発にする）：[ID, 名前] */
     public const ONEOFF = [
         ['CT-101', '抽選会＋景品手配'],
@@ -106,6 +112,8 @@ final class ContentReorg
         ['CT-200', 'サブコンテンツ'],
         ['CT-184', 'イベント運営'],
         ['CT-165', 'トータルイベント'],
+        // 鷹狩りのリハーサル日。決まったメニューではないので単発に（2026-10-09 baba）。本番へは PARENT_LINKS でつなぐ。
+        ['CT-114', '鷹狩りリハーサル'],
     ];
 
     /** 消す（使っている案件が0件）：[ID, 名前] */
@@ -227,6 +235,14 @@ final class ContentReorg
                 $done++;
             } else {
                 $skipped++;
+            }
+            foreach (self::PARENT_LINKS as $child => $parent) {
+                $p = Project::find($child);
+                if ($p && Project::whereKey($parent)->exists() && ! $p->parent_project_id && $p->date_type === 'リハ日') {
+                    $p->parent_project_id = $parent;
+                    $p->save();
+                    $touched[$p->id] = true;
+                }
             }
             foreach (self::PREP_DATE_TYPE as $pid) {
                 $p = Project::find($pid);
