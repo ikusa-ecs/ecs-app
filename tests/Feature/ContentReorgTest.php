@@ -87,6 +87,8 @@ class ContentReorgTest extends TestCase
         $this->assertSame(['鷹狩りリハーサル'], $reha->fresh()->content_names);
         $this->assertSame('リハ日', $reha->fresh()->date_type);
         $this->assertSame('P-2026-0074', $reha->fresh()->parent_project_id, 'リハは本番につながる');
+        $this->assertSame([], $honban->fresh()->content_ids, '鷹狩り行列も単発');
+        $this->assertSame(['鷹狩り行列'], $honban->fresh()->content_names);
 
         $this->assertSame(7, Project::count(), '案件は消えない');
         $this->assertGreaterThan(0, $r['done']);
