@@ -53,6 +53,7 @@ class Project extends Model
             // イベント数に数えるか（null=自動判定／true=数える／false=数えない・先-2）
             'count_as_event' => 'boolean',
             'is_cancelled' => 'boolean',   // キャンセルになった案件（2026-08-26）
+            'no_assign' => 'boolean',      // アサイン不要＝IKUSAは運営に入らない（2026-10-09）。正本＝scopeNeedsAssign
         ];
     }
 
@@ -104,6 +105,20 @@ class Project extends Model
     {
         return $query->where(function ($q) {
             $q->where('is_cancelled', false)->orWhereNull('is_cancelled');
+        });
+    }
+
+    /**
+     * 人を入れる案件だけ（「アサイン不要」の印が付いていないもの・2026-10-09 baba要望）。
+     *
+     * 例：会場備え付けのBBQ＝IKUSAのアクティビティではないので、Dもスタッフも要らない。
+     * 使うのは**人を入れる画面**＝日別ボード・D決め・公開ボード・スタッフ画面の募集・自動アサイン・
+     * 希望の数・危険日など。⚠ 案件一覧・アサイン表・収支・編集履歴には出す（案件があること・売上は残す）。
+     */
+    public function scopeNeedsAssign($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('no_assign', false)->orWhereNull('no_assign');
         });
     }
 

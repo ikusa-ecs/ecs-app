@@ -1182,6 +1182,11 @@ class PastProjectImportController extends Controller
             // 空欄から出した仮の人数か（案件一覧に「仮」と出る／あとで人が本当の数を入れる）。
             'count_tentative' => $head['tentative'],
             'guest_count' => $guests !== '' ? (int) $guests : null,
+        ] + (
+            // 運営人数が「0」＝IKUSAは運営に入らない＝アサイン不要（2026-10-09 baba）。
+            // 1名以上なら人を入れる案件に戻す。⚠ 空欄（仮の人数）のときは触らない＝ECSで付けた印を消さない。
+            $head['tentative'] ? [] : ['no_assign' => (int) $head['max'] === 0]
+        ) + [
             'team_count' => $teams !== '' ? (int) $teams : null,
             'is_repeat' => $get('リピート') === 'あり',
             'alcohol' => $get('お酒') ? ($get('お酒') === 'あり') : null,

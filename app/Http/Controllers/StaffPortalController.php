@@ -87,7 +87,7 @@ class StaffPortalController extends Controller
         $projects = $mine->isEmpty()
             ? collect()
             : Project::whereIn('id', $mine->pluck('project_id')->unique()->all())
-                ->notCancelled()   // キャンセルになった案件は本人にも見せない（2026-08-26）
+                ->notCancelled()->needsAssign()   // キャンセルになった案件は本人にも見せない（2026-08-26）
                 // ⚠ ここで除くのは「下書き」だけ。以前は「完了」もここで除いていたが、
                 //   終わった案件はたいてい「完了」になるため、**終わった案件が1件も出せなかった**
                 //   （2026-09-04 まーみさん「請求書を作るとき過去の案件を見返したい」）。
@@ -616,7 +616,7 @@ class StaffPortalController extends Controller
         //   応募の記録（applications）は消さない＝社員側のエントリー一覧には残る。
         //   確定した人は、非公開でも「確定アサイン」タブで見える（こちらは別の決まり・2026-10-05）。
         $projects = Project::where('is_recruiting', true)
-            ->notCancelled()   // キャンセルになった案件は募集もしない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は募集もしない（2026-08-26）
             ->whereNotIn('status', ['完了', '下書き'])
             ->where(function ($q) use ($office) {
                 // ⚠ 公開は拠点ごと（2026-09-30）＝**自分の拠点で公開された**案件だけ（正本＝OfficePublish）。

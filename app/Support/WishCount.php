@@ -50,7 +50,7 @@ final class WishCount
         $dayOfProject = [];     // project_id => 'Y-m-d'
         $projects = Project::whereNotNull('start_date')
             ->whereBetween('start_date', [$from, $to])
-            ->notCancelled()
+            ->notCancelled()->needsAssign()
             ->get(['id', 'start_date', 'status', 'is_archived'])
             ->filter(fn (Project $p) => $p->status !== '下書き' && $p->is_archived !== true);
         foreach ($projects as $p) {

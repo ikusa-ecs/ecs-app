@@ -207,6 +207,19 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame($newId, (string) ($sync->fresh()->id_changes['13']['to'] ?? ''), '新しいIDがシートへ書き戻されない');
     }
 
+    /** アサイン表の運営人数が「0」なら「アサイン不要」で入る（2026-10-09 baba・会場備え付けのBBQなど）。 */
+    public function test_運営人数0はアサイン不要で入る(): void
+    {
+        $rows = $this->rows('BBQ', '顧客');
+        $rows[8][self::A + 3] = '0';
+        $this->import($this->manager(), $rows);
+
+        $p = Project::firstOrFail();
+        $this->assertTrue($p->no_assign);
+        $this->assertSame(0, $p->required_count);
+        $this->assertFalse((bool) $p->count_tentative, '0は空欄ではない＝仮の人数を入れない');
+    }
+
     /** リハのブロックは、日付の違う本番の案件にシートのIDでつながない（2026-10-09 baba報告）。 */
     public function test_リハのブロックを別の日の本番にIDでつながない(): void
     {

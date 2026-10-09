@@ -920,6 +920,8 @@
       takenOverBy:c.takenOverBy || '', originHelps:!!c.originHelps,
       // 「名古屋巻き取り」の札。⚠ ここに書き写さないと画面側では空になる（詰め替え漏れ）。
       shareTags:c.shareTags || [],
+      // アサイン不要（IKUSAは運営に入らない・2026-10-09）。⚠ ここに書き写さないと札が出ない。
+      noAssign:!!c.noAssign,
       // 詳細プルダウンの現在値（社員ID）。担当なしは null。音響(sound)は上で設定済み。
       directorId:c.director_id, sdId:c.sd_id, goodsId:c.goods_owner_id,
       // 登録日（今日から何日前か。マイナス＝過去に登録）。「登録順」の並べ替えに使う。
@@ -1304,6 +1306,8 @@
         extra += `<span class="of-share${t.kind === '巻き取り' ? ' takeover' : ''}">${t.label}</span>`;
       });
       if (p.sharedToMe) extra += `<span class="of-mine">自拠点にコピー済(${p.myKind})</span>`;
+      // アサイン不要の札（2026-10-09）。日別ボード・D決め・公開ボードに出ない理由が分かるように。
+      if (p.noAssign) extra += `<span class="of-share" title="IKUSAは運営に入らない案件です。日別ボード・D決め・公開ボード・スタッフの募集には出ません。">アサイン不要</span>`;
       // 巻き取ってもらった自拠点の案件＝「自拠点からも人を出す」（2026-09-30 baba要望）。
       // 付けると、この拠点の日別ボードにもこの案件が出る（あと◯名を見ながら自拠点のスタッフを詰められる）。
       if (window.ECS_CAN_SHARE && p.isOwn && p.takenOverBy) {

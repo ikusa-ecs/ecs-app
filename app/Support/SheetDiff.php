@@ -46,7 +46,7 @@ final class SheetDiff
     private const FIELDS = [
         'start_time', 'end_time',
         'event_enter_time', 'event_start_time', 'event_end_time',
-        'required_count', 'required_count_min', 'count_tentative',
+        'required_count', 'required_count_min', 'count_tentative', 'no_assign',
         'guest_count', 'team_count',
         'scale', 'category', 'yomi', 'date_type',
         'format', 'online_tool', 'broadcast',

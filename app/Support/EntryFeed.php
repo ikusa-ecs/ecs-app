@@ -55,7 +55,7 @@ class EntryFeed
     {
         // 拠点で絞るのは案件と、応募したスタッフの両方（スタッフの絞り込みは下＝2026-10-07 baba要望）。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
-            ->notCancelled()   // キャンセルになった案件は出さない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は出さない（2026-08-26）
             ->get()
             ->keyBy('id');
 

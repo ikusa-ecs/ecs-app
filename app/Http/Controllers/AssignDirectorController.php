@@ -48,7 +48,7 @@ class AssignDirectorController extends Controller
         // この画面に出す案件＝完了/下書き以外。拠点で絞るときは「登録拠点」＋「共有された案件」。
         // ※ 先に案件を確定させてから、その案件のD/SD/FCだけを引く（他拠点の分まで数えない）。
         $projects = OfficeScope::applyToProjects(Project::query(), $officeScope)
-            ->notCancelled()   // キャンセルになった案件はDを決めない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件はDを決めない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))

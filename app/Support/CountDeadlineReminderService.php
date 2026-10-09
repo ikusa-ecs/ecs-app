@@ -67,6 +67,10 @@ class CountDeadlineReminderService
             if (in_array($p->status, ['完了', '下書き'], true)) {
                 continue;
             }
+            // アサイン不要（IKUSAは運営に入らない・2026-10-09）＝人数を確定する話が無い。
+            if ($p->no_assign) {
+                continue;
+            }
             // 予備日・リハは対象外（人数確定は本番日の話）。空欄＝本番扱い。
             $dateType = (string) ($p->date_type ?? '');
             if ($dateType !== '' && $dateType !== '本番') {

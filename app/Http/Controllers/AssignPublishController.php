@@ -50,7 +50,7 @@ class AssignPublishController extends Controller
             $office,
             true
         )
-            ->notCancelled()   // キャンセルになった案件は公開の対象にしない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は公開の対象にしない（2026-08-26）
             ->orderBy('start_date')->get();
 
         // 拠点間の関わり（ヘルプ／巻き取り）。2026-09-18 baba指摘

@@ -49,7 +49,7 @@ class AssignDashboardController extends Controller
 
         // ── アサインが必要な案件（未着手・調整中・これから先の開催）──────────────
         $needProjects = OfficeScope::applyToProjects(
-            Project::whereIn('status', ['未着手', '調整中'])->notCancelled(),
+            Project::whereIn('status', ['未着手', '調整中'])->notCancelled()->needsAssign(),
             $office
         )
             ->whereNotNull('start_date')
@@ -86,7 +86,7 @@ class AssignDashboardController extends Controller
         // ── 数値サマリ：募集中の案件 ──────────────────────────────────────
         // 募集中＝スタッフに公開中（staff_published=ON）。うち「未確定」＝決定人数<必要人数。
         $published = OfficeScope::applyToProjects(
-            Project::where('staff_published', true)->notCancelled(),
+            Project::where('staff_published', true)->notCancelled()->needsAssign(),
             $office
         )->get();
         $recruitCount = $published->count();
@@ -102,7 +102,7 @@ class AssignDashboardController extends Controller
         $weekStart = $today->copy()->startOfWeek();
         $weekEnd = $today->copy()->endOfWeek();
         $weekConfirmed = OfficeScope::applyToProjects(
-            Project::where('status', '確定')->notCancelled(),
+            Project::where('status', '確定')->notCancelled()->needsAssign(),
             $office
         )
             ->whereBetween('start_date', [$weekStart, $weekEnd])
@@ -257,7 +257,7 @@ class AssignDashboardController extends Controller
 
         // index() と同じ対象・並び（未着手・調整中／これから先／開催日順）。
         $needProjects = OfficeScope::applyToProjects(
-            Project::whereIn('status', ['未着手', '調整中'])->notCancelled(),
+            Project::whereIn('status', ['未着手', '調整中'])->notCancelled()->needsAssign(),
             $office
         )
             ->whereNotNull('start_date')

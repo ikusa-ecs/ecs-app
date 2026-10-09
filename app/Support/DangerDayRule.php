@@ -103,7 +103,7 @@ final class DangerDayRule
     public static function between(Carbon $from, Carbon $to, ?string $office = null): array
     {
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
-            ->notCancelled()
+            ->notCancelled()->needsAssign()
             ->whereNotNull('start_date')
             ->whereBetween('start_date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
             ->get()

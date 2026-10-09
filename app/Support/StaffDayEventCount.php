@@ -33,7 +33,7 @@ class StaffDayEventCount
         $last = $first->copy()->endOfMonth();
 
         $q = Project::query()
-            ->notCancelled()
+            ->notCancelled()->needsAssign()
             // ⚠ status が空の案件も残す（「!= 下書き」だけだと SQL では空が落ちる）。
             ->where(fn ($w) => $w->whereNull('status')->orWhere('status', '!=', '下書き'))
             ->whereBetween('start_date', [$first->toDateString(), $last->toDateString()])

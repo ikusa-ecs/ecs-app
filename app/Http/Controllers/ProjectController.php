@@ -147,6 +147,7 @@ class ProjectController extends Controller
                 'published' => (bool) $p->staff_published,   // スタッフ公開ボードで「公開する」を押したか
                 'status' => $p->status ?? '未着手',
                 'tentative' => (bool) $p->count_tentative,
+                'noAssign' => (bool) $p->no_assign,    // アサイン不要（IKUSAは運営に入らない・2026-10-09）
                 'repeat' => (bool) $p->is_repeat,      // 手で入れた「リピート案件」の印
                 'lineSent' => (bool) $p->prep_line_sent,
                 'lineMade' => (bool) $p->prep_line_created,
@@ -353,6 +354,7 @@ class ProjectController extends Controller
                     // 運営人数（IKUSA）も同じ形で戻す（「4〜6」と入れたらそのまま出す）。
                     'ikusa_count' => Headcount::label($p->ikusa_count_min, $p->ikusa_count),
                     'count_tentative' => (bool) $p->count_tentative,
+                    'no_assign' => (bool) $p->no_assign,
                     'guest_count' => $p->guest_count,
                     'guest_count_type' => $p->guest_count_type,
                     'team_count' => $p->team_count,
@@ -586,14 +588,16 @@ class ProjectController extends Controller
                 $errors['start_date'] = '開催日を入力するか、「日付未定」にチェックを入れてください。';
             }
             // 「6〜8人」のような範囲でもよい（2026-08-25 baba）。読み方は Headcount が正本。
+            // 「アサイン不要」（IKUSAは運営に入らない・2026-10-09）なら0名でよい＝人数の必須は見ない。
+            $noAssign = $request->boolean('no_assign');
             $count = Headcount::parse($request->input('required_count'))['max'] ?? 0;
-            if ($count < 1 && ! $request->boolean('count_tentative')) {
+            if ($count < 1 && ! $request->boolean('count_tentative') && ! $noAssign) {
                 $errors['required_count'] = '運営人数（全体人数）を入力するか、「人数は仮（未定）」にチェックを入れてください。';
             }
             // 運営人数（IKUSA）も必須（2026-09-18 baba「マストで」）。
             // ⚠ 逃げ道は全体人数と同じ「人数は仮（未定）」ひとつ（チェック1つで両方を仮にする）。
             $ikusa = Headcount::parse($request->input('ikusa_count'))['max'] ?? 0;
-            if ($ikusa < 1 && ! $request->boolean('count_tentative')) {
+            if ($ikusa < 1 && ! $request->boolean('count_tentative') && ! $noAssign) {
                 $errors['ikusa_count'] = '運営人数（IKUSA）を入力するか、「人数は仮（未定）」にチェックを入れてください。';
             }
             if ($errors) {
@@ -741,6 +745,8 @@ class ProjectController extends Controller
             'ikusa_count' => Headcount::parse($request->input('ikusa_count'))['max'],
             'ikusa_count_min' => Headcount::parse($request->input('ikusa_count'))['min'],
             'count_tentative' => $request->has('count_tentative'),
+            // アサイン不要（IKUSAは運営に入らない・2026-10-09）。正本＝Project::scopeNeedsAssign。
+            'no_assign' => $request->boolean('no_assign'),
             'guest_count' => $request->filled('guest_count') ? (int) $request->input('guest_count') : null,
             'guest_count_type' => $request->input('guestCount'),
             'team_count' => $request->filled('team_count') ? (int) $request->input('team_count') : null,

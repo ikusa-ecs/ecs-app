@@ -80,6 +80,8 @@ class ProjectFieldLabels
         'ikusa_count_min'    => '運営人数（IKUSA・下限）',
         'count_as_event'     => 'イベント数に数える',
         'count_tentative'    => '運営人数は仮',
+        // アサイン不要（IKUSAは運営に入らない・2026-10-09）。
+        'no_assign'          => 'アサイン不要',
         'guest_count'        => 'お客様人数',
         'guest_count_type'   => 'お客様人数の区分',
         'team_count'         => 'チーム数',
@@ -142,6 +144,7 @@ class ProjectFieldLabels
         'is_repeat'       => ['リピート', '初回'],
         'alcohol'         => ['あり', 'なし'],
         'count_tentative' => ['仮（未定）', '確定'],
+        'no_assign'       => ['アサイン不要', 'アサインする'],
         'team_tentative'  => ['仮（未定）', '確定'],
         'event_time_tbd'  => ['未定', '決まっている'],
         'prep_line_sent'  => ['済', '未'],

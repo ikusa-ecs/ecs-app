@@ -106,7 +106,7 @@ final class StaffProjectNews
             OfficePublish::scopePublishedFor(Project::query(), $office)
                 ->whereNotNull('start_date')
                 ->whereDate('start_date', '>=', $today->format('Y-m-d'))
-                ->notCancelled(),
+                ->notCancelled()->needsAssign(),
             $office
         )->pluck('id');
 
@@ -119,7 +119,7 @@ final class StaffProjectNews
         $projects = Project::whereIn('id', $ids)
             ->whereNotNull('start_date')
             ->whereDate('start_date', '>=', $today->format('Y-m-d'))
-            ->notCancelled()
+            ->notCancelled()->needsAssign()
             ->get(['id', 'project_name', 'start_date', 'client', 'staff_published'])
             ->keyBy('id');
 

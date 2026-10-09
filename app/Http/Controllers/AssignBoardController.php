@@ -222,7 +222,7 @@ class AssignBoardController extends Controller
         // その日の案件にエントリー（応募）している人。
         $projectDay = Project::whereNotNull('start_date')
             ->whereBetween('start_date', [$from->format('Y-m-d'), $to->format('Y-m-d').' 23:59:59'])
-            ->notCancelled()
+            ->notCancelled()->needsAssign()
             ->pluck('start_date', 'id')
             ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
             ->all();
@@ -448,7 +448,7 @@ class AssignBoardController extends Controller
             $office,
             true
         )
-            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => $p->start_date && ! in_array($p->status, ['完了', '下書き'], true))
@@ -853,7 +853,7 @@ class AssignBoardController extends Controller
         //   ※ すでにこの案件に入っている人は、他拠点でも出す（誰が入っているか分からなくなるため）。
         //   ※ 全拠点で見ているときは全員出す。拠点の見分けの正本＝OfficeScope::personIn。
         $projects = OfficeScope::applyToProjects(Project::query(), $office)
-            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));
@@ -1046,7 +1046,7 @@ class AssignBoardController extends Controller
         // 拠点で絞るのは「案件」だけ。候補者＝応募者∪現メンバー＝その案件に紐づく人なので、
         // 他拠点の人でもそのまま出す（メンバーが消えると保存＝上書きで担当が外れてしまう）。
         $projects = OfficeScope::applyToProjects(Project::with('director:id,name'), $office)
-            ->notCancelled()   // キャンセルになった案件は並べない（2026-08-26）
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));

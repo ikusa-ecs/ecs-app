@@ -410,7 +410,7 @@ class MonthAutoAssign
     private function monthProjects(): Collection
     {
         return OfficeScope::applyToProjects(Project::query(), $this->office)
-            ->notCancelled()
+            ->notCancelled()->needsAssign()
             ->whereNotNull('start_date')
             ->whereBetween('start_date', [
                 $this->monthStart->format('Y-m-d').' 00:00:00',

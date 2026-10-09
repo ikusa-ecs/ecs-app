@@ -900,6 +900,13 @@
                   <input type="checkbox" id="countTentative" name="count_tentative" class="tbd-check" data-tbd-for="requiredCount,ikusaCount">
                   <label for="countTentative">人数は仮（未定）</label>
                 </div>
+                <!-- アサイン不要（2026-10-09 baba要望）。例：会場備え付けのBBQ＝IKUSAのアクティビティではない。
+                     ⚠ チェックすると0名で登録でき、人を入れる画面（日別ボード・D決め・公開ボード・スタッフの募集・
+                        自動アサイン）に出なくなる。案件一覧・アサイン表・収支には残る。正本＝Project::scopeNeedsAssign -->
+                <div class="check-row" style="margin-top:4px;">
+                  <input type="checkbox" id="noAssign" name="no_assign" value="1">
+                  <label for="noAssign">アサイン不要（IKUSAは運営に入らない）</label>
+                </div>
                 <div class="hint"><b>全体人数</b>＝当日その現場に立つ全員（派遣や他社の方も含む）。
                   <b>IKUSA</b>＝そのうち自社で出す人数。<br>
                   <b>「6〜8」のように幅を持たせて書けます。</b>
@@ -1761,10 +1768,12 @@
     if (!date && !document.getElementById('dateTbd').checked) {
       add('開催日を入力するか、「日付未定」にチェックを入れてください。', document.getElementById('startDate'));
     }
-    if (count < 1 && !document.getElementById('countTentative').checked) {
+    // 「アサイン不要」なら0名でよい（2026-10-09・サーバーの判定と同じ）。
+    const noAssign = document.getElementById('noAssign').checked;
+    if (count < 1 && !document.getElementById('countTentative').checked && !noAssign) {
       add('運営人数（全体人数）を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('requiredCount'));
     }
-    if (ikusa < 1 && !document.getElementById('countTentative').checked) {
+    if (ikusa < 1 && !document.getElementById('countTentative').checked && !noAssign) {
       add('運営人数（IKUSA）を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('ikusaCount'));
     }
 
@@ -1977,6 +1986,7 @@
     setCheck('noRecruit', !E.is_recruiting);   // 募集する＝noRecruit外す
     setCheck('isToc', E.is_toc);               // toC（一般消費者向け）
     setCheck('countTentative', E.count_tentative);
+    setCheck('noAssign', E.no_assign);
     setCheck('teamTentative', E.team_tentative);
     setCheck('isRepeat', E.is_repeat);
     setCheck('eventTimeTbd', E.event_time_tbd);
