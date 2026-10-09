@@ -486,6 +486,8 @@
 
   function pjShowError(message) {
     document.getElementById('pjResult').style.display = '';
+    document.getElementById('pjResult').style.minHeight = '';
+    pjKeepY = null;
     document.getElementById('pjWarn').innerHTML = '<div class="pj-flash err">' + pjEsc(message) + '</div>';
     pjClear();
     document.getElementById('pjBtn').disabled = true;
@@ -624,7 +626,15 @@
     var result = document.getElementById('pjResult');
     result.style.display = '';
     document.getElementById('pjBtn').disabled = (okCount === 0);
-    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 「② 確かめ直す」のときは、押した場所のまま（2026-10-09 baba「差分のところも上にもどらないようにしてほしい」）。
+    // はじめて読んだときだけ、結果の表の頭まで動かす。
+    result.style.minHeight = '';
+    if (pjKeepY !== null) {
+      window.scrollTo(0, pjKeepY);
+      pjKeepY = null;
+    } else {
+      result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   // 表の中の入力欄。data-orig にはサーバーが読んだ値を入れておき、
@@ -963,8 +973,15 @@
 
   // 直した内容で、判定だけやり直す（登録はしない）。
   // ⚠ 判定はサーバーにやらせる＝画面にもう1つ同じ判定を書かないため。
+  // 確かめ直す前の画面の位置（表を描き直したあと、ここへ戻す）。null＝戻さない（はじめて読んだとき）。
+  var pjKeepY = null;
+
   function pjRecheck() {
     if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }
+    pjKeepY = window.scrollY;
+    // 描き直すあいだ表が空になって高さが縮み、位置がずれないように、いまの高さを押さえておく。
+    var box = document.getElementById('pjResult');
+    if (box) { box.style.minHeight = box.offsetHeight + 'px'; }
     pjSyncEdits();
     pjPost(document.getElementById('pjEdits').value);
   }
