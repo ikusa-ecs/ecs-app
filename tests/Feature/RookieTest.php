@@ -160,6 +160,35 @@ class RookieTest extends TestCase
         $this->assertEqualsCanonicalizing(['P-MAIN', 'P-SPARE'], array_column($picks, 'projectId'));
     }
 
+    /** 前泊の案件は前日も空いていないと入れない／必修の札（2026-10-09 baba）。 */
+    public function test_前泊は前日も見る_必修の札(): void
+    {
+        $d1 = Carbon::today()->addDays(1);
+        $d2 = Carbon::today()->addDays(2);
+        if (! $d2->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        Content::create(['id' => 'CT-1', 'content_name' => '会議室', 'active' => true]);
+        ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'ある会議室からの脱出', 'difficulty' => 1, 'must' => true, 'content_id' => 'CT-1']);
+        $rookie = PersonFactory::new()->create(['name' => '新人E', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+        ProjectFactory::new()->create(['id' => 'P-STAY', 'office' => '東京', 'start_date' => $d2->format('Y-m-d'),
+            'required_count' => 5, 'status' => '調整中', 'lodging' => '前泊', 'content_ids' => ['CT-1']]);
+
+        $picks = RookieFcPlan::build(Carbon::today(), '東京')['picks'];
+        $this->assertSame(['P-STAY'], array_column($picks, 'projectId'));
+        $this->assertSame('必修', $picks[0]['mark']);
+        $this->assertTrue($picks[0]['first']);
+        $this->assertTrue($picks[0]['preStay']);
+
+        // 前日（土曜など）が×なら入れない。
+        ShiftPreference::create(['staff_id' => $rookie->id, 'period' => $d1->format('Y-m'), 'date' => $d1->format('Y-m-d'), 'availability' => 'NG']);
+        $this->assertSame([], RookieFcPlan::build(Carbon::today(), '東京')['picks']);
+
+        $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
+        $this->assertStringContainsString('function rkAssign(rows)', $this->actingAsPerson($me)->get('/rookies')->getContent());
+    }
+
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
     public function test_ARENA場所貸しは外す(): void
     {

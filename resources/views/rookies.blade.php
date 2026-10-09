@@ -150,22 +150,31 @@
   @endif
   <div class="rk-wrap">
   <table class="rk">
-    <tr><th>日付</th><th>案件</th><th>難易度</th><th>空き</th><th>新人</th><th>理由</th><th>ほかの候補</th></tr>
+    <tr><th><input type="checkbox" onclick="rkCheckAll(this)" title="全部えらぶ"></th><th>日付</th><th>案件</th><th>必修</th><th>難易度</th><th>空き</th><th>新人</th><th>理由</th><th>ほかの候補</th><th></th></tr>
     @forelse ($picks as $p)
-      <tr>
+      <tr class="rk-pick" data-project="{{ $p['projectId'] }}" data-staff="{{ $p['rookieId'] }}">
+        <td><input type="checkbox" class="rk-pick-cb"></td>
         <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($p['date'])->format('n/j') }}@if (($p['dayType'] ?? '本番') !== '本番')<div class="rk-small">{{ $p['dayType'] }}</div>@endif</td>
-        <td><a href="/project-assign?project={{ $p['projectId'] }}">{{ $p['name'] }}</a><div class="rk-small">{{ $p['client'] }}</div></td>
+        <td><a href="/project-assign?project={{ $p['projectId'] }}">{{ $p['name'] }}</a><div class="rk-small">{{ $p['client'] }}@if (! empty($p['preStay']))・<b>前泊あり</b>@endif</div></td>
+        <td>@if (! empty($p['mark']))<b class="{{ $p['mark'] === '必修' ? 'rk-short' : '' }}">{{ $p['mark'] }}</b>@if (! empty($p['first']))<div class="rk-small">初めて</div>@endif @endif</td>
         <td class="rk-num">{{ $p['difficulty'] ?? '—' }}</td>
         <td class="rk-num">{{ $p['room'] }}名</td>
         <td><b>{{ $p['rookie'] }}</b></td>
         <td class="rk-small">{{ $p['why'] }}</td>
         <td class="rk-small">{{ implode('、', $p['others']) }}</td>
+        <td><button class="rk-btn" type="button" onclick="rkAssign([this.closest('tr')])" title="この新人を、この案件にFC（仮）で入れます">入れる</button><span class="rk-small rk-done"></span></td>
       </tr>
     @empty
-      <tr><td colspan="7" class="rk-small">案はありません（空きのある案件が無い、または新人がこの月の目標に届いています）。</td></tr>
+      <tr><td colspan="10" class="rk-small">案はありません（空きのある案件が無い、または新人がこの月の目標に届いています）。</td></tr>
     @endforelse
   </table>
   </div>
+  @if ($picks)
+    <div class="rk-bar" style="margin-top:10px;">
+      <button class="rk-btn main" type="button" onclick="rkAssign(Array.from(document.querySelectorAll('tr.rk-pick')).filter(function (tr) { return tr.querySelector('.rk-pick-cb').checked; }))">チェックしたものを入れる</button>
+      <span class="rk-small">FC・<b>仮</b>で入ります（確定は日別ボードやアサイン画面で）。入れたあと、この表を作り直します。</span>
+    </div>
+  @endif
 </div>
 
 <details class="rk-card rk-more">
@@ -248,6 +257,41 @@
       .then(function (r) { if (!r.ok) throw r.status; mark.textContent = ' ✓ 保存しました'; })
       .catch(function () { form.submit(); });
   }
+  // FCの案を実際にアサインする（2026-10-09 baba「案件でOKってなったらアサイン入るようにしたい」）。
+  // ⚠ 入口は日別ボードなどと同じ /entries/assign（誰がアサインされているかの正本は assignments ひとつ）。
+  //   FC・仮で入れる。1件ずつ順に送り、終わったら読み込み直して表を作り直す（入れた人は案から消える）。
+  function rkCheckAll(box) {
+    document.querySelectorAll('.rk-pick-cb').forEach(function (cb) { cb.checked = box.checked; });
+  }
+  function rkAssign(rows) {
+    if (!rows.length) { alert('入れる案件にチェックを付けてください。'); return; }
+    if (!confirm(rows.length + '件を、FC（仮）で入れます。よろしいですか？')) return;
+    var token = '{{ csrf_token() }}';
+    var ng = [];
+    var chain = Promise.resolve();
+    rows.forEach(function (tr) {
+      chain = chain.then(function () {
+        var mark = tr.querySelector('.rk-done');
+        if (mark) mark.textContent = ' …';
+        return fetch('/entries/assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+          body: JSON.stringify({ project_id: tr.dataset.project, staff_id: tr.dataset.staff, action: 'assign', role: 'FC', status: '仮' })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok && j && j.ok !== false, j: j }; }); })
+          .then(function (res) {
+            if (mark) mark.textContent = res.ok ? ' ✓' : ' ✗';
+            if (!res.ok) ng.push((res.j && res.j.message) || '保存できませんでした');
+          })
+          .catch(function () { if (mark) mark.textContent = ' ✗'; ng.push('通信に失敗しました'); });
+      });
+    });
+    chain.then(function () {
+      if (ng.length) alert('入れられなかったものがあります：\n' + ng.join('\n'));
+      rkRemember();
+      location.reload();
+    });
+  }
+
   // ほかのボタン（OJT・経験など）は読み込み直すので、開いていた枠と元の位置に戻す。
   function rkRemember() {
     try {

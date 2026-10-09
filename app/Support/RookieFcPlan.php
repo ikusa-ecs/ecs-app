@@ -222,10 +222,13 @@ final class RookieFcPlan
         $dispatch = DispatchRows::liveCountsFor($all->keys());
         $lastDay = $all->max(fn ($c) => $c->start_date->format('Y-m-d'));
         $avail = ShiftPreference::whereIn('staff_id', array_keys($state))
-            ->whereBetween('date', [$from, $lastDay.' 23:59:59'])->get()
+            // 前泊の案件は前日も見るので、1日前から読む。
+            ->whereBetween('date', [Carbon::parse($from)->subDay()->format('Y-m-d'), $lastDay.' 23:59:59'])->get()
             ->mapWithKeys(fn ($s) => [$s->staff_id.'|'.Carbon::parse($s->date)->format('Y-m-d') => $s->availability]);
         $mustIds = ContentDifficulty::whereNotNull('content_id')
             ->where(fn ($q) => $q->where('must', true)->orWhere('recommend', true))->pluck('content_id')->flip()->all();
+        // 必修・推奨の札（2026-10-09 baba「必須とかもわかるようにしてほしい」）。
+        $mustOnly = ContentDifficulty::whereNotNull('content_id')->where('must', true)->pluck('content_id')->map(fn ($v) => (string) $v)->flip()->all();
 
         // 案件ごとの空き（選ぶたびに減らす）。
         $room = [];
@@ -237,13 +240,20 @@ final class RookieFcPlan
             $cap[$c->id] = self::capFor($c, $need) - $rows->filter(fn ($a) => isset($state[$a->staff_id]))->pluck('staff_id')->unique()->count();
         }
         $canGo = function (string $id, string $day, $c) use (&$state, &$room, &$cap, $avail) {
+            $prev = self::preStayDay($c);
+
             return $room[$c->id] > 0 && $cap[$c->id] > 0 && ! isset($state[$id]['busy'][$day])
-                && ! in_array($avail[$id.'|'.$day] ?? '', ['NG', '希望休'], true);
+                && ! in_array($avail[$id.'|'.$day] ?? '', ['NG', '希望休'], true)
+                && ($prev === null || self::freeDay($state[$id], $avail, $id, $prev));
         };
 
         $out = [];
-        $put = function ($c, string $id, array $why, array $others) use (&$out, &$state, &$room, &$cap, $names, $map) {
+        $put = function ($c, string $id, array $why, array $others) use (&$out, &$state, &$room, &$cap, $names, $map, $mustIds, $mustOnly) {
             $day = $c->start_date->format('Y-m-d');
+            $cidsHere = array_map('strval', (array) $c->content_ids);
+            $mark = array_filter($cidsHere, fn ($x) => isset($mustOnly[$x])) ? '必修'
+                : (array_filter($cidsHere, fn ($x) => isset($mustIds[$x])) ? '推奨' : '');
+            $first = $cidsHere && array_filter($cidsHere, fn ($x) => ! isset($state[$id]['fcDone'][$x]));
             $state[$id]['remain']--;
             $state[$id]['busy'][$day] = true;
             foreach ((array) $c->content_ids as $x) {
@@ -255,6 +265,9 @@ final class RookieFcPlan
                 'name' => ProjectContentName::of($c, $names, (string) $c->project_name),
                 'client' => (string) ($c->client ?? ''),
                 'dayType' => (string) ($c->date_type ?? '本番'),
+                'mark' => $mark,          // 必修／推奨／空
+                'first' => (bool) $first,   // この新人がFCで初めてのコンテンツか
+                'preStay' => self::preStayDay($c) !== null,
                 'difficulty' => RookieDifficulty::ofProject($c, $map),
                 'room' => $room[$c->id],
                 'rookie' => $state[$id]['person']->name,
@@ -287,7 +300,7 @@ final class RookieFcPlan
             $diff = RookieDifficulty::ofProject($lead, $map);
 
             while ($room[$lead->id] > 0 && $cap[$lead->id] > 0) {
-                $pick = self::pickOne($state, $leadDay, $avail, $cids, $mustIds, $diff);
+                $pick = self::pickOne($state, $leadDay, $avail, $cids, $mustIds, $diff, self::preStayDay($lead));
                 if ($pick === null) {
                     break;
                 }
@@ -327,6 +340,19 @@ final class RookieFcPlan
         return false;
     }
 
+    /** 前泊がある案件なら、その前日（Y-m-d）。無ければ null。判定の正本＝Lodging::hasPreStay。 */
+    public static function preStayDay(Project $c): ?string
+    {
+        return Lodging::hasPreStay($c->lodging) && $c->start_date
+            ? $c->start_date->copy()->subDay()->format('Y-m-d') : null;
+    }
+
+    /** その日、ほかの案件に入っておらず、出勤可能日が×／希望休でもないか。 */
+    private static function freeDay(array $s, $avail, string $id, string $day): bool
+    {
+        return ! isset($s['busy'][$day]) && ! in_array($avail[$id.'|'.$day] ?? '', ['NG', '希望休'], true);
+    }
+
     /**
      * 1案件に新人を何人まで入れてよいか（2026-10-09 baba）。
      *   ・ふつうは1人 ・運営人数が8名を超える案件は2人 ・大型で運営人数12名以上は何人でも（空きの数まで）
@@ -341,11 +367,15 @@ final class RookieFcPlan
     }
 
     /** @return array{0: array, 1: list<array>}|null いちばん点の高い新人と、候補の一覧 */
-    private static function pickOne(array $state, string $day, $avail, array $cids, array $mustIds, ?int $diff): ?array
+    private static function pickOne(array $state, string $day, $avail, array $cids, array $mustIds, ?int $diff, ?string $prevDay = null): ?array
     {
         $cands = [];
         foreach ($state as $id => $s) {
             if ($s['remain'] <= 0 || isset($s['busy'][$day])) {
+                continue;
+            }
+            // 前泊の案件＝前日も空いていないと入れない（2026-10-09 baba「日曜の案件で土曜が×ならアサインできない」）。
+            if ($prevDay !== null && ! self::freeDay($s, $avail, $id, $prevDay)) {
                 continue;
             }
             $av = $avail[$id.'|'.$day] ?? '';
@@ -365,6 +395,9 @@ final class RookieFcPlan
                 $why[] = '出勤可能日〇';
             } else {
                 $why[] = '出勤可能日は未入力';
+            }
+            if ($prevDay !== null) {
+                $why[] = '前泊あり（前日も空いている）';
             }
             if ($diff !== null) {
                 $score += (4 - $diff) * 0.5;
