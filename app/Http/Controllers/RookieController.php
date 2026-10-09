@@ -37,6 +37,8 @@ class RookieController extends Controller
             'others' => OfficeScope::applyToPeople(Person::employees()->where('active', true), $office)
                 ->orderBy('id')->get(['id', 'name'])
                 ->reject(fn ($p) => collect($plan['rookies'])->contains('id', $p->id))->values(),
+            // OJT担当に選べる人＝在籍中の社員（拠点を問わない）。
+            'employees' => Person::employees()->where('active', true)->orderBy('id')->get(['id', 'name']),
             'targets' => Rookies::targets(),
             'difficulties' => ContentDifficulty::orderBy('kind', 'desc')->orderBy('id')->get(),
             'contents' => Content::where('active', true)->orderBy('content_name')->get(['id', 'content_name']),
@@ -75,6 +77,22 @@ class RookieController extends Controller
         $p->save();
 
         return back()->with('ok', $p->name.'さんの起点を直しました。');
+    }
+
+    /** OJT担当とひとことメモ（2026-10-09 baba要望）。 */
+    public function setOjt(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'exists:people,id'],
+            'ojt' => ['nullable', 'string', 'exists:people,id'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+        $p = Person::findOrFail($data['id']);
+        $p->rookie_ojt_id = $data['ojt'] ?: null;
+        $p->rookie_note = $data['note'] ?? null;
+        $p->save();
+
+        return back()->with('ok', $p->name.'さんのOJT担当・メモを保存しました。');
     }
 
     public function setTargets(Request $request)

@@ -52,10 +52,24 @@
     「何ヶ月目」は起点（空なら入社日）の月を1ヶ月目として数えます。</p>
   <div class="rk-wrap">
   <table class="rk">
-    <tr><th>名前</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>起点</th><th></th></tr>
+    <tr><th>名前</th><th>OJT担当・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>起点</th><th></th></tr>
     @forelse ($rookies as $r)
       <tr>
         <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div></td>
+        <td>
+          @if ($canEdit)
+            <form method="POST" action="/rookies/ojt">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
+              <select class="rk-in" name="ojt" onchange="this.form.submit()" title="OJT担当">
+                <option value="">（OJT担当なし）</option>
+                @foreach ($employees as $e)<option value="{{ $e->id }}" @selected($e->id === $r['ojt'])>{{ $e->name }}</option>@endforeach
+              </select>
+              <input class="rk-in" type="text" name="note" value="{{ $r['note'] }}" maxlength="500" placeholder="メモ" style="margin-top:4px; width:150px;" onchange="this.form.submit()">
+            </form>
+          @else
+            {{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
+            @if ($r['note'])<div class="rk-small">{{ $r['note'] }}</div>@endif
+          @endif
+        </td>
         <td class="rk-num">{{ $r['monthNo'] !== null ? $r['monthNo'].'ヶ月目' : '—' }}</td>
         <td class="rk-num">
           @if ($r['target'])
@@ -90,7 +104,7 @@
         </td>
       </tr>
     @empty
-      <tr><td colspan="7" class="rk-small">新人はいません。</td></tr>
+      <tr><td colspan="8" class="rk-small">新人はいません。</td></tr>
     @endforelse
   </table>
   </div>
@@ -107,7 +121,8 @@
 
 <div class="rk-card">
   <h3>👟 FCに入れる案（{{ $month->format('n月') }}・今日から月末まで）</h3>
-  <p class="sub">運営人数に空きがあり、まだ新人が入っていない案件に、その月のFC目標に届いていない新人を1人ずつ当てた案です。
+  <p class="sub">運営人数に空きがある案件に、その月のFC目標に届いていない新人を当てた案です。
+    1案件に入れる新人は、ふつう1人・運営人数が8名を超える案件は2人・大型で12名以上なら空きの数まで。
     その日すでに入っている人・出勤可能日が×／希望休の人は入れません。まだFCでやっていないコンテンツ（必修・推奨を優先）・難易度が低い・イベプラを優先します。</p>
   @if ($unlinked)
     <p class="rk-warn">⚠ 台帳につながっていない難易度の行が{{ $unlinked }}件あります（下の「難易度表」でつなぐと、難易度・必修が案に効きます）。</p>

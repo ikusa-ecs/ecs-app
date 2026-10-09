@@ -344,6 +344,7 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/rookies', [\App\Http\Controllers\RookieController::class, 'index']);
     Route::post('/rookies/state', [\App\Http\Controllers\RookieController::class, 'setState'])->middleware('tier:manager');
     Route::post('/rookies/since', [\App\Http\Controllers\RookieController::class, 'setSince'])->middleware('tier:manager');
+    Route::post('/rookies/ojt', [\App\Http\Controllers\RookieController::class, 'setOjt'])->middleware('tier:manager');
     Route::post('/rookies/targets', [\App\Http\Controllers\RookieController::class, 'setTargets'])->middleware('tier:manager');
     Route::post('/rookies/import', [\App\Http\Controllers\RookieController::class, 'import'])->middleware('tier:manager');
     Route::post('/rookies/link', [\App\Http\Controllers\RookieController::class, 'link'])->middleware('tier:manager');

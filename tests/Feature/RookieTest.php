@@ -95,6 +95,31 @@ class RookieTest extends TestCase
         $this->assertSame([], RookieFcPlan::build(Carbon::today(), '東京')['picks']);
     }
 
+    /** 1案件に入れる新人＝ふつう1人／8名を超えると2人／大型で12名以上は何人でも（2026-10-09 baba）。 */
+    public function test_1案件に入れる新人の数(): void
+    {
+        $p = fn (int $n, string $scale = '') => ProjectFactory::new()->make(['required_count' => $n, 'scale' => $scale]);
+
+        $this->assertSame(1, RookieFcPlan::capFor($p(8), 8));
+        $this->assertSame(2, RookieFcPlan::capFor($p(9), 9));
+        $this->assertSame(2, RookieFcPlan::capFor($p(12, '中型'), 12));
+        $this->assertSame(2, RookieFcPlan::capFor($p(11, '大型'), 11));
+        $this->assertGreaterThan(100, RookieFcPlan::capFor($p(12, '大型'), 12));
+
+        $day = Carbon::today()->addDays(1);
+        if (! $day->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        foreach (['A', 'B', 'C'] as $n) {
+            PersonFactory::new()->create(['name' => '新人'.$n, 'role' => 'employee', 'department' => 'イベプラ',
+                'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+        }
+        $big = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day->format('Y-m-d'), 'required_count' => 10, 'status' => '調整中']);
+
+        $picks = RookieFcPlan::build(Carbon::today(), '東京')['picks'];
+        $this->assertCount(2, array_filter($picks, fn ($x) => $x['projectId'] === $big->id), '8名を超える案件は2人まで');
+    }
+
     public function test_画面と卒業ボタン(): void
     {
         $me = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京', 'must_onboard' => false]);
@@ -102,6 +127,9 @@ class RookieTest extends TestCase
             'hire_date' => Carbon::today()->subMonth(), 'office' => '東京']);
 
         $this->actingAsPerson($me)->get('/rookies')->assertOk()->assertSee('新人B');
+        // OJT担当とメモ（2026-10-09 baba要望）。
+        $this->actingAsPerson($me)->post('/rookies/ojt', ['id' => $new->id, 'ojt' => $me->id, 'note' => '水曜はNG'])->assertRedirect();
+        $this->assertSame([$me->id, '水曜はNG'], [$new->fresh()->rookie_ojt_id, $new->fresh()->rookie_note]);
         $this->actingAsPerson($me)->post('/rookies/state', ['id' => $new->id, 'state' => 'out'])->assertRedirect();
         $this->assertSame('out', $new->fresh()->rookie_state);
 
