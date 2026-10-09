@@ -65,20 +65,6 @@ class RookieController extends Controller
         });
     }
 
-    /** 何ヶ月目かを数える起点。 */
-    public function setSince(Request $request)
-    {
-        $data = $request->validate([
-            'id' => ['required', 'string', 'exists:people,id'],
-            'since' => ['nullable', 'date'],
-        ]);
-        $p = Person::findOrFail($data['id']);
-        $p->rookie_since = $data['since'] ?: null;
-        $p->save();
-
-        return back()->with('ok', $p->name.'さんの起点を直しました。');
-    }
-
     /** OJT担当とひとことメモ（2026-10-09 baba要望）。 */
     public function setOjt(Request $request)
     {

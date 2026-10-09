@@ -343,7 +343,6 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // 新人ページ（2026-10-09 baba要望）。見る・直す＝社員以上（新人が自分で直せるように・baba決定）。FCの案は見るだけ。
     Route::get('/rookies', [\App\Http\Controllers\RookieController::class, 'index']);
     Route::post('/rookies/state', [\App\Http\Controllers\RookieController::class, 'setState']);
-    Route::post('/rookies/since', [\App\Http\Controllers\RookieController::class, 'setSince']);
     Route::post('/rookies/ojt', [\App\Http\Controllers\RookieController::class, 'setOjt']);
     Route::post('/rookies/exp', [\App\Http\Controllers\RookieController::class, 'setExp']);
     Route::post('/rookies/targets', [\App\Http\Controllers\RookieController::class, 'setTargets']);

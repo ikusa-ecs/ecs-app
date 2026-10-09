@@ -49,10 +49,10 @@
 <div class="rk-card">
   <h3>🌱 新人の一覧（{{ $month->format('Y年n月') }}）</h3>
   <p class="sub">入社2年以内のイベプラ・セールスの社員と、手で入れた人が出ます。独り立ちしたら「卒業」を押してください（一覧から消えます・下で元に戻せます）。
-    「何ヶ月目」は起点（空なら入社日）の月を1ヶ月目として数えます。</p>
+    「何ヶ月目」は入社日の月を1ヶ月目として数えます。</p>
   <div class="rk-wrap">
   <table class="rk">
-    <tr><th>名前</th><th>OJT担当・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>起点</th><th></th></tr>
+    <tr><th>名前</th><th>OJT担当・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>入社日</th><th></th></tr>
     @forelse ($rookies as $r)
       <tr>
         <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div></td>
@@ -77,7 +77,7 @@
             <span class="{{ $r['monthFc'] < $r['target']['fc'] ? 'rk-short' : 'rk-okc' }}">{{ $r['monthFc'] < $r['target']['fc'] ? 'あと'.($r['target']['fc'] - $r['monthFc']) : '達成' }}</span><br>
             D {{ $r['monthD'] }}/<b>{{ $r['target']['d'] }}</b>
           @else
-            <span class="rk-small">起点が無い（入社日か起点を入れてください）</span>
+            <span class="rk-small">入社日が未入力（名簿で入社日を入れてください）</span>
           @endif
         </td>
         @foreach (['must', 'recommend'] as $k)
@@ -87,14 +87,7 @@
             @if ($r['progress'][$k]['left'])<div class="rk-small">まだ：{{ implode('、', $r['progress'][$k]['left']) }}</div>@endif
           </td>
         @endforeach
-        <td>
-          @if ($canEdit)
-            <form method="POST" action="/rookies/since">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
-              <input class="rk-in" type="date" name="since" value="{{ $r['since'] }}" onchange="rkRemember(); this.form.submit()" title="空なら入社日から数えます"></form>
-          @else
-            {{ $r['since'] ?: '入社日' }}
-          @endif
-        </td>
+        <td class="rk-num">{{ $r['hire'] ?: '未入力' }}</td>
         <td>
           @if ($canEdit)
             <form method="POST" action="/rookies/state" onsubmit="return confirm('{{ $r['name'] }}さんを卒業（独り立ち）にしますか？')">@csrf
@@ -255,7 +248,7 @@
       .then(function (r) { if (!r.ok) throw r.status; mark.textContent = ' ✓ 保存しました'; })
       .catch(function () { form.submit(); });
   }
-  // ほかのボタン（OJT・起点・経験など）は読み込み直すので、開いていた枠と元の位置に戻す。
+  // ほかのボタン（OJT・経験など）は読み込み直すので、開いていた枠と元の位置に戻す。
   function rkRemember() {
     try {
       var open = [];
