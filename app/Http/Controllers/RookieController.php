@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * 新人ページ（/rookies・2026-10-09 baba要望）。
- * 見る＝社員以上／卒業・目標・難易度表を直す＝管理者以上。
+ * 見る・直す＝社員以上（新人が自分で直せるように・2026-10-09 baba決定）。門はルートの tier:employee。
  * ⚠ FCの案は**見るだけ**（ここからアサインは保存しない）。中身の正本＝App\Support\RookieFcPlan。
  */
 class RookieController extends Controller
@@ -43,7 +43,7 @@ class RookieController extends Controller
             'difficulties' => ContentDifficulty::orderBy('kind', 'desc')->orderBy('id')->get(),
             'contents' => Content::where('active', true)->orderBy('content_name')->get(['id', 'content_name']),
             'unlinked' => $plan['unlinked'],
-            'canEdit' => in_array(optional($request->user())->permission, ['manager', 'admin'], true),
+            'canEdit' => true,   // 社員以上ならだれでも直せる（この画面に来られるのは社員以上だけ）
         ]);
     }
 
@@ -93,6 +93,32 @@ class RookieController extends Controller
         $p->save();
 
         return back()->with('ok', $p->name.'さんのOJT担当・メモを保存しました。');
+    }
+
+    /**
+     * 経験を手で直す（2026-10-09 baba「大型で受付だったから実は経験していない、みたいなことがある」）。
+     * 受け取り：id＋ov[コンテンツID][fc|d]＝''（アサインから自動）／done（やった）／none（やっていない）。
+     */
+    public function setExp(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'exists:people,id'],
+            'ov' => ['nullable', 'array'],
+            'ov.*.fc' => ['nullable', 'in:done,none'],
+            'ov.*.d' => ['nullable', 'in:done,none'],
+        ]);
+        $out = [];
+        foreach (($data['ov'] ?? []) as $cid => $o) {
+            $o = array_filter(['fc' => $o['fc'] ?? null, 'd' => $o['d'] ?? null]);
+            if ($o) {
+                $out[(string) $cid] = $o;
+            }
+        }
+        $p = Person::findOrFail($data['id']);
+        $p->rookie_overrides = $out ?: null;
+        $p->save();
+
+        return back()->with('ok', $p->name.'さんの経験を保存しました。');
     }
 
     public function setTargets(Request $request)

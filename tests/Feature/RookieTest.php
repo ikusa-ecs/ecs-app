@@ -133,7 +133,33 @@ class RookieTest extends TestCase
         $this->actingAsPerson($me)->post('/rookies/state', ['id' => $new->id, 'state' => 'out'])->assertRedirect();
         $this->assertSame('out', $new->fresh()->rookie_state);
 
+        // 社員なら直せる（新人が自分で直せるように・2026-10-09 baba）／スタッフは入れない。
         $emp = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
-        $this->actingAsPerson($emp)->post('/rookies/state', ['id' => $new->id])->assertForbidden();
+        $this->actingAsPerson($emp)->post('/rookies/state', ['id' => $new->id, 'state' => 'in'])->assertRedirect();
+        $this->assertSame('in', $new->fresh()->rookie_state);
+        $staff = PersonFactory::new()->create(['role' => 'staff', 'permission' => 'staff', 'office' => '東京', 'must_onboard' => false]);
+        $this->actingAsPerson($staff)->post('/rookies/state', ['id' => $new->id, 'state' => 'out']);
+        $this->assertSame('in', $new->fresh()->rookie_state, 'スタッフは直せない（スタッフ画面へ戻される）');
+    }
+
+    /** 経験を手で直す（2026-10-09 baba「大型で受付だったから実は経験していない」）。 */
+    public function test_経験を手で直す(): void
+    {
+        Content::create(['id' => 'CT-1', 'content_name' => '戦国運動会', 'active' => true]);
+        ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => '戦国運動会', 'difficulty' => 3, 'must' => true, 'content_id' => 'CT-1']);
+        $new = PersonFactory::new()->create(['name' => '新人C', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->subMonths(2), 'office' => '東京']);
+        $past = ProjectFactory::new()->create(['office' => '東京', 'start_date' => Carbon::today()->subDays(10)->format('Y-m-d'), 'content_ids' => ['CT-1']]);
+        Assignment::create(['project_id' => $past->id, 'staff_id' => $new->id, 'role' => 'UKE', 'status' => '確定',
+            'date' => $past->start_date->format('Y-m-d')]);
+
+        $exp = fn () => collect(RookieFcPlan::build(Carbon::today(), '東京')['rookies'])->firstWhere('id', $new->id);
+        $this->assertSame(['戦国運動会'], $exp()['progress']['must']['readyD'], '自動ではFC済＝D準備OK');
+
+        $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
+        $this->actingAsPerson($me)->post('/rookies/exp', ['id' => $new->id, 'ov' => ['CT-1' => ['fc' => 'none', 'd' => '']]])->assertRedirect();
+        $this->assertSame(['CT-1' => ['fc' => 'none']], $new->fresh()->rookie_overrides);
+        $this->assertSame(['戦国運動会'], $exp()['progress']['must']['left'], 'やっていないにしたら「まだ」に戻る');
+        $this->assertSame(1, $exp()['exp'][0]['fcAuto'], '自動の回数はそのまま見える');
     }
 }

@@ -103,6 +103,34 @@
           @endif
         </td>
       </tr>
+      <tr>
+        <td colspan="8" style="border-top:0; padding-top:0;">
+          <details class="rk-exp">
+            <summary class="rk-small" style="cursor:pointer;">📒 経験を見る・手で直す（{{ count($r['exp']) }}件）</summary>
+            <p class="rk-small">「自動」＝アサインから数えた回数（開催済みだけ）。大型で受付だった、など実は経験していないときは「やっていない」、アサインに残っていないが経験したときは「やった」にしてください。</p>
+            <form method="POST" action="/rookies/exp">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
+              <table class="rk" style="max-width:640px;">
+                <tr><th>コンテンツ</th><th>FC</th><th>D</th></tr>
+                @foreach ($r['exp'] as $e)
+                  <tr>
+                    <td>{{ $e['name'] }}</td>
+                    @foreach (['fc' => 'fcAuto', 'd' => 'dAuto'] as $k => $auto)
+                      <td>
+                        <select class="rk-in" name="ov[{{ $e['id'] }}][{{ $k }}]">
+                          <option value="">自動（{{ $e[$auto] }}回）</option>
+                          <option value="done" @selected($e[$k.'Ov'] === 'done')>やった</option>
+                          <option value="none" @selected($e[$k.'Ov'] === 'none')>やっていない</option>
+                        </select>
+                      </td>
+                    @endforeach
+                  </tr>
+                @endforeach
+              </table>
+              <button class="rk-btn main" type="submit" style="margin-top:6px;">保存</button>
+            </form>
+          </details>
+        </td>
+      </tr>
     @empty
       <tr><td colspan="8" class="rk-small">新人はいません。</td></tr>
     @endforelse

@@ -75,6 +75,29 @@ final class RookieFcPlan
                 }
             }
 
+            // 手で直した経験（2026-10-09 baba「大型で受付だったから実は経験していない、みたいなことがある」）。
+            // done＝やったことにする／none＝やっていないことにする／無し＝アサインから自動。
+            $autoFc = $fcDone;
+            $autoD = $dDone;
+            $ov = is_array($p->rookie_overrides) ? $p->rookie_overrides : [];
+            $fcDone = self::applyOverride($fcDone, $ov, 'fc');
+            $dDone = self::applyOverride($dDone, $ov, 'd');
+            // 手で直す表に出すコンテンツ＝必修・推奨＋アサインで自動で数えたもの＋手で直したもの。
+            $expIds = array_values(array_unique(array_merge(
+                $mustRows->pluck('content_id')->map(fn ($v) => (string) $v)->all(),
+                array_map('strval', array_keys($autoFc)), array_map('strval', array_keys($autoD)),
+                array_map('strval', array_keys($ov))
+            )));
+            $exp = [];
+            foreach ($expIds as $cid) {
+                $exp[] = [
+                    'id' => $cid, 'name' => $contentNames[$cid] ?? $cid,
+                    'fcAuto' => $autoFc[$cid] ?? 0, 'dAuto' => $autoD[$cid] ?? 0,
+                    'fcOv' => (string) ($ov[$cid]['fc'] ?? ''), 'dOv' => (string) ($ov[$cid]['d'] ?? ''),
+                ];
+            }
+            usort($exp, fn ($a, $b) => strcmp($a['name'], $b['name']));
+
             $no = Rookies::monthNo($p, $month);
             $target = Rookies::targetFor($no);
             $fcThisMonth = $monthEvents - $monthD;
@@ -99,6 +122,7 @@ final class RookieFcPlan
                 'monthD' => $monthD,
                 'monthFc' => $fcThisMonth,
                 'progress' => $progress,
+                'exp' => $exp,
             ];
             $state[$p->id] = [
                 'person' => $p,
@@ -111,6 +135,21 @@ final class RookieFcPlan
 
         return ['rookies' => $out, 'picks' => self::picks($month, $office, $state, $map, $contentNames),
             'unlinked' => ContentDifficulty::whereNull('content_id')->count()];
+    }
+
+    /** 手で直した印を当てる（done＝やった／none＝やっていない）。 */
+    private static function applyOverride(array $done, array $ov, string $key): array
+    {
+        foreach ($ov as $cid => $o) {
+            $v = is_array($o) ? ($o[$key] ?? '') : '';
+            if ($v === 'done') {
+                $done[$cid] = max(1, $done[$cid] ?? 0);
+            } elseif ($v === 'none') {
+                unset($done[$cid]);
+            }
+        }
+
+        return $done;
     }
 
     /** 必修・推奨のどこまで済んだか。◻︎▲★（同じ分類から1つ）は分類ごとに1つと数える。 */
