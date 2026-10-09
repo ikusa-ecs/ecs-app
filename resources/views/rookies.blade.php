@@ -59,11 +59,11 @@
         <td>
           @if ($canEdit)
             <form method="POST" action="/rookies/ojt">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
-              <select class="rk-in" name="ojt" onchange="this.form.submit()" title="OJT担当">
+              <select class="rk-in" name="ojt" onchange="rkRemember(); this.form.submit()" title="OJT担当">
                 <option value="">（OJT担当なし）</option>
                 @foreach ($employees as $e)<option value="{{ $e->id }}" @selected($e->id === $r['ojt'])>{{ $e->name }}</option>@endforeach
               </select>
-              <input class="rk-in" type="text" name="note" value="{{ $r['note'] }}" maxlength="500" placeholder="メモ" style="margin-top:4px; width:150px;" onchange="this.form.submit()">
+              <input class="rk-in" type="text" name="note" value="{{ $r['note'] }}" maxlength="500" placeholder="メモ" style="margin-top:4px; width:150px;" onchange="rkRemember(); this.form.submit()">
             </form>
           @else
             {{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
@@ -90,7 +90,7 @@
         <td>
           @if ($canEdit)
             <form method="POST" action="/rookies/since">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
-              <input class="rk-in" type="date" name="since" value="{{ $r['since'] }}" onchange="this.form.submit()" title="空なら入社日から数えます"></form>
+              <input class="rk-in" type="date" name="since" value="{{ $r['since'] }}" onchange="rkRemember(); this.form.submit()" title="空なら入社日から数えます"></form>
           @else
             {{ $r['since'] ?: '入社日' }}
           @endif
@@ -216,10 +216,10 @@
         <td>
           @if ($canEdit)
             <form method="POST" action="/rookies/link">@csrf<input type="hidden" name="id" value="{{ $d->id }}">
-              <select class="rk-in" name="content_id" onchange="this.form.submit()">
+              <select class="rk-in" name="content_id" onchange="rkLink(this)">
                 <option value="">（つながっていない）</option>
                 @foreach ($contents as $c)<option value="{{ $c->id }}" @selected($c->id === $d->content_id)>{{ $c->content_name }}</option>@endforeach
-              </select></form>
+              </select><span class="rk-small rk-saved"></span></form>
           @else
             {{ optional($contents->firstWhere('id', $d->content_id))->content_name ?? '（つながっていない）' }}
           @endif
@@ -243,4 +243,35 @@
   @endforeach
 </details>
 @endif
+
+<script>
+  // 難易度表のつなぎは、画面を読み込み直さずにその場で保存する（2026-10-09 baba「つないだら上に行っちゃうのめんどい」）。
+  // 失敗したらふつうの送信に切り替える（保存されないまま黙らない）。
+  function rkLink(sel) {
+    var form = sel.form;
+    var mark = form.querySelector('.rk-saved');
+    mark.textContent = ' 保存中…';
+    fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw r.status; mark.textContent = ' ✓ 保存しました'; })
+      .catch(function () { form.submit(); });
+  }
+  // ほかのボタン（OJT・起点・経験など）は読み込み直すので、開いていた枠と元の位置に戻す。
+  function rkRemember() {
+    try {
+      var open = [];
+      document.querySelectorAll('details').forEach(function (d, i) { if (d.open) open.push(i); });
+      sessionStorage.setItem('rk_scroll', JSON.stringify({ y: window.scrollY, open: open }));
+    } catch (e) {}
+  }
+  try {
+    var saved = JSON.parse(sessionStorage.getItem('rk_scroll') || 'null');
+    if (saved) {
+      sessionStorage.removeItem('rk_scroll');
+      var all = document.querySelectorAll('details');
+      (saved.open || []).forEach(function (i) { if (all[i]) all[i].open = true; });
+      window.scrollTo(0, parseInt(saved.y, 10) || 0);
+    }
+    document.querySelectorAll('form[method="POST"]').forEach(function (f) { f.addEventListener('submit', rkRemember); });
+  } catch (e) {}
+</script>
 @endsection

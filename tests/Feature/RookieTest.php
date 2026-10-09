@@ -58,6 +58,18 @@ class RookieTest extends TestCase
         $this->assertNull(ContentDifficulty::where('sheet_name', '秘密の会議室からの脱出')->value('content_id'), '合わない名前は勘でつながない');
     }
 
+    /** 難易度表のつなぎはその場で保存（画面を読み込み直さない・2026-10-09 baba）。 */
+    public function test_つなぎはJSONで返す(): void
+    {
+        Content::create(['id' => 'CT-9', 'content_name' => 'ジャングルサバイバル', 'active' => true]);
+        $d = ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'ジャンサバ', 'difficulty' => 1]);
+        $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
+
+        $this->actingAsPerson($me)->postJson('/rookies/link', ['id' => $d->id, 'content_id' => 'CT-9'])->assertOk()->assertJson(['ok' => true]);
+        $this->assertSame('CT-9', $d->fresh()->content_id);
+        $this->assertStringContainsString('function rkLink(sel)', $this->actingAsPerson($me)->get('/rookies')->getContent());
+    }
+
     public function test_新人は自動で出て卒業で消える(): void
     {
         $new = PersonFactory::new()->create(['role' => 'employee', 'department' => 'イベプラ', 'hire_date' => Carbon::today()->subMonths(3), 'office' => '東京']);

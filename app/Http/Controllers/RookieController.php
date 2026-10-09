@@ -149,6 +149,9 @@ class RookieController extends Controller
             'content_id' => ['nullable', 'string', 'exists:contents,id'],
         ]);
         ContentDifficulty::whereKey($data['id'])->update(['content_id' => $data['content_id'] ?: null]);
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);   // 画面はその場で保存する（読み込み直さない・2026-10-09）
+        }
 
         return back()->with('ok', 'コンテンツをつなぎました。');
     }
