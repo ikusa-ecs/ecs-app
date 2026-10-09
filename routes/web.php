@@ -437,6 +437,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // ⚠ 消す操作なので Administrator のみ（コンテンツの削除と同じ）。
     Route::get('/masters/content-cleanup', [MasterController::class, 'contentCleanup'])->middleware('tier:admin');
     Route::post('/masters/content-cleanup', [MasterController::class, 'contentCleanupApply'])->middleware('tier:admin');
+    // コンテンツ台帳の整理（2026-10-09・babaが確認した案を一気に直す）。下見→実行。Administratorだけ。
+    Route::get('/masters/content-reorg', [MasterController::class, 'contentReorg'])->middleware('tier:admin');
+    Route::post('/masters/content-reorg', [MasterController::class, 'contentReorgApply'])->middleware('tier:admin');
     Route::post('/masters/office-options', [MasterController::class, 'officeOptionsSave']);   // 拠点ごとの選択肢（集合形式・音響・移動・運営場所）
     Route::post('/masters/offices', [MasterController::class, 'officeStore']);               // 新規追加
     Route::post('/masters/offices/bulk', [MasterController::class, 'officeBulkStore']);      // まとめて保存

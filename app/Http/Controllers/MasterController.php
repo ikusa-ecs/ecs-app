@@ -141,6 +141,22 @@ class MasterController extends Controller
         return view('content_cleanup', ['candidates' => ContentCleanup::candidates()]);
     }
 
+    /** コンテンツ台帳の整理（2026-10-09 baba確認済みの案を一気に直す）。正本＝App\Support\ContentReorg。 */
+    public function contentReorg()
+    {
+        $rows = \App\Support\ContentReorg::preview();
+
+        return view('content_reorg', ['rows' => $rows, 'okCount' => count(array_filter($rows, fn ($r) => $r['ok']))]);
+    }
+
+    public function contentReorgApply()
+    {
+        $r = \App\Support\ContentReorg::apply();
+
+        return redirect('/masters/content-reorg')->with('status',
+            "{$r['done']}件を直しました（案件{$r['projects']}件をつなぎ直しました）。止めたもの {$r['skipped']}件。");
+    }
+
     public function contentCleanupApply(Request $request)
     {
         $ids = array_values(array_filter((array) $request->input('ids', []), 'is_string'));
