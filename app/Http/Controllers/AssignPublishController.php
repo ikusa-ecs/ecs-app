@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Support\Headcount;
 use App\Models\ProjectShare;
+use App\Support\OfficeCounts;
 use App\Support\OfficePublish;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
@@ -314,6 +315,42 @@ class AssignPublishController extends Controller
             // ⚠ この既定の数をJSに書かないため、サーバーから返す。
             'needStaff' => RecruitStatus::need($project->required_count),
         ]);
+    }
+
+    /**
+     * 拠点ごとの必要人数を保存する（2026-10-09 baba要望「東1 名9 のように」）。正本＝App\Support\OfficeCounts。
+     * 受け取り：id（案件ID）＋ counts（{拠点名: 人数 or 空}）。空の拠点は「分けない」に戻す。
+     * ⚠ 関わっていない拠点の数は受けない（ヘルプも巻き取りも無い拠点に人数を書かない）。
+     * ⚠ どちらの拠点からでも直せる（baba決定）＝門は運営人数と同じ ProjectAccess。
+     */
+    public function setOfficeCounts(Request $request)
+    {
+        $data = $request->validate([
+            'id'       => ['required', 'string', 'exists:projects,id'],
+            'counts'   => ['nullable', 'array'],
+            'counts.*' => ['nullable', 'integer', 'min:0', 'max:999'],
+        ]);
+
+        $project = Project::findOrFail($data['id']);
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+
+        $allowed = OfficeCounts::offices($project);
+        $counts = [];
+        foreach (($data['counts'] ?? []) as $office => $n) {
+            if (! in_array($office, $allowed, true)) {
+                return response()->json(['ok' => false, 'message' => '「'.$office.'」はこの案件に関わっていない拠点です。'], 422);
+            }
+            if ($n !== null && $n !== '') {
+                $counts[$office] = (int) $n;
+            }
+        }
+
+        $project->office_counts = $counts !== [] ? $counts : null;
+        $project->save();
+
+        return response()->json(['ok' => true, 'counts' => OfficeCounts::of($project)]);
     }
 
     /**

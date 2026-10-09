@@ -18,6 +18,7 @@ use App\Support\Headcount;
 use App\Support\LineGroupText;
 use App\Support\RecruitAgainText;
 use App\Support\Lodging;
+use App\Support\OfficeCounts;
 use App\Support\OfficePublish;
 use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
@@ -511,6 +512,12 @@ class AssignBoardController extends Controller
             //   ⚠ 残す1行の決め方＝**その案件の開催日（カードの日）の行を優先**、次に「確定」を優先。
             //     日によって役割が違うときは、開催日の役割が出る（カードはその日のものなので）。
             //   ⚠ 希望者（applicants）側は前から unique('staff_id') 済み。ここだけ抜けていた。
+            // 拠点ごとの必要人数（2026-10-09・正本＝App\Support\OfficeCounts）。
+            // 見ている拠点の数が入っていれば、必要人数も「埋まった数」もその拠点の分だけで数える（A案）。
+            $shares = $sharesByProject->get($p->id, collect());
+            $splitCounts = OfficeCounts::of($p, $shares);
+            $splitNeed = OfficeCounts::needFor($p, $office, $shares);
+
             $startDate = $p->start_date?->format('Y-m-d');
             $assigned = ($assignedByProject->get($p->id) ?? collect())
                 ->sortBy(fn ($a) => [
@@ -519,12 +526,15 @@ class AssignBoardController extends Controller
                     optional($a->date)->format('Y-m-d') ?? '9999-12-31',
                 ])
                 ->unique('staff_id')
-                ->map(function ($a) use ($people) {
+                ->map(function ($a) use ($people, $splitNeed, $office) {
                     $person = $people->get($a->staff_id);
 
                     return [
                         'name' => $person->name ?? $a->staff_id,
                         'id' => $a->staff_id,          // ポジション編集の保存に使う（案件×人）
+                        // 拠点ごとに人数を分けた案件で、見ている拠点の人か（false＝数に入れない・カードでは薄く出す）。
+                        'here' => $splitNeed === null || OfficeCounts::personIs($person, (string) $office),
+                        'office' => (string) (($person->office ?? '') ?: OfficeScope::DEFAULT_OFFICE),
                         'lv' => '-',   // 経験レベルは希望者カラム用。メンバー行では未表示。
                         'pos' => self::POS_LABELS[$a->role] ?? ($a->role ?: '—'),
                         'roleCode' => $a->role ?: '',  // 保存用の役割コード（プルダウンの初期選択）
@@ -596,11 +606,20 @@ class AssignBoardController extends Controller
                 'client' => $p->client ?? '',
                 'note' => $p->note ?? '',   // 案件の備考（見落とし防止でカードに出す）
                 'cat' => $p->site_category ?: '通常',
-                'need' => $p->required_count ?? 0,
+                'need' => $splitNeed ?? ($p->required_count ?? 0),
+                // 拠点ごとの必要人数（2026-10-09）。split＝{拠点: 人数}／splitOffices＝直せる拠点（2つ以上のときだけ欄を出す）。
+                // ⚠ 派遣は登録した拠点の分として数える（dispatchHere）。画面のJSの filledOf も同じ決まり。
+                'split' => (object) $splitCounts,
+                'splitOffices' => OfficeCounts::offices($p, $shares),
+                'splitOn' => $splitNeed !== null,
+                'dispatchHere' => $splitNeed === null || OfficeCounts::dispatchCountsFor($p, (string) $office),
+                'needTotal' => $p->required_count ?? 0,
                 // IKUSAの添え書き（2026-09-18）。正本＝App\Support\Headcount::ikusaNote
                 'needIkusaNote' => Headcount::ikusaNote($p->ikusa_count_min, $p->ikusa_count),
                 // 派遣10名＝10名と数える（依頼中＋確定・2026-09-29）。⚠ 画面のJSは filledOf で同じ足し算をしている。
-                'filled' => count($assigned) + DispatchRows::liveCount($dispatchesByProject[$p->id] ?? []),
+                'filled' => count(array_filter($assigned, fn ($m) => $m['here']))
+                    + (($splitNeed === null || OfficeCounts::dispatchCountsFor($p, (string) $office))
+                        ? DispatchRows::liveCount($dispatchesByProject[$p->id] ?? []) : 0),
                 // お客様（参加者）の人数とチーム数（2026-09-07 baba要望）。
                 // ⚠ スタッフの運営人数（need）とは**別のもの**。取り違えると当日の規模を読み違える。
                 // ⚠ 「未定」は空欄で保存される（案件登録の「人数は未定」チェック）ので、
@@ -631,7 +650,7 @@ class AssignBoardController extends Controller
                 // ⚠ スタッフの画面で使っている必要人数（未入力なら既定の人数）。正本＝RecruitStatus。
                 //   これで「締切（満員）／募集中」を判定する＝社員とスタッフで言うことを合わせる。
                 //   運営人数を増やせば、その場でまた「募集中」に戻る（公開し直さなくてよい）。
-                'needStaff' => RecruitStatus::need($p->required_count),
+                'needStaff' => $splitNeed ?? RecruitStatus::need($p->required_count),
                 // 運営人数の表示用（「6〜8」の形）と、IKUSAの添え書き（2026-09-18 baba要望）。
                 // ⚠ 添え書きの文言は App\Support\Headcount::ikusaNote が正本（画面ごとに書かない）。
                 'needLabel' => Headcount::label($p->required_count_min, $p->required_count),
@@ -639,7 +658,7 @@ class AssignBoardController extends Controller
                 'mine' => $mine,
                 // 拠点間の関わりの札（例：「名古屋からヘルプ」「名古屋に巻き取り」）。2026-09-18 baba要望。
                 // ⚠ 文言は App\Support\ShareTags が正本（画面で文字をつなげない）。
-                'shareTags' => ShareTags::forProject($p->office, $sharesByProject->get($p->id, collect()), $office),
+                'shareTags' => ShareTags::forProject($p->office, $shares, $office),
                 // 営業担当（2026-09-18 baba要望）。LINEグループを作るとき営業担当も招待するので、
                 // 誰を呼ぶのかカードで分かるようにする。⚠ 複数なら「・」でつなぐ。
                 'sales' => implode('・', array_filter(array_map('trim', $salesOwners))),

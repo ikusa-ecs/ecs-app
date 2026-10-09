@@ -91,7 +91,9 @@ class DispatchHeadcountTest extends TestCase
 
         // 画面のJSも同じ足し算（filledOf／confirmedOf に派遣を足す）。
         $html = $this->actingAsPerson($this->manager())->get('/assign')->getContent();
-        $this->assertStringContainsString('function filledOf(c){ return c.assigned.length + dispatchLiveOf(c); }', $html);
-        $this->assertStringContainsString("m.status === '確定').length + dispatchLiveOf(c); }", $html);
+        // ⚠ 2026-10-09 から拠点ごとの人数（OfficeCounts）で「見ている拠点の人・登録拠点の派遣」に絞る形になった。
+        $this->assertStringContainsString('function dispatchHereOf(c){ return (c.dispatchHere === false) ? 0 : dispatchLiveOf(c); }', $html);
+        $this->assertStringContainsString('function filledOf(c){ return hereOf(c).length + dispatchHereOf(c); }', $html);
+        $this->assertStringContainsString("m.status === '確定').length + dispatchHereOf(c); }", $html);
     }
 }

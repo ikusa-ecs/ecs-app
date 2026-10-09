@@ -193,6 +193,15 @@
     .cc-fill .fnum .need { color: var(--muted); font-weight: 400; }
     /* 運営人数を直すボタン（2026-09-08）。人数の右にそっと置く＝バーを押し縮めない。 */
     .cc-fill .need-edit { padding: 2px 7px; font-size: 11px; white-space: nowrap; flex: none; }
+    /* 拠点ごとの必要人数（2026-10-09）。ヘルプ・巻き取りで2拠点以上が関わる案件だけに出る。 */
+    .osplit { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 11.5px; color: var(--muted); margin: 2px 0 4px; }
+    .osplit-h { font-weight: 700; }
+    .osplit-cell { display: inline-flex; align-items: center; gap: 2px; color: var(--ink); }
+    .osplit-cell.cur { font-weight: 700; }
+    .osplit-cell input { width: 42px; padding: 1px 3px; font-size: 11.5px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
+    .osplit-hint { color: var(--warn); }
+    .m-office { font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; margin-left: 2px; white-space: nowrap; }
+    .mem-row.away .m-name { opacity: .6; }
 
     /* ポジション充足ランプ */
     .cc-pos { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -837,7 +846,12 @@
       tags:(c.tags||[]).slice(), pos:(c.pos||[]).map(p => p.slice()),
       // 割当メンバー：DBボードならその実データ、見本なら後で candPool から作る（下の forEach）。
       // note＝担当メモ（軍師/サポ等）・patrol＝巡回数。マップで捨てると表示できないので保持する。
-      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, roleCode2:m.roleCode2, status:m.status, note:m.note, patrol:m.patrol, remark:m.remark }))
+      // here＝見ている拠点の人か（拠点ごとに人数を分けた案件だけ false がある）／office＝その人の拠点（2026-10-09）。
+      assigned:(c.assigned||[]).map(m => ({ name:m.name, lv:m.lv, pos:m.pos, type:m.type, id:m.id, roleCode:m.roleCode, roleCode2:m.roleCode2, status:m.status, note:m.note, patrol:m.patrol, remark:m.remark, here:m.here, office:m.office || '' })),
+      // 拠点ごとの必要人数（2026-10-09 baba要望「東1 名9」）。正本＝App\Support\OfficeCounts。
+      // ⚠ 詰め替えを忘れると欄が出ない・数え方が全体に戻る（この画面でよくある事故）。
+      split:(c.split || {}), splitOffices:(c.splitOffices || []).slice(), splitOn:!!c.splitOn,
+      dispatchHere:(c.dispatchHere !== false), needTotal:c.needTotal
     }));
 
   // 備考をこの画面で直したときは、持っているデータにも書き戻す（再描画で古い備考に戻らないように）。
@@ -908,7 +922,11 @@
   function dispatchLiveOf(c){
     return (c.dispatches || []).reduce((s, d) => s + (d.cancelled ? 0 : Math.max(0, parseInt(d.count, 10) || 0)), 0);
   }
-  function filledOf(c){ return c.assigned.length + dispatchLiveOf(c); }
+  // ⚠ 拠点ごとに人数を分けた案件では、見ている拠点の人だけ数える（here===false は数えない）。
+  //   派遣は登録した拠点の分（dispatchHere）。サーバーの filled と同じ決まり（正本＝App\Support\OfficeCounts）。
+  function hereOf(c){ return c.assigned.filter(m => m.here !== false); }
+  function dispatchHereOf(c){ return (c.dispatchHere === false) ? 0 : dispatchLiveOf(c); }
+  function filledOf(c){ return hereOf(c).length + dispatchHereOf(c); }
   // メンバーの並び順＝上から D → (SD) → MC → OP → FC → CK → 軍師/サポ → 受付 → その他。
   const ECS_ROLE_RANK = { D:0, SD:1, MC:2, OP:3, FC:4, CK:5, SP:6, GUN:6, RP:7, UKE:7 };
   function roleRank(code){ return (code && (code in ECS_ROLE_RANK)) ? ECS_ROLE_RANK[code] : 99; }
@@ -1096,6 +1114,49 @@
         if (!ok || !(j && j.ok)) { alert((j && j.message) || '運営人数を保存できませんでした。'); return; }
         // ⚠ 画面のあちこち（その日の「必要◯名／あと◯名」・募集の残り・バーの色）が
         //   この数を見ているので、読み込み直してそろえる＝一部だけ古いまま残るのを防ぐ。
+        location.reload();
+      })
+      .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
+  }
+
+  // ===== 拠点ごとの必要人数（2026-10-09 baba要望「東1 名9 のように変えられたら最高」）=====
+  // ヘルプ・巻き取りで2つ以上の拠点が関わる案件だけに出す。どちらの拠点からでも直せる（baba決定）。
+  // ⚠ 数えるのも拠点ごと＝この拠点の人だけで「あと◯名」を出す。正本＝App\Support\OfficeCounts。
+  // ⚠ 空にした拠点は「分けない」に戻る（運営人数で動く）。
+  function splitHtml(c){
+    if (!USING_DB || (c.splitOffices || []).length < 2) return '';
+    const split = c.split || {};
+    const cells = c.splitOffices.map(o => {
+      const v = (split[o] !== undefined && split[o] !== null) ? split[o] : '';
+      const cur = (o === window.ECS_OFFICE_SCOPE) ? ' cur' : '';
+      return `<label class="osplit-cell${cur}">${escHtml(o)}<input type="number" min="0" max="999" value="${v}" data-office="${escAttr(o)}" onchange="saveSplit('${c.id}')"></label>`;
+    }).join('');
+    const keys = Object.keys(split);
+    const sum = keys.reduce((s, k) => s + (parseInt(split[k], 10) || 0), 0);
+    const hint = (keys.length && sum !== (c.needTotal || 0))
+      ? `<span class="osplit-hint">合計 ${sum}名（運営人数 ${c.needTotal || 0}名）</span>` : '';
+    return `<div class="osplit" id="osplit-${c.id}" title="拠点ごとの必要人数。入れた拠点では、その拠点の人だけで「あと◯名」を数えます。空にすると運営人数で動きます。"><span class="osplit-h">拠点ごと</span>${cells}${hint}</div>`;
+  }
+  function saveSplit(id){
+    const box = document.getElementById('osplit-' + id);
+    if (!box) return;
+    const counts = {};
+    let bad = false;
+    box.querySelectorAll('input[data-office]').forEach(inp => {
+      const v = String(inp.value).trim();
+      if (v !== '' && !/^[0-9]+$/.test(v)) bad = true;
+      counts[inp.dataset.office] = (v === '') ? null : Number(v);
+    });
+    if (bad) { alert('数字で入れてください（例 3）。'); return; }
+    fetch('/assign-publish/office-counts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ id: id, counts: counts })
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok || !(j && j.ok)) { alert((j && j.message) || '拠点ごとの人数を保存できませんでした。'); return; }
+        // 「あと◯名」・バー・その日の合計がこの数を見ているので、読み込み直してそろえる（editNeed と同じ）。
         location.reload();
       })
       .catch(() => alert('通信に失敗しました。もう一度お試しください。'));
@@ -2337,7 +2398,7 @@
   //   （取込でシートのメンバーが仮で入った瞬間に締切になり、スタッフがエントリー
   //     できなくなっていたため。カードの「割当済」は今までどおり仮も入れて数える）。
   // ⚠ 派遣（依頼中＋確定）も足す＝会社に頼んだ枠にスタッフを重ねて募集しない（2026-09-29）。
-  function confirmedOf(c){ return c.assigned.filter(m => m.status === '確定').length + dispatchLiveOf(c); }
+  function confirmedOf(c){ return hereOf(c).filter(m => m.status === '確定').length + dispatchHereOf(c); }
   function isFullForStaff(c){ return confirmedOf(c) >= needStaffOf(c); }
   function remainForStaff(c){ return Math.max(0, needStaffOf(c) - confirmedOf(c)); }
 
@@ -2863,7 +2924,10 @@
       // 名前の色でも区別する（2026-08-28 baba要望）＝社員は青・派遣は紫。横に出るバッジと同じ色。
       // ⚠ かぶり(dup)の赤が勝つようにCSS側で書く順番を決めている。
       const kindCls = m.type === 'emp' ? ' emp' : (m.type === 'haken' ? ' haken' : '');
-      return `<div class="mem-row"><span class="m-no">${i+1}</span><span class="m-name ${dup}${kindCls}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
+      // 拠点ごとに人数を分けた案件で、ほかの拠点の人（この拠点の人数には数えない・2026-10-09）。
+      const away = m.here === false;
+      const awayTag = away ? `<span class="m-office" title="${escAttr(m.office)}の人です。この拠点の人数には数えません">${escHtml(m.office)}</span>` : '';
+      return `<div class="mem-row${away ? ' away' : ''}"><span class="m-no">${i+1}</span><span class="m-name ${dup}${kindCls}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${awayTag}${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
     // 「仮」の人数（この人たちはスタッフの画面に出ないので、見出しで気づけるようにする・2026-08-21 baba）
     const kariN = members.filter(m => m.status === '仮').length;
@@ -3037,6 +3101,7 @@
         <button class="edit-btn need-edit" onclick="editNeed('${c.id}')"
                 title="運営人数（必要人数）を直します。案件登録・アサイン表・公開ボードと同じ欄に保存されます">✎ 人数</button>
       </div>
+      ${splitHtml(c)}
       <div class="cc-cols">
         ${memCol}
         ${candCol}

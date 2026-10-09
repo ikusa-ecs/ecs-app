@@ -47,6 +47,8 @@ class Project extends Model
             'staff_extra' => 'boolean',   // null に意味がある（区分に合わせる）。正本＝StaffExtra
             // どの拠点のスタッフに公開しているか（null＝これまでどおり関わる全拠点）。正本＝App\Support\OfficePublish（2026-09-30）
             'published_offices' => 'array',
+            // 拠点ごとの必要人数（例 {"東京":1,"名古屋":9}・null＝運営人数1つで動く）。正本＝App\Support\OfficeCounts（2026-10-09）
+            'office_counts' => 'array',
             'is_archived' => 'boolean',   // 手動アーカイブ（null=自動判定）
             // イベント数に数えるか（null=自動判定／true=数える／false=数えない・先-2）
             'count_as_event' => 'boolean',

@@ -316,6 +316,7 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/assign-publish/memo', [AssignPublishController::class, 'setMemo']);
     // スタッフ本人に伝えること（集合場所の詳細・持ち物・服装・注意事項）を projects へ保存。
     Route::post('/assign-publish/count', [AssignPublishController::class, 'setCount']);        // 必要人数（運営人数）
+    Route::post('/assign-publish/office-counts', [AssignPublishController::class, 'setOfficeCounts']); // 拠点ごとの必要人数（2026-10-09）
     Route::post('/assign-publish/staff-info', [AssignPublishController::class, 'setStaffInfo']);
     // 追加案件バッジの手動オン/オフ・通常案件の一斉締切日も DB に保存する。
     Route::post('/assign-publish/category', [AssignPublishController::class, 'setCategory']);

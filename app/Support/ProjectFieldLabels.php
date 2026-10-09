@@ -120,6 +120,8 @@ class ProjectFieldLabels
         'published_offices'  => '公開している拠点',
         // スタッフ画面の「追加」札（区分とは別・2026-10-07）。正本＝StaffExtra。
         'staff_extra'        => 'スタッフ画面の「追加」',
+        // 拠点ごとの必要人数（2026-10-09）。正本＝OfficeCounts。
+        'office_counts'      => '拠点ごとの人数',
         'publish_memo'       => '公開ボードの備考',
         'extra_published_at' => '追加案件の公開日',
         'is_archived'        => 'アーカイブ',
@@ -231,6 +233,11 @@ class ProjectFieldLabels
 
         if (in_array($field, self::DATE_FIELDS, true)) {
             return self::wrapEmpty(self::dateText($value));
+        }
+
+        // 拠点ごとの人数は「東京1・名古屋9」と出す（数字だけ並ぶと、どの拠点の数か分からない）。
+        if ($field === 'office_counts') {
+            return self::wrapEmpty(OfficeCounts::label(is_array($value) ? $value : (json_decode((string) $value, true) ?: [])));
         }
 
         if (is_array($value)) {
