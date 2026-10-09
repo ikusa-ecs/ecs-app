@@ -149,6 +149,14 @@ class MasterController extends Controller
         return view('content_reorg', ['rows' => $rows, 'okCount' => count(array_filter($rows, fn ($r) => $r['ok']))]);
     }
 
+    /** 単発にする（台帳から消して、使っている案件には名前だけ残す・2026-10-09 baba要望）。 */
+    public function contentOneoff(string $id)
+    {
+        $r = \App\Support\ContentReorg::toOneoff($id);
+
+        return redirect('/masters#contents')->with('status', $r['message']);
+    }
+
     public function contentReorgApply()
     {
         $r = \App\Support\ContentReorg::apply();

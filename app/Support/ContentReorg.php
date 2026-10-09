@@ -284,6 +284,34 @@ final class ContentReorg
         return ['done' => $done, 'skipped' => $skipped, 'projects' => count($touched)];
     }
 
+    /**
+     * 1件を単発にする（マスタ管理の「単発に」ボタン・2026-10-09 baba要望）。
+     * 台帳から消して、使っている案件には名前だけ残す。紙の在庫が入っていれば止める。
+     *
+     * @return array{ok:bool, projects:int, message:string}
+     */
+    public static function toOneoff(string $id): array
+    {
+        $c = Content::find($id);
+        if (! $c) {
+            return ['ok' => false, 'projects' => 0, 'message' => 'コンテンツが見つかりませんでした。'];
+        }
+        if (ContentPaperStock::where('content_id', $id)->exists()) {
+            return ['ok' => false, 'projects' => 0, 'message' => '「'.$c->content_name.'」は謎解きの紙の在庫が入っているので、単発にできません。'];
+        }
+        $n = 0;
+        DB::transaction(function () use ($c, $id, &$n) {
+            foreach (self::projectsWith($id) as $p) {
+                self::unlink($p, $id);
+                $n++;
+            }
+            self::moveRefs($id, (string) $c->content_name, [], []);
+            $c->delete();
+        });
+
+        return ['ok' => true, 'projects' => $n, 'message' => '「'.$c->content_name.'」を単発にしました（案件'.$n.'件に名前を残しました）。'];
+    }
+
     /** IDと名前が案と一致するか・紙の在庫が無いか。問題なければ空文字。 */
     private static function check(string $id, string $name, array $byId, array $stocked): string
     {

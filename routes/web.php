@@ -432,6 +432,7 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/masters/contents/{id}/requirements', [MasterController::class, 'contentReqsSave']);
     Route::post('/masters/contents/{id}/{dir}/move', [MasterController::class, 'contentMove'])->where('dir', 'up|down'); // 上下並び替え
     Route::post('/masters/contents/{id}/delete', [MasterController::class, 'contentDestroy'])->middleware('tier:admin'); // 削除はAdministratorのみ
+    Route::post('/masters/contents/{id}/oneoff', [MasterController::class, 'contentOneoff'])->middleware('tier:admin'); // 単発にする（2026-10-09）
     // まとめて削除（2026-08-31 baba要望）。案件CSVの取込で台帳に増えたコンテンツを一度に片づける。
     // ⚠ 案件で使われているコンテンツは消さない（コントローラ側でも断る）。削除はAdministratorのみ。
     Route::post('/masters/contents/bulk-delete', [MasterController::class, 'contentBulkDestroy'])->middleware('tier:admin');

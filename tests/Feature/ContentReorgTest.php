@@ -98,6 +98,24 @@ class ContentReorgTest extends TestCase
         $this->assertSame(0, $again['done']);
     }
 
+    /** マスタ管理の「単発に」ボタン（2026-10-09 baba）。 */
+    public function test_単発にするボタン(): void
+    {
+        $this->c('CT-900', 'マグロ解体ショー');
+        $p = $this->p('P-9', ['CT-900'], ['マグロ解体ショー']);
+        $admin = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京', 'must_onboard' => false]);
+        $mgr = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京', 'must_onboard' => false]);
+
+        $this->actingAsPerson($mgr)->post('/masters/contents/CT-900/oneoff');
+        $this->assertTrue(Content::whereKey('CT-900')->exists(), '管理者は押せない');
+
+        $this->actingAsPerson($admin)->get('/masters')->assertOk()->assertSee('/masters/contents/CT-900/oneoff', false);
+        $this->actingAsPerson($admin)->post('/masters/contents/CT-900/oneoff')->assertRedirect();
+        $this->assertFalse(Content::whereKey('CT-900')->exists());
+        $this->assertSame([], $p->fresh()->content_ids);
+        $this->assertSame(['マグロ解体ショー'], $p->fresh()->content_names, '案件の名前は残る');
+    }
+
     public function test_画面はAdministratorだけ(): void
     {
         $admin = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京', 'must_onboard' => false]);

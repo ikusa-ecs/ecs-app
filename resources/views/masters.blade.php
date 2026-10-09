@@ -140,6 +140,12 @@
           <div class="m-del">
             @if (($usedCounts[$c->id] ?? 0) > 0)
               <span class="m-used" title="{{ $usedCounts[$c->id] }}件の案件で使われているため削除できません">案件<br>{{ $usedCounts[$c->id] }}件</span>
+              {{-- 単発にする（2026-10-09 baba要望）＝台帳から消すが、使っている案件の名前は残す。 --}}
+              @if ($canDelete)
+                <button type="submit" class="m-btn" formaction="/masters/contents/{{ $c->id }}/oneoff" formnovalidate
+                        title="台帳から消して、使っている案件には名前だけ残します（単発のコンテンツ名になります）"
+                        onclick="return confirm('{{ $c->id }} を単発にします。台帳から消えて、使っている{{ $usedCounts[$c->id] }}件の案件には名前だけ残ります。よろしいですか？')">単発に</button>
+              @endif
             @elseif ($canDelete)
               <input type="checkbox" name="del[]" value="{{ $c->id }}" form="contentBulkDelete"
                      title="このコンテンツを削除する（下の「選んだものを削除」を押すと消えます）">
