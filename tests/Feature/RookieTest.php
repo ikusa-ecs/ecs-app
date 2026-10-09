@@ -132,6 +132,14 @@ class RookieTest extends TestCase
         $this->assertCount(2, array_filter($picks, fn ($x) => $x['projectId'] === $big->id), '8名を超える案件は2人まで');
     }
 
+    /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
+    public function test_ARENA場所貸しは外す(): void
+    {
+        $this->assertTrue(RookieFcPlan::isArenaRental(ProjectFactory::new()->make(['format' => 'ARENA場所貸し'])));
+        $this->assertTrue(RookieFcPlan::isArenaRental(ProjectFactory::new()->make(['format' => 'リアル', 'project_name' => 'ARENA場所貸し(マルシェ)', 'content_names' => ['ARENA場所貸し(マルシェ)']])));
+        $this->assertFalse(RookieFcPlan::isArenaRental(ProjectFactory::new()->make(['format' => 'リアル', 'project_name' => '謎パ', 'content_names' => ['謎パ']])));
+    }
+
     public function test_画面と卒業ボタン(): void
     {
         $me = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京', 'must_onboard' => false]);

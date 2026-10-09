@@ -210,6 +210,9 @@ final class RookieFcPlan
 
         $out = [];
         foreach ($cases as $c) {
+            if (self::isArenaRental($c, $names)) {
+                continue;   // ARENA場所貸しは新人を入れない（2026-10-09 baba）
+            }
             $day = $c->start_date->format('Y-m-d');
             $rows = $assigned->get($c->id, collect());
             $filled = $rows->pluck('staff_id')->unique()->count() + ($dispatch[$c->id] ?? 0);
@@ -251,6 +254,24 @@ final class RookieFcPlan
         }
 
         return $out;
+    }
+
+    /**
+     * ARENA場所貸しの案件か（2026-10-09 baba「新人のアサインからARENA場所貸しは外してほしい」）。
+     * 実施形態が「ARENA場所貸し」、またはコンテンツ名・案件名が「ARENA場所貸し」「ARENA貸し出し」のもの。
+     */
+    public static function isArenaRental(Project $c, array $names = []): bool
+    {
+        if (str_contains((string) ($c->format ?? ''), 'ARENA場所貸し')) {
+            return true;
+        }
+        foreach (array_merge(ProjectContentName::names($c, $names), [(string) $c->project_name]) as $n) {
+            if (str_contains($n, 'ARENA場所貸し') || str_contains($n, 'ARENA貸し出し')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
