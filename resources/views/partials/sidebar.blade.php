@@ -54,6 +54,8 @@
              （メニューが長くなったため・baba要望）。`/entry-feed` を開くとそのタブへ転送します。 --}}
         <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>
         <a class="{{ ($active ?? '') === 'auto_assign_month' ? 'active' : '' }}" href="/auto-assign-month"><span class="nav-icon">⚡</span> 月まとめ自動アサイン</a>
+        {{-- 新人ページ（2026-10-09 baba要望）＝新人ごとの進み具合と、FCに入れる案（見るだけ）。 --}}
+        <a class="{{ ($active ?? '') === 'rookies' ? 'active' : '' }}" href="/rookies"><span class="nav-icon">🌱</span> 新人</a>
         {{-- 派遣一覧＝どの案件にどこへ何名頼んだかのシート（2026-09-03 baba要望）。
              ⚠ 入れる場所は日別ボードの「＋派遣」。それまでDBに何も残っていなかった。 --}}
         <a class="{{ ($active ?? '') === 'dispatch_list' ? 'active' : '' }}" href="/dispatch-list"><span class="nav-icon">🤝</span> 派遣一覧</a>

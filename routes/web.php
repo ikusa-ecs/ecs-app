@@ -340,6 +340,13 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // ⚠ それまで日別ボードの「＋派遣」は**画面の中だけ**で、DBに何も残っていなかった
     //   （押しても読み込み直すと消えていた）。入れる場所は今までどおり日別ボードの「＋派遣」。
     // /dispatch-list ＝頼んだ派遣を開催日順に並べたシート。
+    // 新人ページ（2026-10-09 baba要望）。見る＝社員以上／直す＝管理者以上。FCの案は見るだけ。
+    Route::get('/rookies', [\App\Http\Controllers\RookieController::class, 'index']);
+    Route::post('/rookies/state', [\App\Http\Controllers\RookieController::class, 'setState'])->middleware('tier:manager');
+    Route::post('/rookies/since', [\App\Http\Controllers\RookieController::class, 'setSince'])->middleware('tier:manager');
+    Route::post('/rookies/targets', [\App\Http\Controllers\RookieController::class, 'setTargets'])->middleware('tier:manager');
+    Route::post('/rookies/import', [\App\Http\Controllers\RookieController::class, 'import'])->middleware('tier:manager');
+    Route::post('/rookies/link', [\App\Http\Controllers\RookieController::class, 'link'])->middleware('tier:manager');
     Route::get('/dispatch-list', [DispatchController::class, 'index']);
     Route::post('/dispatches', [DispatchController::class, 'store']);
     Route::post('/dispatches/{id}', [DispatchController::class, 'update']);

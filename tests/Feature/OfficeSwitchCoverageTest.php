@@ -34,6 +34,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/paper-stock',         // 謎解きの紙 在庫（2026-09-15 に追加）
         '/active-bonus',        // アクティブスタッフ増加計画（2026-09-17 に追加）
         '/broadcast-list',      // 配信・中継案件一覧（2026-09-18 に追加・FB No.21）
+        '/rookies',             // 新人（2026-10-09 に追加）
     ];
 
     private function admin(): Person
