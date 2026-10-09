@@ -35,6 +35,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/active-bonus',        // アクティブスタッフ増加計画（2026-09-17 に追加）
         '/broadcast-list',      // 配信・中継案件一覧（2026-09-18 に追加・FB No.21）
         '/rookies',             // 新人（2026-10-09 に追加）
+        '/past-projects',       // 過去案件（2026-10-09 に追加）
     ];
 
     private function admin(): Person
@@ -67,6 +68,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/assign-wishlist',
         '/paper-stock',
         '/broadcast-list',
+        '/past-projects',
     ];
 
     public function test_全拠点はoffice_allで指定する(): void

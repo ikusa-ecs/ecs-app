@@ -25,6 +25,8 @@
         <a class="{{ ($active ?? '') === 'projects' ? 'active' : '' }}" href="/projects"><span class="nav-icon">▤</span> 案件一覧</a>
         {{-- 年月フォルダ（案件一覧の画面だけJSで中身が入る。他画面では空のまま） --}}
         <div class="ym-tree" id="ymTree"></div>
+        {{-- 過去案件（2026-10-09）＝終わった案件を年→月で見る。案件一覧を重くしないために分けた。 --}}
+        <a class="{{ ($active ?? '') === 'past_projects' ? 'active' : '' }}" href="/past-projects"><span class="nav-icon">🗂</span> 過去案件</a>
         {{-- アサイン表は「案件の分類」なので案件グループに置く（baba 2026-07-16）。 --}}
         <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
         <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>

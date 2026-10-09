@@ -280,6 +280,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/assign-sheet/share/remove', [AssignSheetController::class, 'removeShare'])->middleware('tier:manager');
     // クライアント別アサイン履歴。お客様ごとに「常連スタッフ」と過去案件の顔ぶれを見る（見るだけ）。
     Route::get('/assign-history', [AssignHistoryController::class, 'index']);
+    // 過去案件（2026-10-09 baba要望）＝年→月のフォルダで、終わった案件とメンバーを見る（見るだけ）。
+    Route::get('/past-projects', [\App\Http\Controllers\PastProjectsController::class, 'index']);
     // クライアント履歴の照会（AJAX用）。案件登録フォームが ?client=名前 で呼び、リピート判定＋過去案件をJSONで返す。
     Route::get('/clients/lookup', [AssignHistoryController::class, 'lookup']);
     // アサインダッシュボード＝担当者向けの状況まとめ。「アサインが必要な案件」だけ本物の案件から作る。
