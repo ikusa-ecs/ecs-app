@@ -78,6 +78,25 @@ final class StaffInvoiceDraft
             }
         }
 
+        // 手で入れた手当（「手当の記録」・2026-10-13）。$allowances は StaffAllowances::row の形。
+        // ⚠ MC・ロング・前日設営・事前リハーサル・宿泊はアサインから自動でも数える＝**自動で数えた日と同じ日の手入力は足さない**
+        //   （二重に数えない）。重なったものは「要確認」で知らせる。自動で拾えない日（アサインに無い仕事）だけ足す。
+        $byKind = [];
+        foreach ($allowances as $a) {
+            $byKind[$a['kind']][] = $a;
+        }
+        $overlap = [];
+        $addManualDays = function (array &$perDay, string $kind) use ($byKind, &$overlap, $md) {
+            foreach ($byKind[$kind] ?? [] as $a) {
+                if (isset($perDay[$a['date']])) {
+                    $overlap[] = $kind.' '.$md($a['date']);
+
+                    continue;
+                }
+                $perDay[$a['date']] = $a['count'];
+            }
+        };
+
         // ② MC手当（案件ごと・同じ日に2案件なら「(2案件)」）。
         $mc = [];
         foreach ($main as $c) {
@@ -85,6 +104,7 @@ final class StaffInvoiceDraft
                 $mc[$c['ymd']] = ($mc[$c['ymd']] ?? 0) + 1;
             }
         }
+        $addManualDays($mc, 'MC手当');
         if ($mc) {
             ksort($mc);
             $label = implode('、', array_map(fn ($y, $n) => $md($y).($n > 1 ? '('.$n.'案件)' : ''), array_keys($mc), $mc));
@@ -93,38 +113,59 @@ final class StaffInvoiceDraft
         }
 
         // ③ ロング手当（実施形態がリアルロング）。
-        $long = array_values(array_unique(array_map(fn ($c) => $c['ymd'], array_filter($main, fn ($c) => ProjectFormats::countCode($c['format']) === 'long'))));
+        $long = array_fill_keys(array_unique(array_map(fn ($c) => $c['ymd'], array_filter($main, fn ($c) => ProjectFormats::countCode($c['format']) === 'long'))), 1);
+        $addManualDays($long, 'ロング手当');
         if ($long) {
-            $items[] = ['label' => 'ロング手当：'.$days($long), 'qty' => count($long).'回', 'price' => self::LONG, 'amount' => self::LONG * count($long)];
+            $n = array_sum($long);
+            $items[] = ['label' => 'ロング手当：'.$days(array_keys($long)), 'qty' => $n.'回', 'price' => self::LONG, 'amount' => self::LONG * $n];
         }
 
-        // ④ 前日設営手当（日程種別＝前日設営）。
-        $prep = array_values(array_unique(array_map(fn ($c) => $c['ymd'], array_filter($live, fn ($c) => $c['dayType'] === '前日設営'))));
-        if ($prep) {
-            $items[] = ['label' => '前日設営手当：'.$days($prep), 'qty' => count($prep).'回', 'price' => self::PREP, 'amount' => self::PREP * count($prep)];
+        // ④ 前日設営手当・⑤ 事前リハーサル手当・6時間以上＝1案件は、**手当の記録だけを見る**（2026-10-13 baba）。
+        //   アサインの前日設営・リハ日は StaffAllowances::syncAuto が手当の記録へ自動で入れる＝ここで数え直さない
+        //   （消した・種類を切り替えた、を正しく反映するため）。
+        $prepRows = $byKind['前日設営手当'] ?? [];
+        if ($prepRows) {
+            $perDay = [];
+            foreach ($prepRows as $a) {
+                $perDay[$a['date']] = ($perDay[$a['date']] ?? 0) + $a['count'];
+            }
+            $n = array_sum($perDay);
+            $items[] = ['label' => '前日設営手当：'.$days(array_keys($perDay)), 'qty' => $n.'回', 'price' => self::PREP, 'amount' => self::PREP * $n];
+        }
+        foreach ($byKind['事前リハーサル手当'] ?? [] as $a) {
+            $what = $a['project'] !== '' ? $a['project'] : $a['note'];
+            $items[] = ['label' => '事前リハーサル手当：'.$md($a['date']).($what !== '' ? '（'.$what.'リハーサル）' : ''), 'qty' => $a['count'].'回', 'price' => $a['unit'], 'amount' => $a['amount']];
+        }
+        foreach ($byKind[StaffAllowances::SIX_HOURS] ?? [] as $a) {
+            $kindName = $a['unit'] === self::BASE['オンライン'] ? 'オンライン' : 'リアル';
+            $what = $a['project'] !== '' ? $a['project'] : $a['note'];
+            $items[] = ['label' => $kindName.'イベント（6時間以上のリハ・設営）：'.$md($a['date']).($what !== '' ? '（'.$what.'）' : ''),
+                'qty' => $a['count'].'日', 'price' => $a['unit'], 'amount' => $a['amount']];
         }
 
-        // ⑤ 事前リハーサル手当（日程種別＝リハ日）。
-        foreach (array_filter($live, fn ($c) => $c['dayType'] === 'リハ日') as $c) {
-            $items[] = ['label' => '事前リハーサル手当：'.$md($c['ymd']).'（'.$c['name'].'リハーサル）', 'qty' => '1回', 'price' => self::REHEARSAL, 'amount' => self::REHEARSAL];
-        }
-
-        // ⑥ 前泊手当（案件の宿泊が前泊あり）。前泊した日＝前日。
+        // ⑥ 宿泊（前泊）手当（案件の宿泊が前泊あり）。前泊した日＝前日。＋手入力（後泊など）。
+        $stayDays = [];
         foreach ($main as $c) {
             if (Lodging::hasPreStay($c['lodging'])) {
                 $prev = Carbon::parse($c['ymd'])->subDay()->format('Y-m-d');
+                $stayDays[$prev] = 1;
                 $items[] = ['label' => '前泊手当：'.$md($prev).'（'.$md($c['ymd']).'本番の'.$c['name'].'のため）'
                     .(str_contains($c['lodging'], '一部') ? '※一部前泊＝本人が泊まったか確認' : ''),
                     'qty' => '1回', 'price' => self::STAY, 'amount' => self::STAY];
             }
         }
+        foreach ($byKind['宿泊手当'] ?? [] as $a) {
+            if (isset($stayDays[$a['date']])) {
+                $overlap[] = '宿泊手当 '.$md($a['date']);
 
-        // ⑦ 手で入れた手当（運転・スライド・事前レクチャー・その他＝「手当の記録」・2026-10-13）。
-        //   $allowances は StaffAllowances::row の形。運転・スライドは日付を並べて1行、レクチャー・その他は1件1行。
-        $byKind = [];
-        foreach ($allowances as $a) {
-            $byKind[$a['kind']][] = $a;
+                continue;
+            }
+            $what = $a['note'] !== '' ? $a['note'] : $a['project'];
+            $items[] = ['label' => '宿泊手当：'.$md($a['date']).($what !== '' ? '（'.$what.'）' : ''), 'qty' => $a['count'].'回', 'price' => $a['unit'], 'amount' => $a['amount']];
         }
+
+        // ⑦ 手で入れるだけの手当（運転・スライド・事前レクチャー・大型・その他）。
+        //   運転・スライドは日付を並べて1行、ほかは1件1行。
         foreach (['運転手当', 'スライド手当'] as $kind) {
             if (empty($byKind[$kind])) {
                 continue;
@@ -140,7 +181,7 @@ final class StaffInvoiceDraft
             $label = implode('、', array_map(fn ($y, $c) => $md($y).($c > 1 ? '('.$c.'回)' : ''), array_keys($perDay), $perDay));
             $items[] = ['label' => $kind.'：'.$label, 'qty' => $n.($kind === 'スライド手当' ? '案件' : '回'), 'price' => $unit, 'amount' => $unit * $n];
         }
-        foreach (['事前レクチャー手当', 'その他'] as $kind) {
+        foreach (['事前レクチャー手当', '大型手当', 'その他'] as $kind) {
             foreach ($byKind[$kind] ?? [] as $a) {
                 $what = $a['project'] !== '' ? $a['project'] : $a['note'];
                 $name = $kind === 'その他' ? ($a['note'] !== '' ? $a['note'] : 'その他') : $kind;
@@ -152,8 +193,11 @@ final class StaffInvoiceDraft
         // ECSでは分からないもの＝見る人が確かめる。
         $checks[] = '交通費：最寄り駅'.($station !== '' ? '「'.$station.'」' : '（名簿に未入力）').'から。往復'.number_format(self::TRAVEL_CAP).'円までに収まっているか（税区分は対象外）';
         $checks[] = $allowances
-            ? '運転・スライド・事前レクチャー手当は「手当の記録」に入っているぶんだけ数えています'
-            : '運転手当（20分以上運転）・スライド手当・事前レクチャー手当は「手当の記録」にまだ入っていません（請求書にあれば確かめて入れてください）';
+            ? '運転・スライド・事前レクチャー・大型手当は「手当の記録」に入っているぶんだけ数えています'
+            : '運転手当（20分以上運転）・スライド手当・事前レクチャー手当などは「手当の記録」にまだ入っていません（請求書にあれば確かめて入れてください）';
+        if ($overlap) {
+            $checks[] = '手当の記録のうち、アサインから自動で数えた日と同じ日のものは二重に数えていません：'.implode('、', $overlap);
+        }
         $cancelled = array_values(array_filter($cases, fn ($c) => $c['cancelled']));
         if ($cancelled) {
             $checks[] = 'キャンセル料の対象かも：'.implode('、', array_map(fn ($c) => $md($c['ymd']).' '.$c['name'], $cancelled))

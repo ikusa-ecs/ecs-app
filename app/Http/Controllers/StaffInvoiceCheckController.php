@@ -43,8 +43,11 @@ class StaffInvoiceCheckController extends Controller
         $staffQuery = OfficeScope::applyToPeople(Person::staff(), $office);
         $staffIds = $staffQuery->pluck('id')->all();
 
-        // 手で入れた手当（運転・スライド・事前レクチャー・その他・2026-10-13）。この月の日付のもの。
-        $allowances = StaffAllowance::whereIn('staff_id', $staffIds)
+        // 前日設営・リハの手当を、アサインから手当の記録へ自動で入れておく（何度開いても同じ・消した行は入れ直さない）。
+        StaffAllowances::syncAuto($month, $month->copy()->endOfMonth()->startOfDay(), $staffIds);
+
+        // 手当の記録（運転・スライド・事前レクチャー・前日設営・リハ・その他・2026-10-13）。この月の日付のもの。消した行は出さない。
+        $allowances = StaffAllowance::whereIn('staff_id', $staffIds)->whereNull('dismissed_at')
             ->whereDate('date', '>=', $month->format('Y-m-d'))
             ->whereDate('date', '<=', $month->copy()->endOfMonth()->format('Y-m-d'))
             ->orderBy('date')->orderBy('id')->get();
@@ -115,13 +118,15 @@ class StaffInvoiceCheckController extends Controller
             'allowances' => $allowRows,
             'allowanceKinds' => StaffAllowances::KINDS,
             'allowanceHints' => StaffAllowances::HINTS,
-            // スタッフ → その月の案件（入力欄で「どの案件か」を選ぶため）。名前は拠点の在籍スタッフ全員から選べる。
+            'allowanceSwitchable' => StaffAllowances::SWITCHABLE,
+            'allowanceNeedsAmount' => array_values(array_filter(array_keys(StaffAllowances::KINDS), fn ($k) => StaffAllowances::needsAmount($k))),
+            // 入力欄：案件を選ぶと、その案件にアサインされたスタッフがチェックで並ぶ（2026-10-13 baba
+            // 「案件を選んだらアサインされていたスタッフで絞る・複数チェックして同じ内容を入れたい」）。
+            // 名前を打って候補から足すとき用に、拠点の在籍スタッフ全員も渡す（案件登録のセールス欄と同じ仕組み）。
             'formStaff' => OfficeScope::applyToPeople(Person::staff(), $office)->where('active', true)
                 ->orderByRaw("case when coalesce(nullif(name_kana, ''), '') = '' then 1 else 0 end")->orderBy('name_kana')->orderBy('name')
                 ->get(['id', 'name'])->map(fn ($p) => ['id' => $p->id, 'name' => (string) $p->name])->values(),
-            'formCases' => collect($list)->mapWithKeys(fn ($r) => [$r['id'] => collect($r['cases'])->map(fn ($c) => [
-                'id' => $c['projectId'], 'ymd' => $c['ymd'], 'label' => $c['date'].' '.$c['name'],
-            ])->unique('id')->values()]),
+            'formProjects' => self::formProjects($list),
             'counts' => [
                 'all' => count($list),
                 'received' => count(array_filter($list, fn ($r) => $r['received'])),
@@ -166,6 +171,27 @@ class StaffInvoiceCheckController extends Controller
             'at' => $on ? $row->{$data['field'].'_at'}->format('n/j H:i') : '',
             'by' => $on ? (string) $row->{$data['field'].'_by'} : '',
         ]);
+    }
+
+    /**
+     * 手当の入力欄の「案件」＝この月にスタッフがアサインされている案件（日付順）と、その案件のスタッフ。
+     *
+     * @return list<array{id:string, ymd:string, label:string, staff: list<array{id:string, name:string, role:string}>}>
+     */
+    private static function formProjects(array $list): array
+    {
+        $out = [];
+        foreach ($list as $r) {
+            foreach ($r['cases'] as $c) {
+                $out[$c['projectId']] ??= ['id' => $c['projectId'], 'ymd' => $c['ymd'],
+                    'label' => $c['date'].' '.$c['name'].($c['client'] !== '' ? '／'.$c['client'] : ''), 'staff' => []];
+                $out[$c['projectId']]['staff'][$r['id']] = ['id' => $r['id'], 'name' => $r['name'],
+                    'role' => preg_replace('/（.*?）/u', '', $c['role'])];
+            }
+        }
+        usort($out, fn ($a, $b) => [$a['ymd'], $a['label']] <=> [$b['ymd'], $b['label']]);
+
+        return array_map(fn ($p) => ['staff' => array_values($p['staff'])] + $p, $out);
     }
 
     /** 1人ぶんの明細をコピーする文（請求書と見比べる・チャットに貼る用）。表や罫線は使わない。 */

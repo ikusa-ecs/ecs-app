@@ -9,6 +9,7 @@ use App\Models\StaffAllowance;
 use App\Support\AssignmentRole;
 use App\Support\StaffAllowances;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
@@ -19,49 +20,100 @@ use Illuminate\Validation\Rule;
  */
 class StaffAllowanceController extends Controller
 {
-    /** 1件入れる。画面からは JSON（収支入力）かフォーム（請求書チェック）で来る。 */
+    /**
+     * 入れる。画面からは JSON（収支入力）かフォーム（請求書チェック）で来る。
+     * 2026-10-13 baba「宿泊手当は一部のスタッフのこともある＝複数チェックして同じ内容を入れたい」
+     *   → staff_ids[]（複数）でも staff_id（1人）でも受ける。チェックした人それぞれに1行ずつ入れる。
+     */
     public function store(Request $request)
     {
+        // 1人だけ（staff_id）で来ても、複数（staff_ids[]）にそろえる。
+        if (! $request->has('staff_ids') && $request->filled('staff_id')) {
+            $request->merge(['staff_ids' => [(string) $request->input('staff_id')]]);
+        }
         $data = $request->validate([
-            'staff_id' => ['required', 'string', Rule::exists('people', 'id')->where('role', 'staff')],
+            'staff_ids' => ['required', 'array', 'min:1', 'max:60'],
+            'staff_ids.*' => ['string', 'distinct', Rule::exists('people', 'id')->where('role', 'staff')],
             'project_id' => ['nullable', 'string', Rule::exists('projects', 'id')],
             'date' => ['required', 'date'],
             'kind' => ['required', Rule::in(array_keys(StaffAllowances::KINDS))],
             'count' => ['nullable', 'integer', 'min:1', 'max:20'],
-            // その他のときだけ金額が要る。
-            'amount' => ['nullable', 'integer', 'min:0', 'max:200000', Rule::requiredIf($request->input('kind') === 'その他')],
+            // 金額を手で入れる種類（大型手当・その他）のときだけ金額が要る。
+            'amount' => ['nullable', 'integer', 'min:0', 'max:200000', Rule::requiredIf(StaffAllowances::needsAmount((string) $request->input('kind')))],
             'note' => ['nullable', 'string', 'max:200'],
-        ], [], ['staff_id' => 'スタッフ', 'date' => '日付', 'kind' => '手当の種類', 'amount' => '金額', 'count' => '回数']);
+        ], ['staff_ids.required' => 'スタッフを1人以上選んでください。'],
+            ['staff_ids' => 'スタッフ', 'staff_ids.*' => 'スタッフ', 'date' => '日付', 'kind' => '手当の種類', 'amount' => '金額', 'count' => '回数']);
 
-        $a = StaffAllowance::create([
-            'staff_id' => $data['staff_id'],
-            'project_id' => $data['project_id'] ?? null,
-            'date' => $data['date'],
-            'kind' => $data['kind'],
-            'count' => (int) ($data['count'] ?? 1),
-            'amount' => $data['kind'] === 'その他' ? (int) $data['amount'] : null,
-            'note' => trim((string) ($data['note'] ?? '')) ?: null,
-            'created_by' => (string) (Auth::user()->name ?? ''),
-        ]);
-
-        if ($request->wantsJson()) {
-            return response()->json(['ok' => true, 'item' => $this->row($a)]);
+        // 「1案件として数える（6時間以上）」の金額＝案件の実施形態の基本報酬（金額を入れていればそれ）。
+        $amount = StaffAllowances::needsAmount($data['kind']) ? (int) $data['amount'] : null;
+        if ($data['kind'] === StaffAllowances::SIX_HOURS) {
+            $amount = isset($data['amount']) ? (int) $data['amount']
+                : StaffAllowances::sixHoursAmount(! empty($data['project_id']) ? Project::find($data['project_id']) : null);
         }
 
-        return back()->with('ok', $a->kind.'を入れました。');
+        $items = [];
+        foreach ($data['staff_ids'] as $sid) {
+            $a = StaffAllowance::create([
+                'staff_id' => $sid,
+                'project_id' => $data['project_id'] ?? null,
+                'date' => $data['date'],
+                'kind' => $data['kind'],
+                'count' => (int) ($data['count'] ?? 1),
+                'amount' => $amount,
+                'note' => trim((string) ($data['note'] ?? '')) ?: null,
+                'created_by' => (string) (Auth::user()->name ?? ''),
+            ]);
+            $items[] = $this->row($a);
+        }
+
+        $msg = $data['kind'].'を'.count($items).'人に入れました。';
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true, 'item' => $items[0], 'items' => $items, 'message' => $msg]);
+        }
+
+        return back()->with('ok', $msg);
     }
 
-    /** 1件消す。 */
+    /**
+     * 1件消す。自動で入れた行（前日設営・リハ）は「消した印」を付けて隠す＝次に開いても入れ直さない。
+     */
     public function destroy(Request $request, int $id)
     {
         $a = StaffAllowance::findOrFail($id);
-        $a->delete();
+        if ($a->auto_key !== null) {
+            $a->dismissed_at = now();
+            $a->save();
+        } else {
+            $a->delete();
+        }
 
         if ($request->wantsJson()) {
             return response()->json(['ok' => true]);
         }
 
         return back()->with('ok', $a->kind.'を消しました。');
+    }
+
+    /**
+     * リハ・設営の行の種類を切り替える（前日設営手当／事前リハーサル手当／1案件として数える）。
+     * 2026-10-13 baba「前日設営だけかもしれないし、リハもかもしれない。6時間以上のリハ・設営は1案件にカウント」。
+     */
+    public function changeKind(Request $request, int $id)
+    {
+        $data = $request->validate(['kind' => ['required', Rule::in(StaffAllowances::SWITCHABLE)]]);
+        $a = StaffAllowance::findOrFail($id);
+        abort_unless(in_array($a->kind, StaffAllowances::SWITCHABLE, true), 422);
+        $a->kind = $data['kind'];
+        $a->amount = $data['kind'] === StaffAllowances::SIX_HOURS
+            ? StaffAllowances::sixHoursAmount($a->project_id ? Project::find($a->project_id) : null)
+            : null;
+        $a->save();
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true, 'item' => $this->row($a)]);
+        }
+
+        return back()->with('ok', '「'.$a->kind.'」に切り替えました。');
     }
 
     /**
@@ -72,6 +124,10 @@ class StaffAllowanceController extends Controller
         $project = Project::findOrFail((string) $request->query('project', ''));
         $asg = Assignment::where('project_id', $project->id)->where('status', '!=', 'キャンセル')
             ->orderBy('date')->get(['staff_id', 'role', 'date']);
+        // 前日設営・リハの手当を自動で入れておく（請求書チェックの画面と同じ・何度呼んでも同じ）。
+        if ($asg->isNotEmpty()) {
+            StaffAllowances::syncAuto(Carbon::parse($asg->min('date'))->startOfDay(), Carbon::parse($asg->max('date'))->startOfDay(), null, $project->id);
+        }
         $people = Person::staff()->whereIn('id', $asg->pluck('staff_id'))->pluck('name', 'id');
 
         $staff = [];
@@ -87,10 +143,12 @@ class StaffAllowanceController extends Controller
             'ok' => true,
             'date' => optional($project->start_date)->format('Y-m-d'),
             'staff' => array_values($staff),
-            'items' => StaffAllowance::where('project_id', $project->id)->orderBy('date')->orderBy('id')->get()
+            'items' => StaffAllowance::where('project_id', $project->id)->whereNull('dismissed_at')->orderBy('date')->orderBy('id')->get()
                 ->map(fn ($a) => $this->row($a))->values(),
             'kinds' => StaffAllowances::KINDS,
             'hints' => StaffAllowances::HINTS,
+            'switchable' => StaffAllowances::SWITCHABLE,
+            'needsAmount' => array_values(array_filter(array_keys(StaffAllowances::KINDS), fn ($k) => StaffAllowances::needsAmount($k))),
         ]);
     }
 

@@ -266,11 +266,12 @@
 
       <!-- スタッフの手当（2026-10-13）。保存先は「請求書チェック・手当管理表」と同じ（/staff-allowances）。 -->
       <div class="panel mp-wrap" id="alPanel" style="margin-top:20px;">
-        <div class="case-head" style="font-size:15px;">✍ この案件のスタッフの手当（運転・スライド・事前レクチャーなど）</div>
-        <p class="note-cell" style="margin:6px 0 10px;">この案件に入っているスタッフに付く手当を入れてください。入れたものは「🧾 請求書チェック・手当管理表」の請求書の目安に足されます（押した瞬間に保存）。<br>
-          ※ 前泊・ロング・MC・前日設営・リハはアサインから自動で数えるので、ここでは入れません。</p>
+        <div class="case-head" style="font-size:15px;">✍ この案件のスタッフの手当（運転・スライド・宿泊・設営・リハなど）</div>
+        <p class="note-cell" style="margin:6px 0 10px;">手当を付ける人にチェックして（何人でも）、種類などを入れて「＋入れる」。チェックした全員に同じ内容が入ります。入れたものは「🧾 請求書チェック・手当管理表」の請求書の目安に足されます。<br>
+          ※ 前日設営・リハ日のアサインは自動で入ります（いらなければ「消す」・6時間以上なら種類を「1案件として数える」に切り替え）。MC・前泊・ロングはアサインから自動で数えます。</p>
+        <div id="alPeople" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
         <div class="al-form" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-          <select id="alStaff"></select>
+          <button class="btn" type="button" onclick="alCheckAll(true)">全員にチェック</button>
           <select id="alKind" onchange="alKindChanged()"></select>
           <input type="date" id="alDate">
           <input type="number" id="alCount" min="1" max="20" value="1" style="width:60px;" title="回数"> 回
@@ -487,7 +488,7 @@
   // ===== スタッフの手当（2026-10-13 baba「収支入力からも運転手当やレクチャー手当を追加できたら」）=====
   // 案件を選ぶたびに、その案件のスタッフと入っている手当をサーバーから読む（保存先は /staff-allowances の1つ）。
   // ⚠ 失敗をだまって流さない＝赤字で知らせる。
-  let AL = { project: null, hints: {} };
+  let AL = { project: null, hints: {}, needsAmount: [], switchable: [] };
   function alEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
   function alMsg(text, ng){ const m = document.getElementById('alMsg'); m.textContent = text; m.style.color = ng ? '#b91c1c' : ''; }
   async function alLoad(id){
@@ -499,12 +500,17 @@
       if (!r.ok) throw new Error('通信エラー ' + r.status);
       const j = await r.json();
       if (AL.project !== id) return;   // 読み込みの途中で別の案件を選んだ
-      const st = document.getElementById('alStaff');
-      st.innerHTML = j.staff.length ? '' : '<option value="">（この案件にスタッフはいません）</option>';
-      j.staff.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name + '（' + s.role.replace(/（.*?）/g, '') + '）'; st.appendChild(o); });
+      // その案件のスタッフをチェックで並べる（2026-10-13 baba「複数チェックして同じ内容を入れたい」）。
+      const box = document.getElementById('alPeople');
+      box.innerHTML = j.staff.length ? j.staff.map(s => '<label style="display:inline-flex; gap:4px; align-items:center; font-size:12.5px; border:1px solid var(--line); border-radius:999px; padding:3px 10px; cursor:pointer;">'
+        + '<input type="checkbox" class="al-pick" value="' + alEsc(s.id) + '"> ' + alEsc(s.name) + ' <span class="note-cell">' + alEsc(s.role.replace(/（.*?）/g, '')) + '</span></label>').join('')
+        : '<span class="note-cell">（この案件にスタッフはいません）</span>';
+      AL.needsAmount = j.needsAmount || [];
+      AL.switchable = j.switchable || [];
       const kd = document.getElementById('alKind');
       kd.innerHTML = '';
-      Object.keys(j.kinds).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k + (j.kinds[k] ? '（' + Number(j.kinds[k]).toLocaleString('ja-JP') + '円）' : ''); kd.appendChild(o); });
+      Object.keys(j.kinds).forEach(k => { const o = document.createElement('option'); o.value = k;
+        o.textContent = k + (j.kinds[k] ? '（' + Number(j.kinds[k]).toLocaleString('ja-JP') + '円）' : (AL.needsAmount.indexOf(k) >= 0 ? '（金額を入れる）' : '（基本報酬）')); kd.appendChild(o); });
       AL.hints = j.hints || {};
       document.getElementById('alDate').value = j.date || '';
       alKindChanged();
@@ -516,19 +522,38 @@
   }
   function alKindChanged(){
     const k = document.getElementById('alKind').value;
-    document.getElementById('alAmount').style.display = (k === 'その他') ? '' : 'none';
+    document.getElementById('alAmount').style.display = (AL.needsAmount.indexOf(k) >= 0) ? '' : 'none';
     document.getElementById('alHint').textContent = AL.hints[k] || '';
   }
+  function alCheckAll(on){ document.querySelectorAll('#alPeople .al-pick').forEach(c => { c.checked = on; }); }
   function alRender(items){
     const body = document.getElementById('alBody');
     if (!items.length) { body.innerHTML = '<tr><td colspan="7" class="note-cell">まだ入っていません。</td></tr>'; return; }
-    body.innerHTML = items.map(a => '<tr><td>' + alEsc(a.md) + '</td><td>' + alEsc(a.staff) + '</td><td>' + alEsc(a.kind) + (a.count > 1 ? ' ×' + a.count : '')
+    // 自動で入った行（前日設営・リハ日）は印を付け、リハ・設営は種類を切り替えられる（6時間以上なら1案件）。
+    const kindCell = a => (a.auto ? '<span class="note-cell" style="font-weight:700;">自動</span> ' : '')
+      + (a.switchable
+        ? '<select onchange="alSwitch(' + Number(a.id) + ', this.value)">' + AL.switchable.map(k => '<option' + (k === a.kind ? ' selected' : '') + '>' + alEsc(k) + '</option>').join('') + '</select>'
+        : alEsc(a.kind))
+      + (a.count > 1 ? ' ×' + a.count : '');
+    body.innerHTML = items.map(a => '<tr><td>' + alEsc(a.md) + '</td><td>' + alEsc(a.staff) + '</td><td>' + kindCell(a)
       + '</td><td>' + alEsc(a.note) + '</td><td class="num">' + Number(a.amount).toLocaleString('ja-JP') + '円</td><td class="note-cell">' + alEsc(a.by)
       + '</td><td><button class="btn" type="button" onclick="alDel(' + Number(a.id) + ')">消す</button></td></tr>').join('');
   }
+  async function alSwitch(aid, kind){
+    try {
+      const r = await fetch('/staff-allowances/' + aid + '/kind', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF }, body: JSON.stringify({ kind }) });
+      if (!r.ok) throw new Error('通信エラー ' + r.status);
+      alMsg('✓ 「' + kind + '」に切り替えました');
+      alLoad(AL.project);
+    } catch (e) {
+      alMsg('⚠ 切り替えられませんでした（' + e.message + '）', true);
+      alLoad(AL.project);
+    }
+  }
   async function alAdd(){
     const body = {
-      staff_id: document.getElementById('alStaff').value,
+      staff_ids: [...document.querySelectorAll('#alPeople .al-pick:checked')].map(c => c.value),
       project_id: AL.project,
       date: document.getElementById('alDate').value,
       kind: document.getElementById('alKind').value,
@@ -536,7 +561,7 @@
       amount: document.getElementById('alAmount').value === '' ? null : Number(document.getElementById('alAmount').value),
       note: document.getElementById('alNote').value,
     };
-    if (!body.staff_id) { alMsg('⚠ スタッフを選んでください。', true); return; }
+    if (!body.staff_ids.length) { alMsg('⚠ 手当を付けるスタッフにチェックしてください。', true); return; }
     if (!body.date) { alMsg('⚠ 日付を入れてください。', true); return; }
     try {
       const r = await fetch('/staff-allowances', { method: 'POST',
@@ -549,7 +574,7 @@
       document.getElementById('alNote').value = '';
       document.getElementById('alAmount').value = '';
       document.getElementById('alCount').value = 1;
-      alMsg('✓ ' + j.item.kind + 'を入れました');
+      alMsg('✓ ' + (j.message || (j.item.kind + 'を入れました')));
       alLoad(AL.project);
     } catch (e) {
       alMsg('⚠ 入れられませんでした（' + e.message + '）', true);

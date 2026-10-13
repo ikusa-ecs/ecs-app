@@ -43,6 +43,11 @@
   .si-tabs a { text-decoration: none; color: var(--muted); font-weight: 700; font-size: 13.5px; padding: 8px 14px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -2px; }
   .si-tabs a.on { color: var(--ink); background: var(--panel); border-color: var(--line); border-bottom: 2px solid var(--panel); }
   .si-tab-n { font-size: 11px; font-weight: 700; margin-left: 6px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); }
+  .si-auto { font-size: 10.5px; font-weight: 700; color: var(--brand); border: 1px solid var(--brand); border-radius: 999px; padding: 0 6px; margin-right: 4px; }
+  .si-kind { padding: 2px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-size: 12px; font-family: inherit; }
+  .si-people { display: flex; flex-wrap: wrap; gap: 6px; }
+  .si-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; cursor: pointer; background: var(--panel); color: var(--ink); }
+  .si-chip:has(input:checked) { border-color: var(--brand); font-weight: 700; }
   .si-allow-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .si-allow-form select, .si-allow-form input { padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-family: inherit; font-size: 12.5px; }
   .si-sub { font-size: 11.5px; color: var(--muted); line-height: 1.6; padding-left: 1em; display: flex; flex-wrap: wrap; gap: 4px 12px; }
@@ -205,30 +210,49 @@
 @if ($tab === 'allowances')
 {{-- 手当の記録（2026-10-13 baba「運転手当・スライド手当・事前レクチャー手当を社員に追加してもらいたい」）。
      入れたものは各スタッフの「🧾 請求書の目安」に足される。マイページの収支入力からも入れられる（保存先は同じ）。
-     前泊・ロング・MC・前日設営・リハはアサインから自動で数えるので、ここでは選べない（二重に数えないため）。 --}}
+     MC・宿泊・ロング・前日設営・リハはアサインから自動でも数える＝同じ日に入れても請求書の目安では二重に数えない（StaffInvoiceDraft）。 --}}
 <div class="si-guide" style="margin-top:18px;" id="allowances">
   <div style="font-weight:800; font-size:14px; margin-bottom:4px;">✍ 手当の記録（{{ $month->format('n月') }}）</div>
-  <div class="si-who" style="display:block; margin-bottom:8px;">運転手当（20分以上運転）・スライド手当・事前レクチャー手当など、アサインからは分からない手当を入れてください。入れたものは各スタッフの「🧾 請求書の目安」に足されます。マイページの「収支入力」からも入れられます。</div>
-  <form method="POST" action="/staff-allowances" class="si-allow-form">@csrf
-    <select name="staff_id" id="alStaff" required onchange="alFillCases()">
-      <option value="">スタッフを選ぶ</option>
-      @foreach ($formStaff as $s)
-        <option value="{{ $s['id'] }}" @selected(old('staff_id') === $s['id'])>{{ $s['name'] }}</option>
-      @endforeach
-    </select>
-    <select name="project_id" id="alCase" onchange="alPickCase()">
-      <option value="">案件（任意）</option>
-    </select>
-    <input type="date" name="date" id="alDate" required value="{{ old('date') }}">
-    <select name="kind" id="alKind" required onchange="alKindChanged()">
-      @foreach ($allowanceKinds as $k => $unit)
-        <option value="{{ $k }}" @selected(old('kind') === $k)>{{ $k }}{{ $unit ? '（'.number_format($unit).'円）' : '' }}</option>
-      @endforeach
-    </select>
-    <input type="number" name="count" min="1" max="20" value="{{ old('count', 1) }}" style="width:60px;" title="回数"> 回
-    <input type="number" name="amount" id="alAmount" min="0" max="200000" placeholder="金額（その他）" value="{{ old('amount') }}" style="width:120px; display:none;">
-    <input type="text" name="note" maxlength="200" placeholder="メモ（例：10/18本番の本能寺レクチャー）" value="{{ old('note') }}" style="width:240px;">
-    <button type="submit" class="si-copy" style="margin:0; font-weight:700;">＋ 入れる</button>
+  <div class="si-who" style="display:block; margin-bottom:8px;">①案件を選ぶ → ②その案件のスタッフから手当を付ける人にチェック（何人でも）→ ③手当の種類などを入れて「＋入れる」。チェックした全員に同じ内容が入ります。案件に入っていない人は名前を打って追加できます。<b>前日設営・リハ日のアサインは自動で入ります</b>（いらなければ「消す」・6時間以上なら種類を「1案件として数える」に切り替え）。入れたものは各スタッフの「🧾 請求書の目安」に足されます。マイページの「収支入力」からも入れられます。</div>
+  {{-- 2026-10-13 baba「案件を選んだらアサインされていたスタッフで絞る」「名前を途中まで打ったら候補が出る」「複数チェックして同じ内容を入れたい」 --}}
+  <form method="POST" action="/staff-allowances" id="alForm" onsubmit="return alBeforeSubmit()">@csrf
+    <div class="si-allow-form">
+      <b style="font-size:12.5px;">①</b>
+      <select name="project_id" id="alCase" onchange="alPickCase()" style="max-width:420px;">
+        <option value="">案件を選ぶ（案件の無い手当は空のまま）</option>
+        @foreach ($formProjects as $fp)
+          <option value="{{ $fp['id'] }}">{{ $fp['label'] }}（{{ count($fp['staff']) }}人）</option>
+        @endforeach
+      </select>
+    </div>
+    <div class="si-allow-form" style="margin-top:6px; align-items:flex-start;">
+      <b style="font-size:12.5px;">②</b>
+      <div style="flex:1; min-width:240px;">
+        <div id="alPeople" class="si-people"><span class="si-who" style="display:inline;">案件を選ぶと、その案件のスタッフがここに並びます。</span></div>
+        <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <input type="text" id="alAddName" list="alStaffList" placeholder="ほかの人を名前で追加（途中まで打つと候補）" style="width:260px;" autocomplete="off">
+          <datalist id="alStaffList">
+            @foreach ($formStaff as $s)<option value="{{ $s['name'] }}"></option>@endforeach
+          </datalist>
+          <button type="button" class="si-copy" style="margin:0;" onclick="alAddByName()">＋ 追加</button>
+          <button type="button" class="si-copy" style="margin:0;" onclick="alCheckAll(true)">全員にチェック</button>
+          <button type="button" class="si-copy" style="margin:0;" onclick="alCheckAll(false)">チェックを外す</button>
+        </div>
+      </div>
+    </div>
+    <div class="si-allow-form" style="margin-top:6px;">
+      <b style="font-size:12.5px;">③</b>
+      <select name="kind" id="alKind" required onchange="alKindChanged()">
+        @foreach ($allowanceKinds as $k => $unit)
+          <option value="{{ $k }}" @selected(old('kind') === $k)>{{ $k }}{{ $unit ? '（'.number_format($unit).'円）' : (in_array($k, $allowanceNeedsAmount, true) ? '（金額を入れる）' : '（基本報酬）') }}</option>
+        @endforeach
+      </select>
+      <input type="date" name="date" id="alDate" required value="{{ old('date') }}" title="手当が付いた日">
+      <input type="number" name="count" min="1" max="20" value="{{ old('count', 1) }}" style="width:60px;" title="回数"> 回
+      <input type="number" name="amount" id="alAmount" min="0" max="200000" placeholder="1回の金額" value="{{ old('amount') }}" style="width:120px; display:none;">
+      <input type="text" name="note" maxlength="200" placeholder="メモ（例：後泊／本能寺のレクチャー）" value="{{ old('note') }}" style="width:240px;">
+      <button type="submit" class="si-copy" style="margin:0; font-weight:700;">＋ チェックした人に入れる</button>
+    </div>
   </form>
   <div class="si-who" id="alHint" style="display:block; margin-top:4px;"></div>
 
@@ -239,7 +263,22 @@
         <tr>
           <td>{{ $a['md'] }}</td>
           <td>{{ $a['staff'] }}</td>
-          <td>{{ $a['kind'] }}{{ $a['count'] > 1 ? ' ×'.$a['count'] : '' }}</td>
+          <td>
+            @if ($a['auto'])<span class="si-auto" title="アサイン（前日設営・リハ日）から自動で入りました。いらなければ「消す」">自動</span>@endif
+            @if ($a['switchable'])
+              {{-- リハ・設営は種類を切り替えられる（6時間以上なら1案件として数える・2026-10-13 baba）。 --}}
+              <form method="POST" action="/staff-allowances/{{ $a['id'] }}/kind" style="display:inline;">@csrf
+                <select name="kind" onchange="this.form.submit()" class="si-kind">
+                  @foreach ($allowanceSwitchable as $sk)
+                    <option value="{{ $sk }}" @selected($sk === $a['kind'])>{{ $sk }}</option>
+                  @endforeach
+                </select>
+              </form>
+            @else
+              {{ $a['kind'] }}
+            @endif
+            {{ $a['count'] > 1 ? ' ×'.$a['count'] : '' }}
+          </td>
           <td class="hide-sp">{{ $a['project'] }}{{ $a['project'] !== '' && $a['note'] !== '' ? '／' : '' }}{{ $a['note'] }}</td>
           <td class="num">{{ number_format($a['amount']) }}円</td>
           <td class="hide-sp"><span class="si-who" style="display:inline;">{{ $a['by'] }}</span></td>
@@ -257,29 +296,68 @@
 </div>
 
 <script>
-  // 手当の入力欄（2026-10-13）。スタッフを選ぶと、その人のこの月の案件が選べる。案件を選ぶと日付が入る。
-  var AL_CASES = @json($formCases);
+  // 手当の入力欄（2026-10-13）。案件を選ぶ → その案件のスタッフがチェックで並ぶ → チェックした全員に同じ内容を入れる。
+  // 案件に入っていない人は、名前を打って候補（datalist）から追加する（案件登録のセールス欄と同じ仕組み）。
+  var AL_PROJECTS = @json($formProjects);
+  var AL_STAFF = @json($formStaff);
   var AL_HINTS = @json($allowanceHints);
-  function alFillCases() {
-    var sel = document.getElementById('alCase');
-    var sid = document.getElementById('alStaff').value;
-    sel.innerHTML = '<option value="">案件（任意）</option>';
-    (AL_CASES[sid] || []).forEach(function (c) {
-      var o = document.createElement('option');
-      o.value = c.id; o.textContent = c.label; o.dataset.ymd = c.ymd;
-      sel.appendChild(o);
-    });
+  var AL_NEEDS_AMOUNT = @json($allowanceNeedsAmount);
+  function alEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+  function alChip(id, name, role, checked) {
+    var box = document.getElementById('alPeople');
+    if (box.querySelector('input[value="' + id + '"]')) {   // もう並んでいる人はチェックだけ
+      box.querySelector('input[value="' + id + '"]').checked = true;
+      return;
+    }
+    var hint = box.querySelector('.si-who'); if (hint) hint.remove();
+    var label = document.createElement('label');
+    label.className = 'si-chip';
+    label.innerHTML = '<input type="checkbox" name="staff_ids[]" value="' + alEsc(id) + '"' + (checked ? ' checked' : '') + '> '
+      + alEsc(name) + (role ? '<span class="si-who" style="display:inline; margin-left:4px;">' + alEsc(role) + '</span>' : '');
+    box.appendChild(label);
   }
   function alPickCase() {
-    var o = document.getElementById('alCase').selectedOptions[0];
-    if (o && o.dataset.ymd) document.getElementById('alDate').value = o.dataset.ymd;
+    var id = document.getElementById('alCase').value;
+    var p = AL_PROJECTS.find(function (x) { return x.id === id; });
+    var box = document.getElementById('alPeople');
+    box.innerHTML = '';
+    if (!p) {
+      box.innerHTML = '<span class="si-who" style="display:inline;">案件を選ぶと、その案件のスタッフがここに並びます（案件の無い手当は、下の名前の欄から追加してください）。</span>';
+      return;
+    }
+    document.getElementById('alDate').value = p.ymd;
+    p.staff.forEach(function (s) { alChip(s.id, s.name, s.role, false); });
+    if (!p.staff.length) box.innerHTML = '<span class="si-who" style="display:inline;">この案件にスタッフはいません。</span>';
+  }
+  function alAddByName() {
+    var input = document.getElementById('alAddName');
+    var name = input.value.trim();
+    var s = AL_STAFF.find(function (x) { return x.name === name; });
+    if (!s) { alert('名簿に「' + name + '」さんが見つかりません。候補から選んでください。'); return; }
+    alChip(s.id, s.name, '', true);
+    input.value = '';
+  }
+  function alCheckAll(on) {
+    document.querySelectorAll('#alPeople input[type=checkbox]').forEach(function (c) { c.checked = on; });
   }
   function alKindChanged() {
     var k = document.getElementById('alKind').value;
-    document.getElementById('alAmount').style.display = (k === 'その他') ? '' : 'none';
+    var need = AL_NEEDS_AMOUNT.indexOf(k) >= 0;
+    var amount = document.getElementById('alAmount');
+    amount.style.display = need ? '' : 'none';
+    amount.required = need;
     document.getElementById('alHint').textContent = AL_HINTS[k] || '';
   }
-  alFillCases(); alKindChanged();
+  // 送る前に、だれにも付いていない／名前の欄に打ったまま追加し忘れ、を知らせる。
+  function alBeforeSubmit() {
+    var pending = document.getElementById('alAddName').value.trim();
+    if (pending) { alAddByName(); }
+    var n = document.querySelectorAll('#alPeople input[type=checkbox]:checked').length;
+    if (!n) { alert('手当を付けるスタッフにチェックしてください。'); return false; }
+    return true;
+  }
+  document.getElementById('alAddName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); alAddByName(); } });
+  alKindChanged();
 </script>
 @endif {{-- /手当の記録のタブ --}}
 
