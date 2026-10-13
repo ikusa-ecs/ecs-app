@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
+use App\Models\Setting;
 use App\Models\StaffInvoiceCheck;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
@@ -116,12 +117,28 @@ class StaffInvoiceCheckController extends Controller
             'ym' => $ym,
             'office' => $office,
             'list' => $list,
+            'folderUrl' => (string) Setting::get(self::FOLDER_KEY, ''),
             'counts' => [
                 'all' => count($list),
                 'received' => count(array_filter($list, fn ($r) => $r['received'])),
                 'checked' => count(array_filter($list, fn ($r) => $r['checked'])),
             ],
         ]);
+    }
+
+    /** 請求書PDFの置き場所（Googleフォームで集めたPDFのフォルダ）のURLを入れる鍵。 */
+    public const FOLDER_KEY = 'staff_invoice_folder_url';
+
+    /**
+     * 請求書PDFの置き場所のURLを保存（2026-10-13 baba「Googleフォームで送ってもらっているPDFの格納先URLを置きたい」）。
+     * 空で保存すると消える。http(s) のURLだけ受け付ける（変な文字をリンクにしないため）。
+     */
+    public function saveFolder(Request $request)
+    {
+        $data = $request->validate(['url' => ['nullable', 'url:http,https', 'max:500']]);
+        Setting::put(self::FOLDER_KEY, trim((string) ($data['url'] ?? '')));
+
+        return back()->with('ok', ($data['url'] ?? '') !== '' ? '請求書PDFの置き場所を保存しました。' : '請求書PDFの置き場所を消しました。');
     }
 
     /** 📨／✅ の印を付ける・外す（押した瞬間に保存）。 */

@@ -57,6 +57,26 @@
   名前の行の「明細」を開くと、その人の日付・案件・役割が並びます。※ アサイン表の取込で名簿と名前が合わなかった人は、ECSにアサインが入っていないのでここにも出ません。
 </p>
 
+@if (session('ok'))<div class="si-guide" style="border-color:var(--ok-line, #86efac);">✓ {{ session('ok') }}</div>@endif
+@if ($errors->any())<div class="si-guide si-ng" style="font-size:12.5px;">⚠ URLの形が正しくありません（https:// から始まるURLを貼ってください）。</div>@endif
+
+{{-- 請求書PDFの置き場所（2026-10-13 baba「Googleフォームで送ってもらっているPDFの格納先URLを置きたい」）。 --}}
+<div class="si-guide" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+  <b>📁 請求書PDFの置き場所</b>
+  @if ($folderUrl !== '')
+    <a class="si-copy" style="margin:0; text-decoration:none;" href="{{ $folderUrl }}" target="_blank" rel="noopener">開く ↗</a>
+  @else
+    <span class="si-who" style="display:inline;">まだ入っていません（Googleフォームで集めたPDFのフォルダのURLを貼ってください）</span>
+  @endif
+  <details style="margin-left:auto;">
+    <summary class="si-who" style="display:inline; cursor:pointer;">✎ URLを{{ $folderUrl !== '' ? '変える' : '入れる' }}</summary>
+    <form method="POST" action="/staff-invoice-check/folder" style="display:flex; gap:6px; margin-top:6px;">@csrf
+      <input type="url" name="url" value="{{ $folderUrl }}" placeholder="https://drive.google.com/drive/folders/…" style="width:340px; max-width:70vw; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink);">
+      <button type="submit" class="si-copy" style="margin:0;">保存</button>
+    </form>
+  </details>
+</div>
+
 {{-- 請求書の作り方（マニュアルの要点・2026-10-13 baba「請求書の作り方から要りそうな情報を載せて」）。
      元＝ドライブ「【マニュアル】請求書作成（26年5月～）」。単価を変えるときは App\Support\StaffInvoiceDraft と合わせる。 --}}
 <details class="si-guide">
