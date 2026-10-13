@@ -368,6 +368,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // スタッフ関連の画面（Blade化済み）
     // スタッフ名簿は DB（people＋ポジション可否＋NGペア）から読む。
     Route::get('/staff', [PersonController::class, 'staff']);
+    // スタッフ別アサイン（請求書チェック）（2026-10-13 baba）。見る・押すは社員以上（このグループ）。
+    Route::get('/staff-invoice-check', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'index']);
+    Route::post('/staff-invoice-check/mark', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'mark']);
     // スタッフ名簿のCSV出力（氏名・事務所・区分・できる役割・通算など）。
     Route::get('/staff/export.csv', [PersonController::class, 'exportStaffCsv']);
     // スタッフの「できるポジション・NGペア・専属・人柄・メモ」を保存（/staff 詳細パネルからAJAX）。

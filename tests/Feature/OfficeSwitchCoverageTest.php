@@ -36,6 +36,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/broadcast-list',      // 配信・中継案件一覧（2026-09-18 に追加・FB No.21）
         '/rookies',             // 新人（2026-10-09 に追加）
         '/past-projects',       // 過去案件（2026-10-09 に追加）
+        '/staff-invoice-check', // スタッフ別アサイン（請求書チェック）（2026-10-13 に追加）
     ];
 
     private function admin(): Person
