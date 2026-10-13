@@ -37,10 +37,12 @@ class PersonalCasesOffTest extends TestCase
     /** 過去の開催日は off が負の日数、archived=true。 */
     public function test_past_project_has_negative_off_and_is_archived(): void
     {
-        $today = Carbon::parse('2026-07-14');
+        // ⚠ 日付は今日から数える（2026-10-13）。固定の日付だと「3か月より前は読まない」
+        //   （RecentWindow＝本当の今日から数える）の外に出て、月日が経つと落ちる。
+        $today = Carbon::today();
 
         $p = ProjectFactory::new()->create([
-            'start_date' => '2026-07-11',   // 3日前
+            'start_date' => $today->copy()->subDays(3)->toDateString(),   // 3日前
         ]);
 
         $case = PersonalCases::cases($today)->firstWhere('id', $p->id);

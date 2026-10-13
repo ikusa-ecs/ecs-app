@@ -273,8 +273,12 @@ class EmployeeAvailabilityController extends Controller
             return 0; // period の形がおかしいときは何もしない（消しすぎないように）
         }
 
+        // ⚠ whereBetween('date', ['…-01', '…-31']) は使えない（2026-10-13 修正）。
+        //   date は日時（'2026-10-31 00:00:00'）で入っているので、文字の比べ方だと '2026-10-31' より後になり、
+        //   **月の最終日だけ範囲から漏れて、〇を外しても消えなかった**。whereDate で日付として比べる。
         $rows = ShiftPreference::where('staff_id', $employeeId)
-            ->whereBetween('date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()])
+            ->whereDate('date', '>=', $month->copy()->startOfMonth()->toDateString())
+            ->whereDate('date', '<=', $month->copy()->endOfMonth()->toDateString())
             ->get();
 
         $cleared = 0;
