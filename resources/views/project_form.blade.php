@@ -1103,6 +1103,10 @@
             <div class="hist-meta">
               <span class="hist-when">{{ $h->created_at?->format('Y/m/d H:i') }}</span>
               <span class="hist-who">{{ $h->person_name ?: 'システム' }}</span>
+              {{-- どこから変えたか（2026-10-13）。 --}}
+              @if (! empty($h->source))
+                <span style="font-size:11.5px;" title="どの画面の、どこから変えたか">📍 {{ $h->source }}</span>
+              @endif
             </div>
             @if ($h->action === 'created')
               <div class="hist-body"><span class="hist-tag new">新規登録</span>この案件を登録しました。</div>

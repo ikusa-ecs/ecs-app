@@ -156,6 +156,35 @@ class ProjectHistoryTest extends TestCase
             ->assertSee('10月26日(月)・株式会社テスト商事');
     }
 
+    /**
+     * どの画面のどこから変えたかが残る（2026-10-13 baba）。
+     * ページ＝送信元（Referer）・部分＝送り先。同じ入口でも、開いていた画面で見分けられる。
+     */
+    public function test_history_records_page_and_part(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'role' => 'employee']);
+        $project = ProjectFactory::new()->create(['office' => '東京', 'note' => '前']);
+
+        $this->actingAsPerson($me);
+        // 画面を通さずに「アサイン表の✎から送った」ときと同じ状態を作る。
+        $req = \Illuminate\Http\Request::create('/assign-sheet/project', 'POST', [], [], [], [
+            'HTTP_REFERER' => 'http://localhost/assign-sheet?ym=2026-10',
+        ]);
+        $this->app->instance('request', $req);
+        $project->update(['note' => '後']);
+
+        $h = ProjectHistory::where('project_id', $project->id)->where('field', 'note')->first();
+        $this->assertSame('アサイン表 › 案件の時間・人数・備考', $h->source);
+
+        // 名前の無い送り先でも黙って捨てずに、URLのまま残る。
+        $this->app->instance('request', \Illuminate\Http\Request::create('/some/new-endpoint', 'POST'));
+        $this->assertSame('/some/new-endpoint', \App\Support\HistorySource::current());
+
+        // 画面にも出る。
+        $this->app->instance('request', \Illuminate\Http\Request::create('/project-history', 'GET'));
+        $this->get('/project-history?period=all')->assertOk()->assertSee('アサイン表 › 案件の時間・人数・備考');
+    }
+
     /** 一般社員には他拠点の案件の履歴を見せない（全拠点運用・設計書19.2）。 */
     public function test_history_screen_hides_other_office_projects(): void
     {

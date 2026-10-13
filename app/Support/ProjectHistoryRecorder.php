@@ -123,7 +123,17 @@ class ProjectHistoryRecorder
     {
         $me = Auth::user();
 
-        ProjectHistory::create([
+        // どこから変えたか（2026-10-13）。⚠ 列がまだ無いサーバー（migrate 前）では書かない＝保存を止めない。
+        $source = [];
+        try {
+            if (Schema::hasColumn('project_histories', 'source')) {
+                $source = ['source' => HistorySource::current()];
+            }
+        } catch (\Throwable $e) {
+            $source = [];
+        }
+
+        ProjectHistory::create($source + [
             'project_id'   => (string) $project->id,
             'project_name' => $project->project_name,
             'action'       => $action,

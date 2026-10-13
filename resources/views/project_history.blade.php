@@ -17,6 +17,8 @@
   /* 案件名の横に「10月26日(月)・企業名」（2026-10-13）。案件名より控えめに。 */
   .ph-info { font-size: 12px; color: var(--muted); }
   .sec-title + .ph-info { margin: -6px 0 12px; }
+  /* どこから変えたか（2026-10-13）。 */
+  .ph-src { font-size: 11.5px; color: var(--ink); background: var(--surface-2, #f3f4f6); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
   /* 黒ベース（2026-09-09）。白いプルダウンのままだと黒地で浮く。 */
   html[data-theme="dark"] .ph-bar select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
   .ph-pager { display: flex; gap: 10px; align-items: center; margin-top: 16px; font-size: 13px; }
@@ -108,6 +110,10 @@
               @if (! empty($projectInfo[$h->project_id]))
                 <span class="ph-info">{{ $projectInfo[$h->project_id] }}</span>
               @endif
+            @endif
+            {{-- どこから変えたか（2026-10-13）。それより前の記録には無い。 --}}
+            @if (! empty($h->source))
+              <span class="ph-src" title="どの画面の、どこから変えたか">📍 {{ $h->source }}</span>
             @endif
           </div>
           @if ($h->action === 'created')
