@@ -372,6 +372,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/staff-invoice-check', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'index']);
     Route::post('/staff-invoice-check/mark', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'mark']);
     Route::post('/staff-invoice-check/folder', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'saveFolder']);
+    // 社員別アサイン一覧（2026-10-13 baba）。見るだけ・社員以上。
+    Route::get('/employee-assignments', [\App\Http\Controllers\EmployeeAssignmentsController::class, 'index']);
     // 手当の記録（運転・スライド・事前レクチャー・その他）＝請求書チェックと収支入力の両方から（2026-10-13）。
     Route::post('/staff-allowances', [\App\Http\Controllers\StaffAllowanceController::class, 'store']);
     Route::post('/staff-allowances/{id}/delete', [\App\Http\Controllers\StaffAllowanceController::class, 'destroy'])->whereNumber('id');

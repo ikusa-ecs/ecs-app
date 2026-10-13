@@ -84,6 +84,8 @@
         {{-- スタッフ別アサイン（請求書チェック）（2026-10-13）。 --}}
         <a class="{{ ($active ?? '') === 'staff_invoice_check' ? 'active' : '' }}" href="/staff-invoice-check"><span class="nav-icon">🧾</span> 請求書チェック・手当管理表</a>
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+        {{-- 社員別アサイン一覧（2026-10-13）。 --}}
+        <a class="{{ ($active ?? '') === 'employee_assignments' ? 'active' : '' }}" href="/employee-assignments"><span class="nav-icon">👥</span> 社員別アサイン一覧</a>
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
         <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>
         {{-- CSV取込は増やさず1項目に集約。ハブ画面から名簿・コンテンツ・案件の各取込へ。 --}}
