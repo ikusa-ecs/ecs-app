@@ -172,12 +172,13 @@
     <p class="rk-warn">⚠ 台帳につながっていない難易度の行が{{ $unlinked }}件あります（下の「難易度表」でつなぐと、難易度・必修が案に効きます）。</p>
   @endif
   {{-- 案のとおりに入れたら何件になるか（2026-10-09 baba）。この月の日だけ数える。 --}}
+  {{-- 2026-10-13 baba「新人の誰が何回入るか・1か月でこれをやったら何件増えるか」＝案が0件の新人も出し、合計の行を足した。 --}}
   @if ($picks)
+    <div class="rk-small" style="font-weight:700; margin:4px 0;">📊 この案をぜんぶ入れたら（{{ $month->format('n月') }}）＝新人のFCが合計 ＋{{ collect($rookies)->sum('pickInMonth') }}件</div>
     <div class="rk-wrap" style="margin-bottom:12px;">
     <table class="rk" style="max-width:620px;">
       <tr><th>新人</th><th>いまのFC</th><th>案</th><th>入れたら</th><th>FC目標</th></tr>
       @foreach ($rookies as $r)
-        @if ($r['pickInMonth'] || $r['pickOutside'])
           <tr>
             <td><b>{{ $r['name'] }}</b></td>
             <td class="rk-num">{{ $r['monthFc'] }}件</td>
@@ -192,8 +193,14 @@
               @endif
             </td>
           </tr>
-        @endif
       @endforeach
+      <tr>
+        <td><b>合計</b></td>
+        <td class="rk-num">{{ collect($rookies)->sum('monthFc') }}件</td>
+        <td class="rk-num"><b>＋{{ collect($rookies)->sum('pickInMonth') }}件</b></td>
+        <td class="rk-num"><b>{{ collect($rookies)->sum('afterFc') }}件</b></td>
+        <td></td>
+      </tr>
     </table>
     </div>
   @endif
@@ -243,7 +250,7 @@
 </details>
 
 <details class="rk-card rk-more" @if ($unlinked) open @endif>
-  <summary>📚 難易度表（コンテンツ難易度シート）</summary>
+  <summary>📚 難易度表（コンテンツ難易度シート）・ECSより前の経験の取込</summary>
   <p class="sub">スプレッドシート「コンテンツ難易度」のリアル・オンラインをそれぞれCSVで取り込みます（入れ直すと上書き）。
     名前が台帳と合わない行は、右のプルダウンで台帳のコンテンツを選んでつないでください。つながっていない行は使いません。</p>
   @if ($canEdit)
@@ -251,6 +258,14 @@
       <select class="rk-in" name="kind"><option>リアル</option><option>オンライン</option></select>
       <input type="file" name="file" accept=".csv,text/csv">
       <button class="rk-btn main" type="submit">取り込む</button>
+    </form>
+    {{-- ECSより前の経験（2026-10-13 baba）。チェックが入っているところだけ「やった」にする。空欄は触らない。 --}}
+    <p class="sub" style="margin-top:12px;">🗂 <b>ECSより前の経験</b>：「新人社員管理シート」の「新人経験値」タブをCSVでダウンロードして取り込みます。
+      チェックが入っている「経験あり」「D経験あり」だけを、各人の「経験を見る・手で直す」に「やった」で入れます（空欄は触りません＝入れ直すと増えたぶんだけ足されます）。
+      コンテンツは上の難易度表（リアル）でつないだものを使います。</p>
+    <form class="rk-bar" method="POST" action="/rookies/import-exp" enctype="multipart/form-data">@csrf
+      <input type="file" name="file" accept=".csv,text/csv">
+      <button class="rk-btn main" type="submit">経験を取り込む</button>
     </form>
   @endif
   <div class="rk-wrap">

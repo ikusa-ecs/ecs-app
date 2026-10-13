@@ -213,6 +213,11 @@ class RookieTest extends TestCase
         $this->assertSame(1, $r['monthFc']);
         $this->assertSame(1, $r['pickInMonth']);
         $this->assertSame(2, $r['afterFc'], 'いま1件＋案1件');
+
+        // 画面に「ぜんぶ入れたら合計＋何件」が出る（2026-10-13 baba）。
+        $this->actingAsPerson($ojt)->get('/rookies')->assertOk()
+            ->assertSee('この案をぜんぶ入れたら')
+            ->assertSee('合計');
     }
 
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
@@ -264,5 +269,38 @@ class RookieTest extends TestCase
         $this->assertSame(['CT-1' => ['fc' => 'none']], $new->fresh()->rookie_overrides);
         $this->assertSame(['戦国運動会'], $exp()['progress']['must']['left'], 'やっていないにしたら「まだ」に戻る');
         $this->assertSame(1, $exp()['exp'][0]['fcAuto'], '自動の回数はそのまま見える');
+    }
+
+    /**
+     * 「新人経験値」シートの取込（ECSより前の経験・2026-10-13 baba）。
+     * チェックが入っているところだけ「やった」にする／空欄は触らない（手で入れた印を消さない）／
+     * 名簿に無い名前・台帳につながっていないコンテンツは入れずに知らせる。
+     */
+    public function test_新人経験値シートを取り込む(): void
+    {
+        $csv = "４,コンテンツ名,難易度,\"新人セールス\nD必修\",新人セールス\nD推奨,熊上 結愛,15ヵ月,大霜　知弘,7ヵ月,知らない 人,1ヵ月,,暦\n"
+            ."達成目安,ー,ー,6ヶ月,12ヶ月,経験あり,D経験あり,経験あり,D経験あり,経験あり,D経験あり,,暦\n"
+            ."謎解き脱出,ある会議室からの脱出,1,●,●,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,,1ヶ月目\n"
+            .",秘密の会議室からの脱出,3,,,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE,,2ヶ月目\n"
+            .",ミッションスクランブル,2,●,●,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,,\n";
+        // 2列目の見出しに改行が入るので、そのセルを引用符でくくる（シートのCSVと同じ）。
+        $csv = str_replace("新人セールス\nD推奨,熊上", "\"新人セールス\nD推奨\",熊上", $csv);
+
+        $p1 = PersonFactory::new()->create(['name' => '熊上 結愛', 'role' => 'employee']);
+        $p2 = PersonFactory::new()->create(['name' => '大霜 知弘', 'role' => 'employee',
+            'rookie_overrides' => ['CT-3' => ['fc' => 'none']]]);
+        Content::create(['id' => 'CT-1', 'content_name' => '会議室', 'active' => true]);
+        Content::create(['id' => 'CT-3', 'content_name' => 'ミッスク', 'active' => true]);
+        ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'ある会議室からの脱出', 'difficulty' => 1, 'content_id' => 'CT-1']);
+        ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'ミッションスクランブル', 'difficulty' => 2, 'content_id' => 'CT-3']);
+
+        $this->actingAsPerson($p1)->post('/rookies/import-exp', [
+            'file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('exp.csv', $csv),
+        ])->assertRedirect()->assertSessionHas('ok', fn ($m) => str_contains($m, '知らない 人')
+            && str_contains($m, '秘密の会議室からの脱出'));
+
+        $this->assertSame(['CT-1' => ['fc' => 'done', 'd' => 'done']], $p1->fresh()->rookie_overrides);
+        // 全角空白の名前でも同じ人。空欄（ミッスク FALSE）は手で入れた「やっていない」を消さない。
+        $this->assertSame(['CT-3' => ['fc' => 'none'], 'CT-1' => ['fc' => 'done']], $p2->fresh()->rookie_overrides);
     }
 }

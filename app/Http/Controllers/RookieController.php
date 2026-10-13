@@ -7,6 +7,7 @@ use App\Models\ContentDifficulty;
 use App\Models\Person;
 use App\Support\OfficeScope;
 use App\Support\RookieDifficulty;
+use App\Support\RookieExperienceSheet;
 use App\Support\RookieFcPlan;
 use App\Support\Rookies;
 use Illuminate\Http\Request;
@@ -125,6 +126,27 @@ class RookieController extends Controller
 
         return back()->with('ok', $request->input('kind').'の難易度を'.$r['saved'].'件 取り込みました（台帳につながった '
             .$r['linked'].'件・まだつながっていない '.$r['unlinked'].'件）。');
+    }
+
+    /**
+     * 「新人経験値」シートのCSVを取り込む（ECSより前の経験・2026-10-13 baba）。
+     * チェックが入っているところだけ「やった」にする＝入れ直すと増えたぶんが足される。正本＝RookieExperienceSheet。
+     */
+    public function importExperience(Request $request)
+    {
+        $request->validate(['file' => ['required', 'file', 'max:4096']]);
+        $r = RookieExperienceSheet::import((string) file_get_contents($request->file('file')->getRealPath()));
+
+        $msg = $r['people'].'人ぶんを読み、経験の印を'.$r['marks'].'件 入れました。';
+        if ($r['unknownPeople']) {
+            $msg .= ' ⚠ 名簿で見つからない名前（入れていません）：'.implode('・', $r['unknownPeople']).'。';
+        }
+        if ($r['unlinked']) {
+            $msg .= ' ⚠ 難易度表で台帳につながっていないコンテンツ（入れていません・つないでから入れ直してください）：'
+                .implode('・', $r['unlinked']).'。';
+        }
+
+        return back()->with('ok', $msg);
     }
 
     /** 難易度の行を台帳のコンテンツにつなぐ（空＝外す）。 */

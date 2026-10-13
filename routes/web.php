@@ -349,6 +349,7 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/rookies/exp', [\App\Http\Controllers\RookieController::class, 'setExp']);
     Route::post('/rookies/targets', [\App\Http\Controllers\RookieController::class, 'setTargets']);
     Route::post('/rookies/import', [\App\Http\Controllers\RookieController::class, 'import']);
+    Route::post('/rookies/import-exp', [\App\Http\Controllers\RookieController::class, 'importExperience']);
     Route::post('/rookies/link', [\App\Http\Controllers\RookieController::class, 'link']);
     Route::get('/dispatch-list', [DispatchController::class, 'index']);
     Route::post('/dispatches', [DispatchController::class, 'store']);
