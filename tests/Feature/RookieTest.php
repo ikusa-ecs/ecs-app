@@ -272,6 +272,33 @@ class RookieTest extends TestCase
     }
 
     /**
+     * 目標の表はセールス版とイベプラ版（2026-10-13 baba）。所属で選ぶ。
+     * イベプラの7ヶ月目からは D数を決めない＝FCの目標はイベント数 − 実際のD数。
+     */
+    public function test_イベプラ新人は_イベプラの表(): void
+    {
+        $ep = PersonFactory::new()->make(['department' => 'イベプラ']);
+        $sales = PersonFactory::new()->make(['department' => 'セールス']);
+        $this->assertSame(Rookies::EVENTPLAN, Rookies::kindOf($ep));
+        $this->assertSame(Rookies::SALES, Rookies::kindOf($sales));
+
+        $this->assertSame(['events' => 10, 'd' => 0, 'fc' => 10, 'dFree' => false, 'kind' => 'イベプラ'], Rookies::targetFor(2, Rookies::EVENTPLAN));
+        $this->assertSame(8, Rookies::targetFor(2, Rookies::SALES)['events'], 'セールスは前のまま');
+        $t = Rookies::targetFor(8, Rookies::EVENTPLAN, 3);
+        $this->assertTrue($t['dFree']);
+        $this->assertSame(4, $t['fc'], '7件まで − Dを3件やった＝FCは4件');
+
+        // 画面から保存。セールスの表は変わらない。D数を空＝決めない。
+        $me = PersonFactory::new()->create(['role' => 'employee']);
+        $this->actingAsPerson($me)->post('/rookies/targets', ['kind' => 'イベプラ', 't' => [1 => ['events' => 9, 'd' => '1'], 7 => ['events' => 6, 'd' => '']]])
+            ->assertRedirect();
+        $this->assertSame([9, 1], Rookies::targets(Rookies::EVENTPLAN)[1]);
+        $this->assertSame([6, null], Rookies::targets(Rookies::EVENTPLAN)[7]);
+        $this->assertSame(Rookies::DEFAULT_TARGETS, Rookies::targets(Rookies::SALES));
+        $this->actingAsPerson($me)->get('/rookies')->assertOk()->assertSee('イベプラ新人')->assertSee('セールス新人');
+    }
+
+    /**
      * 「新人経験値」シートの取込（ECSより前の経験・2026-10-13 baba）。
      * チェックが入っているところだけ「やった」にする／空欄は触らない（手で入れた印を消さない）／
      * 名簿に無い名前・台帳につながっていないコンテンツは入れずに知らせる。

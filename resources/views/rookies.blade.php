@@ -75,7 +75,8 @@
           @if ($r['target'])
             FC {{ $r['monthFc'] }}/<b>{{ $r['target']['fc'] }}</b>
             <span class="{{ $r['monthFc'] < $r['target']['fc'] ? 'rk-short' : 'rk-okc' }}">{{ $r['monthFc'] < $r['target']['fc'] ? 'あと'.($r['target']['fc'] - $r['monthFc']) : '達成' }}</span><br>
-            D {{ $r['monthD'] }}/<b>{{ $r['target']['d'] }}</b>
+            D {{ $r['monthD'] }}/<b>{{ $r['target']['dFree'] ? '自由' : $r['target']['d'] }}</b>
+            <div class="rk-small" title="{{ $r['target']['dFree'] ? 'この月はD数を決めず、DとFCを合わせて'.$r['target']['events'].'件まで' : '' }}">{{ $r['target']['kind'] }}の表{{ $r['target']['dFree'] ? '・合わせて'.$r['target']['events'].'件まで' : '' }}</div>
           @else
             <span class="rk-small">入社日が未入力（名簿で入社日を入れてください）</span>
           @endif
@@ -235,18 +236,26 @@
 
 <details class="rk-card rk-more">
   <summary>📋 月ごとの目標（何ヶ月目 → イベント数・うちD数）</summary>
-  <p class="sub">シート「セールス新人イベントおよびD数」の値です。FCの目標＝イベント数 − D数。12ヶ月目より先は12ヶ月目の数を使います。</p>
-  <form method="POST" action="/rookies/targets">@csrf
-    <table class="rk" style="max-width:420px;">
-      <tr><th>何ヶ月目</th><th>イベント数</th><th>うちD数</th></tr>
-      @foreach ($targets as $m => $t)
-        <tr><td>{{ $m }}ヶ月目</td>
-          <td><input class="rk-in n" type="number" min="0" name="t[{{ $m }}][events]" value="{{ $t[0] }}" @disabled(! $canEdit)></td>
-          <td><input class="rk-in n" type="number" min="0" name="t[{{ $m }}][d]" value="{{ $t[1] }}" @disabled(! $canEdit)></td></tr>
-      @endforeach
-    </table>
-    @if ($canEdit)<button class="rk-btn main" type="submit" style="margin-top:8px;">保存</button>@endif
-  </form>
+  <p class="sub">シート「セールス新人イベントおよびD数」「イベプラ新人イベントおよびD数」の値です。所属がセールスの人はセールスの表、イベプラ（だけ）の人はイベプラの表を使います。
+    FCの目標＝イベント数 − D数。<b>D数を空にした月</b>は「D数は決めない（DとFCを合わせてイベント数まで）」＝FCの目標はイベント数 − その月にやったD数です。12ヶ月目より先は12ヶ月目の数を使います。</p>
+  <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
+  {{-- 2026-10-13 baba「イベプラの新人の目標もある」＝表を2つ。保存は表ごと。 --}}
+  @foreach ($targetSets as $kind => $set)
+    <form method="POST" action="/rookies/targets">@csrf
+      <input type="hidden" name="kind" value="{{ $kind }}">
+      <div style="font-weight:700; margin-bottom:4px;">{{ $kind }}新人</div>
+      <table class="rk" style="max-width:360px;">
+        <tr><th>何ヶ月目</th><th>イベント数</th><th>うちD数</th></tr>
+        @foreach ($set as $m => $t)
+          <tr><td>{{ $m }}ヶ月目</td>
+            <td><input class="rk-in n" type="number" min="0" name="t[{{ $m }}][events]" value="{{ $t[0] }}" @disabled(! $canEdit)></td>
+            <td><input class="rk-in n" type="number" min="0" name="t[{{ $m }}][d]" value="{{ $t[1] }}" placeholder="自由" @disabled(! $canEdit)></td></tr>
+        @endforeach
+      </table>
+      @if ($canEdit)<button class="rk-btn main" type="submit" style="margin-top:8px;">{{ $kind }}の表を保存</button>@endif
+    </form>
+  @endforeach
+  </div>
 </details>
 
 <details class="rk-card rk-more" @if ($unlinked) open @endif>

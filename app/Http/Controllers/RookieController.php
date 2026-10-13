@@ -40,7 +40,8 @@ class RookieController extends Controller
                 ->reject(fn ($p) => collect($plan['rookies'])->contains('id', $p->id))->values(),
             // OJT担当に選べる人＝在籍中の社員（拠点を問わない）。
             'employees' => Person::employees()->where('active', true)->orderBy('id')->get(['id', 'name']),
-            'targets' => Rookies::targets(),
+            // 月ごとの目標の表＝セールス版とイベプラ版（2026-10-13）。
+            'targetSets' => [Rookies::SALES => Rookies::targets(Rookies::SALES), Rookies::EVENTPLAN => Rookies::targets(Rookies::EVENTPLAN)],
             'difficulties' => ContentDifficulty::orderBy('kind', 'desc')->orderBy('id')->get(),
             'contents' => Content::where('active', true)->orderBy('content_name')->get(['id', 'content_name']),
             'unlinked' => $plan['unlinked'],
@@ -110,9 +111,10 @@ class RookieController extends Controller
 
     public function setTargets(Request $request)
     {
-        Rookies::saveTargets((array) $request->input('t', []));
+        $kind = $request->input('kind') === Rookies::EVENTPLAN ? Rookies::EVENTPLAN : Rookies::SALES;
+        Rookies::saveTargets((array) $request->input('t', []), $kind);
 
-        return back()->with('ok', '月ごとの目標を保存しました。');
+        return back()->with('ok', $kind.'新人の月ごとの目標を保存しました。');
     }
 
     /** 「コンテンツ難易度」CSVを取り込む（リアル／オンライン）。 */

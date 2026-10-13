@@ -109,7 +109,8 @@ final class RookieFcPlan
             usort($exp, fn ($a, $b) => strcmp($a['name'], $b['name']));
 
             $no = Rookies::monthNo($p, $month);
-            $target = Rookies::targetFor($no);
+            // 表はセールス版／イベプラ版を所属で選ぶ（2026-10-13）。D数を決めない月は実際のD数で引く。
+            $target = Rookies::targetFor($no, Rookies::kindOf($p), $monthD);
             $fcThisMonth = $monthEvents - $monthD;
 
             // 必修・推奨の進み具合（Dでやったら「済」・FCだけなら「D準備OK」）。
