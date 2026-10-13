@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'スタッフ別アサイン（請求書チェック）')
-@section('h1', 'スタッフ別アサイン（請求書チェック）')
+@section('title', '請求書チェック・手当管理表')
+@section('h1', '請求書チェック・手当管理表')
 @php $active = 'staff_invoice_check'; @endphp
 
 @push('head')
@@ -38,6 +38,8 @@
   .si-guide { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--ink); }
   .si-guide summary { cursor: pointer; font-weight: 700; }
   .si-guide ul { margin: 6px 0 0; padding-left: 1.2em; line-height: 1.8; }
+  .si-allow-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .si-allow-form select, .si-allow-form input { padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-family: inherit; font-size: 12.5px; }
   .si-sub { font-size: 11.5px; color: var(--muted); line-height: 1.6; padding-left: 1em; display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .si-fmt { font-weight: 700; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
   .si-copy { font-size: 11.5px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 2px 8px; cursor: pointer; margin-left: 6px; }
@@ -58,7 +60,16 @@
 </p>
 
 @if (session('ok'))<div class="si-guide" style="border-color:var(--ok-line, #86efac);">✓ {{ session('ok') }}</div>@endif
-@if ($errors->any())<div class="si-guide si-ng" style="font-size:12.5px;">⚠ URLの形が正しくありません（https:// から始まるURLを貼ってください）。</div>@endif
+@if ($errors->any())
+  <div class="si-guide si-ng" style="font-size:12.5px;">
+    @if ($errors->has('url'))⚠ URLの形が正しくありません（https:// から始まるURLを貼ってください）。<br>@endif
+    @foreach ($errors->messages() as $key => $msgs)
+      @if ($key !== 'url')
+        @foreach ($msgs as $msg)⚠ {{ $msg }}<br>@endforeach
+      @endif
+    @endforeach
+  </div>
+@endif
 
 {{-- 請求書PDFの置き場所（2026-10-13 baba「Googleフォームで送ってもらっているPDFの格納先URLを置きたい」）。 --}}
 <div class="si-guide" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -172,6 +183,85 @@
   @endforeach
 </table>
 @endif
+
+{{-- 手当の記録（2026-10-13 baba「運転手当・スライド手当・事前レクチャー手当を社員に追加してもらいたい」）。
+     入れたものは各スタッフの「🧾 請求書の目安」に足される。マイページの収支入力からも入れられる（保存先は同じ）。
+     前泊・ロング・MC・前日設営・リハはアサインから自動で数えるので、ここでは選べない（二重に数えないため）。 --}}
+<div class="si-guide" style="margin-top:18px;" id="allowances">
+  <div style="font-weight:800; font-size:14px; margin-bottom:4px;">✍ 手当の記録（{{ $month->format('n月') }}）</div>
+  <div class="si-who" style="display:block; margin-bottom:8px;">運転手当（20分以上運転）・スライド手当・事前レクチャー手当など、アサインからは分からない手当を入れてください。入れたものは各スタッフの「🧾 請求書の目安」に足されます。マイページの「収支入力」からも入れられます。</div>
+  <form method="POST" action="/staff-allowances" class="si-allow-form">@csrf
+    <select name="staff_id" id="alStaff" required onchange="alFillCases()">
+      <option value="">スタッフを選ぶ</option>
+      @foreach ($formStaff as $s)
+        <option value="{{ $s['id'] }}" @selected(old('staff_id') === $s['id'])>{{ $s['name'] }}</option>
+      @endforeach
+    </select>
+    <select name="project_id" id="alCase" onchange="alPickCase()">
+      <option value="">案件（任意）</option>
+    </select>
+    <input type="date" name="date" id="alDate" required value="{{ old('date') }}">
+    <select name="kind" id="alKind" required onchange="alKindChanged()">
+      @foreach ($allowanceKinds as $k => $unit)
+        <option value="{{ $k }}" @selected(old('kind') === $k)>{{ $k }}{{ $unit ? '（'.number_format($unit).'円）' : '' }}</option>
+      @endforeach
+    </select>
+    <input type="number" name="count" min="1" max="20" value="{{ old('count', 1) }}" style="width:60px;" title="回数"> 回
+    <input type="number" name="amount" id="alAmount" min="0" max="200000" placeholder="金額（その他）" value="{{ old('amount') }}" style="width:120px; display:none;">
+    <input type="text" name="note" maxlength="200" placeholder="メモ（例：10/18本番の本能寺レクチャー）" value="{{ old('note') }}" style="width:240px;">
+    <button type="submit" class="si-copy" style="margin:0; font-weight:700;">＋ 入れる</button>
+  </form>
+  <div class="si-who" id="alHint" style="display:block; margin-top:4px;"></div>
+
+  @if ($allowances)
+    <table class="si-table" style="margin-top:10px;">
+      <tr><th>日付</th><th>スタッフ</th><th>手当</th><th class="hide-sp">案件・メモ</th><th style="text-align:right;">金額</th><th class="hide-sp">入れた人</th><th></th></tr>
+      @foreach ($allowances as $a)
+        <tr>
+          <td>{{ $a['md'] }}</td>
+          <td>{{ $a['staff'] }}</td>
+          <td>{{ $a['kind'] }}{{ $a['count'] > 1 ? ' ×'.$a['count'] : '' }}</td>
+          <td class="hide-sp">{{ $a['project'] }}{{ $a['project'] !== '' && $a['note'] !== '' ? '／' : '' }}{{ $a['note'] }}</td>
+          <td class="num">{{ number_format($a['amount']) }}円</td>
+          <td class="hide-sp"><span class="si-who" style="display:inline;">{{ $a['by'] }}</span></td>
+          <td>
+            <form method="POST" action="/staff-allowances/{{ $a['id'] }}/delete" onsubmit="return confirm('この手当を消しますか？')">@csrf
+              <button type="submit" class="si-copy" style="margin:0;">消す</button>
+            </form>
+          </td>
+        </tr>
+      @endforeach
+    </table>
+  @else
+    <p class="si-who" style="display:block; margin-top:8px;">この月はまだ入っていません。</p>
+  @endif
+</div>
+
+<script>
+  // 手当の入力欄（2026-10-13）。スタッフを選ぶと、その人のこの月の案件が選べる。案件を選ぶと日付が入る。
+  var AL_CASES = @json($formCases);
+  var AL_HINTS = @json($allowanceHints);
+  function alFillCases() {
+    var sel = document.getElementById('alCase');
+    var sid = document.getElementById('alStaff').value;
+    sel.innerHTML = '<option value="">案件（任意）</option>';
+    (AL_CASES[sid] || []).forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.id; o.textContent = c.label; o.dataset.ymd = c.ymd;
+      sel.appendChild(o);
+    });
+  }
+  function alPickCase() {
+    var o = document.getElementById('alCase').selectedOptions[0];
+    if (o && o.dataset.ymd) document.getElementById('alDate').value = o.dataset.ymd;
+  }
+  function alKindChanged() {
+    var k = document.getElementById('alKind').value;
+    document.getElementById('alAmount').style.display = (k === 'その他') ? '' : 'none';
+    document.getElementById('alHint').textContent = AL_HINTS[k] || '';
+  }
+  alFillCases(); alKindChanged();
+</script>
 
 <script>
   // 押した瞬間に保存（2026-10-13）。⚠ 失敗をだまって流さない＝チェックを元に戻して赤字で知らせる。

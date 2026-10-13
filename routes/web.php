@@ -372,6 +372,10 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/staff-invoice-check', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'index']);
     Route::post('/staff-invoice-check/mark', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'mark']);
     Route::post('/staff-invoice-check/folder', [\App\Http\Controllers\StaffInvoiceCheckController::class, 'saveFolder']);
+    // 手当の記録（運転・スライド・事前レクチャー・その他）＝請求書チェックと収支入力の両方から（2026-10-13）。
+    Route::post('/staff-allowances', [\App\Http\Controllers\StaffAllowanceController::class, 'store']);
+    Route::post('/staff-allowances/{id}/delete', [\App\Http\Controllers\StaffAllowanceController::class, 'destroy'])->whereNumber('id');
+    Route::get('/staff-allowances/project', [\App\Http\Controllers\StaffAllowanceController::class, 'forProject']);
     // スタッフ名簿のCSV出力（氏名・事務所・区分・できる役割・通算など）。
     Route::get('/staff/export.csv', [PersonController::class, 'exportStaffCsv']);
     // スタッフの「できるポジション・NGペア・専属・人柄・メモ」を保存（/staff 詳細パネルからAJAX）。

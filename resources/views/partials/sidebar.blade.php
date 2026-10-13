@@ -82,7 +82,7 @@
       <div class="group-items">
         <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">☷</span> スタッフ（名簿・稼働状況）</a>
         {{-- スタッフ別アサイン（請求書チェック）（2026-10-13）。 --}}
-        <a class="{{ ($active ?? '') === 'staff_invoice_check' ? 'active' : '' }}" href="/staff-invoice-check"><span class="nav-icon">🧾</span> スタッフ別アサイン（請求書チェック）</a>
+        <a class="{{ ($active ?? '') === 'staff_invoice_check' ? 'active' : '' }}" href="/staff-invoice-check"><span class="nav-icon">🧾</span> 請求書チェック・手当管理表</a>
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
         <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>

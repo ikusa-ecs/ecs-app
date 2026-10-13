@@ -263,6 +263,28 @@
           ※ 単価・ルールの詳細は「収支の入力定義」を確認。本番では会計・請求の仕組みと連携する想定です。
         </p>
       </div>
+
+      <!-- スタッフの手当（2026-10-13）。保存先は「請求書チェック・手当管理表」と同じ（/staff-allowances）。 -->
+      <div class="panel mp-wrap" id="alPanel" style="margin-top:20px;">
+        <div class="case-head" style="font-size:15px;">✍ この案件のスタッフの手当（運転・スライド・事前レクチャーなど）</div>
+        <p class="note-cell" style="margin:6px 0 10px;">この案件に入っているスタッフに付く手当を入れてください。入れたものは「🧾 請求書チェック・手当管理表」の請求書の目安に足されます（押した瞬間に保存）。<br>
+          ※ 前泊・ロング・MC・前日設営・リハはアサインから自動で数えるので、ここでは入れません。</p>
+        <div class="al-form" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+          <select id="alStaff"></select>
+          <select id="alKind" onchange="alKindChanged()"></select>
+          <input type="date" id="alDate">
+          <input type="number" id="alCount" min="1" max="20" value="1" style="width:60px;" title="回数"> 回
+          <input type="number" id="alAmount" min="0" max="200000" placeholder="金額（その他）" style="width:120px; display:none;">
+          <input type="text" id="alNote" maxlength="200" placeholder="メモ（例：本能寺のレクチャー）" style="width:220px;">
+          <button class="btn primary" type="button" onclick="alAdd()">＋ 入れる</button>
+        </div>
+        <div class="note-cell" id="alHint" style="margin-top:4px;"></div>
+        <div class="note-cell" id="alMsg" style="margin-top:4px; font-weight:700;"></div>
+        <table class="tbl" style="margin-top:8px;">
+          <thead><tr><th>日付</th><th>スタッフ</th><th>手当</th><th>メモ</th><th class="num">金額</th><th>入れた人</th><th></th></tr></thead>
+          <tbody id="alBody"></tbody>
+        </table>
+      </div>
 @endverbatim
 @endsection
 
@@ -459,6 +481,91 @@
       }
     });
     recalc();
+    alLoad(id);
+  }
+
+  // ===== スタッフの手当（2026-10-13 baba「収支入力からも運転手当やレクチャー手当を追加できたら」）=====
+  // 案件を選ぶたびに、その案件のスタッフと入っている手当をサーバーから読む（保存先は /staff-allowances の1つ）。
+  // ⚠ 失敗をだまって流さない＝赤字で知らせる。
+  let AL = { project: null, hints: {} };
+  function alEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+  function alMsg(text, ng){ const m = document.getElementById('alMsg'); m.textContent = text; m.style.color = ng ? '#b91c1c' : ''; }
+  async function alLoad(id){
+    AL.project = id;
+    alMsg('');
+    document.getElementById('alBody').innerHTML = '<tr><td colspan="7" class="note-cell">読み込み中…</td></tr>';
+    try {
+      const r = await fetch('/staff-allowances/project?project=' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } });
+      if (!r.ok) throw new Error('通信エラー ' + r.status);
+      const j = await r.json();
+      if (AL.project !== id) return;   // 読み込みの途中で別の案件を選んだ
+      const st = document.getElementById('alStaff');
+      st.innerHTML = j.staff.length ? '' : '<option value="">（この案件にスタッフはいません）</option>';
+      j.staff.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name + '（' + s.role.replace(/（.*?）/g, '') + '）'; st.appendChild(o); });
+      const kd = document.getElementById('alKind');
+      kd.innerHTML = '';
+      Object.keys(j.kinds).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k + (j.kinds[k] ? '（' + Number(j.kinds[k]).toLocaleString('ja-JP') + '円）' : ''); kd.appendChild(o); });
+      AL.hints = j.hints || {};
+      document.getElementById('alDate').value = j.date || '';
+      alKindChanged();
+      alRender(j.items || []);
+    } catch (e) {
+      document.getElementById('alBody').innerHTML = '';
+      alMsg('⚠ 手当を読み込めませんでした（' + e.message + '）。開き直してください。', true);
+    }
+  }
+  function alKindChanged(){
+    const k = document.getElementById('alKind').value;
+    document.getElementById('alAmount').style.display = (k === 'その他') ? '' : 'none';
+    document.getElementById('alHint').textContent = AL.hints[k] || '';
+  }
+  function alRender(items){
+    const body = document.getElementById('alBody');
+    if (!items.length) { body.innerHTML = '<tr><td colspan="7" class="note-cell">まだ入っていません。</td></tr>'; return; }
+    body.innerHTML = items.map(a => '<tr><td>' + alEsc(a.md) + '</td><td>' + alEsc(a.staff) + '</td><td>' + alEsc(a.kind) + (a.count > 1 ? ' ×' + a.count : '')
+      + '</td><td>' + alEsc(a.note) + '</td><td class="num">' + Number(a.amount).toLocaleString('ja-JP') + '円</td><td class="note-cell">' + alEsc(a.by)
+      + '</td><td><button class="btn" type="button" onclick="alDel(' + Number(a.id) + ')">消す</button></td></tr>').join('');
+  }
+  async function alAdd(){
+    const body = {
+      staff_id: document.getElementById('alStaff').value,
+      project_id: AL.project,
+      date: document.getElementById('alDate').value,
+      kind: document.getElementById('alKind').value,
+      count: Number(document.getElementById('alCount').value || 1),
+      amount: document.getElementById('alAmount').value === '' ? null : Number(document.getElementById('alAmount').value),
+      note: document.getElementById('alNote').value,
+    };
+    if (!body.staff_id) { alMsg('⚠ スタッフを選んでください。', true); return; }
+    if (!body.date) { alMsg('⚠ 日付を入れてください。', true); return; }
+    try {
+      const r = await fetch('/staff-allowances', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.ok) {
+        const first = j && j.errors ? Object.values(j.errors)[0][0] : ('通信エラー ' + r.status);
+        throw new Error(first);
+      }
+      document.getElementById('alNote').value = '';
+      document.getElementById('alAmount').value = '';
+      document.getElementById('alCount').value = 1;
+      alMsg('✓ ' + j.item.kind + 'を入れました');
+      alLoad(AL.project);
+    } catch (e) {
+      alMsg('⚠ 入れられませんでした（' + e.message + '）', true);
+    }
+  }
+  async function alDel(aid){
+    if (!confirm('この手当を消しますか？')) return;
+    try {
+      const r = await fetch('/staff-allowances/' + aid + '/delete', { method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF } });
+      if (!r.ok) throw new Error('通信エラー ' + r.status);
+      alMsg('✓ 消しました');
+      alLoad(AL.project);
+    } catch (e) {
+      alMsg('⚠ 消せませんでした（' + e.message + '）', true);
+    }
   }
 
   async function saveCase(){

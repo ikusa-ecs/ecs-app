@@ -7,7 +7,9 @@ use App\Models\Content;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\Setting;
+use App\Models\StaffAllowance;
 use App\Models\StaffInvoiceCheck;
+use App\Support\StaffAllowances;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\ProjectContentName;
@@ -51,13 +53,28 @@ class StaffInvoiceCheckController extends Controller
             ->where('status', '!=', 'キャンセル')
             ->orderBy('date')->get(['project_id', 'staff_id', 'role', 'status', 'date']);
 
-        $projects = Project::whereIn('id', $rows->pluck('project_id')->unique())->get()->keyBy('id');
+        // 手で入れた手当（運転・スライド・事前レクチャー・その他・2026-10-13）。この月の日付のもの。
+        $allowances = StaffAllowance::whereIn('staff_id', $staffIds)
+            ->whereDate('date', '>=', $month->format('Y-m-d'))
+            ->whereDate('date', '<=', $month->copy()->endOfMonth()->format('Y-m-d'))
+            ->orderBy('date')->orderBy('id')->get();
+
+        $projects = Project::whereIn('id', $rows->pluck('project_id')->merge($allowances->pluck('project_id'))->filter()->unique())->get()->keyBy('id');
         $contentNames = Content::pluck('content_name', 'id');
-        $people = Person::whereIn('id', $rows->pluck('staff_id')->unique())->get(['id', 'name', 'name_kana', 'office', 'nearest_station'])->keyBy('id');
+        $people = Person::whereIn('id', $rows->pluck('staff_id')->merge($allowances->pluck('staff_id'))->unique())
+            ->get(['id', 'name', 'name_kana', 'office', 'nearest_station'])->keyBy('id');
         $checks = StaffInvoiceCheck::where('ym', $ym)->get()->keyBy('staff_id');
 
+        $projectNames = $projects->map(fn ($p) => ProjectContentName::of($p, $contentNames, (string) $p->project_name))->all();
+        $staffNames = $people->map(fn ($p) => (string) $p->name)->all();
+        $allowRows = $allowances->map(fn ($a) => StaffAllowances::row($a, $projectNames, $staffNames))->values()->all();
+        $allowByStaff = collect($allowRows)->groupBy('staffId');
+
+        $byStaff = $rows->groupBy('staff_id');
         $list = [];
-        foreach ($rows->groupBy('staff_id') as $sid => $mine) {
+        // アサインがある人＋手当だけある人（例：レクチャーだけの月）。
+        foreach ($byStaff->keys()->merge($allowByStaff->keys())->unique() as $sid) {
+            $mine = $byStaff->get($sid, collect());
             $p = $people->get($sid);
             if (! $p) {
                 continue;
@@ -86,7 +103,8 @@ class StaffInvoiceCheckController extends Controller
                     'cancelled' => $pr ? (bool) $pr->is_cancelled : false,
                 ];
             }
-            if (! $cases) {
+            $myAllow = $allowByStaff->get($sid, collect())->values()->all();
+            if (! $cases && ! $myAllow) {
                 continue;
             }
             $c = $checks->get($sid);
@@ -101,7 +119,8 @@ class StaffInvoiceCheckController extends Controller
                 'checked' => $c?->checked_at ? ['at' => $c->checked_at->format('n/j H:i'), 'by' => (string) $c->checked_by] : null,
                 'copyText' => self::copyText((string) $p->name, $month, $cases),
                 // 請求書に出てくるはずの品目（マニュアルの書き方・標準単価の目安）。正本＝StaffInvoiceDraft。
-                'draft' => StaffInvoiceDraft::build($cases, (string) ($p->nearest_station ?? '')),
+                'draft' => StaffInvoiceDraft::build($cases, (string) ($p->nearest_station ?? ''), $myAllow),
+                'allowances' => $myAllow,
             ];
         }
         // 並びは読み（name_kana）順＝請求書の束をあいうえお順で見やすく。読みが無ければ名前。
@@ -118,6 +137,17 @@ class StaffInvoiceCheckController extends Controller
             'office' => $office,
             'list' => $list,
             'folderUrl' => (string) Setting::get(self::FOLDER_KEY, ''),
+            // 手当の記録（この月・全員ぶん）と、入力欄の選択肢（2026-10-13）。
+            'allowances' => $allowRows,
+            'allowanceKinds' => StaffAllowances::KINDS,
+            'allowanceHints' => StaffAllowances::HINTS,
+            // スタッフ → その月の案件（入力欄で「どの案件か」を選ぶため）。名前は拠点の在籍スタッフ全員から選べる。
+            'formStaff' => OfficeScope::applyToPeople(Person::staff(), $office)->where('active', true)
+                ->orderByRaw("case when coalesce(nullif(name_kana, ''), '') = '' then 1 else 0 end")->orderBy('name_kana')->orderBy('name')
+                ->get(['id', 'name'])->map(fn ($p) => ['id' => $p->id, 'name' => (string) $p->name])->values(),
+            'formCases' => collect($list)->mapWithKeys(fn ($r) => [$r['id'] => collect($r['cases'])->map(fn ($c) => [
+                'id' => $c['projectId'], 'ymd' => $c['ymd'], 'label' => $c['date'].' '.$c['name'],
+            ])->unique('id')->values()]),
             'counts' => [
                 'all' => count($list),
                 'received' => count(array_filter($list, fn ($r) => $r['received'])),

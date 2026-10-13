@@ -46,7 +46,7 @@ class StaffInvoiceCheckTest extends TestCase
             ->assertSee('集合 7:00・解散 18:30')
             ->assertSee('代々木公園 東京都渋谷区')
             ->assertSee("　FC（巡回ファシリ）\n　リアルロング／集合 7:00・解散 18:30／代々木公園 東京都渋谷区", false)
-            ->assertDontSee('出ない次郎')   // キャンセルだけの人は出ない
+            ->assertDontSee('data-id="'.$s2->id.'"', false)   // キャンセルだけの人は一覧の行に出ない（手当の入力欄の選択肢には出る）
             ->assertDontSee('社員三郎');    // 社員は請求書を出さない
 
         // 📨 を付ける → 誰が付けたかが残る。外せば消える。

@@ -12,7 +12,8 @@ use Illuminate\Support\Carbon;
  *   手当：MC・スライド 1,000/案件、ロング・宿泊（前泊）・運転・事前レクチャー/リハーサル 2,000/回、前日設営 4,000/回
  *   交通費：往復3,000円まで（税区分は対象外）
  * ⚠ 金額は**標準単価での目安**。本当は人ごとに日当も交通費も違う（2026-08-17 baba）＝「合っているか」の判定には使わない。
- * ⚠ ECSでは分からないもの（交通費・運転・スライド・事前レクチャー・キャンセル料）は「要確認」として出すだけ。
+ * ⚠ 運転・スライド・事前レクチャーは、社員が「手当の記録」（staff_allowances・単価の正本＝StaffAllowances）に入れたぶんを足す。
+ *   交通費・キャンセル料はECSでは分からない＝「要確認」として出すだけ。
  * ⚠ 単価をここ以外に書かない（マニュアルが変わったらここ1か所を直す）。
  */
 final class StaffInvoiceDraft
@@ -35,7 +36,7 @@ final class StaffInvoiceDraft
      * @param  list<array{ymd:string, name:string, format:string, roleCode:string, dayType:string, lodging:string, cancelled:bool, status:string}>  $cases
      * @return array{items: list<array{label:string, qty:string, price:int, amount:int}>, total:int, checks: list<string>}
      */
-    public static function build(array $cases, string $station = ''): array
+    public static function build(array $cases, string $station = '', array $allowances = []): array
     {
         $items = [];
         $checks = [];
@@ -118,9 +119,41 @@ final class StaffInvoiceDraft
             }
         }
 
+        // ⑦ 手で入れた手当（運転・スライド・事前レクチャー・その他＝「手当の記録」・2026-10-13）。
+        //   $allowances は StaffAllowances::row の形。運転・スライドは日付を並べて1行、レクチャー・その他は1件1行。
+        $byKind = [];
+        foreach ($allowances as $a) {
+            $byKind[$a['kind']][] = $a;
+        }
+        foreach (['運転手当', 'スライド手当'] as $kind) {
+            if (empty($byKind[$kind])) {
+                continue;
+            }
+            $rows = $byKind[$kind];
+            $n = array_sum(array_column($rows, 'count'));
+            $unit = $rows[0]['unit'];
+            $perDay = [];
+            foreach ($rows as $a) {
+                $perDay[$a['date']] = ($perDay[$a['date']] ?? 0) + $a['count'];
+            }
+            ksort($perDay);
+            $label = implode('、', array_map(fn ($y, $c) => $md($y).($c > 1 ? '('.$c.'回)' : ''), array_keys($perDay), $perDay));
+            $items[] = ['label' => $kind.'：'.$label, 'qty' => $n.($kind === 'スライド手当' ? '案件' : '回'), 'price' => $unit, 'amount' => $unit * $n];
+        }
+        foreach (['事前レクチャー手当', 'その他'] as $kind) {
+            foreach ($byKind[$kind] ?? [] as $a) {
+                $what = $a['project'] !== '' ? $a['project'] : $a['note'];
+                $name = $kind === 'その他' ? ($a['note'] !== '' ? $a['note'] : 'その他') : $kind;
+                $items[] = ['label' => $name.'：'.$md($a['date']).($kind !== 'その他' && $what !== '' ? '（'.$what.'）' : ''),
+                    'qty' => $a['count'].'回', 'price' => $a['unit'], 'amount' => $a['amount']];
+            }
+        }
+
         // ECSでは分からないもの＝見る人が確かめる。
         $checks[] = '交通費：最寄り駅'.($station !== '' ? '「'.$station.'」' : '（名簿に未入力）').'から。往復'.number_format(self::TRAVEL_CAP).'円までに収まっているか（税区分は対象外）';
-        $checks[] = '運転手当（20分以上運転）・スライド手当・事前レクチャー手当はECSに記録がありません';
+        $checks[] = $allowances
+            ? '運転・スライド・事前レクチャー手当は「手当の記録」に入っているぶんだけ数えています'
+            : '運転手当（20分以上運転）・スライド手当・事前レクチャー手当は「手当の記録」にまだ入っていません（請求書にあれば確かめて入れてください）';
         $cancelled = array_values(array_filter($cases, fn ($c) => $c['cancelled']));
         if ($cancelled) {
             $checks[] = 'キャンセル料の対象かも：'.implode('、', array_map(fn ($c) => $md($c['ymd']).' '.$c['name'], $cancelled))
