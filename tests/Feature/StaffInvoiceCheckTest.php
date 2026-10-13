@@ -35,7 +35,7 @@ class StaffInvoiceCheckTest extends TestCase
         Assignment::create(['project_id' => $p->id, 'staff_id' => $s2->id, 'role' => 'FC', 'status' => 'キャンセル', 'date' => '2026-10-12']);
         Assignment::create(['project_id' => $p->id, 'staff_id' => $emp->id, 'role' => 'D', 'status' => '確定', 'date' => '2026-10-12']);
 
-        $res = $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10');
+        $res = $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10&tab=check');
         $res->assertOk()
             ->assertSee('請求太郎')
             ->assertSee('明細 2件')
@@ -64,24 +64,24 @@ class StaffInvoiceCheckTest extends TestCase
         $this->assertSame('担当花子', $row->checked_by);
 
         // 別の月の印とは混ざらない。
-        $this->get('/staff-invoice-check?ym=2026-11')->assertOk()->assertSee('この月にアサインのあるスタッフはいません');
+        $this->get('/staff-invoice-check?ym=2026-11&tab=check')->assertOk()->assertSee('この月にアサインのあるスタッフはいません');
     }
 
     /** 請求書PDFの置き場所のURLを入れて、画面から開ける（2026-10-13）。おかしな文字は受け付けない。 */
     public function test_folder_url_can_be_saved(): void
     {
         $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京']);
-        $this->actingAsPerson($me)->get('/staff-invoice-check')->assertOk()->assertSee('まだ入っていません');
+        $this->actingAsPerson($me)->get('/staff-invoice-check?tab=check')->assertOk()->assertSee('まだ入っていません');
 
         $url = 'https://drive.google.com/drive/folders/abc123';
         $this->post('/staff-invoice-check/folder', ['url' => $url])->assertRedirect();
-        $this->get('/staff-invoice-check')->assertOk()->assertSee($url);
+        $this->get('/staff-invoice-check?tab=check')->assertOk()->assertSee($url);
 
         $this->post('/staff-invoice-check/folder', ['url' => 'javascript:alert(1)'])->assertSessionHasErrors('url');
-        $this->get('/staff-invoice-check')->assertSee($url);   // 前の値のまま
+        $this->get('/staff-invoice-check?tab=check')->assertSee($url);   // 前の値のまま
 
         $this->post('/staff-invoice-check/folder', ['url' => ''])->assertRedirect();
-        $this->get('/staff-invoice-check')->assertSee('まだ入っていません');
+        $this->get('/staff-invoice-check?tab=check')->assertSee('まだ入っていません');
     }
 
     public function test_staff_cannot_open(): void

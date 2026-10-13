@@ -94,16 +94,17 @@ class StaffInvoiceCheckController extends Controller
         // 並びは読み（name_kana）順＝請求書の束をあいうえお順で見やすく。読みが無ければ名前。
         usort($list, fn ($a, $b) => strcmp($a['kana'] ?: $a['name'], $b['kana'] ?: $b['name']));
 
-        // タブ（請求書チェック／手当の記録・2026-10-13）。前の月・次の月は拠点とタブを持ち回る。
-        $tab = $request->query('tab') === 'allowances' ? 'allowances' : 'check';
+        // タブ（手当の記録／請求書チェック・2026-10-13）。前の月・次の月は拠点とタブを持ち回る。
+        // ⚠ はじめに出すのは「手当の記録」（いろいろな社員が使うので・2026-10-13 baba）。請求書チェックは ?tab=check。
+        $tab = $request->query('tab') === 'check' ? 'check' : 'allowances';
         $officeQ = $request->filled('office') ? '&office='.urlencode((string) $request->query('office')) : '';
-        $tabQ = $tab === 'allowances' ? '&tab=allowances' : '';
+        $tabQ = '&tab='.$tab;
         $base = '/staff-invoice-check?ym=';
 
         return view('staff_invoice_check', [
             'month' => $month,
             'tab' => $tab,
-            'tabUrls' => ['check' => $base.$ym.$officeQ, 'allowances' => $base.$ym.$officeQ.'&tab=allowances'],
+            'tabUrls' => ['allowances' => $base.$ym.$officeQ.'&tab=allowances', 'check' => $base.$ym.$officeQ.'&tab=check'],
             'prevUrl' => $base.$month->copy()->subMonth()->format('Y-m').$officeQ.$tabQ,
             'nextUrl' => $base.$month->copy()->addMonth()->format('Y-m').$officeQ.$tabQ,
             'ym' => $ym,

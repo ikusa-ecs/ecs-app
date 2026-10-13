@@ -47,7 +47,7 @@ class StaffAllowanceTest extends TestCase
         $this->postJson('/staff-allowances', ['staff_id' => $s2->id, 'date' => '2026-10-11', 'kind' => 'その他', 'amount' => 1500,
             'note' => '資料印刷'])->assertOk();
 
-        $res = $this->get('/staff-invoice-check?ym=2026-10')->assertOk()
+        $res = $this->get('/staff-invoice-check?ym=2026-10&tab=check')->assertOk()
             ->assertSee('請求書チェック・手当管理表')
             ->assertSee('運転手当：10/12')
             ->assertSee('スライド手当：10/12(2回)')
@@ -56,8 +56,8 @@ class StaffAllowanceTest extends TestCase
             ->assertSee('資料印刷：10/11')
             ->assertDontSee('✍ 手当の記録（10月）');   // 手当の記録はタブを切り替えたときだけ（2026-10-13）
 
-        // 「✍ 手当の記録」のタブ＝入力欄と一覧。月の移動でもタブのまま。
-        $this->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk()
+        // 「✍ 手当の記録」のタブ＝入力欄と一覧。**はじめに開くのはこちら**（2026-10-13 baba）。月の移動でもタブのまま。
+        $this->get('/staff-invoice-check?ym=2026-10')->assertOk()
             ->assertSee('✍ 手当の記録（10月）')
             ->assertSee('本能寺のレクチャー')
             ->assertSee('ym=2026-11&amp;tab=allowances', false)

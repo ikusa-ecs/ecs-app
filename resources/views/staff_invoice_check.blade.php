@@ -76,8 +76,9 @@
 {{-- タブ（2026-10-13 baba「手当の記録は表示する拠点の下にページを切り替えられる感じで」）。
      どちらのタブかはURLの ?tab= で覚える＝月を移っても・手当を入れたあとでも同じタブのまま。 --}}
 <div class="si-tabs">
-  <a class="{{ $tab === 'check' ? 'on' : '' }}" href="{{ $tabUrls['check'] }}">🧾 請求書チェック</a>
+  {{-- 手当の記録が先（いろいろな社員が使う・2026-10-13 baba）。 --}}
   <a class="{{ $tab === 'allowances' ? 'on' : '' }}" href="{{ $tabUrls['allowances'] }}">✍ 手当の記録<span class="si-tab-n">{{ count($allowances) }}</span></a>
+  <a class="{{ $tab === 'check' ? 'on' : '' }}" href="{{ $tabUrls['check'] }}">🧾 請求書チェック</a>
 </div>
 
 <div class="si-bar">
