@@ -52,7 +52,7 @@
     「何ヶ月目」は入社日の月を1ヶ月目として数えます。</p>
   <div class="rk-wrap">
   <table class="rk">
-    <tr><th>名前</th><th>OJT担当・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>入社日</th><th></th></tr>
+    <tr><th>名前</th><th>OJT担当・チームリーダー・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>入社日</th><th></th></tr>
     @forelse ($rookies as $r)
       <tr>
         <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div></td>
@@ -63,10 +63,16 @@
                 <option value="">（OJT担当なし）</option>
                 @foreach ($employees as $e)<option value="{{ $e->id }}" @selected($e->id === $r['ojt'])>{{ $e->name }}</option>@endforeach
               </select>
+              {{-- チームリーダー（2026-10-13 baba）。 --}}
+              <select class="rk-in" name="leader" onchange="rkRemember(); this.form.submit()" title="チームリーダー" style="margin-top:4px;">
+                <option value="">（チームリーダーなし）</option>
+                @foreach ($employees as $e)<option value="{{ $e->id }}" @selected($e->id === $r['leader'])>{{ $e->name }}</option>@endforeach
+              </select>
               <input class="rk-in" type="text" name="note" value="{{ $r['note'] }}" maxlength="500" placeholder="メモ" style="margin-top:4px; width:150px;" onchange="rkRemember(); this.form.submit()">
             </form>
           @else
-            {{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
+            OJT：{{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
+            <div class="rk-small">リーダー：{{ optional($employees->firstWhere('id', $r['leader']))->name ?? '—' }}</div>
             @if ($r['note'])<div class="rk-small">{{ $r['note'] }}</div>@endif
           @endif
         </td>

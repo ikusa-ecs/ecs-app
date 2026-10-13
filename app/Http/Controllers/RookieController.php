@@ -77,14 +77,19 @@ class RookieController extends Controller
         $data = $request->validate([
             'id' => ['required', 'string', 'exists:people,id'],
             'ojt' => ['nullable', 'string', 'exists:people,id'],
+            // チームリーダー（2026-10-13 baba）。
+            'leader' => ['nullable', 'string', 'exists:people,id'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
         $p = Person::findOrFail($data['id']);
         $p->rookie_ojt_id = $data['ojt'] ?: null;
+        if ($request->has('leader')) {
+            $p->rookie_leader_id = $data['leader'] ?: null;
+        }
         $p->rookie_note = $data['note'] ?? null;
         $p->save();
 
-        return back()->with('ok', $p->name.'さんのOJT担当・メモを保存しました。');
+        return back()->with('ok', $p->name.'さんのOJT担当・チームリーダー・メモを保存しました。');
     }
 
     /**

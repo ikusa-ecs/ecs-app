@@ -126,6 +126,8 @@ final class RookieFcPlan
                 'state' => (string) ($p->rookie_state ?? ''),
                 // OJT担当とひとことメモ（2026-10-09 baba「新人とOJTを記載できるところもほしい」）。
                 'ojt' => (string) ($p->rookie_ojt_id ?? ''),
+                // チームリーダー（2026-10-13 baba）。
+                'leader' => (string) ($p->rookie_leader_id ?? ''),
                 'note' => (string) ($p->rookie_note ?? ''),
                 'monthNo' => $no,
                 'target' => $target,
@@ -148,7 +150,7 @@ final class RookieFcPlan
 
         $picks = self::picks($month, $office, $state, $map, $contentNames);
         // 案のとおりに入れたら何件になるか（2026-10-09 baba）。数えるのはこの月の日だけ（月の外の同じイベントの日は別）。
-        $ojtNames = Person::whereIn('id', array_filter(array_column($out, 'ojt')))->pluck('name', 'id');
+        $ojtNames = Person::whereIn('id', array_filter(array_merge(array_column($out, 'ojt'), array_column($out, 'leader'))))->pluck('name', 'id');
         foreach ($out as &$r) {
             $mine = array_filter($picks, fn ($x) => $x['rookieId'] === $r['id']);
             $r['pickInMonth'] = count(array_filter($mine, fn ($x) => Carbon::parse($x['date'])->isSameMonth($month)));
@@ -158,7 +160,7 @@ final class RookieFcPlan
             $r['dCases'] = array_values(array_filter($r['cases'], fn ($c) => $c['role'] === 'D'));
             $r['myPicks'] = array_values($mine);
             // OJT・本人に確認してもらう文（2026-10-13 baba「チャットワークでOJTと本人に確認したい・すぐコピペ」）。
-            $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month);
+            $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month, (string) ($ojtNames[$r['leader']] ?? ''));
         }
         unset($r);
 
@@ -180,7 +182,7 @@ final class RookieFcPlan
      *     11/20(金) 謎パ／◯◯［必修・初めて］
      *     この内容で問題ないか確認をお願いします。
      */
-    private static function copyText(array $r, string $ojt, Carbon $month): string
+    private static function copyText(array $r, string $ojt, Carbon $month, string $leader = ''): string
     {
         $line = function (array $c, string $tail) {
             $d = Carbon::parse($c['date']);
@@ -191,7 +193,8 @@ final class RookieFcPlan
                 .$tail;
         };
 
-        $lines = ['【新人】'.$r['name'].($ojt !== '' ? '（OJT：'.$ojt.'）' : '').' '.$month->format('n月').'のアサイン確認'];
+        $who = array_filter([$ojt !== '' ? 'OJT：'.$ojt : '', $leader !== '' ? 'リーダー：'.$leader : '']);
+        $lines = ['【新人】'.$r['name'].($who ? '（'.implode('／', $who).'）' : '').' '.$month->format('n月').'のアサイン確認'];
         if ($r['target']) {
             $t = $r['target'];
             $lines[] = '目標：イベント'.$t['events'].'件'.($t['dFree'] ? '（DとFC合わせて）' : '（うちD'.$t['d'].'件）')

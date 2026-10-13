@@ -251,6 +251,14 @@ class RookieTest extends TestCase
         // OJT担当とメモ（2026-10-09 baba要望）。
         $this->actingAsPerson($me)->post('/rookies/ojt', ['id' => $new->id, 'ojt' => $me->id, 'note' => '水曜はNG'])->assertRedirect();
         $this->assertSame([$me->id, '水曜はNG'], [$new->fresh()->rookie_ojt_id, $new->fresh()->rookie_note]);
+        // チームリーダー（2026-10-13 baba）。確認文の見出しにも出る。
+        $leader = PersonFactory::new()->create(['name' => 'リーダー丸', 'role' => 'employee', 'office' => '東京']);
+        $this->post('/rookies/ojt', ['id' => $new->id, 'ojt' => $me->id, 'leader' => $leader->id, 'note' => '水曜はNG'])->assertRedirect();
+        $this->assertSame($leader->id, $new->fresh()->rookie_leader_id);
+        $this->assertSame($me->id, $new->fresh()->rookie_ojt_id, 'OJT担当はそのまま');
+        $r = collect(\App\Support\RookieFcPlan::build(Carbon::today()->startOfMonth(), '東京')['rookies'])->firstWhere('id', $new->id);
+        $this->assertStringContainsString('／リーダー：リーダー丸）', $r['copyText']);
+        $this->get('/rookies')->assertOk()->assertSee('（チームリーダーなし）');
         $this->actingAsPerson($me)->post('/rookies/state', ['id' => $new->id, 'state' => 'out'])->assertRedirect();
         $this->assertSame('out', $new->fresh()->rookie_state);
 
