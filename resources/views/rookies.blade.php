@@ -271,7 +271,7 @@
     {{-- ECSより前の経験（2026-10-13 baba）。チェックが入っているところだけ「やった」にする。空欄は触らない。 --}}
     <p class="sub" style="margin-top:12px;">🗂 <b>ECSより前の経験</b>：「新人社員管理シート」の「新人経験値」タブをCSVでダウンロードして取り込みます。
       チェックが入っている「経験あり」「D経験あり」だけを、各人の「経験を見る・手で直す」に「やった」で入れます（空欄は触りません＝入れ直すと増えたぶんだけ足されます）。
-      コンテンツは上の難易度表（リアル）でつないだものを使います。</p>
+      <b>リアルもオンラインもこの1枚でまとめて入ります</b>（上半分＝リアル、「【オンライン】」の行から下＝オンライン）。コンテンツは上の難易度表でつないだもの（リアル／オンラインそれぞれ）を使います。</p>
     <form class="rk-bar" method="POST" action="/rookies/import-exp" enctype="multipart/form-data">@csrf
       <input type="file" name="file" accept=".csv,text/csv">
       <button class="rk-btn main" type="submit">経験を取り込む</button>

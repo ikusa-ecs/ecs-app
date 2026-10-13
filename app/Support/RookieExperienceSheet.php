@@ -16,16 +16,19 @@ use App\Models\Person;
  *   ・TRUE＝「やった」にする（経験あり→fc、D経験あり→d）。
  *   ・FALSE・空＝**触らない**（ECSのアサインから数えた経験や、手で入れた印を消さない）。
  *   ⚠ ECSを始める前の経験はアサインに残っていない＝この取込でしか入らない。
- * コンテンツ＝難易度表（content_difficulties・リアル）でつないだ台帳のコンテンツ。
+ * コンテンツ＝難易度表（content_difficulties）でつないだ台帳のコンテンツ。上半分はリアル・下半分はオンラインの表で引く。
  *   つながっていない行は使わない（勘でつながない＝RookieDifficulty と同じ考え方）。結果で一覧を出す。
  * 人＝社員の氏名（空白の有無・全角半角を無視）。1人に決まらない名前は使わない。
  */
 final class RookieExperienceSheet
 {
     /**
-     * CSV → 「人の名前 → [コンテンツ名 => ['fc'=>bool,'d'=>bool]]」。
+     * CSV → 「人の名前 → 種類（リアル／オンライン） → [コンテンツ名 => ['fc'=>bool,'d'=>bool]]」。
+     * ⚠ 1枚の中に、上がリアル・「【オンライン】」の見出し行（もう一度「コンテンツ名」がある行）から下がオンライン
+     *   （2026-10-13 baba「リアルとオンラインがまとまっているので1枚で登録したい」）。
+     *   「消えた資料」「ジャンサバ」などは両方にある＝種類ごとに分けて持つ。人の列は上の見出しのものを使う。
      *
-     * @return array<string, array<string, array{fc:bool, d:bool}>>
+     * @return array<string, array<string, array<string, array{fc:bool, d:bool}>>>
      */
     public static function parse(string $csv): array
     {
@@ -66,13 +69,20 @@ final class RookieExperienceSheet
         }
 
         $out = [];
+        $kind = RookieDifficulty::REAL;
         for ($i = $start + 2; $i < count($rows); $i++) {
             $name = $rows[$i][$nameCol] ?? '';
-            if ($name === '' || $name === 'ー') {
+            // 2つ目の「コンテンツ名」の行＝ここから下はオンライン。
+            if ($name === 'コンテンツ名') {
+                $kind = str_contains(implode('', $rows[$i]), 'オンライン') ? RookieDifficulty::ONLINE : RookieDifficulty::REAL;
+
+                continue;
+            }
+            if ($name === '' || $name === 'ー' || $name === 'D数') {
                 continue;
             }
             foreach ($people as $col => $person) {
-                $out[$person][$name] = [
+                $out[$person][$kind][$name] = [
                     'fc' => self::yes($rows[$i][$col] ?? ''),
                     'd' => self::yes($rows[$i][$col + 1] ?? ''),
                 ];
@@ -91,9 +101,11 @@ final class RookieExperienceSheet
     {
         $parsed = self::parse($csv);
 
-        // シートの名前 → 台帳のコンテンツID（リアルの難易度表でつないだもの）。
-        $link = ContentDifficulty::where('kind', RookieDifficulty::REAL)->whereNotNull('content_id')
-            ->pluck('content_id', 'sheet_name')->all();
+        // 種類 → シートの名前 → 台帳のコンテンツID（難易度表でつないだもの）。
+        $link = [];
+        foreach (ContentDifficulty::whereNotNull('content_id')->get(['kind', 'sheet_name', 'content_id']) as $d) {
+            $link[$d->kind][$d->sheet_name] = $d->content_id;
+        }
 
         $byName = [];
         foreach (Person::employees()->get(['id', 'name']) as $p) {
@@ -104,7 +116,7 @@ final class RookieExperienceSheet
         $unlinked = [];
         $people = 0;
         $marks = 0;
-        foreach ($parsed as $personName => $contents) {
+        foreach ($parsed as $personName => $byKind) {
             $ids = $byName[self::key($personName)] ?? [];
             if (count($ids) !== 1) {
                 $unknownPeople[] = $personName;
@@ -114,21 +126,23 @@ final class RookieExperienceSheet
             $p = Person::find($ids[0]);
             $ov = is_array($p->rookie_overrides) ? $p->rookie_overrides : [];
             $changed = false;
-            foreach ($contents as $sheetName => $v) {
-                if (! $v['fc'] && ! $v['d']) {
-                    continue;
-                }
-                $cid = $link[$sheetName] ?? null;
-                if ($cid === null) {
-                    $unlinked[$sheetName] = true;
+            foreach ($byKind as $kind => $contents) {
+                foreach ($contents as $sheetName => $v) {
+                    if (! $v['fc'] && ! $v['d']) {
+                        continue;
+                    }
+                    $cid = $link[$kind][$sheetName] ?? null;
+                    if ($cid === null) {
+                        $unlinked[$sheetName.'（'.$kind.'）'] = true;
 
-                    continue;
-                }
-                foreach (['fc', 'd'] as $k) {
-                    if ($v[$k] && ($ov[$cid][$k] ?? null) !== 'done') {
-                        $ov[$cid][$k] = 'done';
-                        $changed = true;
-                        $marks++;
+                        continue;
+                    }
+                    foreach (['fc', 'd'] as $k) {
+                        if ($v[$k] && ($ov[$cid][$k] ?? null) !== 'done') {
+                            $ov[$cid][$k] = 'done';
+                            $changed = true;
+                            $marks++;
+                        }
                     }
                 }
             }

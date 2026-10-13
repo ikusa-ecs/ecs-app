@@ -309,7 +309,12 @@ class RookieTest extends TestCase
             ."達成目安,ー,ー,6ヶ月,12ヶ月,経験あり,D経験あり,経験あり,D経験あり,経験あり,D経験あり,,暦\n"
             ."謎解き脱出,ある会議室からの脱出,1,●,●,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,,1ヶ月目\n"
             .",秘密の会議室からの脱出,3,,,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE,,2ヶ月目\n"
-            .",ミッションスクランブル,2,●,●,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,,\n";
+            .",ミッションスクランブル,2,●,●,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,,\n"
+            .",D数,,10,17,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,,\n"
+            // 下半分＝オンライン（見出しに名前は無い・人の列は上と同じ）。「消えた資料」はリアルにもある名前。
+            ."【オンライン】,コンテンツ名,難易度,\"新人\nD必修\",,,,,,,,,\n"
+            ."達成目安,ー,ー,6ヶ月,ー,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,,\n"
+            ."リモ探,消えた資料,2,,,FALSE,FALSE,TRUE,TRUE,FALSE,FALSE,,\n";
         // 2列目の見出しに改行が入るので、そのセルを引用符でくくる（シートのCSVと同じ）。
         $csv = str_replace("新人セールス\nD推奨,熊上", "\"新人セールス\nD推奨\",熊上", $csv);
 
@@ -320,6 +325,9 @@ class RookieTest extends TestCase
         Content::create(['id' => 'CT-3', 'content_name' => 'ミッスク', 'active' => true]);
         ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'ある会議室からの脱出', 'difficulty' => 1, 'content_id' => 'CT-1']);
         ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'ミッションスクランブル', 'difficulty' => 2, 'content_id' => 'CT-3']);
+        // 同じ名前でもリアルとオンラインは別の台帳（リアルの「消えた資料」はつながっていない）。
+        Content::create(['id' => 'CT-ON', 'content_name' => 'リモート消えた資料', 'active' => true]);
+        ContentDifficulty::create(['kind' => 'オンライン', 'sheet_name' => '消えた資料', 'difficulty' => 2, 'content_id' => 'CT-ON']);
 
         $this->actingAsPerson($p1)->post('/rookies/import-exp', [
             'file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('exp.csv', $csv),
@@ -328,6 +336,7 @@ class RookieTest extends TestCase
 
         $this->assertSame(['CT-1' => ['fc' => 'done', 'd' => 'done']], $p1->fresh()->rookie_overrides);
         // 全角空白の名前でも同じ人。空欄（ミッスク FALSE）は手で入れた「やっていない」を消さない。
-        $this->assertSame(['CT-3' => ['fc' => 'none'], 'CT-1' => ['fc' => 'done']], $p2->fresh()->rookie_overrides);
+        $this->assertSame(['CT-3' => ['fc' => 'none'], 'CT-1' => ['fc' => 'done'], 'CT-ON' => ['fc' => 'done', 'd' => 'done']],
+            $p2->fresh()->rookie_overrides, 'オンラインの部分も同じ1枚で入る');
     }
 }
