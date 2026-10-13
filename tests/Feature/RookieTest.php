@@ -210,6 +210,10 @@ class RookieTest extends TestCase
         $this->assertSame('水合戦', $r['cases'][0]['name']);
         $this->assertStringContainsString('【新人】新人F（OJT：先輩OJT）', $r['copyText']);
         $this->assertStringContainsString('水合戦／A社　FC（仮）', $r['copyText']);
+        // D／FC／これから入れる案に分かれ、最後に確認のお願い（2026-10-13 baba）。
+        $this->assertStringContainsString("■ D（ディレクター）\n（なし）", $r['copyText']);
+        $this->assertStringContainsString('■ これからFCで入れる案（まだ入っていません）', $r['copyText']);
+        $this->assertStringEndsWith('この内容で問題ないか確認をお願いします。', $r['copyText']);
         $this->assertSame(1, $r['monthFc']);
         $this->assertSame(1, $r['pickInMonth']);
         $this->assertSame(2, $r['afterFc'], 'いま1件＋案1件');
@@ -218,6 +222,15 @@ class RookieTest extends TestCase
         $this->actingAsPerson($ojt)->get('/rookies')->assertOk()
             ->assertSee('この案をぜんぶ入れたら')
             ->assertSee('合計');
+
+        // Dで入ると「Dの一覧」とコピー文のDの欄に出る。
+        Assignment::where('project_id', $done->id)->where('role', 'FC')->delete();
+        Assignment::create(['project_id' => $done->id, 'staff_id' => $rookie->id, 'role' => 'D', 'status' => '確定', 'date' => $d1->format('Y-m-d')]);
+        $r = collect(RookieFcPlan::build(Carbon::today(), '東京')['rookies'])->firstWhere('id', $rookie->id);
+        $this->assertCount(1, $r['dCases']);
+        $this->assertStringContainsString("■ D（ディレクター）\n".$d1->format('n/j'), $r['copyText']);
+        $this->actingAsPerson($ojt)->get('/rookies')->assertOk()
+            ->assertSee('🎬 Dの一覧')->assertSee('全員分をまとめてコピー');
     }
 
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */

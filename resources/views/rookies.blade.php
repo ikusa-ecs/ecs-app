@@ -103,7 +103,7 @@
           <details class="rk-exp">
             <summary class="rk-small" style="cursor:pointer;">📋 {{ $month->format('n月') }}の案件（{{ count($r['cases']) }}件）</summary>
             <div class="rk-bar" style="margin:6px 0;">
-              <textarea class="rk-in rk-copy" readonly rows="{{ min(8, count($r['cases']) + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
+              <textarea class="rk-in rk-copy" readonly rows="{{ min(16, substr_count($r['copyText'], "\n") + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
               <button class="rk-btn" type="button" onclick="rkCopy(this)" title="アサインチャットに貼って、OJTに見てもらう文をコピーします">📋 コピー</button><span class="rk-small rk-copied"></span>
             </div>
             @if ($r['cases'])
@@ -161,6 +161,54 @@
       </select>
       <button class="rk-btn" type="submit">＋新人に入れる</button>
     </form>
+  @endif
+</div>
+
+{{-- Dの一覧（2026-10-13 baba「FCの案と一緒に、ディレクターの一覧（今アサインされている一覧）を見たい」）。 --}}
+<div class="rk-card">
+  <h3>🎬 Dの一覧（{{ $month->format('n月') }}・新人がDで入っている案件）</h3>
+  <p class="sub">いまアサインに入っている「D」だけを日付順に並べています（仮も確定も）。Dを決めるのは今までどおりD決め画面です。</p>
+  @if ($dRows->isEmpty())
+    <p class="rk-small">この月、Dで入っている新人はいません。</p>
+  @else
+    <div class="rk-wrap">
+    <table class="rk" style="max-width:760px;">
+      <tr><th>日付</th><th>新人</th><th>案件</th><th>状態</th></tr>
+      @foreach ($dRows as $c)
+        <tr>
+          <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($c['date'])->format('n/j') }}<div class="rk-small">{{ ['日','月','火','水','木','金','土'][\Illuminate\Support\Carbon::parse($c['date'])->dayOfWeek] }}{{ $c['dayType'] && $c['dayType'] !== '本番' ? '・'.$c['dayType'] : '' }}</div></td>
+          <td><b>{{ $c['rookie'] }}</b></td>
+          <td><a href="/project-assign?project={{ $c['projectId'] }}">{{ $c['name'] }}</a><div class="rk-small">{{ $c['client'] }}</div></td>
+          <td>{{ $c['status'] }}</td>
+        </tr>
+      @endforeach
+    </table>
+    </div>
+  @endif
+</div>
+
+{{-- チャットワークでOJT・本人に確認してもらう文（2026-10-13 baba「テキストですぐコピペできるように」）。
+     文はサーバーが作ったもの（RookieFcPlan::copyText）をそのまま使う＝画面で組み立てない。 --}}
+<div class="rk-card">
+  <h3>💬 OJT・本人への確認（チャットワーク用の文）</h3>
+  <p class="sub">新人ごとに「Dで入っている案件／FC・そのほか／これからFCで入れる案」をまとめた文です。「コピー」を押してチャットワークに貼ってください。
+    FCの案を「入れる」と、次に開いたときは「FC・そのほか」に移ります。</p>
+  @if ($rookies)
+    <div class="rk-bar" style="margin-bottom:8px;">
+      <textarea class="rk-copy" readonly style="position:absolute; left:-9999px; width:1px; height:1px;">{{ collect($rookies)->pluck('copyText')->implode("\n\n") }}</textarea>
+      <button class="rk-btn main" type="button" onclick="rkCopy(this)">📋 全員分をまとめてコピー</button><span class="rk-small rk-copied"></span>
+    </div>
+    @foreach ($rookies as $r)
+      <details class="rk-exp">
+        <summary class="rk-small" style="cursor:pointer;"><b>{{ $r['name'] }}</b>（D {{ count($r['dCases']) }}件・FCの案 {{ count($r['myPicks']) }}件）</summary>
+        <div class="rk-bar" style="margin:6px 0; align-items:flex-start;">
+          <textarea class="rk-in rk-copy" readonly rows="{{ min(16, substr_count($r['copyText'], "\n") + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
+          <button class="rk-btn" type="button" onclick="rkCopy(this)">📋 コピー</button><span class="rk-small rk-copied"></span>
+        </div>
+      </details>
+    @endforeach
+  @else
+    <p class="rk-small">新人がいません。</p>
   @endif
 </div>
 

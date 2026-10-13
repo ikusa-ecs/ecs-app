@@ -135,8 +135,7 @@ final class RookieFcPlan
                 'progress' => $progress,
                 'exp' => $exp,
                 'cases' => collect($monthCases)->sortBy('date')->values()->all(),
-                // アサインチャットに貼ってOJTに見てもらう文（2026-10-09 baba）。表や罫線は使わない。
-                'copyText' => self::copyText($p, $month, collect($monthCases)->sortBy('date')->values()->all()),
+                // アサインチャットに貼る文は、FCの案がそろってから作る（下・copyText）。
             ];
             $state[$p->id] = [
                 'person' => $p,
@@ -149,11 +148,17 @@ final class RookieFcPlan
 
         $picks = self::picks($month, $office, $state, $map, $contentNames);
         // 案のとおりに入れたら何件になるか（2026-10-09 baba）。数えるのはこの月の日だけ（月の外の同じイベントの日は別）。
+        $ojtNames = Person::whereIn('id', array_filter(array_column($out, 'ojt')))->pluck('name', 'id');
         foreach ($out as &$r) {
             $mine = array_filter($picks, fn ($x) => $x['rookieId'] === $r['id']);
             $r['pickInMonth'] = count(array_filter($mine, fn ($x) => Carbon::parse($x['date'])->isSameMonth($month)));
             $r['pickOutside'] = count($mine) - $r['pickInMonth'];
             $r['afterFc'] = $r['monthFc'] + $r['pickInMonth'];
+            // Dで入っている案件（2026-10-13 baba「ディレクターの一覧（今アサインされてる一覧）を見えるようにしたい」）。
+            $r['dCases'] = array_values(array_filter($r['cases'], fn ($c) => $c['role'] === 'D'));
+            $r['myPicks'] = array_values($mine);
+            // OJT・本人に確認してもらう文（2026-10-13 baba「チャットワークでOJTと本人に確認したい・すぐコピペ」）。
+            $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month);
         }
         unset($r);
 
@@ -162,28 +167,67 @@ final class RookieFcPlan
     }
 
     /**
-     * 新人の「この月の案件」を、アサインチャットに貼る文にする（2026-10-09 baba「コピペしてOJTに見てもらいたい」）。
-     * 例：【新人】大霜 知弘（OJT：◯◯）10月の案件 3件
-     *     10/12(土) 戦国運動会／株式会社◯◯　FC（仮）
+     * 新人の月のアサインを、チャットワークに貼ってOJT・本人に確認してもらう文にする
+     * （2026-10-09 baba「コピペしてOJTに見てもらいたい」→ 10-13 D／FC／これから入れる案に分けた）。
+     * ⚠ 表や罫線は使わない（チャットワークでそのまま読めるように）。
+     * 例：【新人】大霜 知弘（OJT：◯◯）11月のアサイン確認
+     *     目標：イベント5件（うちD3件）／いま：D 1件・FC 2件
+     *     ■ D（ディレクター）
+     *     11/8(土) 戦国運動会／株式会社◯◯（仮）
+     *     ■ FC・そのほか
+     *     11/12(水) 水合戦／◯◯　FC（仮）
+     *     ■ これからFCで入れる案（まだ入っていません）
+     *     11/20(金) 謎パ／◯◯［必修・初めて］
+     *     この内容で問題ないか確認をお願いします。
      */
-    private static function copyText(Person $p, Carbon $month, array $cases): string
+    private static function copyText(array $r, string $ojt, Carbon $month): string
     {
-        $ojt = $p->rookie_ojt_id ? (string) Person::whereKey($p->rookie_ojt_id)->value('name') : '';
-        $week = ['日', '月', '火', '水', '木', '金', '土'];
-        $lines = ['【新人】'.$p->name.($ojt !== '' ? '（OJT：'.$ojt.'）' : '').' '.$month->format('n月').'の案件 '.count($cases).'件'];
-        foreach ($cases as $c) {
+        $line = function (array $c, string $tail) {
             $d = Carbon::parse($c['date']);
-            $lines[] = $d->format('n/j').'('.$week[$d->dayOfWeek].') '.$c['name']
+
+            return $d->format('n/j').'('.self::WEEK[$d->dayOfWeek].') '.$c['name']
                 .($c['client'] !== '' ? '／'.$c['client'] : '')
                 .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')
-                .'　'.$c['role'].'（'.$c['status'].'）';
+                .$tail;
+        };
+
+        $lines = ['【新人】'.$r['name'].($ojt !== '' ? '（OJT：'.$ojt.'）' : '').' '.$month->format('n月').'のアサイン確認'];
+        if ($r['target']) {
+            $t = $r['target'];
+            $lines[] = '目標：イベント'.$t['events'].'件'.($t['dFree'] ? '（DとFC合わせて）' : '（うちD'.$t['d'].'件）')
+                .'／いま：D '.$r['monthD'].'件・FC '.$r['monthFc'].'件';
         }
-        if (! $cases) {
-            $lines[] = '（まだ入っていません）';
+
+        $lines[] = '■ D（ディレクター）';
+        foreach ($r['dCases'] as $c) {
+            $lines[] = $line($c, '（'.$c['status'].'）');
         }
+        if (! $r['dCases']) {
+            $lines[] = '（なし）';
+        }
+
+        $others = array_values(array_filter($r['cases'], fn ($c) => $c['role'] !== 'D'));
+        $lines[] = '■ FC・そのほか';
+        foreach ($others as $c) {
+            $lines[] = $line($c, '　'.$c['role'].'（'.$c['status'].'）');
+        }
+        if (! $others) {
+            $lines[] = '（なし）';
+        }
+
+        if ($r['myPicks']) {
+            $lines[] = '■ これからFCで入れる案（まだ入っていません）';
+            foreach ($r['myPicks'] as $p) {
+                $tags = array_filter([$p['mark'], $p['first'] ? '初めて' : '', $p['preStay'] ? '前泊' : '']);
+                $lines[] = $line($p, $tags ? '［'.implode('・', $tags).'］' : '');
+            }
+        }
+        $lines[] = 'この内容で問題ないか確認をお願いします。';
 
         return implode("\n", $lines);
     }
+
+    private const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 
     /** 手で直した印を当てる（done＝やった／none＝やっていない）。 */
     private static function applyOverride(array $done, array $ov, string $key): array
