@@ -105,6 +105,13 @@ final class StaffInvoiceDraft
             }
         }
         $addManualDays($mc, 'MC手当');
+        // 大型MC手当は通常のMC手当と併用不可（規定）＝大型MCを入れた日は、MC手当から外す。
+        foreach ($byKind['大型MC手当'] ?? [] as $a) {
+            if (isset($mc[$a['date']])) {
+                unset($mc[$a['date']]);
+                $overlap[] = 'MC手当 '.$md($a['date']).'（大型MC手当と併用不可）';
+            }
+        }
         if ($mc) {
             ksort($mc);
             $label = implode('、', array_map(fn ($y, $n) => $md($y).($n > 1 ? '('.$n.'案件)' : ''), array_keys($mc), $mc));
@@ -120,7 +127,7 @@ final class StaffInvoiceDraft
             $items[] = ['label' => 'ロング手当：'.$days(array_keys($long)), 'qty' => $n.'回', 'price' => self::LONG, 'amount' => self::LONG * $n];
         }
 
-        // ④ 前日設営手当・⑤ 事前リハーサル手当・6時間以上＝1案件は、**手当の記録だけを見る**（2026-10-13 baba）。
+        // ④ 前日設営手当・⑤ 事前リハーサル手当・4時間以上のリハ＝1日分は、**手当の記録だけを見る**（2026-10-13 baba）。
         //   アサインの前日設営・リハ日は StaffAllowances::syncAuto が手当の記録へ自動で入れる＝ここで数え直さない
         //   （消した・種類を切り替えた、を正しく反映するため）。
         $prepRows = $byKind['前日設営手当'] ?? [];
@@ -139,7 +146,7 @@ final class StaffInvoiceDraft
         foreach ($byKind[StaffAllowances::SIX_HOURS] ?? [] as $a) {
             $kindName = $a['unit'] === self::BASE['オンライン'] ? 'オンライン' : 'リアル';
             $what = $a['project'] !== '' ? $a['project'] : $a['note'];
-            $items[] = ['label' => $kindName.'イベント（6時間以上のリハ・設営）：'.$md($a['date']).($what !== '' ? '（'.$what.'）' : ''),
+            $items[] = ['label' => $kindName.'イベント（4時間以上のリハ＝1日分）：'.$md($a['date']).($what !== '' ? '（'.$what.'）' : ''),
                 'qty' => $a['count'].'日', 'price' => $a['unit'], 'amount' => $a['amount']];
         }
 
@@ -181,19 +188,24 @@ final class StaffInvoiceDraft
             $label = implode('、', array_map(fn ($y, $c) => $md($y).($c > 1 ? '('.$c.'回)' : ''), array_keys($perDay), $perDay));
             $items[] = ['label' => $kind.'：'.$label, 'qty' => $n.($kind === 'スライド手当' ? '案件' : '回'), 'price' => $unit, 'amount' => $unit * $n];
         }
-        foreach (['事前レクチャー手当', '大型手当', 'その他'] as $kind) {
+        // 1件1行で出すもの（報酬規定「■追加報酬（手当）」・2026-10-13）。キャンセル料・遅刻の減額もここ。
+        $perRow = ['事前レクチャー手当', 'MC巡回手当', '大型MC手当', '英語手当', 'リーダー手当', 'ディレクター手当', '大型手当',
+            '片付け手当', '深夜設営手当', 'キャンセル料', StaffAllowances::LATE, 'その他'];
+        foreach ($perRow as $kind) {
             foreach ($byKind[$kind] ?? [] as $a) {
                 $what = $a['project'] !== '' ? $a['project'] : $a['note'];
                 $name = $kind === 'その他' ? ($a['note'] !== '' ? $a['note'] : 'その他') : $kind;
+                // 遅刻の減額は引く（マイナス）。
+                $sign = $kind === StaffAllowances::LATE ? -1 : 1;
                 $items[] = ['label' => $name.'：'.$md($a['date']).($kind !== 'その他' && $what !== '' ? '（'.$what.'）' : ''),
-                    'qty' => $a['count'].'回', 'price' => $a['unit'], 'amount' => $a['amount']];
+                    'qty' => $a['count'].'回', 'price' => $sign * $a['unit'], 'amount' => $sign * $a['amount']];
             }
         }
 
         // ECSでは分からないもの＝見る人が確かめる。
         $checks[] = '交通費：最寄り駅'.($station !== '' ? '「'.$station.'」' : '（名簿に未入力）').'から。往復'.number_format(self::TRAVEL_CAP).'円までに収まっているか（税区分は対象外）';
         $checks[] = $allowances
-            ? '運転・スライド・事前レクチャー・大型手当は「手当の記録」に入っているぶんだけ数えています'
+            ? '運転・スライド・事前レクチャー・大型・リーダー・英語などの手当は「手当の記録」に入っているぶんだけ数えています'
             : '運転手当（20分以上運転）・スライド手当・事前レクチャー手当などは「手当の記録」にまだ入っていません（請求書にあれば確かめて入れてください）';
         if ($overlap) {
             $checks[] = '手当の記録のうち、アサインから自動で数えた日と同じ日のものは二重に数えていません：'.implode('、', $overlap);
@@ -201,7 +213,7 @@ final class StaffInvoiceDraft
         $cancelled = array_values(array_filter($cases, fn ($c) => $c['cancelled']));
         if ($cancelled) {
             $checks[] = 'キャンセル料の対象かも：'.implode('、', array_map(fn ($c) => $md($c['ymd']).' '.$c['name'], $cancelled))
-                .'（前日＝1/3・当日＝1/2・集合1時間前を過ぎてから＝全額＋交通費／スタッフ都合は対象外）';
+                .'（前日＝1/3・当日（前日19時〜集合1時間前）＝1/2・集合1時間前を過ぎてから＝全額＋交通費／体調不良は対象外。あれば手当の記録に「キャンセル料」で入れてください）';
         }
         $spare = array_filter($live, fn ($c) => $c['dayType'] === '予備日');
         if ($spare) {

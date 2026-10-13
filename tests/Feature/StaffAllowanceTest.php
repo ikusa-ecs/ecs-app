@@ -88,7 +88,7 @@ class StaffAllowanceTest extends TestCase
 
     /**
      * 前日設営・リハ日のアサインは手当の記録に自動で入る／消したら入れ直さない／
-     * 種類を切り替えられる（6時間以上＝1案件）／複数人にまとめて入れる（2026-10-13 baba）。
+     * 種類を切り替えられる（4時間以上のリハ＝1日分）／複数人にまとめて入れる（2026-10-13 baba）。
      */
     public function test_auto_rows_dismiss_switch_and_multi(): void
     {
@@ -115,12 +115,12 @@ class StaffAllowanceTest extends TestCase
         $this->assertNotNull($rowA->fresh()->dismissed_at);
         $this->assertSame(3, StaffAllowance::count(), '消した印として残る＝入れ直さない');
 
-        // 種類を切り替える：6時間以上のリハ＝1案件（オンラインの案件なので6,000円）。
+        // 種類を切り替える：4時間以上のリハ＝1日分（オンラインの案件なので6,000円）。
         $rowReh = StaffAllowance::where('kind', '事前リハーサル手当')->first();
         $this->post('/staff-allowances/'.$rowReh->id.'/kind', ['kind' => StaffAllowances::SIX_HOURS])->assertRedirect();
         $this->assertSame(6000, $rowReh->fresh()->amount);
         $this->get('/staff-invoice-check?ym=2026-10&tab=check')->assertOk()
-            ->assertSee('オンラインイベント（6時間以上のリハ・設営）：10/10')
+            ->assertSee('オンラインイベント（4時間以上のリハ＝1日分）：10/10')
             ->assertSee('前日設営手当：10/17');
 
         // 複数人にまとめて入れる（宿泊手当を2人に）。

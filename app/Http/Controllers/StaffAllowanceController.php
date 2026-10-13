@@ -44,7 +44,7 @@ class StaffAllowanceController extends Controller
         ], ['staff_ids.required' => 'スタッフを1人以上選んでください。'],
             ['staff_ids' => 'スタッフ', 'staff_ids.*' => 'スタッフ', 'date' => '日付', 'kind' => '手当の種類', 'amount' => '金額', 'count' => '回数']);
 
-        // 「1案件として数える（6時間以上）」の金額＝案件の実施形態の基本報酬（金額を入れていればそれ）。
+        // 「1日分として数える（4時間以上のリハ）」の金額＝案件の実施形態の基本報酬（金額を入れていればそれ）。
         $amount = StaffAllowances::needsAmount($data['kind']) ? (int) $data['amount'] : null;
         if ($data['kind'] === StaffAllowances::SIX_HOURS) {
             $amount = isset($data['amount']) ? (int) $data['amount']
@@ -96,7 +96,7 @@ class StaffAllowanceController extends Controller
 
     /**
      * リハ・設営の行の種類を切り替える（前日設営手当／事前リハーサル手当／1案件として数える）。
-     * 2026-10-13 baba「前日設営だけかもしれないし、リハもかもしれない。6時間以上のリハ・設営は1案件にカウント」。
+     * 2026-10-13 baba「前日設営だけかもしれないし、リハもかもしれない。6時間以上のリハ・設営は1案件にカウント（→規定は4時間以上のリハで1日分）」。
      */
     public function changeKind(Request $request, int $id)
     {

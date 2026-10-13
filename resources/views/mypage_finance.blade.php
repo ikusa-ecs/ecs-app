@@ -268,7 +268,7 @@
       <div class="panel mp-wrap" id="alPanel" style="margin-top:20px;">
         <div class="case-head" style="font-size:15px;">✍ この案件のスタッフの手当（運転・スライド・宿泊・設営・リハなど）</div>
         <p class="note-cell" style="margin:6px 0 10px;">手当を付ける人にチェックして（何人でも）、種類などを入れて「＋入れる」。チェックした全員に同じ内容が入ります。入れたものは「🧾 請求書チェック・手当管理表」の請求書の目安に足されます。<br>
-          ※ 前日設営・リハ日のアサインは自動で入ります（いらなければ「消す」・6時間以上なら種類を「1案件として数える」に切り替え）。MC・前泊・ロングはアサインから自動で数えます。</p>
+          ※ 前日設営・リハ日のアサインは自動で入ります（いらなければ「消す」・4時間以上のリハなら種類を「1日分として数える」に切り替え）。MC・前泊・ロングはアサインから自動で数えます。</p>
         <div id="alPeople" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
         <div class="al-form" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
           <button class="btn" type="button" onclick="alCheckAll(true)">全員にチェック</button>
@@ -529,7 +529,7 @@
   function alRender(items){
     const body = document.getElementById('alBody');
     if (!items.length) { body.innerHTML = '<tr><td colspan="7" class="note-cell">まだ入っていません。</td></tr>'; return; }
-    // 自動で入った行（前日設営・リハ日）は印を付け、リハ・設営は種類を切り替えられる（6時間以上なら1案件）。
+    // 自動で入った行（前日設営・リハ日）は印を付け、リハ・設営は種類を切り替えられる（4時間以上のリハなら1日分）。
     const kindCell = a => (a.auto ? '<span class="note-cell" style="font-weight:700;">自動</span> ' : '')
       + (a.switchable
         ? '<select onchange="alSwitch(' + Number(a.id) + ', this.value)">' + AL.switchable.map(k => '<option' + (k === a.kind ? ' selected' : '') + '>' + alEsc(k) + '</option>').join('') + '</select>'

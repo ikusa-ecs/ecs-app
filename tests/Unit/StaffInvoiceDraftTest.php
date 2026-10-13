@@ -41,7 +41,7 @@ class StaffInvoiceDraftTest extends TestCase
             // 前日設営・リハは手当の記録（アサインから自動で入る行）を見る（2026-10-13）。
             $this->a('10/30', '2026-10-30', '前日設営手当', 4000),
             $this->a('10/10', '2026-10-10', '事前リハーサル手当', 2000, '鷹狩り'),
-            // 6時間以上のリハ・設営＝1案件として数える。
+            // 4時間以上のリハ＝1日分として数える。
             $this->a('10/31', '2026-10-31', StaffAllowances::SIX_HOURS, 9000, 'NEW運動会'),
             // 自動で数えるMCと同じ日に手で入れても二重にしない。アサインに無い日は足す。
             $this->a('10/5', '2026-10-05', 'MC手当', 1000),
@@ -63,13 +63,34 @@ class StaffInvoiceDraftTest extends TestCase
         $this->assertSame(27000, $byLabel['リアルイベント：10/5、12、18']['amount']);
         $this->assertSame(13500, $byLabel['リアルイベント2案件/日：10/20']['price'], '2案件/日＝×1.5');
         $this->assertSame(4000, $byLabel['MC手当：10/5、10/20(2案件)、10/26']['amount']);
-        $this->assertContains('リアルイベント（6時間以上のリハ・設営）：10/31（NEW運動会）', $labels);
-        $this->assertSame(9000, $byLabel['リアルイベント（6時間以上のリハ・設営）：10/31（NEW運動会）']['amount']);
+        $this->assertContains('リアルイベント（4時間以上のリハ＝1日分）：10/31（NEW運動会）', $labels);
+        $this->assertSame(9000, $byLabel['リアルイベント（4時間以上のリハ＝1日分）：10/31（NEW運動会）']['amount']);
         $this->assertContains('大型手当：10/11（大型の手当）', $labels);
 
         $checks = implode("\n", $d['checks']);
         $this->assertStringContainsString('最寄り駅「新宿」', $checks);
         $this->assertStringContainsString('キャンセル料の対象かも：10/28 水合戦', $checks);
         $this->assertStringContainsString('二重に数えていません：MC手当 10/5', $checks);
+    }
+
+    /** 報酬規定（2026-10-13）：大型MCとMCは併用不可・遅刻の減額は引く・キャンセル料は入れた金額。 */
+    public function test_rules_from_the_pay_regulation(): void
+    {
+        $d = StaffInvoiceDraft::build([
+            $this->c('2026-10-05', ['roleCode' => 'MC']),
+            $this->c('2026-10-12', ['roleCode' => 'MC']),
+        ], '', [
+            $this->a('10/12', '2026-10-12', '大型MC手当', 2000, '大運動会'),
+            $this->a('10/5', '2026-10-05', StaffAllowances::LATE, 3600, '', '2時間遅刻'),
+            $this->a('10/20', '2026-10-20', 'キャンセル料', 3000, '', '前日キャンセル'),
+        ]);
+        $byLabel = array_column($d['items'], null, 'label');
+        $this->assertArrayHasKey('MC手当：10/5', $byLabel, '大型MCの日（10/12）はMC手当から外す');
+        $this->assertSame(2000, $byLabel['大型MC手当：10/12（大運動会）']['amount']);
+        $this->assertSame(-3600, $byLabel['遅刻の減額：10/5（2時間遅刻）']['amount'], '遅刻の減額は引く');
+        $this->assertSame(3000, $byLabel['キャンセル料：10/20（前日キャンセル）']['amount']);
+        // 9,000×2日 ＋ MC 1,000 ＋ 大型MC 2,000 − 3,600 ＋ 3,000
+        $this->assertSame(18000 + 1000 + 2000 - 3600 + 3000, $d['total']);
+        $this->assertStringContainsString('大型MC手当と併用不可', implode("\n", $d['checks']));
     }
 }
