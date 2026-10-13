@@ -119,7 +119,7 @@ final class StaffAllowances
             ->where('status', '!=', 'キャンセル')
             ->when($staffIds !== null, fn ($q) => $q->whereIn('staff_id', $staffIds))
             ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
-            ->get(['project_id', 'staff_id', 'date']);
+            ->get(['project_id', 'staff_id', 'role', 'date']);
         $projects = Project::whereIn('id', $asg->pluck('project_id')->unique())
             ->get(['id', 'project_name', 'content_ids', 'content_names', 'date_type', 'is_cancelled', 'format'])->keyBy('id');
         $staff = \App\Models\Person::staff()->whereIn('id', $asg->pluck('staff_id')->unique())->pluck('id')->flip();
@@ -131,13 +131,18 @@ final class StaffAllowances
             if (! $p || $p->is_cancelled || ! isset($staff[$a->staff_id])) {
                 continue;
             }
-            // ⚠ ARENA場所貸しはD手当（ディレクター手当）。2026-10-13 baba「場所貸しはD手当だと思う」。
-            //   「ARENA場所貸し(ライブリハ)」は取込でリハ日と読まれていた＝事前リハーサル手当にしない。
-            $kind = RookieFcPlan::isArenaRental($p, $contentNames) ? 'ディレクター手当' : match ((string) $p->date_type) {
-                '前日設営' => '前日設営手当',
-                'リハ日' => '事前リハーサル手当',
-                default => null,
-            };
+            // ⚠ ARENA場所貸しは「Dポジションの人だけD手当（ディレクター手当）・FCなどほかの役割は手当なし」
+            //   （2026-10-13 baba「Dポジションは D手当が入るけど、FCだったらD手当無い」）。
+            //   「ARENA場所貸し(ライブリハ)」は取込でリハ日と読まれていた＝事前リハーサル手当にもしない。
+            if (RookieFcPlan::isArenaRental($p, $contentNames)) {
+                $kind = $a->role === AssignmentRole::D ? 'ディレクター手当' : null;
+            } else {
+                $kind = match ((string) $p->date_type) {
+                    '前日設営' => '前日設営手当',
+                    'リハ日' => '事前リハーサル手当',
+                    default => null,
+                };
+            }
             if ($kind === null) {
                 continue;
             }
@@ -169,9 +174,10 @@ final class StaffAllowances
             StaffAllowance::create(['staff_id' => $sid, 'project_id' => $pid, 'date' => $date, 'kind' => $kind,
                 'count' => 1, 'auto_key' => $key, 'created_by' => '自動（アサイン）']);
         }
-        // アサインが無くなった自動の行は取り除く（消した印のある行は、印として残す）。
+        // アサインが無くなった・決まりで要らなくなった自動の行は取り除く
+        // （消した印のある行は印として残す／手で種類を切り替えた行は人の判断なので残す）。
         foreach ($have as $key => $row) {
-            if (! isset($want[$key]) && $row->dismissed_at === null) {
+            if (! isset($want[$key]) && $row->dismissed_at === null && ! self::isTouched($row)) {
                 $row->delete();
             }
         }

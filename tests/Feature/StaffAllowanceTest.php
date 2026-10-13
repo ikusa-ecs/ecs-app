@@ -160,8 +160,15 @@ class StaffAllowanceTest extends TestCase
         StaffAllowance::create(['staff_id' => $s->id, 'project_id' => $p->id, 'date' => '2026-10-20', 'kind' => '事前リハーサル手当',
             'count' => 1, 'auto_key' => 'auto:'.$p->id.':'.$s->id.':2026-10-20', 'created_by' => '自動（アサイン）']);
 
+        // 同じ場所貸しにFCで入った人（2026-10-13 baba「FCだったらD手当無い」）＋前の決まりで入っていた行。
+        $fc = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京']);
+        Assignment::create(['project_id' => $p->id, 'staff_id' => $fc->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-20']);
+        StaffAllowance::create(['staff_id' => $fc->id, 'project_id' => $p->id, 'date' => '2026-10-20', 'kind' => '事前リハーサル手当',
+            'count' => 1, 'auto_key' => 'auto:'.$p->id.':'.$fc->id.':2026-10-20', 'created_by' => '自動（アサイン）']);
+
         $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10')->assertOk();
-        $this->assertSame(['ディレクター手当'], StaffAllowance::pluck('kind')->all());
+        $this->assertSame(['ディレクター手当'], StaffAllowance::pluck('kind')->all(), 'Dの人だけD手当・FCの行は取り除く');
+        $this->assertSame($s->id, StaffAllowance::value('staff_id'));
         $this->assertSame(5000, StaffAllowances::unit(StaffAllowance::first()));
 
         // 取込でも、場所貸しの名前は「リハ日」と読まない。
