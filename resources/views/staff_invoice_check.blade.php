@@ -44,6 +44,9 @@
   .si-tabs a.on { color: var(--ink); background: var(--panel); border-color: var(--line); border-bottom: 2px solid var(--panel); }
   .si-tab-n { font-size: 11px; font-weight: 700; margin-left: 6px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); }
   .si-auto { font-size: 10.5px; font-weight: 700; color: var(--brand); border: 1px solid var(--brand); border-radius: 999px; padding: 0 6px; margin-right: 4px; }
+  .si-note { display: block; width: 100%; max-width: 260px; margin-top: 4px; padding: 3px 6px; border: 1px dashed var(--line); border-radius: 6px; background: transparent; color: var(--ink); font-size: 12px; font-family: inherit; }
+  .si-note:focus { border-style: solid; background: var(--panel); }
+  .si-note.ng { border-color: #b91c1c; }
   .si-kind { padding: 2px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-size: 12px; font-family: inherit; }
   .si-people { display: flex; flex-wrap: wrap; gap: 6px; }
   .si-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; cursor: pointer; background: var(--panel); color: var(--ink); }
@@ -263,10 +266,13 @@
 
   @if ($allowances)
     <table class="si-table" style="margin-top:10px;">
-      <tr><th>日付</th><th>スタッフ</th><th>手当</th><th class="hide-sp">案件・メモ</th><th style="text-align:right;">金額</th><th class="hide-sp">入れた人</th><th></th></tr>
+      {{-- 並び（2026-10-13 baba）：日付・案件・企業様名・スタッフ・手当（＋メモ）・金額・入れた人・消す --}}
+      <tr><th>日付</th><th>案件</th><th class="hide-sp">企業様名</th><th>スタッフ</th><th>手当・メモ</th><th style="text-align:right;">金額</th><th class="hide-sp">入れた人</th><th></th></tr>
       @foreach ($allowances as $a)
         <tr>
           <td>{{ $a['md'] }}</td>
+          <td>{{ $a['project'] !== '' ? $a['project'] : '—' }}</td>
+          <td class="hide-sp">{{ $a['client'] }}</td>
           <td>{{ $a['staff'] }}</td>
           <td>
             @if ($a['auto'])<span class="si-auto" title="アサイン（前日設営・リハ日）から自動で入りました。いらなければ「消す」">自動</span>@endif
@@ -283,10 +289,8 @@
               {{ $a['kind'] }}
             @endif
             {{ $a['count'] > 1 ? ' ×'.$a['count'] : '' }}
-          </td>
-          <td class="hide-sp">
-            {{ $a['project'] }}@if ($a['client'] !== '')<span class="si-who" style="display:inline;">／{{ $a['client'] }}</span>@endif
-            @if ($a['note'] !== '')<div class="si-who">{{ $a['note'] }}</div>@endif
+            {{-- メモはあとから書ける（自動で入った行にも・欄から離れたら保存・2026-10-13 baba）。 --}}
+            <input type="text" class="si-note" maxlength="200" value="{{ $a['note'] }}" placeholder="✎ メモ" data-id="{{ $a['id'] }}" data-saved="{{ $a['note'] }}" onchange="alSaveNote(this)">
           </td>
           <td class="num">{{ number_format($a['amount']) }}円</td>
           <td class="hide-sp"><span class="si-who" style="display:inline;">{{ $a['by'] }}</span></td>
@@ -363,6 +367,16 @@
     var n = document.querySelectorAll('#alPeople input[type=checkbox]:checked').length;
     if (!n) { alert('手当を付けるスタッフにチェックしてください。'); return false; }
     return true;
+  }
+  // 一覧のメモ（欄から離れたら保存）。⚠ 失敗をだまって流さない＝赤枠＋お知らせ。
+  function alSaveNote(input) {
+    fetch('/staff-allowances/' + input.dataset.id + '/note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
+      body: JSON.stringify({ note: input.value })
+    })
+      .then(function (r) { if (!r.ok) throw new Error('通信エラー ' + r.status); input.classList.remove('ng'); input.dataset.saved = input.value; input.title = '✓ 保存しました'; })
+      .catch(function (e) { input.classList.add('ng'); alert('メモを保存できませんでした（' + e.message + '）。もう一度入れてください。'); });
   }
   document.getElementById('alAddName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); alAddByName(); } });
   alKindChanged();

@@ -61,7 +61,8 @@ class StaffAllowanceTest extends TestCase
         $this->get('/staff-invoice-check?ym=2026-10')->assertOk()
             ->assertSee('✍ 手当の記録（10月）')
             ->assertSee('本能寺のレクチャー')
-            ->assertSee('／株式会社テスト商事')   // 一覧の「案件・メモ」に企業様名（2026-10-13）
+            ->assertSeeInOrder(['<th>日付</th>', '<th>案件</th>', '企業様名', '<th>スタッフ</th>', '手当・メモ', '金額', '入れた人'], false)   // 並び（2026-10-13 baba）
+            ->assertSee('株式会社テスト商事')
             ->assertSee('ym=2026-11&amp;tab=allowances', false)
             ->assertDontSee('📁 請求書PDFの置き場所');
 
@@ -132,9 +133,39 @@ class StaffAllowanceTest extends TestCase
         $this->postJson('/staff-allowances', ['staff_id' => $a->id, 'date' => '2026-10-18', 'kind' => '大型手当'])
             ->assertOk()->assertJsonPath('item.amount', 2000);
 
+        // メモはあとから書ける（自動で入った行にも）。
+        $auto = StaffAllowance::where('kind', '前日設営手当')->whereNull('dismissed_at')->first();
+        $this->postJson('/staff-allowances/'.$auto->id.'/note', ['note' => '7時から設営'])->assertOk();
+        $this->assertSame('7時から設営', $auto->fresh()->note);
+
         // 収支入力の画面（案件ごと）も、消した行は出さない・自動の印が付く。
         $this->getJson('/staff-allowances/project?project='.$prep->id)->assertOk()
             ->assertJsonCount(3, 'items')   // 設営（リハ二郎・自動）＋宿泊×2
             ->assertJsonPath('items.0.auto', true);
+    }
+
+    /**
+     * ARENA場所貸しはD手当（2026-10-13 baba「場所貸しはD手当だと思う」）。
+     * 「ARENA場所貸し(ライブリハ)」が取込でリハ日になっていても、事前リハーサル手当にしない。
+     * 前の決まりで入ってしまった自動の行（誰も触っていない）は、開いたときに直る。
+     */
+    public function test_arena_rental_gets_director_allowance(): void
+    {
+        $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京']);
+        $s = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京']);
+        $p = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-20', 'date_type' => 'リハ日',
+            'project_name' => 'ARENA場所貸し(ライブリハ)', 'content_names' => ['ARENA場所貸し(ライブリハ)']]);
+        Assignment::create(['project_id' => $p->id, 'staff_id' => $s->id, 'role' => 'D', 'status' => '確定', 'date' => '2026-10-20']);
+        // 前の決まりで入っていた行（誰も触っていない）。
+        StaffAllowance::create(['staff_id' => $s->id, 'project_id' => $p->id, 'date' => '2026-10-20', 'kind' => '事前リハーサル手当',
+            'count' => 1, 'auto_key' => 'auto:'.$p->id.':'.$s->id.':2026-10-20', 'created_by' => '自動（アサイン）']);
+
+        $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10')->assertOk();
+        $this->assertSame(['ディレクター手当'], StaffAllowance::pluck('kind')->all());
+        $this->assertSame(5000, StaffAllowances::unit(StaffAllowance::first()));
+
+        // 取込でも、場所貸しの名前は「リハ日」と読まない。
+        $this->assertNull(\App\Support\ScheduleMark::detect('ARENA場所貸し(ライブリハ)'));
+        $this->assertNotNull(\App\Support\ScheduleMark::detect('綱引き大会(リハ)'));
     }
 }

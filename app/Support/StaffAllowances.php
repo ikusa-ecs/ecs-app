@@ -59,7 +59,7 @@ final class StaffAllowances
     public const LATE = '遅刻の減額';
 
     /** 自動で入れた行で切り替えられる種類（リハ・設営）。 */
-    public const SWITCHABLE = ['前日設営手当', '事前リハーサル手当', self::SIX_HOURS];
+    public const SWITCHABLE = ['前日設営手当', '事前リハーサル手当', self::SIX_HOURS, 'ディレクター手当'];
 
     /** 種類ごとの説明（入力欄の横に出す）。 */
     public const HINTS = [
@@ -121,8 +121,9 @@ final class StaffAllowances
             ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
             ->get(['project_id', 'staff_id', 'date']);
         $projects = Project::whereIn('id', $asg->pluck('project_id')->unique())
-            ->get(['id', 'date_type', 'is_cancelled', 'format'])->keyBy('id');
+            ->get(['id', 'project_name', 'content_ids', 'content_names', 'date_type', 'is_cancelled', 'format'])->keyBy('id');
         $staff = \App\Models\Person::staff()->whereIn('id', $asg->pluck('staff_id')->unique())->pluck('id')->flip();
+        $contentNames = \App\Models\Content::pluck('content_name', 'id')->all();
 
         $want = [];
         foreach ($asg as $a) {
@@ -130,7 +131,9 @@ final class StaffAllowances
             if (! $p || $p->is_cancelled || ! isset($staff[$a->staff_id])) {
                 continue;
             }
-            $kind = match ((string) $p->date_type) {
+            // ⚠ ARENA場所貸しはD手当（ディレクター手当）。2026-10-13 baba「場所貸しはD手当だと思う」。
+            //   「ARENA場所貸し(ライブリハ)」は取込でリハ日と読まれていた＝事前リハーサル手当にしない。
+            $kind = RookieFcPlan::isArenaRental($p, $contentNames) ? 'ディレクター手当' : match ((string) $p->date_type) {
                 '前日設営' => '前日設営手当',
                 'リハ日' => '事前リハーサル手当',
                 default => null,
@@ -142,16 +145,26 @@ final class StaffAllowances
             $want['auto:'.$a->project_id.':'.$a->staff_id.':'.$date] = [$a->staff_id, $a->project_id, $date, $kind];
         }
 
-        // いま入っている自動の行（この範囲・この人／この案件）。
+        // いま入っている自動の行（この範囲・この人／この案件）。手で種類を切り替えた行は鍵の頭が「auto*:」。
         $have = StaffAllowance::whereNotNull('auto_key')
             ->whereDate('date', '>=', $from->format('Y-m-d'))->whereDate('date', '<=', $to->format('Y-m-d'))
             ->when($staffIds !== null, fn ($q) => $q->whereIn('staff_id', $staffIds))
             ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
-            ->get()->keyBy('auto_key');
+            ->get()->keyBy(fn ($r) => self::baseKey((string) $r->auto_key));
 
         foreach ($want as $key => [$sid, $pid, $date, $kind]) {
             if ($have->has($key)) {
-                continue;   // もう入っている（消した印があっても入れ直さない）
+                // もう入っている（消した印があっても入れ直さない）。
+                // ただし**誰も触っていない自動の行**で、決まりが変わって種類がずれたものは直す
+                // （2026-10-13：場所貸しに事前リハーサル手当が入っていた）。手で種類を切り替えた行は触らない。
+                $row = $have->get($key);
+                if ($row->dismissed_at === null && $row->kind !== $kind && ! self::isTouched($row)) {
+                    $row->kind = $kind;
+                    $row->amount = null;
+                    $row->save();
+                }
+
+                continue;
             }
             StaffAllowance::create(['staff_id' => $sid, 'project_id' => $pid, 'date' => $date, 'kind' => $kind,
                 'count' => 1, 'auto_key' => $key, 'created_by' => '自動（アサイン）']);
@@ -162,6 +175,28 @@ final class StaffAllowances
                 $row->delete();
             }
         }
+    }
+
+    /**
+     * 自動で入れた行を「手で直した」印にする（種類を切り替えたとき）。
+     * 印の付いた行は、決まりが変わっても自動で種類を直さない（人の判断を上書きしない）。
+     */
+    public static function markTouched(StaffAllowance $a): void
+    {
+        if ($a->auto_key !== null && str_starts_with($a->auto_key, 'auto:')) {
+            $a->auto_key = 'auto*:'.substr($a->auto_key, 5);
+        }
+    }
+
+    private static function isTouched(StaffAllowance $a): bool
+    {
+        return str_starts_with((string) $a->auto_key, 'auto*:');
+    }
+
+    /** 自動の鍵から「手で直した」印を外した形（同じアサインかどうかを比べる用）。 */
+    private static function baseKey(string $key): string
+    {
+        return str_starts_with($key, 'auto*:') ? 'auto:'.substr($key, 6) : $key;
     }
 
     /** 画面に渡す形。 */

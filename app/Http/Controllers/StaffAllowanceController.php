@@ -95,6 +95,23 @@ class StaffAllowanceController extends Controller
     }
 
     /**
+     * メモをあとから書く・直す（2026-10-13 baba「メモを入れるところがない」＝自動で入った行にも書けるように）。
+     */
+    public function saveNote(Request $request, int $id)
+    {
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:200']]);
+        $a = StaffAllowance::findOrFail($id);
+        $a->note = trim((string) ($data['note'] ?? '')) ?: null;
+        $a->save();
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back()->with('ok', 'メモを保存しました。');
+    }
+
+    /**
      * リハ・設営の行の種類を切り替える（前日設営手当／事前リハーサル手当／1案件として数える）。
      * 2026-10-13 baba「前日設営だけかもしれないし、リハもかもしれない。6時間以上のリハ・設営は1案件にカウント（→規定は4時間以上のリハで1日分）」。
      */
@@ -104,6 +121,7 @@ class StaffAllowanceController extends Controller
         $a = StaffAllowance::findOrFail($id);
         abort_unless(in_array($a->kind, StaffAllowances::SWITCHABLE, true), 422);
         $a->kind = $data['kind'];
+        StaffAllowances::markTouched($a);   // 手で切り替えた＝自動で種類を直さない
         $a->amount = $data['kind'] === StaffAllowances::SIX_HOURS
             ? StaffAllowances::sixHoursAmount($a->project_id ? Project::find($a->project_id) : null)
             : null;

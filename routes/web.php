@@ -378,6 +378,7 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/staff-allowances', [\App\Http\Controllers\StaffAllowanceController::class, 'store']);
     Route::post('/staff-allowances/{id}/delete', [\App\Http\Controllers\StaffAllowanceController::class, 'destroy'])->whereNumber('id');
     Route::post('/staff-allowances/{id}/kind', [\App\Http\Controllers\StaffAllowanceController::class, 'changeKind'])->whereNumber('id');
+    Route::post('/staff-allowances/{id}/note', [\App\Http\Controllers\StaffAllowanceController::class, 'saveNote'])->whereNumber('id');
     Route::get('/staff-allowances/project', [\App\Http\Controllers\StaffAllowanceController::class, 'forProject']);
     // スタッフ名簿のCSV出力（氏名・事務所・区分・できる役割・通算など）。
     Route::get('/staff/export.csv', [PersonController::class, 'exportStaffCsv']);
