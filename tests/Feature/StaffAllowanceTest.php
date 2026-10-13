@@ -79,9 +79,8 @@ class StaffAllowanceTest extends TestCase
         $this->actingAsPerson($me);
         // 決まっていない種類は入れられない。
         $this->postJson('/staff-allowances', ['staff_id' => $s->id, 'date' => '2026-10-12', 'kind' => '謎の手当'])->assertStatus(422);
-        // その他・大型手当は金額が要る。
+        // その他は金額が要る。
         $this->postJson('/staff-allowances', ['staff_id' => $s->id, 'date' => '2026-10-12', 'kind' => 'その他'])->assertStatus(422);
-        $this->postJson('/staff-allowances', ['staff_id' => $s->id, 'date' => '2026-10-12', 'kind' => '大型手当'])->assertStatus(422);
         // 社員には付けない（請求書を出さない）。
         $this->postJson('/staff-allowances', ['staff_id' => $emp->id, 'date' => '2026-10-12', 'kind' => '運転手当'])->assertStatus(422);
         $this->assertSame(0, StaffAllowance::count());
@@ -128,6 +127,9 @@ class StaffAllowanceTest extends TestCase
         $this->post('/staff-allowances', ['staff_ids' => [$a->id, $b->id], 'project_id' => $prep->id, 'date' => '2026-10-17',
             'kind' => '宿泊手当', 'note' => '後泊'])->assertRedirect()->assertSessionHas('ok', '宿泊手当を2人に入れました。');
         $this->assertSame(2, StaffAllowance::where('kind', '宿泊手当')->count());
+        // 大型手当は1回2,000円（2026-10-13 baba）。金額を入れなくてよい。
+        $this->postJson('/staff-allowances', ['staff_id' => $a->id, 'date' => '2026-10-18', 'kind' => '大型手当'])
+            ->assertOk()->assertJsonPath('item.amount', 2000);
 
         // 収支入力の画面（案件ごと）も、消した行は出さない・自動の印が付く。
         $this->getJson('/staff-allowances/project?project='.$prep->id)->assertOk()
