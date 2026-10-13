@@ -27,6 +27,19 @@
   .si-cases { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.8; }
   .si-cases .st { font-size: 11px; color: var(--muted); }
   .si-cases .cx { font-size: 11px; color: #b91c1c; font-weight: 700; }
+  .si-cases li { margin-bottom: 4px; }
+  .si-draft { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+  .si-dt { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+  .si-draft table { border-collapse: collapse; font-size: 12px; }
+  .si-draft td { padding: 2px 8px 2px 0; border: 0; vertical-align: top; }
+  .si-draft td.n { text-align: right; white-space: nowrap; }
+  .si-draft tr.sum td { font-weight: 700; border-top: 1px solid var(--line); }
+  .si-checks { margin: 4px 0 0; padding: 0; list-style: none; font-size: 11.5px; color: var(--muted); line-height: 1.7; }
+  .si-guide { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--ink); }
+  .si-guide summary { cursor: pointer; font-weight: 700; }
+  .si-guide ul { margin: 6px 0 0; padding-left: 1.2em; line-height: 1.8; }
+  .si-sub { font-size: 11.5px; color: var(--muted); line-height: 1.6; padding-left: 1em; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .si-fmt { font-weight: 700; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
   .si-copy { font-size: 11.5px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 2px 8px; cursor: pointer; margin-left: 6px; }
   .si-saving { font-size: 10.5px; color: var(--muted); }
   .si-ng { font-size: 10.5px; color: #b91c1c; font-weight: 700; }
@@ -43,6 +56,25 @@
   月を選ぶと、その月にアサイン（キャンセル以外）があるスタッフが並びます。スタッフから請求書が届いたら<b>📨</b>、中身を明細と見比べて合っていたら<b>✅</b>にチェックしてください。<b>押した瞬間に保存</b>されます（誰がいつ付けたかも残ります）。<br>
   名前の行の「明細」を開くと、その人の日付・案件・役割が並びます。※ アサイン表の取込で名簿と名前が合わなかった人は、ECSにアサインが入っていないのでここにも出ません。
 </p>
+
+{{-- 請求書の作り方（マニュアルの要点・2026-10-13 baba「請求書の作り方から要りそうな情報を載せて」）。
+     元＝ドライブ「【マニュアル】請求書作成（26年5月～）」。単価を変えるときは App\Support\StaffInvoiceDraft と合わせる。 --}}
+<details class="si-guide">
+  <summary>📘 請求書の作り方（スタッフ向けマニュアルの要点）</summary>
+  <ul>
+    <li>スタッフは <b>INVOY</b>（invoy.jp）で作って、PDFを提出。取引先＝株式会社IKUSA（御中）</li>
+    <li>請求書番号・PDF名＝<b>「yymm請求書_氏名」</b>（例：2610請求書_戦太郎）／件名＝「氏名_◯月勤務分」</li>
+    <li>発行日＝<b>勤務月の月末</b>／お支払期限＝<b>翌月末</b>／税込み表示・10％・端数切捨て・源泉徴収なし</li>
+    <li>基本報酬＝オンライン <b>6,000円</b>・リアル <b>9,000円</b>／日。1日2案件＝×1.5（2案件/日）、3案件＝×2（3案件/日）</li>
+    <li>手当＝MC・スライド 1,000円/案件、ロング・宿泊（前泊）・運転（20分以上）・事前レクチャー/リハーサル 2,000円/回、前日設営 4,000円/回<br>
+      ※ 動画視聴・事前ブリーフィング・体験会への参加は対象外</li>
+    <li>交通費＝自宅最寄り駅⇔会社（池袋・東池袋・大塚）など。<b>往復3,000円まで</b>。税区分は「対象外」</li>
+    <li>キャンセル料＝前日 1/3・当日（集合1時間前まで）1/2・当日（集合1時間前を過ぎてから）全額＋交通費。体調不良・自宅Wi-Fiなどスタッフ都合は対象外</li>
+    <li>品目の書き方の例：「リアルイベント：10/5、12」「MC手当：10/5」「前泊手当：10/4（10/5本番のチャンバラのため）」<br>
+      ※ 下の各スタッフの「明細」に、ECSのアサインから作った<b>請求書の目安</b>を同じ書き方で出しています（標準単価なので、人によって違うことがあります）</li>
+    <li><a href="https://drive.google.com/file/d/1rsX68FKkCKQqwsNEq4BrViPmL63PKjLT/view" target="_blank" rel="noopener">マニュアル（PDF）を開く</a></li>
+  </ul>
+</details>
 
 @include('partials.office_switch')
 
@@ -79,9 +111,34 @@
               <li>{{ $c['date'] }}　<a href="/project-assign?project={{ urlencode($c['projectId']) }}">{{ $c['name'] }}</a>{{ $c['client'] !== '' ? '／'.$c['client'] : '' }}{{ $c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '' }}　{{ $c['role'] }}
                 @if ($c['status'] !== '確定')<span class="st">（{{ $c['status'] }}）</span>@endif
                 @if ($c['cancelled'])<span class="cx">案件中止</span>@endif
+                {{-- 実施形態・集合／解散・会場住所（2026-10-13） --}}
+                @if ($c['format'] !== '' || $c['meet'] !== '' || $c['leave'] !== '' || $c['place'] !== '')
+                  <div class="si-sub">
+                    @if ($c['format'] !== '')<span class="si-fmt">{{ $c['format'] }}</span>@endif
+                    @if ($c['meet'] !== '' || $c['leave'] !== '')<span>{{ $c['meet'] !== '' ? '集合 '.$c['meet'] : '' }}{{ $c['meet'] !== '' && $c['leave'] !== '' ? '・' : '' }}{{ $c['leave'] !== '' ? '解散 '.$c['leave'] : '' }}</span>@endif
+                    @if ($c['place'] !== '')<span>📍 {{ $c['place'] }}</span>@endif
+                  </div>
+                @endif
               </li>
             @endforeach
           </ul>
+          {{-- 請求書に出てくるはずの品目（マニュアルの書き方・標準単価の目安）。正本＝App\Support\StaffInvoiceDraft。 --}}
+          <div class="si-draft">
+            <div class="si-dt">🧾 請求書の目安（マニュアルの書き方・標準単価）</div>
+            @if ($r['draft']['items'])
+              <table>
+                @foreach ($r['draft']['items'] as $it)
+                  <tr><td>{{ $it['label'] }}</td><td class="n">{{ $it['qty'] }}</td><td class="n">× {{ number_format($it['price']) }}円</td><td class="n">{{ number_format($it['amount']) }}円</td></tr>
+                @endforeach
+                <tr class="sum"><td>合計（交通費・ECSで分からない手当を除く）</td><td></td><td></td><td class="n">{{ number_format($r['draft']['total']) }}円</td></tr>
+              </table>
+            @endif
+            <ul class="si-checks">
+              @foreach ($r['draft']['checks'] as $ck)
+                <li>⚠ {{ $ck }}</li>
+              @endforeach
+            </ul>
+          </div>
         </details>
       </td>
       <td class="num hide-sp">{{ count($r['cases']) }}件<span class="si-who">うち確定 {{ $r['confirmed'] }}</span></td>

@@ -1,0 +1,140 @@
+<?php
+
+namespace App\Support;
+
+use Illuminate\Support\Carbon;
+
+/**
+ * スタッフの月のアサインから「請求書に出てくるはずの品目」を作る（2026-10-13 baba「請求書の作り方を見て要りそうな情報を載せて」）。
+ *
+ * 元＝ドライブ「【マニュアル】請求書作成（26年5月～）」（野口さん・INVOYへの入力方法）。書き方・単価はここに合わせる。
+ *   基本報酬：オンライン 6,000／リアル 9,000（1日2案件＝×1.5・3案件＝×2）
+ *   手当：MC・スライド 1,000/案件、ロング・宿泊（前泊）・運転・事前レクチャー/リハーサル 2,000/回、前日設営 4,000/回
+ *   交通費：往復3,000円まで（税区分は対象外）
+ * ⚠ 金額は**標準単価での目安**。本当は人ごとに日当も交通費も違う（2026-08-17 baba）＝「合っているか」の判定には使わない。
+ * ⚠ ECSでは分からないもの（交通費・運転・スライド・事前レクチャー・キャンセル料）は「要確認」として出すだけ。
+ * ⚠ 単価をここ以外に書かない（マニュアルが変わったらここ1か所を直す）。
+ */
+final class StaffInvoiceDraft
+{
+    public const BASE = ['オンライン' => 6000, 'リアル' => 9000];
+
+    public const MC = 1000;
+
+    public const LONG = 2000;
+
+    public const STAY = 2000;
+
+    public const REHEARSAL = 2000;
+
+    public const PREP = 4000;
+
+    public const TRAVEL_CAP = 3000;
+
+    /**
+     * @param  list<array{ymd:string, name:string, format:string, roleCode:string, dayType:string, lodging:string, cancelled:bool, status:string}>  $cases
+     * @return array{items: list<array{label:string, qty:string, price:int, amount:int}>, total:int, checks: list<string>}
+     */
+    public static function build(array $cases, string $station = ''): array
+    {
+        $items = [];
+        $checks = [];
+        $md = fn (string $ymd) => Carbon::parse($ymd)->format('n/j');
+        // 「10/5、12、20」の書き方（マニュアルの例どおり＝同じ月は日だけ続ける）。
+        $days = function (array $ymds) {
+            sort($ymds);
+            $out = [];
+            $lastMonth = null;
+            foreach ($ymds as $y) {
+                $d = Carbon::parse($y);
+                $out[] = $lastMonth === $d->month ? (string) $d->day : $d->format('n/j');
+                $lastMonth = $d->month;
+            }
+
+            return implode('、', $out);
+        };
+
+        $live = array_values(array_filter($cases, fn ($c) => ! $c['cancelled']));
+        $main = array_values(array_filter($live, fn ($c) => in_array($c['dayType'], ['', '本番'], true)));
+
+        // ① 基本報酬（本番の日だけ）。同じ日・同じ種類の案件数で 1／2／3案件/日 に分ける。
+        $byKindDay = [];
+        foreach ($main as $c) {
+            // ⚠ リアル／リアルロング／オンラインの見分けは正本 ProjectFormats::countCode だけ（手当が変わるところ）。
+            $kind = ProjectFormats::countCode($c['format']) === 'online' ? 'オンライン' : 'リアル';
+            $byKindDay[$kind][$c['ymd']] = ($byKindDay[$kind][$c['ymd']] ?? 0) + 1;
+        }
+        foreach (['オンライン', 'リアル'] as $kind) {
+            $groups = [];
+            foreach ($byKindDay[$kind] ?? [] as $ymd => $n) {
+                $groups[min($n, 3)][] = $ymd;
+            }
+            ksort($groups);
+            foreach ($groups as $n => $ymds) {
+                $price = (int) (self::BASE[$kind] * [1 => 1, 2 => 1.5, 3 => 2][$n]);
+                $items[] = ['label' => $kind.'イベント'.($n > 1 ? $n.'案件/日' : '').'：'.$days($ymds),
+                    'qty' => count($ymds).'日', 'price' => $price, 'amount' => $price * count($ymds)];
+            }
+        }
+
+        // ② MC手当（案件ごと・同じ日に2案件なら「(2案件)」）。
+        $mc = [];
+        foreach ($main as $c) {
+            if ($c['roleCode'] === AssignmentRole::MC) {
+                $mc[$c['ymd']] = ($mc[$c['ymd']] ?? 0) + 1;
+            }
+        }
+        if ($mc) {
+            ksort($mc);
+            $label = implode('、', array_map(fn ($y, $n) => $md($y).($n > 1 ? '('.$n.'案件)' : ''), array_keys($mc), $mc));
+            $n = array_sum($mc);
+            $items[] = ['label' => 'MC手当：'.$label, 'qty' => $n.'案件', 'price' => self::MC, 'amount' => self::MC * $n];
+        }
+
+        // ③ ロング手当（実施形態がリアルロング）。
+        $long = array_values(array_unique(array_map(fn ($c) => $c['ymd'], array_filter($main, fn ($c) => ProjectFormats::countCode($c['format']) === 'long'))));
+        if ($long) {
+            $items[] = ['label' => 'ロング手当：'.$days($long), 'qty' => count($long).'回', 'price' => self::LONG, 'amount' => self::LONG * count($long)];
+        }
+
+        // ④ 前日設営手当（日程種別＝前日設営）。
+        $prep = array_values(array_unique(array_map(fn ($c) => $c['ymd'], array_filter($live, fn ($c) => $c['dayType'] === '前日設営'))));
+        if ($prep) {
+            $items[] = ['label' => '前日設営手当：'.$days($prep), 'qty' => count($prep).'回', 'price' => self::PREP, 'amount' => self::PREP * count($prep)];
+        }
+
+        // ⑤ 事前リハーサル手当（日程種別＝リハ日）。
+        foreach (array_filter($live, fn ($c) => $c['dayType'] === 'リハ日') as $c) {
+            $items[] = ['label' => '事前リハーサル手当：'.$md($c['ymd']).'（'.$c['name'].'リハーサル）', 'qty' => '1回', 'price' => self::REHEARSAL, 'amount' => self::REHEARSAL];
+        }
+
+        // ⑥ 前泊手当（案件の宿泊が前泊あり）。前泊した日＝前日。
+        foreach ($main as $c) {
+            if (Lodging::hasPreStay($c['lodging'])) {
+                $prev = Carbon::parse($c['ymd'])->subDay()->format('Y-m-d');
+                $items[] = ['label' => '前泊手当：'.$md($prev).'（'.$md($c['ymd']).'本番の'.$c['name'].'のため）'
+                    .(str_contains($c['lodging'], '一部') ? '※一部前泊＝本人が泊まったか確認' : ''),
+                    'qty' => '1回', 'price' => self::STAY, 'amount' => self::STAY];
+            }
+        }
+
+        // ECSでは分からないもの＝見る人が確かめる。
+        $checks[] = '交通費：最寄り駅'.($station !== '' ? '「'.$station.'」' : '（名簿に未入力）').'から。往復'.number_format(self::TRAVEL_CAP).'円までに収まっているか（税区分は対象外）';
+        $checks[] = '運転手当（20分以上運転）・スライド手当・事前レクチャー手当はECSに記録がありません';
+        $cancelled = array_values(array_filter($cases, fn ($c) => $c['cancelled']));
+        if ($cancelled) {
+            $checks[] = 'キャンセル料の対象かも：'.implode('、', array_map(fn ($c) => $md($c['ymd']).' '.$c['name'], $cancelled))
+                .'（前日＝1/3・当日＝1/2・集合1時間前を過ぎてから＝全額＋交通費／スタッフ都合は対象外）';
+        }
+        $spare = array_filter($live, fn ($c) => $c['dayType'] === '予備日');
+        if ($spare) {
+            $checks[] = '予備日のアサインが'.count($spare).'件あります（実施したかどうか確認）';
+        }
+        $tentative = array_filter($live, fn ($c) => $c['status'] === '仮');
+        if ($tentative) {
+            $checks[] = 'まだ「仮」のアサインが'.count($tentative).'件あります（本当に出たか確認）';
+        }
+
+        return ['items' => $items, 'total' => array_sum(array_column($items, 'amount')), 'checks' => $checks];
+    }
+}

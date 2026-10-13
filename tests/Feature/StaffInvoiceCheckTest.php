@@ -27,7 +27,8 @@ class StaffInvoiceCheckTest extends TestCase
         $s2 = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京', 'name' => '出ない次郎']);
         $emp = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => '社員三郎']);
 
-        $p = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-12', 'project_name' => '戦国運動会', 'client' => 'A社']);
+        $p = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-12', 'project_name' => '戦国運動会', 'client' => 'A社',
+            'format' => 'リアルロング', 'start_time' => '7:00', 'end_time' => '18:30', 'location' => "代々木公園\n東京都渋谷区"]);
         $x = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-20', 'project_name' => '水合戦', 'client' => 'B社', 'is_cancelled' => true]);
         Assignment::create(['project_id' => $p->id, 'staff_id' => $s1->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-12']);
         Assignment::create(['project_id' => $x->id, 'staff_id' => $s1->id, 'role' => 'MC', 'status' => '確定', 'date' => '2026-10-20']);
@@ -40,6 +41,11 @@ class StaffInvoiceCheckTest extends TestCase
             ->assertSee('明細 2件')
             ->assertSee('戦国運動会')
             ->assertSee('案件中止')
+            // 実施形態・集合／解散・会場住所（2026-10-13）。コピーの文にも2行目で入る。
+            ->assertSee('リアルロング')
+            ->assertSee('集合 7:00・解散 18:30')
+            ->assertSee('代々木公園 東京都渋谷区')
+            ->assertSee("　FC（巡回ファシリ）\n　リアルロング／集合 7:00・解散 18:30／代々木公園 東京都渋谷区", false)
             ->assertDontSee('出ない次郎')   // キャンセルだけの人は出ない
             ->assertDontSee('社員三郎');    // 社員は請求書を出さない
 

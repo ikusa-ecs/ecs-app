@@ -10,6 +10,7 @@ use App\Models\StaffInvoiceCheck;
 use App\Support\AssignmentRole;
 use App\Support\OfficeScope;
 use App\Support\ProjectContentName;
+use App\Support\StaffInvoiceDraft;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -51,7 +52,7 @@ class StaffInvoiceCheckController extends Controller
 
         $projects = Project::whereIn('id', $rows->pluck('project_id')->unique())->get()->keyBy('id');
         $contentNames = Content::pluck('content_name', 'id');
-        $people = Person::whereIn('id', $rows->pluck('staff_id')->unique())->get(['id', 'name', 'name_kana', 'office'])->keyBy('id');
+        $people = Person::whereIn('id', $rows->pluck('staff_id')->unique())->get(['id', 'name', 'name_kana', 'office', 'nearest_station'])->keyBy('id');
         $checks = StaffInvoiceCheck::where('ym', $ym)->get()->keyBy('staff_id');
 
         $list = [];
@@ -65,12 +66,20 @@ class StaffInvoiceCheckController extends Controller
                 $pr = $projects->get($a->project_id);
                 $d = Carbon::parse($a->date);
                 $cases[] = [
+                    'ymd' => $d->format('Y-m-d'),
+                    'roleCode' => (string) $a->role,
+                    'lodging' => $pr ? (string) ($pr->lodging ?? '') : '',
                     'date' => $d->format('n/j').'('.self::WEEKDAYS[$d->dayOfWeek].')',
                     'projectId' => $a->project_id,
                     'name' => $pr ? ProjectContentName::of($pr, $contentNames, (string) $pr->project_name) : $a->project_id,
                     'client' => $pr ? (string) ($pr->client ?? '') : '',
                     'dayType' => $pr ? (string) ($pr->date_type ?? '本番') : '',
                     'role' => AssignmentRole::label((string) $a->role),
+                    // 請求書と見比べる材料（2026-10-13 baba「住所と集合解散・リアル/リアルロング/オンラインも」）。
+                    'format' => $pr ? trim((string) ($pr->format ?? '')) : '',
+                    'meet' => $pr ? trim((string) ($pr->start_time ?? '')) : '',
+                    'leave' => $pr ? trim((string) ($pr->end_time ?? '')) : '',
+                    'place' => $pr ? trim((string) preg_replace('/\s+/u', ' ', (string) ($pr->location ?? ''))) : '',
                     'status' => (string) $a->status,
                     // 中止になった案件も消さずに印を付けて出す（キャンセル料の請求が来ることがあるため）。
                     'cancelled' => $pr ? (bool) $pr->is_cancelled : false,
@@ -90,6 +99,8 @@ class StaffInvoiceCheckController extends Controller
                 'received' => $c?->received_at ? ['at' => $c->received_at->format('n/j H:i'), 'by' => (string) $c->received_by] : null,
                 'checked' => $c?->checked_at ? ['at' => $c->checked_at->format('n/j H:i'), 'by' => (string) $c->checked_by] : null,
                 'copyText' => self::copyText((string) $p->name, $month, $cases),
+                // 請求書に出てくるはずの品目（マニュアルの書き方・標準単価の目安）。正本＝StaffInvoiceDraft。
+                'draft' => StaffInvoiceDraft::build($cases, (string) ($p->nearest_station ?? '')),
             ];
         }
         // 並びは読み（name_kana）順＝請求書の束をあいうえお順で見やすく。読みが無ければ名前。
@@ -144,9 +155,19 @@ class StaffInvoiceCheckController extends Controller
             $lines[] = $c['date'].' '.$c['name'].($c['client'] !== '' ? '／'.$c['client'] : '')
                 .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')
                 .'　'.$c['role'].($c['status'] !== '確定' ? '（'.$c['status'].'）' : '')
-                .($c['cancelled'] ? '【案件中止】' : '');
+                .($c['cancelled'] ? '【案件中止】' : '')
+                .self::detailLine($c);
         }
 
         return implode("\n", $lines);
+    }
+
+    /** 2行目＝「　リアルロング／集合 7:00・解散 18:00／会場住所」（無い項目は書かない）。 */
+    public static function detailLine(array $c): string
+    {
+        $time = trim(($c['meet'] !== '' ? '集合 '.$c['meet'] : '').($c['meet'] !== '' && $c['leave'] !== '' ? '・' : '').($c['leave'] !== '' ? '解散 '.$c['leave'] : ''));
+        $bits = array_filter([$c['format'], $time, $c['place']], fn ($v) => $v !== '');
+
+        return $bits ? "\n　".implode('／', $bits) : '';
     }
 }
