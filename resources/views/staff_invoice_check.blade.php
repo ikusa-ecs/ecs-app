@@ -284,7 +284,10 @@
             @endif
             {{ $a['count'] > 1 ? ' ×'.$a['count'] : '' }}
           </td>
-          <td class="hide-sp">{{ $a['project'] }}{{ $a['project'] !== '' && $a['note'] !== '' ? '／' : '' }}{{ $a['note'] }}</td>
+          <td class="hide-sp">
+            {{ $a['project'] }}@if ($a['client'] !== '')<span class="si-who" style="display:inline;">／{{ $a['client'] }}</span>@endif
+            @if ($a['note'] !== '')<div class="si-who">{{ $a['note'] }}</div>@endif
+          </td>
           <td class="num">{{ number_format($a['amount']) }}円</td>
           <td class="hide-sp"><span class="si-who" style="display:inline;">{{ $a['by'] }}</span></td>
           <td>

@@ -165,9 +165,11 @@ final class StaffAllowances
     }
 
     /** 画面に渡す形。 */
-    public static function row(StaffAllowance $a, array $projectNames = [], array $staffNames = []): array
+    public static function row(StaffAllowance $a, array $projectNames = [], array $staffNames = [], array $projectClients = []): array
     {
         return [
+            // 企業様名（2026-10-13 baba「案件メモに企業様名も」）。一覧の「案件・メモ」の列に出す。品目名には入れない。
+            'client' => $a->project_id ? (string) ($projectClients[$a->project_id] ?? '') : '',
             'id' => $a->id,
             'staffId' => $a->staff_id,
             'staff' => $staffNames[$a->staff_id] ?? $a->staff_id,

@@ -63,7 +63,8 @@ class StaffInvoiceCheckController extends Controller
 
         $projectNames = $projects->map(fn ($p) => ProjectContentName::of($p, $contentNames, (string) $p->project_name))->all();
         $staffNames = $people->map(fn ($p) => (string) $p->name)->all();
-        $allowRows = $allowances->map(fn ($a) => StaffAllowances::row($a, $projectNames, $staffNames))->values()->all();
+        $projectClients = $projects->map(fn ($p) => trim((string) ($p->client ?? '')))->all();
+        $allowRows = $allowances->map(fn ($a) => StaffAllowances::row($a, $projectNames, $staffNames, $projectClients))->values()->all();
         $allowByStaff = collect($allowRows)->groupBy('staffId');
 
         $list = [];

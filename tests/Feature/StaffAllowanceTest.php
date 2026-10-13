@@ -26,7 +26,7 @@ class StaffAllowanceTest extends TestCase
         $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => '担当花子']);
         $s1 = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京', 'name' => '運転太郎']);
         $s2 = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京', 'name' => '講師次郎']);
-        $p = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-12', 'project_name' => '戦国運動会']);
+        $p = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-12', 'project_name' => '戦国運動会', 'client' => '株式会社テスト商事']);
         Assignment::create(['project_id' => $p->id, 'staff_id' => $s1->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-12']);
 
         // ① 請求書チェックの画面から（フォーム）。
@@ -61,6 +61,7 @@ class StaffAllowanceTest extends TestCase
         $this->get('/staff-invoice-check?ym=2026-10')->assertOk()
             ->assertSee('✍ 手当の記録（10月）')
             ->assertSee('本能寺のレクチャー')
+            ->assertSee('／株式会社テスト商事')   // 一覧の「案件・メモ」に企業様名（2026-10-13）
             ->assertSee('ym=2026-11&amp;tab=allowances', false)
             ->assertDontSee('📁 請求書PDFの置き場所');
 

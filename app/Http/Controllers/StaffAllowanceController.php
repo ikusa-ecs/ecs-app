@@ -155,8 +155,9 @@ class StaffAllowanceController extends Controller
     private function row(StaffAllowance $a): array
     {
         $staff = Person::whereKey($a->staff_id)->pluck('name', 'id')->all();
-        $proj = $a->project_id ? Project::whereKey($a->project_id)->pluck('project_name', 'id')->all() : [];
+        $p = $a->project_id ? Project::find($a->project_id) : null;
 
-        return StaffAllowances::row($a, $proj, $staff);
+        return StaffAllowances::row($a, $p ? [$p->id => (string) $p->project_name] : [], $staff,
+            $p ? [$p->id => trim((string) ($p->client ?? ''))] : []);
     }
 }
