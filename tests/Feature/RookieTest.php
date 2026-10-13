@@ -258,7 +258,9 @@ class RookieTest extends TestCase
         $this->assertSame($me->id, $new->fresh()->rookie_ojt_id, 'OJT担当はそのまま');
         $r = collect(\App\Support\RookieFcPlan::build(Carbon::today()->startOfMonth(), '東京')['rookies'])->firstWhere('id', $new->id);
         $this->assertStringContainsString('／リーダー：リーダー丸）', $r['copyText']);
-        $this->get('/rookies')->assertOk()->assertSee('（チームリーダーなし）');
+        $this->get('/rookies')->assertOk()->assertSee('（チームリーダーなし）')
+            // 目次と縮める仕組み（2026-10-13）。中身はJSが見出しから作る。
+            ->assertSee('id="rkToc"', false)->assertSee('function rkToc()', false);
         $this->actingAsPerson($me)->post('/rookies/state', ['id' => $new->id, 'state' => 'out'])->assertRedirect();
         $this->assertSame('out', $new->fresh()->rookie_state);
 

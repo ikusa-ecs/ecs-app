@@ -25,6 +25,19 @@
   .flash { background: var(--ok-soft); border: 1px solid #bbe3c6; color: #15803d; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; margin-bottom: 14px; }
   .rk-warn { color: var(--warn); font-size: 12px; font-weight: 700; }
   details.rk-more > summary { cursor: pointer; font-weight: 700; font-size: 13.5px; }
+  /* 縮める・目次（2026-10-13 baba「全部ちっちゃく縮められるように・Notionみたいにここに飛びたい」）。 */
+  .rk-card > h3 { cursor: pointer; user-select: none; }
+  .rk-card > h3::before { content: '▾ '; color: var(--muted); }
+  .rk-card.rk-folded > h3::before { content: '▸ '; }
+  .rk-card.rk-folded > :not(h3) { display: none; }
+  .rk-card.rk-folded { padding-bottom: 10px; }
+  .rk-toc { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 14px; }
+  .rk-toc b { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .rk-toc a { font-size: 12.5px; text-decoration: none; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+  .rk-toc a:hover { border-color: var(--brand); }
+  .rk-toc .sp { flex: 1; }
+  .rk-card { scroll-margin-top: 64px; }
 </style>
 @endpush
 
@@ -45,6 +58,9 @@
   <label>月：<input class="rk-in" type="month" name="month" value="{{ $month->format('Y-m') }}"></label>
   <button class="rk-btn" type="submit">表示</button>
 </form>
+
+{{-- 目次（押すとそのブロックへ飛ぶ・縮めていたら開く）。中身は下の rkToc() が見出しから作る。 --}}
+<nav class="rk-toc" id="rkToc" aria-label="目次"></nav>
 
 <div class="rk-card">
   <h3>🌱 新人の一覧（{{ $month->format('Y年n月') }}）</h3>
@@ -432,6 +448,68 @@
   }
 
   // ほかのボタン（OJT・経験など）は読み込み直すので、開いていた枠と元の位置に戻す。
+  // ===== 縮める・目次（2026-10-13 baba「全部ちっちゃく縮められるように」「Notionみたいにここに飛びたい」）=====
+  // ・見出し（h3）を押すとそのブロックを縮める／開く。縮めた状態はこの端末で覚える（localStorage）。
+  // ・下のほうの「月ごとの目標」などはもともと開け閉めできる（details）。目次から飛ぶと開く。
+  // ・覚える鍵は見出しの文字の「（」より前＝月が変わっても同じブロックとして覚える。
+  (function rkToc() {
+    var KEY = 'rk_folded';
+    var folded = {};
+    try { folded = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { folded = {}; }
+    var save = function () { try { localStorage.setItem(KEY, JSON.stringify(folded)); } catch (e) {} };
+    var toc = document.getElementById('rkToc');
+    if (!toc) return;
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.rk-card'));
+    var title = function (el) { return (el.textContent || '').trim().replace(/\s+/g, ' '); };
+    toc.innerHTML = '<b>目次</b>';
+    cards.forEach(function (card, i) {
+      var head = card.querySelector(':scope > h3, :scope > summary');
+      if (!head) return;
+      var text = title(head);
+      var key = text.split('（')[0];
+      card.id = card.id || ('rk-sec-' + i);
+      var isDetails = card.tagName === 'DETAILS';
+      if (!isDetails) {
+        if (folded[key]) card.classList.add('rk-folded');
+        head.title = '押すと縮める／開く';
+        head.addEventListener('click', function () {
+          card.classList.toggle('rk-folded');
+          if (card.classList.contains('rk-folded')) folded[key] = 1; else delete folded[key];
+          save();
+        });
+      }
+      var a = document.createElement('a');
+      a.href = '#' + card.id;
+      a.textContent = key;
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        if (isDetails) card.open = true;
+        else if (card.classList.contains('rk-folded')) { card.classList.remove('rk-folded'); delete folded[key]; save(); }
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      toc.appendChild(a);
+    });
+    var sp = document.createElement('span'); sp.className = 'sp'; toc.appendChild(sp);
+    var mk = function (label, fold) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'rk-btn'; b.textContent = label;
+      b.addEventListener('click', function () {
+        cards.forEach(function (card) {
+          var head = card.querySelector(':scope > h3, :scope > summary');
+          if (!head) return;
+          var key = title(head).split('（')[0];
+          if (card.tagName === 'DETAILS') { card.open = !fold; return; }
+          card.classList.toggle('rk-folded', fold);
+          if (fold) folded[key] = 1; else delete folded[key];
+        });
+        save();
+      });
+      toc.appendChild(b);
+    };
+    mk('すべて縮める', true);
+    mk('すべて開く', false);
+  })();
+
   function rkRemember() {
     try {
       var open = [];
