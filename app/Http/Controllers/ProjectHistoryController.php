@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectHistory;
+use App\Support\LineGroupText;
 use App\Support\OfficeScope;
 use App\Support\ProjectHistoryRecorder;
 use Illuminate\Http\Request;
@@ -47,6 +48,7 @@ class ProjectHistoryController extends Controller
                 'periods'        => self::PERIODS,
                 'peopleOptions'  => collect(),
                 'projectOptions' => collect(),
+                'projectInfo'    => [],
                 'needsSetup'     => true,
             ]);
         }
@@ -104,6 +106,18 @@ class ProjectHistoryController extends Controller
             ->limit(300)
             ->get();
 
+        // 案件名だけでは「何日のどの企業様の案件か」が分からない（2026-10-13 baba）。
+        // 開催日と企業名を案件IDごとに引いておく。履歴の行には当時の案件名しか残っていないため、
+        // 開催日・企業名は「今の」案件から読む（削除された案件は引けない＝案件名だけ出す）。
+        $ids = collect($histories->items())->pluck('project_id')
+            ->merge($projectOptions->pluck('project_id'))
+            ->push($projectId)
+            ->filter()->unique()->values();
+        $projectInfo = Project::query()->whereIn('id', $ids)
+            ->get(['id', 'project_name', 'client', 'start_date'])
+            ->mapWithKeys(fn (Project $p) => [$p->id => self::infoLabel($p)])
+            ->all();
+
         // 表示中の案件名（?project= で1件に絞ったときの見出し用）。
         $projectLabel = $projectId !== ''
             ? (optional(Project::find($projectId))->project_name ?: $projectId)
@@ -118,7 +132,17 @@ class ProjectHistoryController extends Controller
             'periods'        => self::PERIODS,
             'peopleOptions'  => $peopleOptions,
             'projectOptions' => $projectOptions,
+            'projectInfo'    => $projectInfo,
             'needsSetup'     => false,
         ]);
+    }
+
+    /** 「10月26日(月)・株式会社〇〇」。開催日も企業名も無ければ空文字。 */
+    private static function infoLabel(Project $project): string
+    {
+        $date = $project->start_date ? LineGroupText::dateLabel($project) : '日付未定';
+        $client = trim((string) $project->client);
+
+        return $client === '' ? $date : $date.'・'.$client;
     }
 }

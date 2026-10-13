@@ -133,6 +133,29 @@ class ProjectHistoryTest extends TestCase
         $res->assertSee('田中 一郎');
     }
 
+    /** 案件名の横に開催日と企業名も出す＝何日のどの企業様の案件か分かる（2026-10-13）。 */
+    public function test_history_screen_shows_date_and_client(): void
+    {
+        $tokyo   = PersonFactory::new()->create(['office' => '東京']);
+        $project = ProjectFactory::new()->create([
+            'office' => '東京', 'project_name' => '謎解きパーティー',
+            'client' => '株式会社テスト商事', 'start_date' => '2026-10-26',
+        ]);
+
+        $this->actingAsPerson($tokyo);
+        $project->update(['note' => 'メモ']);
+
+        $this->get('/project-history?period=all')
+            ->assertOk()
+            ->assertSee('謎解きパーティー')
+            ->assertSee('10月26日(月)・株式会社テスト商事');
+
+        // 1件に絞ったときの見出しの下にも出る。
+        $this->get('/project-history?period=all&project='.urlencode($project->id))
+            ->assertOk()
+            ->assertSee('10月26日(月)・株式会社テスト商事');
+    }
+
     /** 一般社員には他拠点の案件の履歴を見せない（全拠点運用・設計書19.2）。 */
     public function test_history_screen_hides_other_office_projects(): void
     {

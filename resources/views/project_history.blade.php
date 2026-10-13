@@ -14,6 +14,9 @@
     font-size: 13.5px; font-family: inherit; background: #fff; max-width: 320px;
   }
   .ph-count { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  /* 案件名の横に「10月26日(月)・企業名」（2026-10-13）。案件名より控えめに。 */
+  .ph-info { font-size: 12px; color: var(--muted); }
+  .sec-title + .ph-info { margin: -6px 0 12px; }
   /* 黒ベース（2026-09-09）。白いプルダウンのままだと黒地で浮く。 */
   html[data-theme="dark"] .ph-bar select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
   .ph-pager { display: flex; gap: 10px; align-items: center; margin-top: 16px; font-size: 13px; }
@@ -55,7 +58,7 @@
       <option value="">すべての案件</option>
       @foreach ($projectOptions as $opt)
         <option value="{{ $opt->project_id }}" @selected($projectId === $opt->project_id)>
-          {{ $opt->project_name ?: $opt->project_id }}
+          {{ ! empty($projectInfo[$opt->project_id]) ? $projectInfo[$opt->project_id].'／' : '' }}{{ $opt->project_name ?: $opt->project_id }}
         </option>
       @endforeach
     </select>
@@ -84,6 +87,9 @@
 <div class="panel">
   @if ($projectLabel)
     <div class="sec-title">{{ $projectLabel }} の編集履歴</div>
+    @if (! empty($projectInfo[$projectId]))
+      <div class="ph-info">{{ $projectInfo[$projectId] }}</div>
+    @endif
   @endif
 
   @if ($histories->isEmpty())
@@ -99,6 +105,9 @@
               <span class="hist-project">
                 <a href="/project-form?project={{ urlencode($h->project_id) }}">{{ $h->project_name ?: $h->project_id }}</a>
               </span>
+              @if (! empty($projectInfo[$h->project_id]))
+                <span class="ph-info">{{ $projectInfo[$h->project_id] }}</span>
+              @endif
             @endif
           </div>
           @if ($h->action === 'created')
