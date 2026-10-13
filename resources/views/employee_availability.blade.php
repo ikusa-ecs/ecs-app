@@ -154,6 +154,10 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.18);
     }
     .ea-float-save:hover { background: var(--brand-fill-hover); }
+    /* 保存できていないとき（2026-10-13 都度保存）。赤く点滅＝気づかずに閉じないように。 */
+    .ea-float-save.ng { background: #b91c1c; animation: eaSaveBlink 1s infinite; }
+    @keyframes eaSaveBlink { 50% { opacity: .55; } }
+    .ea-saved.ng { color: #b91c1c; }
 
     /* 全社員一覧テーブル */
     /* 日付の見出しを固定（2026-10-02 baba要望）。下へスクロールしても日付の行が上に残る。
@@ -406,7 +410,8 @@
         社員は普段は平日勤務で、イベントは主に<b>土日・祝日・長期休暇（お盆・正月）</b>に入るため、その日を
         <span style="color:#15803d;font-weight:700;">〇＝出勤可</span>／<span style="color:#b91c1c;font-weight:700;">×＝不可</span>／<span style="color:#b45309;font-weight:700;">△＝条件つき・未定</span>
         で入力します。平日は「希望休（休みたい日）」を登録できます。<br>
-        入力して<b>「保存」</b>を押すと内容は保存され、次に開いたときも同じ内容が表示されます。
+        入力した内容は<b>押したその場で自動で保存</b>され、次に開いたときも同じ内容が表示されます（保存ボタンを押す必要はありません）。
+        右下が<b style="color:#b91c1c;">赤い「⚠ 保存できていません」</b>になったときだけ、押して保存し直してください。
       </div>
 
       <!-- タブ -->
@@ -455,14 +460,15 @@
               <textarea id="memo" style="min-height:90px;" placeholder="例：今月は3件くらい参加したい／運動会系をやりたい／8/12は午後だけ可／お盆は実家のため要相談 など"></textarea>
             </div>
             <div class="ea-save">
-              <button onclick="saveMine()">この月の内容を保存</button>
+              <button onclick="saveMine()">いま保存する</button>
               <span class="ea-saved" id="savedMsg">✓ 保存しました</span>
+              <div class="hint" style="font-size:12px; color:var(--muted); margin-top:4px;">※ 自動で保存されます（備考は打ち終わって少ししたら保存）。</div>
             </div>
           </div>
         </div>
 
         <!-- 常に見える保存ボタン（右下・下までスクロール不要） -->
-        <button class="ea-float-save" id="floatSave" onclick="saveMine()">💾 この月の内容を保存</button>
+        <button class="ea-float-save" id="floatSave" onclick="saveMine()">💾 いま保存する</button>
       </div>
 
       <!-- その日のメモを書く小窓（✎ を押すと開く） -->
@@ -480,7 +486,7 @@
             <button class="ok" onclick="applyDayNote()">この日に入れる</button>
           </div>
           <p class="dn-sub" style="margin:10px 0 0;">
-            ※ 入れたあと、下の「この月の内容を保存」を押すと保存されます。
+            ※ 「この日に入れる」を押すと自動で保存されます。
           </p>
         </div>
       </div>
@@ -709,6 +715,7 @@
           if (next === undefined) delete myState[k]; else myState[k] = next;
           applyEvent(cell, myState[k]);
           applyExtras(cell, y, m, d);   // 〇に戻したら注意の印も出し直す
+          autoSave(y, m);
         });
       } else {
         applyWeekday(cell, myState[k]);
@@ -716,6 +723,7 @@
           if (myState[k] === 'off') delete myState[k]; else myState[k] = 'off';
           applyWeekday(cell, myState[k]);
           applyExtras(cell, y, m, d);
+          autoSave(y, m);
         });
       }
       // ✎ はマスのクリック（〇×△の切替）と別扱いにする。
@@ -729,7 +737,6 @@
     // 備考をこの月の保存値に
     const f = myFields[monKey(y,m)] || {};
     document.getElementById('memo').value = f.memo || '';
-    document.getElementById('savedMsg').style.display = 'none';
   }
   function applyEvent(cell, v){
     cell.classList.remove('v-ok','v-ng','v-maybe','v-need');
@@ -825,57 +832,142 @@
     const y = cursor.getFullYear(), m = cursor.getMonth()+1;
     myFields[monKey(y,m)] = { memo: document.getElementById('memo').value };
     renderCalendar();
+    autoSave(y, m);
   }
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeDayNote(); });
 
-  function saveMine(){
-    const y = cursor.getFullYear(), m = cursor.getMonth()+1;
-    const memo = document.getElementById('memo').value;
-    myFields[monKey(y,m)] = { memo: memo };
-    // モック：localStorage にも保存（端末内のみ・DB保存できない場合の保険）
+  // ===== 都度保存（2026-10-13 baba要望）=====
+  // ⚠ もともとは「この月の内容を保存」を押すまで何も保存していなかったため、
+  //   **押し忘れて閉じ、入れた〇×△が消えた**という社員がいた（D決め画面と同じ事故・2026-09-02）。
+  //   そこで〇×△・希望休・その日のメモ・備考を変えたら、少し待ってから**その月ぶんまるごと**送る。
+  //   丸ごとなので、通信が前後しても最後に送ったものが正しく残る（1件ずつ順に送る）。
+  // ⚠ 失敗をだまって流すと結局「消えた」になる。失敗したら右下のボタンを赤く点滅させて
+  //   「保存し直す」にし、送れていないまま閉じようとしたら引き止める（D決め画面と同じ4点）。
+  const SAVE = {
+    waiting: new Map(),   // "Y-M" => true（まだ送れていない月）
+    timer: null,
+    busy: false,
+    stopped: false,       // 失敗したら止める（同じ失敗を延々くり返さないため）
+  };
+
+  /** 変えたら呼ぶ。少し待ってから送る（〇×△を続けて押したときに毎回送らないため）。 */
+  function autoSave(y, m, wait){
+    // 打ちかけの備考も、いま開いている月ぶんは控えておく（送る中身は myFields から作る）。
+    const cy = cursor.getFullYear(), cm = cursor.getMonth()+1;
+    myFields[monKey(cy,cm)] = { memo: document.getElementById('memo').value };
+    // 端末内にも控える（見本データのとき＝DBに社員が居ないときの保存先）。
     try { localStorage.setItem('ecs_emp_avail', JSON.stringify({ state: myState, fields: myFields, notes: myNotes })); } catch(e){}
+    if (!ME) { setSaveState('ok', '✓ 保存しました（この端末）'); return; }
 
+    SAVE.waiting.set(monKey(y,m), true);
+    setSaveState('wait', '保存中…');
+    clearTimeout(SAVE.timer);
+    SAVE.timer = setTimeout(function(){ SAVE.timer = null; SAVE.stopped = false; pumpSave(); }, wait == null ? 600 : wait);
+  }
+
+  /** 右下のボタンと「保存しました」の表示を、いまの状態に合わせる。 */
+  function setSaveState(kind, text){
     const msg = document.getElementById('savedMsg');
-
-    // DBに社員が居る＝本物の保存先がある場合は、この月の入力をサーバへ保存する。
-    if (ME){
-      // この月（Y-M）に属する state だけ抜き出して送る。
-      const monthState = {};
-      const prefix = y + '-' + m + '-';
-      for (const k in myState){ if (k.indexOf(prefix) === 0) monthState[k] = myState[k]; }
-      // その日のメモも同じ月ぶんだけ送る。
-      // ⚠ その月に一度でも書いた日は「空文字」でも送る＝消したことをサーバに伝えるため
-      //   （送らないと「変更なし」と見なされて、消したはずのメモが残る）。
-      const monthNotes = {};
-      const days = new Date(y, m, 0).getDate();
-      for (let d=1; d<=days; d++){
-        const k = keyOf(y,m,d);
-        if (k in myNotes) monthNotes[k] = myNotes[k];
-        else if (k in savedNotes) monthNotes[k] = '';   // 消された日
-      }
-      const period = y + '-' + String(m).padStart(2,'0'); // 例 2026-07
-      fetch(window.ECS_SAVE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept':'application/json' },
-        body: JSON.stringify({ employee_id: ME.id, period: period, state: monthState, memo: memo, day_notes: monthNotes })
-      })
-      .then(r => r.json())
-      .then(res => {
-        const ok = !!(res && res.ok);
-        // 保存できたら「保存済みのメモ」の控えを取り直す（次に消したときも正しく伝わるように）。
-        if (ok) savedNotes = Object.assign({}, myNotes);
-        msg.textContent = ok ? '✓ 保存しました' : '保存に失敗しました';
-        msg.style.display = 'inline';
-        flashFloat(ok);
-      })
-      .catch(() => { msg.textContent = '保存に失敗しました（通信エラー）'; msg.style.display = 'inline'; flashFloat(false); });
-    } else {
-      // モック（DBに社員が無い）：従来どおり端末内保存のみ。
-      msg.textContent = '✓ 保存しました';
+    const fb = document.getElementById('floatSave');
+    if (msg){
+      msg.textContent = text;
       msg.style.display = 'inline';
-      flashFloat(true);
+      msg.classList.toggle('ng', kind === 'ng');
+    }
+    if (fb){
+      fb.classList.toggle('ng', kind === 'ng');
+      fb.textContent = kind === 'ng' ? '⚠ 保存できていません（押して保存し直す）'
+        : kind === 'wait' ? '保存中…'
+        : kind === 'ok' ? '✓ 保存しました'
+        : '💾 いま保存する';
     }
   }
+
+  /** 1か月ぶんの送る中身。 */
+  function monthPayload(y, m){
+    // この月（Y-M）に属する state だけ抜き出して送る。
+    const monthState = {};
+    const prefix = y + '-' + m + '-';
+    for (const k in myState){ if (k.indexOf(prefix) === 0) monthState[k] = myState[k]; }
+    // その日のメモも同じ月ぶんだけ送る。
+    // ⚠ その月に一度でも書いた日は「空文字」でも送る＝消したことをサーバに伝えるため
+    //   （送らないと「変更なし」と見なされて、消したはずのメモが残る）。
+    const monthNotes = {};
+    const days = new Date(y, m, 0).getDate();
+    for (let d=1; d<=days; d++){
+      const k = keyOf(y,m,d);
+      if (k in myNotes) monthNotes[k] = myNotes[k];
+      else if (k in savedNotes) monthNotes[k] = '';   // 消された日
+    }
+    const f = myFields[monKey(y,m)] || {};
+    return {
+      employee_id: ME.id,
+      period: y + '-' + String(m).padStart(2,'0'), // 例 2026-07
+      state: monthState, memo: f.memo || '', day_notes: monthNotes,
+    };
+  }
+
+  function pumpSave(){
+    if (SAVE.busy || SAVE.stopped) return;
+    const next = SAVE.waiting.keys().next();
+    if (next.done) return;
+    const ym = next.value;
+    SAVE.waiting.delete(ym);
+    const parts = ym.split('-');
+    const y = Number(parts[0]), m = Number(parts[1]);
+    // ⚠ 送る時点のメモを控えておく（送っている間に書き足したぶんを「保存済み」にしないため）。
+    const sentNotes = Object.assign({}, myNotes);
+
+    SAVE.busy = true;
+    setSaveState('wait', '保存中…');
+    fetch(window.ECS_SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept':'application/json' },
+      body: JSON.stringify(monthPayload(y, m))
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('通信エラー ' + r.status)))
+      .then(res => {
+        if (!res || !res.ok) throw new Error((res && res.message) || '保存できませんでした');
+        SAVE.busy = false;
+        // 保存できたら「保存済みのメモ」の控えを取り直す（次に消したときも正しく伝わるように）。
+        savedNotes = sentNotes;
+        if (SAVE.waiting.size === 0 && !SAVE.timer) setSaveState('ok', '✓ 保存しました');
+        pumpSave();
+      })
+      .catch(e => {
+        SAVE.busy = false;
+        SAVE.stopped = true;
+        SAVE.waiting.set(ym, true);   // 送れなかった月は残す（保存し直すで再送）
+        setSaveState('ng', '⚠ 保存できていません');
+        alert('出勤可能日を保存できませんでした（' + e.message + '）。\n\n' +
+              '右下の「保存し直す」を押してください。\n' +
+              'それでも直らないときは、内容を控えてから画面を開き直してください。');
+      });
+  }
+
+  /** 右下・下のボタン＝いま開いている月をすぐ送る（失敗したときは「保存し直す」）。 */
+  function saveMine(){
+    const y = cursor.getFullYear(), m = cursor.getMonth()+1;
+    autoSave(y, m, 0);
+  }
+
+  // 備考は打つたびに送らず、手が止まったら送る（1.5秒）。欄を離れたらすぐ送る。
+  (function(){
+    const memoEl = document.getElementById('memo');
+    if (!memoEl) return;
+    memoEl.addEventListener('input', function(){ autoSave(cursor.getFullYear(), cursor.getMonth()+1, 1500); });
+    memoEl.addEventListener('blur', function(){
+      if (SAVE.timer) saveMine();
+    });
+  })();
+
+  // ⚠ 送れていないものが残ったまま閉じられると、また「消えた」になる。ブラウザに引き止めてもらう。
+  window.addEventListener('beforeunload', function(ev){
+    if (SAVE.waiting.size > 0 || SAVE.busy || SAVE.timer) {
+      ev.preventDefault();
+      ev.returnValue = '';
+    }
+  });
 
   // 保存済みデータの読み込み（モック用）。DBに自分のデータがある場合はDBを優先し、端末内データでは上書きしない。
   (function loadSaved(){
@@ -1180,12 +1272,6 @@
   }
 
   // 浮く保存ボタンに保存結果を一瞬だけ表示（下までスクロールしなくても分かるように）
-  function flashFloat(ok){
-    const fb = document.getElementById('floatSave');
-    if (!fb) return;
-    fb.textContent = ok ? '✓ 保存しました' : '保存に失敗しました';
-    setTimeout(()=>{ fb.textContent = '💾 この月の内容を保存'; }, 1800);
-  }
   function moveMonth(diff){
     cursor = new Date(cursor.getFullYear(), cursor.getMonth()+diff, 1);
     renderCalendar();
