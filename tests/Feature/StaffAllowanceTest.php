@@ -53,7 +53,15 @@ class StaffAllowanceTest extends TestCase
             ->assertSee('スライド手当：10/12(2回)')
             ->assertSee('講師次郎')                                  // 手当だけの人も出る
             ->assertSee('事前レクチャー手当：10/10（本能寺のレクチャー）')
-            ->assertSee('資料印刷：10/11');
+            ->assertSee('資料印刷：10/11')
+            ->assertDontSee('✍ 手当の記録（10月）');   // 手当の記録はタブを切り替えたときだけ（2026-10-13）
+
+        // 「✍ 手当の記録」のタブ＝入力欄と一覧。月の移動でもタブのまま。
+        $this->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk()
+            ->assertSee('✍ 手当の記録（10月）')
+            ->assertSee('本能寺のレクチャー')
+            ->assertSee('ym=2026-11&amp;tab=allowances', false)
+            ->assertDontSee('📁 請求書PDFの置き場所');
 
         // 消せる。
         $id = StaffAllowance::where('kind', '運転手当')->value('id');

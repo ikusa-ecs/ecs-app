@@ -38,6 +38,11 @@
   .si-guide { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--ink); }
   .si-guide summary { cursor: pointer; font-weight: 700; }
   .si-guide ul { margin: 6px 0 0; padding-left: 1.2em; line-height: 1.8; }
+  /* タブ（2026-10-13）。表示する拠点の下で「請求書チェック／手当の記録」を切り替える。 */
+  .si-tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin: 0 0 12px; flex-wrap: wrap; }
+  .si-tabs a { text-decoration: none; color: var(--muted); font-weight: 700; font-size: 13.5px; padding: 8px 14px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -2px; }
+  .si-tabs a.on { color: var(--ink); background: var(--panel); border-color: var(--line); border-bottom: 2px solid var(--panel); }
+  .si-tab-n { font-size: 11px; font-weight: 700; margin-left: 6px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); }
   .si-allow-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .si-allow-form select, .si-allow-form input { padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-family: inherit; font-size: 12.5px; }
   .si-sub { font-size: 11.5px; color: var(--muted); line-height: 1.6; padding-left: 1em; display: flex; flex-wrap: wrap; gap: 4px 12px; }
@@ -54,11 +59,6 @@
 
 @section('content')
 
-<p class="si-intro">
-  月を選ぶと、その月にアサイン（キャンセル以外）があるスタッフが並びます。スタッフから請求書が届いたら<b>📨</b>、中身を明細と見比べて合っていたら<b>✅</b>にチェックしてください。<b>押した瞬間に保存</b>されます（誰がいつ付けたかも残ります）。<br>
-  名前の行の「明細」を開くと、その人の日付・案件・役割が並びます。※ アサイン表の取込で名簿と名前が合わなかった人は、ECSにアサインが入っていないのでここにも出ません。
-</p>
-
 @if (session('ok'))<div class="si-guide" style="border-color:var(--ok-line, #86efac);">✓ {{ session('ok') }}</div>@endif
 @if ($errors->any())
   <div class="si-guide si-ng" style="font-size:12.5px;">
@@ -70,6 +70,32 @@
     @endforeach
   </div>
 @endif
+
+@include('partials.office_switch')
+
+{{-- タブ（2026-10-13 baba「手当の記録は表示する拠点の下にページを切り替えられる感じで」）。
+     どちらのタブかはURLの ?tab= で覚える＝月を移っても・手当を入れたあとでも同じタブのまま。 --}}
+<div class="si-tabs">
+  <a class="{{ $tab === 'check' ? 'on' : '' }}" href="{{ $tabUrls['check'] }}">🧾 請求書チェック</a>
+  <a class="{{ $tab === 'allowances' ? 'on' : '' }}" href="{{ $tabUrls['allowances'] }}">✍ 手当の記録<span class="si-tab-n">{{ count($allowances) }}</span></a>
+</div>
+
+<div class="si-bar">
+  <a class="nav" href="{{ $prevUrl }}">‹ 前の月</a>
+  <span class="ym">{{ $month->format('Y年n月') }}</span>
+  <a class="nav" href="{{ $nextUrl }}">次の月 ›</a>
+  @if ($tab === 'check')
+    <span class="cnt">{{ $counts['all'] }}人／📨 {{ $counts['received'] }}人／✅ {{ $counts['checked'] }}人</span>
+    <span class="sp"></span>
+    <label><input type="checkbox" id="siOnlyOpen" onchange="siFilter()"> ✅がまだの人だけ</label>
+  @endif
+</div>
+
+@if ($tab === 'check')
+<p class="si-intro">
+  月を選ぶと、その月にアサイン（キャンセル以外）があるスタッフが並びます。スタッフから請求書が届いたら<b>📨</b>、中身を明細と見比べて合っていたら<b>✅</b>にチェックしてください。<b>押した瞬間に保存</b>されます（誰がいつ付けたかも残ります）。<br>
+  名前の行の「明細」を開くと、その人の日付・案件・役割が並びます。※ アサイン表の取込で名簿と名前が合わなかった人は、ECSにアサインが入っていないのでここにも出ません。
+</p>
 
 {{-- 請求書PDFの置き場所（2026-10-13 baba「Googleフォームで送ってもらっているPDFの格納先URLを置きたい」）。 --}}
 <div class="si-guide" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -107,29 +133,25 @@
   </ul>
 </details>
 
-@include('partials.office_switch')
-
-<div class="si-bar">
-  <a class="nav" href="{{ $prevUrl }}">‹ 前の月</a>
-  <span class="ym">{{ $month->format('Y年n月') }}</span>
-  <a class="nav" href="{{ $nextUrl }}">次の月 ›</a>
-  <span class="cnt">{{ $counts['all'] }}人／📨 {{ $counts['received'] }}人／✅ {{ $counts['checked'] }}人</span>
-  <span class="sp"></span>
-  <label><input type="checkbox" id="siOnlyOpen" onchange="siFilter()"> ✅がまだの人だけ</label>
-</div>
-
 @if (! $list)
   <div class="panel"><p class="si-intro" style="margin:0;">この月にアサインのあるスタッフはいません。</p></div>
 @else
 <table class="si-table">
   <tr>
-    <th>スタッフ</th>
-    <th class="hide-sp">件数</th>
+    {{-- チェック欄は名前の前（2026-10-13 baba「請求書とチェック済みのチェックボックスは名前の前に」）。 --}}
     <th style="text-align:center;">📨 請求書</th>
     <th style="text-align:center;">✅ チェック済</th>
+    <th>スタッフ</th>
+    <th class="hide-sp">件数</th>
   </tr>
   @foreach ($list as $r)
     <tr class="si-row {{ $r['checked'] ? 'done' : '' }}" data-id="{{ $r['id'] }}">
+      @foreach (['received' => '請求書が届いた', 'checked' => '明細と見比べて合っていた'] as $field => $title)
+        <td class="box">
+          <input type="checkbox" title="{{ $title }}" data-field="{{ $field }}" @checked($r[$field]) onchange="siMark(this)">
+          <span class="si-who">{{ $r[$field] ? $r[$field]['at'].' '.$r[$field]['by'] : '' }}</span>
+        </td>
+      @endforeach
       <td>
         <span class="si-name">{{ $r['name'] }}</span>
         @if ($r['office'] !== '')<span class="si-who" style="display:inline; margin-left:6px;">{{ $r['office'] }}</span>@endif
@@ -173,17 +195,13 @@
         </details>
       </td>
       <td class="num hide-sp">{{ count($r['cases']) }}件<span class="si-who">うち確定 {{ $r['confirmed'] }}</span></td>
-      @foreach (['received' => '請求書が届いた', 'checked' => '明細と見比べて合っていた'] as $field => $title)
-        <td class="box">
-          <input type="checkbox" title="{{ $title }}" data-field="{{ $field }}" @checked($r[$field]) onchange="siMark(this)">
-          <span class="si-who">{{ $r[$field] ? $r[$field]['at'].' '.$r[$field]['by'] : '' }}</span>
-        </td>
-      @endforeach
     </tr>
   @endforeach
 </table>
 @endif
+@endif {{-- /請求書チェックのタブ --}}
 
+@if ($tab === 'allowances')
 {{-- 手当の記録（2026-10-13 baba「運転手当・スライド手当・事前レクチャー手当を社員に追加してもらいたい」）。
      入れたものは各スタッフの「🧾 請求書の目安」に足される。マイページの収支入力からも入れられる（保存先は同じ）。
      前泊・ロング・MC・前日設営・リハはアサインから自動で数えるので、ここでは選べない（二重に数えないため）。 --}}
@@ -262,6 +280,7 @@
   }
   alFillCases(); alKindChanged();
 </script>
+@endif {{-- /手当の記録のタブ --}}
 
 <script>
   // 押した瞬間に保存（2026-10-13）。⚠ 失敗をだまって流さない＝チェックを元に戻して赤字で知らせる。
