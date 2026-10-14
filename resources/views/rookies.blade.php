@@ -347,7 +347,24 @@
        新人×その月の日付。中身はJS（rkDist）が、入っている案件と下の案の表から作る＝新人を替えるとすぐ動く。 --}}
   @if ($rookies)
     <div class="rk-small" style="font-weight:700; margin:8px 0 4px;">🗓 日付で見る（{{ $month->format('n月') }}）　<span style="font-weight:400;">■D／■FC・そのほか（入っている）／□案　前半＝1〜15日・後半＝16日〜</span></div>
-    <div class="rk-wrap" id="rkDist" style="margin-bottom:12px;"></div>
+    <div class="rk-wrap" id="rkDist" style="margin-bottom:8px;"></div>
+  @endif
+  {{-- 案に無い案件にも手で入れる（2026-10-14 baba「案の人や案件を変えられない」）。
+       日付で見るのすぐ下（baba「下のほうにあると見にくい」＝偏りを見ながらそのまま入れられるように）。 --}}
+  @if ($rookies && $openCases)
+    <div class="rk-bar" style="margin-bottom:14px; padding-bottom:10px; border-bottom:1px dashed var(--line);">
+      <b style="font-size:12.5px;">＋ 案に無い案件に入れる：</b>
+      <select class="rk-in" id="rkAddWho" onchange="rkAddCheck()">
+        @foreach ($rookies as $r)<option value="{{ $r['id'] }}">{{ $r['name'] }}</option>@endforeach
+      </select>
+      <select class="rk-in" id="rkAddCase" onchange="rkAddCheck()" style="max-width:420px;">
+        @foreach ($openCases as $c)
+          <option value="{{ $c['projectId'] }}" data-date="{{ $c['date'] }}">{{ \Illuminate\Support\Carbon::parse($c['date'])->format('n/j') }}{{ $c['dayType'] !== '本番' ? '（'.$c['dayType'].'）' : '' }} {{ $c['name'] }}{{ $c['client'] !== '' ? '／'.$c['client'] : '' }}（空き{{ $c['room'] }}）</option>
+        @endforeach
+      </select>
+      <button class="rk-btn main" type="button" onclick="rkAddOne()">入れる</button>
+      <span class="rk-small rk-warn" id="rkAddWarn"></span><span class="rk-small" id="rkAddDone"></span>
+    </div>
   @endif
   <div class="rk-wrap">
   <table class="rk">
@@ -384,22 +401,6 @@
     <div class="rk-bar" style="margin-top:10px;">
       <button class="rk-btn main" type="button" onclick="rkAssign(Array.from(document.querySelectorAll('tr.rk-pick')).filter(function (tr) { return tr.querySelector('.rk-pick-cb').checked; }))">チェックしたものを入れる</button>
       <span class="rk-small">FC・<b>仮</b>で入ります（確定は日別ボードやアサイン画面で）。入れたあと、この表を作り直します。</span>
-    </div>
-  @endif
-  {{-- 案に無い案件にも手で入れる（2026-10-14 baba「案の人や案件を変えられない」）。 --}}
-  @if ($rookies && $openCases)
-    <div class="rk-bar" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);">
-      <b style="font-size:12.5px;">＋ 案に無い案件に入れる：</b>
-      <select class="rk-in" id="rkAddWho" onchange="rkAddCheck()">
-        @foreach ($rookies as $r)<option value="{{ $r['id'] }}">{{ $r['name'] }}</option>@endforeach
-      </select>
-      <select class="rk-in" id="rkAddCase" onchange="rkAddCheck()" style="max-width:420px;">
-        @foreach ($openCases as $c)
-          <option value="{{ $c['projectId'] }}" data-date="{{ $c['date'] }}">{{ \Illuminate\Support\Carbon::parse($c['date'])->format('n/j') }}{{ $c['dayType'] !== '本番' ? '（'.$c['dayType'].'）' : '' }} {{ $c['name'] }}{{ $c['client'] !== '' ? '／'.$c['client'] : '' }}（空き{{ $c['room'] }}）</option>
-        @endforeach
-      </select>
-      <button class="rk-btn main" type="button" onclick="rkAddOne()">入れる</button>
-      <span class="rk-small rk-warn" id="rkAddWarn"></span><span class="rk-small" id="rkAddDone"></span>
     </div>
   @endif
 </div>
