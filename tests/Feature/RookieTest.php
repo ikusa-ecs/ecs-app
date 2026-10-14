@@ -245,7 +245,15 @@ class RookieTest extends TestCase
         // 画面に「ぜんぶ入れたら合計＋何件」が出る（2026-10-13 baba）。
         $this->actingAsPerson($ojt)->get('/rookies')->assertOk()
             ->assertSee('この案をぜんぶ入れたら')
-            ->assertSee('合計');
+            ->assertSee('合計')
+            // 案の新人を替える・外す・案に無い案件に入れる・日付で見る（2026-10-14 baba「案の人や案件を変えられない」）。
+            ->assertSee('onchange="rkSwap(this)"', false)->assertSee('>外す</button>', false)
+            ->assertSee('id="rkAddCase"', false)->assertSee('id="rkDist"', false)->assertSee('window.rkDist = function', false);
+        // 手で入れられる案件＝空きのある案件（満員の水合戦は出ない）。もう入っている日も渡る。
+        $plan = RookieFcPlan::build(Carbon::today(), '東京');
+        $this->assertNotContains($done->id, array_column($plan['openCases'], 'projectId'), '満員は出ない');
+        $this->assertCount(1, $plan['openCases']);
+        $this->assertSame([$d1->format('Y-m-d')], $plan['busy'][$rookie->id]);
 
         // Dで入ると「Dの一覧」とコピー文のDの欄に出る。
         Assignment::where('project_id', $done->id)->where('role', 'FC')->delete();

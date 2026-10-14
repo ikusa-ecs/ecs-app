@@ -34,6 +34,8 @@ class RookieController extends Controller
             'office' => $office,
             'rookies' => $plan['rookies'],
             'picks' => $plan['picks'],
+            'openCases' => $plan['openCases'],
+            'busy' => $plan['busy'],
             // 新人がDで入っている案件を日付順に（2026-10-13 baba「ディレクターの一覧を見たい」）。
             'dRows' => collect($plan['rookies'])
                 ->flatMap(fn ($r) => collect($r['dCases'])->map(fn ($c) => $c + ['rookie' => $r['name']]))

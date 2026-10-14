@@ -38,6 +38,15 @@
   .rk-toc a:hover { border-color: var(--brand); }
   .rk-toc .sp { flex: 1; }
   .rk-card { scroll-margin-top: 64px; }
+  /* 日付で見る（2026-10-14）。1マス＝1日。 */
+  table.rk-dist { border-collapse: collapse; font-size: 11px; }
+  table.rk-dist th, table.rk-dist td { border: 1px solid var(--line); padding: 2px 3px; text-align: center; min-width: 20px; white-space: nowrap; }
+  table.rk-dist th.nm, table.rk-dist td.nm { text-align: left; min-width: 90px; position: sticky; left: 0; background: var(--panel); }
+  table.rk-dist .we { color: var(--warn); }
+  table.rk-dist td.half { border-left: 2px solid var(--muted); }
+  table.rk-dist .d { background: var(--brand-fill); color: #fff; font-weight: 700; border-radius: 3px; padding: 0 3px; }
+  table.rk-dist .f { background: var(--ok-soft); color: var(--ink); font-weight: 700; border-radius: 3px; padding: 0 3px; }
+  table.rk-dist .p { border: 1px dashed var(--brand); color: var(--brand); font-weight: 700; border-radius: 3px; padding: 0 3px; }
 </style>
 @endpush
 
@@ -277,6 +286,12 @@
     </table>
     </div>
   @endif
+  {{-- 日付で見る（2026-10-14 baba「この人が前半に多いから…後半に固まってるからチェンジ…が見られる一覧」）。
+       新人×その月の日付。中身はJS（rkDist）が、入っている案件と下の案の表から作る＝新人を替えるとすぐ動く。 --}}
+  @if ($rookies)
+    <div class="rk-small" style="font-weight:700; margin:8px 0 4px;">🗓 日付で見る（{{ $month->format('n月') }}）　<span style="font-weight:400;">■D／■FC・そのほか（入っている）／□案　前半＝1〜15日・後半＝16日〜</span></div>
+    <div class="rk-wrap" id="rkDist" style="margin-bottom:12px;"></div>
+  @endif
   <div class="rk-wrap">
   <table class="rk">
     <tr><th><input type="checkbox" onclick="rkCheckAll(this)" title="全部えらぶ"></th><th>日付</th><th>案件</th><th>必修</th><th>難易度</th><th>空き</th><th>新人</th><th>理由</th><th>ほかの候補</th><th></th></tr>
@@ -288,10 +303,20 @@
         <td>@if (! empty($p['mark']))<b class="{{ $p['mark'] === '必修' ? 'rk-short' : '' }}">{{ $p['mark'] }}</b>@if (! empty($p['first']))<div class="rk-small">初めて</div>@endif @endif</td>
         <td class="rk-num">{{ $p['difficulty'] ?? '—' }}</td>
         <td class="rk-num">{{ $p['room'] }}名</td>
-        <td><b>{{ $p['rookie'] }}</b></td>
+        {{-- 新人を替えられる（2026-10-14 baba「案の人や案件を変えられない」）。ほかの候補を上に出す。 --}}
+        <td>
+          <select class="rk-in rk-who" data-date="{{ $p['date'] }}" onchange="rkSwap(this)" title="別の新人に替える">
+            <option value="{{ $p['rookieId'] }}" selected>{{ $p['rookie'] }}（案）</option>
+            @foreach (collect($rookies)->sortBy(fn ($r) => in_array($r['name'], $p['others'], true) ? 0 : 1) as $r)
+              @if ($r['id'] !== $p['rookieId'])<option value="{{ $r['id'] }}">{{ $r['name'] }}{{ in_array($r['name'], $p['others'], true) ? '（ほかの候補）' : '' }}</option>@endif
+            @endforeach
+          </select>
+          <div class="rk-small rk-warn rk-who-warn"></div>
+        </td>
         <td class="rk-small">{{ $p['why'] }}</td>
         <td class="rk-small">{{ implode('、', $p['others']) }}</td>
-        <td><button class="rk-btn" type="button" onclick="rkAssign([this.closest('tr')])" title="この新人を、この案件にFC（仮）で入れます">入れる</button><span class="rk-small rk-done"></span></td>
+        <td style="white-space:nowrap;"><button class="rk-btn" type="button" onclick="rkAssign([this.closest('tr')])" title="この新人を、この案件にFC（仮）で入れます">入れる</button>
+          <button class="rk-btn" type="button" onclick="this.closest('tr').remove(); window.rkDist()" title="この案を表から外します（開き直すと案は作り直されます）">外す</button><span class="rk-small rk-done"></span></td>
       </tr>
     @empty
       <tr><td colspan="10" class="rk-small">案はありません（空きのある案件が無い、または新人がこの月の目標に届いています）。</td></tr>
@@ -302,6 +327,22 @@
     <div class="rk-bar" style="margin-top:10px;">
       <button class="rk-btn main" type="button" onclick="rkAssign(Array.from(document.querySelectorAll('tr.rk-pick')).filter(function (tr) { return tr.querySelector('.rk-pick-cb').checked; }))">チェックしたものを入れる</button>
       <span class="rk-small">FC・<b>仮</b>で入ります（確定は日別ボードやアサイン画面で）。入れたあと、この表を作り直します。</span>
+    </div>
+  @endif
+  {{-- 案に無い案件にも手で入れる（2026-10-14 baba「案の人や案件を変えられない」）。 --}}
+  @if ($rookies && $openCases)
+    <div class="rk-bar" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);">
+      <b style="font-size:12.5px;">＋ 案に無い案件に入れる：</b>
+      <select class="rk-in" id="rkAddWho" onchange="rkAddCheck()">
+        @foreach ($rookies as $r)<option value="{{ $r['id'] }}">{{ $r['name'] }}</option>@endforeach
+      </select>
+      <select class="rk-in" id="rkAddCase" onchange="rkAddCheck()" style="max-width:420px;">
+        @foreach ($openCases as $c)
+          <option value="{{ $c['projectId'] }}" data-date="{{ $c['date'] }}">{{ \Illuminate\Support\Carbon::parse($c['date'])->format('n/j') }}{{ $c['dayType'] !== '本番' ? '（'.$c['dayType'].'）' : '' }} {{ $c['name'] }}{{ $c['client'] !== '' ? '／'.$c['client'] : '' }}（空き{{ $c['room'] }}）</option>
+        @endforeach
+      </select>
+      <button class="rk-btn main" type="button" onclick="rkAddOne()">入れる</button>
+      <span class="rk-small rk-warn" id="rkAddWarn"></span><span class="rk-small" id="rkAddDone"></span>
     </div>
   @endif
 </div>
@@ -420,6 +461,90 @@
   function rkCheckAll(box) {
     document.querySelectorAll('.rk-pick-cb').forEach(function (cb) { cb.checked = box.checked; });
   }
+  // 新人ごとの、もう入っている日（2026-10-14）。案の新人を替えたとき・手で足すときに知らせる。
+  var RK_BUSY = @json((object) $busy);
+  var RK_NAMES = @json(collect($rookies)->pluck('name', 'id'));
+  function rkBusyOn(staff, date) { return (RK_BUSY[staff] || []).indexOf(date) !== -1; }
+
+  // 日付で見る（2026-10-14 baba「前半に多い・後半に固まってる、を見てチェンジしたい」）。
+  // 入っている案件（サーバー）＋下の案の表（いまの新人）から作る。新人を替えたり外したりしたら作り直す。
+  var RK_CASES = @json(collect($rookies)->mapWithKeys(fn ($r) => [$r['id'] => collect($r['cases'])->map(fn ($c) => ['date' => $c['date'], 'role' => $c['role'], 'name' => $c['name']])->values()]));
+  var RK_MONTH = '{{ $month->format('Y-m') }}';
+  window.rkDist = function () {
+    var box = document.getElementById('rkDist');
+    if (!box) return;
+    var y = +RK_MONTH.slice(0, 4), m = +RK_MONTH.slice(5, 7);
+    var last = new Date(y, m, 0).getDate();
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var esc = function (s) { return String(s).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); };
+    var wd = ['日', '月', '火', '水', '木', '金', '土'];
+    // 新人 → 日付 → [{k:'d'|'f'|'p', name}]
+    var cell = {};
+    var add = function (sid, date, k, name) {
+      if (date.slice(0, 7) !== RK_MONTH) return;
+      ((cell[sid] = cell[sid] || {})[date] = cell[sid][date] || []).push({ k: k, name: name });
+    };
+    Object.keys(RK_CASES).forEach(function (sid) {
+      (RK_CASES[sid] || []).forEach(function (c) { add(sid, c.date, c.role === 'D' ? 'd' : 'f', c.name + '（' + c.role + '）'); });
+    });
+    document.querySelectorAll('tr.rk-pick').forEach(function (tr) {
+      var who = tr.querySelector('.rk-who');
+      var link = tr.querySelector('a');
+      add(tr.dataset.staff, who ? who.dataset.date : '', 'p', (link ? link.textContent : '') + '（案）');
+    });
+    var head = '<tr><th class="nm">新人</th>';
+    for (var d = 1; d <= last; d++) {
+      var w = new Date(y, m - 1, d).getDay();
+      head += '<th class="' + (w === 0 || w === 6 ? 'we' : '') + (d === 16 ? ' half' : '') + '">' + d + '<br>' + wd[w] + '</th>';
+    }
+    head += '<th>前半</th><th>後半</th><th>計</th></tr>';
+    var body = '';
+    Object.keys(RK_NAMES).forEach(function (sid) {
+      var row = '<tr><td class="nm"><b>' + esc(RK_NAMES[sid]) + '</b></td>';
+      var first = 0, second = 0;
+      for (var d = 1; d <= last; d++) {
+        var items = ((cell[sid] || {})[RK_MONTH + '-' + pad(d)]) || [];
+        if (items.length) { if (d <= 15) first++; else second++; }
+        var mark = '';
+        if (items.length) {
+          var k = items.some(function (i) { return i.k === 'd'; }) ? 'd' : (items.some(function (i) { return i.k === 'f'; }) ? 'f' : 'p');
+          mark = '<span class="' + k + '" title="' + esc(items.map(function (i) { return i.name; }).join(' / ')) + '">'
+            + (k === 'd' ? 'D' : (k === 'f' ? 'F' : '案')) + (items.length > 1 ? items.length : '') + '</span>';
+        }
+        row += '<td' + (d === 16 ? ' class="half"' : '') + '>' + mark + '</td>';
+      }
+      body += row + '<td class="rk-num">' + first + '</td><td class="rk-num">' + second + '</td><td class="rk-num"><b>' + (first + second) + '</b></td></tr>';
+    });
+    box.innerHTML = '<table class="rk-dist">' + head + body + '</table>';
+  };
+  window.rkDist();
+
+  // 案の新人を替える（2026-10-14 baba「案の人や案件を変えられない」）。「入れる」はこの行の新人で入れる。
+  function rkSwap(sel) {
+    var tr = sel.closest('tr');
+    tr.dataset.staff = sel.value;
+    var warn = tr.querySelector('.rk-who-warn');
+    // ⚠ 同じ表で、替えた先の新人がもう同じ日に案で入っていないか（替えるとかぶることがある）。
+    var dup = Array.from(document.querySelectorAll('tr.rk-pick')).some(function (o) {
+      return o !== tr && o.dataset.staff === sel.value && o.querySelector('.rk-who').dataset.date === sel.dataset.date;
+    });
+    warn.textContent = rkBusyOn(sel.value, sel.dataset.date) ? '⚠ この日はもう別の案件に入っています'
+      : (dup ? '⚠ この日、ほかの案でも入っています' : '');
+    if (window.rkDist) window.rkDist();
+  }
+
+  // 案に無い案件に手で入れる。
+  function rkAddCheck() {
+    var who = document.getElementById('rkAddWho'), cs = document.getElementById('rkAddCase');
+    var date = cs.options[cs.selectedIndex].dataset.date;
+    document.getElementById('rkAddWarn').textContent = rkBusyOn(who.value, date) ? '⚠ この日はもう別の案件に入っています' : '';
+  }
+  function rkAddOne() {
+    var who = document.getElementById('rkAddWho'), cs = document.getElementById('rkAddCase');
+    var done = document.getElementById('rkAddDone');
+    rkAssign([{ dataset: { project: cs.value, staff: who.value }, querySelector: function () { return done; } }]);
+  }
+
   function rkAssign(rows) {
     if (!rows.length) { alert('入れる案件にチェックを付けてください。'); return; }
     if (!confirm(rows.length + '件を、FC（仮）で入れます。よろしいですか？')) return;

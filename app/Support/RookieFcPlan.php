@@ -165,7 +165,50 @@ final class RookieFcPlan
         unset($r);
 
         return ['rookies' => $out, 'picks' => $picks,
+            // 案に無い案件にも手で入れられるように（2026-10-14 baba「案の人や案件を変えられない」）。
+            'openCases' => self::openCases($month, $office, $contentNames),
+            // 新人ごとの、もう入っている日（案の新人を替えたとき・手で足すときに「その日は入っています」を出す）。
+            'busy' => collect($state)->map(fn ($s) => array_keys($s['busy']))->all(),
             'unlinked' => ContentDifficulty::whereNull('content_id')->count()];
+    }
+
+    /**
+     * 手で新人を足せる案件＝今日から月末・空きがある・ARENA場所貸しでない（案と同じ範囲）。
+     * 空き＝運営人数 −（入っている人＋派遣）。案を入れる前の数。
+     *
+     * @return list<array{projectId: string, date: string, name: string, client: string, dayType: string, room: int}>
+     */
+    public static function openCases(Carbon $month, ?string $office, array $names): array
+    {
+        $from = Carbon::today()->max($month)->format('Y-m-d');
+        $to = $month->copy()->endOfMonth()->format('Y-m-d').' 23:59:59';
+        $cases = OfficeScope::hideTakenOver(OfficeScope::applyToProjects(Project::query(), $office), $office, true)
+            ->notCancelled()->needsAssign()->whereNotNull('start_date')->whereNotIn('status', ['完了', '下書き'])
+            ->whereBetween('start_date', [$from, $to])->orderBy('start_date')->orderBy('start_time')->get()
+            ->reject(fn ($c) => self::isArenaRental($c, $names))->values();
+        if ($cases->isEmpty()) {
+            return [];
+        }
+        $assigned = Assignment::whereIn('project_id', $cases->pluck('id'))->where('status', '!=', 'キャンセル')->get()->groupBy('project_id');
+        $dispatch = DispatchRows::liveCountsFor($cases->pluck('id'));
+
+        $out = [];
+        foreach ($cases as $c) {
+            $room = RecruitStatus::need($c->required_count)
+                - (($assigned->get($c->id) ?? collect())->pluck('staff_id')->unique()->count() + ($dispatch[$c->id] ?? 0));
+            if ($room > 0) {
+                $out[] = [
+                    'projectId' => $c->id,
+                    'date' => $c->start_date->format('Y-m-d'),
+                    'name' => ProjectContentName::of($c, $names, (string) $c->project_name),
+                    'client' => (string) ($c->client ?? ''),
+                    'dayType' => (string) ($c->date_type ?? '本番'),
+                    'room' => $room,
+                ];
+            }
+        }
+
+        return $out;
     }
 
     /**
