@@ -58,7 +58,7 @@ class StaffAllowanceTest extends TestCase
             ->assertDontSee('✍ 手当の記録（10月）');   // 手当の記録はタブを切り替えたときだけ（2026-10-13）
 
         // 「✍ 手当の記録」のタブ＝入力欄と一覧。**はじめに開くのはこちら**（2026-10-13 baba）。月の移動でもタブのまま。
-        $this->get('/staff-invoice-check?ym=2026-10')->assertOk()
+        $this->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk()
             ->assertSee('✍ 手当の記録（10月）')
             ->assertSee('本能寺のレクチャー')
             ->assertSeeInOrder(['<th>日付</th>', '<th>案件</th>', '企業様名', '<th>スタッフ</th>', '手当・メモ', '金額', '入れた人'], false)   // 並び（2026-10-13 baba）
@@ -104,8 +104,8 @@ class StaffAllowanceTest extends TestCase
         Assignment::create(['project_id' => $reh->id, 'staff_id' => $b->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-10']);
 
         // 開くと自動で入る（何度開いても1回だけ）。
-        $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10')->assertOk();
-        $this->get('/staff-invoice-check?ym=2026-10')->assertOk()->assertSee('si-auto', false);
+        $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk();
+        $this->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk()->assertSee('si-auto', false);
         $this->assertSame(3, StaffAllowance::whereNotNull('auto_key')->count());
         $this->assertSame(2, StaffAllowance::where('kind', '前日設営手当')->count());
         $this->assertSame(1, StaffAllowance::where('kind', '事前リハーサル手当')->count());
@@ -113,7 +113,9 @@ class StaffAllowanceTest extends TestCase
         // 消したら隠れ、開き直しても入れ直さない。
         $rowA = StaffAllowance::where('staff_id', $a->id)->first();
         $this->post('/staff-allowances/'.$rowA->id.'/delete')->assertRedirect();
-        $this->get('/staff-invoice-check?ym=2026-10')->assertOk();
+        $this->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk();
+        // はじめに出るのは請求書チェック（2026-10-14 baba「請求書チェックを前に戻す」）。
+        $this->get('/staff-invoice-check?ym=2026-10')->assertOk()->assertSeeInOrder(['class="on"', '🧾 請求書チェック', '✍ 手当の記録'], false);
         $this->assertNotNull($rowA->fresh()->dismissed_at);
         $this->assertSame(3, StaffAllowance::count(), '消した印として残る＝入れ直さない');
 
@@ -166,7 +168,7 @@ class StaffAllowanceTest extends TestCase
         StaffAllowance::create(['staff_id' => $fc->id, 'project_id' => $p->id, 'date' => '2026-10-20', 'kind' => '事前リハーサル手当',
             'count' => 1, 'auto_key' => 'auto:'.$p->id.':'.$fc->id.':2026-10-20', 'created_by' => '自動（アサイン）']);
 
-        $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10')->assertOk();
+        $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10&tab=allowances')->assertOk();
         $this->assertSame(['ディレクター手当'], StaffAllowance::pluck('kind')->all(), 'Dの人だけD手当・FCの行は取り除く');
         $this->assertSame($s->id, StaffAllowance::value('staff_id'));
         $this->assertSame(5000, StaffAllowances::unit(StaffAllowance::first()));

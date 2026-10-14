@@ -99,8 +99,9 @@ class StaffInvoiceCheckController extends Controller
         usort($list, fn ($a, $b) => strcmp($a['kana'] ?: $a['name'], $b['kana'] ?: $b['name']));
 
         // タブ（手当の記録／請求書チェック・2026-10-13）。前の月・次の月は拠点とタブを持ち回る。
-        // ⚠ はじめに出すのは「手当の記録」（いろいろな社員が使うので・2026-10-13 baba）。請求書チェックは ?tab=check。
-        $tab = $request->query('tab') === 'check' ? 'check' : 'allowances';
+        // はじめに出すのは「請求書チェック」（2026-10-14 baba「手当は請求書担当の人が見ているので、請求書チェックを前に戻す」）。
+        // ⚠ 10/13〜10/14 は手当の記録が先だった。手当の記録は ?tab=allowances。
+        $tab = $request->query('tab') === 'allowances' ? 'allowances' : 'check';
         $officeQ = $request->filled('office') ? '&office='.urlencode((string) $request->query('office')) : '';
         $tabQ = '&tab='.$tab;
         $base = '/staff-invoice-check?ym=';
