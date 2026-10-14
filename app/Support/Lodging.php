@@ -37,6 +37,22 @@ final class Lodging
         return false;
     }
 
+    /** 「後泊がある」と数える言葉。「後泊あり」「前後泊あり」（2026-10-14・FBシート No.23）。 */
+    public const POST_STAY_WORDS = ['後泊'];
+
+    /** 後泊があるか。 */
+    public static function hasPostStay(?string $lodging): bool
+    {
+        $v = trim((string) $lodging);
+        foreach (self::POST_STAY_WORDS as $word) {
+            if ($v !== '' && str_contains($v, $word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** 画面に出す宿泊の文字。空なら「無」。 */
     public static function label(?string $lodging): string
     {

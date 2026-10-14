@@ -58,6 +58,9 @@ class MonthAutoAssign
     /** NGペアの判定（両方向・id で比べる）。正本＝App\Support\NgPairs。plan() のはじめに1回だけ読む。 */
     private ?NgPairs $ngPairs = null;
 
+    /** @var array<string, array<string, string>> 前泊の前日・後泊の翌日が×の人（StayDayCheck::map） */
+    private array $stayNg = [];
+
     /**
      * @param  array<int, string>  $skipDays      自動アサインしない日（'Y-m-d' の並び・2026-09-07 baba要望）
      * @param  array<int, string>  $skipProjects  自動アサインしない案件（案件IDの並び・2026-09-07 baba要望）
@@ -96,6 +99,8 @@ class MonthAutoAssign
         // ── 材料をまとめて引く（案件ごとに問い合わせない）──────────────
         $people = $this->candidatePeople();
         $this->ngPairs = NgPairs::load();
+        // 前泊の前日・後泊の翌日が×の人（2026-10-14・FBシート No.23）。正本＝App\Support\StayDayCheck。
+        $this->stayNg = StayDayCheck::map($projects, $people->keys()->all());
         $apps = Application::whereIn('project_id', $projects->pluck('id'))
             ->get(['project_id', 'staff_id'])
             ->groupBy('project_id')
@@ -584,7 +589,8 @@ class MonthAutoAssign
 
         return (new AssignmentScorer(
             $p, $p->start_date, $wish, $sameDay, $monthCount, $repeatIds, $contentNames, self::MONTH_CAP
-        ))->setProjectMembers(array_keys($memberOf[$p->id] ?? []), $this->ngPairs ?? NgPairs::load());
+        ))->setProjectMembers(array_keys($memberOf[$p->id] ?? []), $this->ngPairs ?? NgPairs::load())
+            ->setStayNg($this->stayNg[$p->id] ?? []);
     }
 
     /**

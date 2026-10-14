@@ -21,6 +21,7 @@ use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ProjectSeries;
+use App\Support\StayDayCheck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -152,10 +153,13 @@ class AssignmentController extends Controller
             ? Application::whereIn('project_id', $siblingIds)->pluck('staff_id')->unique()->all()
             : [];
 
+        // 前泊の前日・後泊の翌日が×の人（2026-10-14・FBシート No.23）。正本＝App\Support\StayDayCheck。
+        $stayNg = StayDayCheck::map([$project], Person::staff()->pluck('id')->all())[$project->id] ?? [];
+
         $scorer = (new AssignmentScorer(
             $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP,
             $seriesEntryIds
-        ))->setProjectMembers(array_keys($existing), $ngPairs);
+        ))->setProjectMembers(array_keys($existing), $ngPairs)->setStayNg($stayNg);
 
         // ── 候補スタッフを拠点で絞る（全拠点運用・2026-08-05 baba確定＝アサイン画面は第1弾）──
         // 管理者以上はスイッチで選んだ拠点（未選択＝全拠点）、一般社員は自拠点固定。null＝絞らない。

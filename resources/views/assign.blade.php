@@ -819,6 +819,9 @@
       // 必要ポジション（コンテンツ×規模）。⚠ 自動アサインがこれを見て枠を作る。
       //   詰め替えを忘れると、また「MCが2人」「謎解きなのに軍師」に戻る。
       template:(c.template || {}),
+      // 前泊の前日・後泊の翌日が×の人＝{本人ID: '前日10/24が×（前泊）'}（2026-10-14・FBシート No.23）。
+      // 希望者に札を出し、⚡自動アサインでは選ばない。
+      stayNg:(c.stayNg || {}),
       note:c.note,   // 案件の備考（見落とすと事故るのでカードに出す）
       // LINEグループを作るときの文章と準備チェック（2026-09-16）。
       // ⚠ ここで詰め替えを忘れると、「📱 LINE」のパネルは開くのに**枠の中が空**になる
@@ -1239,9 +1242,10 @@
   function autoWhyText(c, pool, why){
     const NL = String.fromCharCode(10);
     const lines = [];
-    const outCount = why.emp + why.member + why.busy + why.cap + why.noid;
+    const outCount = why.emp + why.member + why.busy + why.cap + why.noid + (why.stay || 0);
     if (outCount > 0) {
       const parts = [];
+      if (why.stay)   parts.push('前泊の前日・後泊の翌日が× ' + why.stay + '名');
       if (why.member) parts.push('すでにメンバー ' + why.member + '名');
       if (why.busy)   parts.push('同じ日に別の案件 ' + why.busy + '名');
       if (why.cap)    parts.push('今月の上限（' + MONTH_CAP + '件）' + why.cap + '名');
@@ -1309,7 +1313,7 @@
       //   「まだえらばれていないスタッフさんがいるのに、もうアサインできる人がいないになる」）。
       //   数えていないと、お知らせに書いてある理由（メンバー／同日かぶり／今月上限）と
       //   本当の理由（役割ができる登録がない）が食い違い、原因を探せない。
-      const why = { emp: 0, member: 0, busy: 0, cap: 0, noid: 0 };
+      const why = { emp: 0, member: 0, busy: 0, cap: 0, noid: 0, stay: 0 };
       const pool = dayPeople(c.off, dayCases)
         .filter(p => p.applied.includes(c.id) || p.cal)
         // ⚠ 社員は自動アサインで選ばない（2026-09-09 baba「日別ボードで自動アサインを押したら
@@ -1323,6 +1327,8 @@
           if (assignedIds.has(p.id) || already.has(p.name)) { why.member++; return false; }
           if (taken.has(p.name)) { why.busy++; return false; }
           if (monthCountOf(p.name, amap) >= MONTH_CAP) { why.cap++; return false; }
+          // 前泊の前日・後泊の翌日が×（2026-10-14・FBシート No.23）。候補には札つきで残し、自動では選ばない。
+          if ((c.stayNg || {})[p.id]) { why.stay++; return false; }
           return true;
         })
         .filter(p => { if (seenPick.has(p.id)) return false; seenPick.add(p.id); return true; });
@@ -2978,6 +2984,9 @@
       const where  = (!picked && busyWhere.get(p.name)) || null;
       const st = candStatus(p);
       const busyTag = where ? `<span class="cstat busy" title="${escHtml(busyTitle(p.name, where))}">⛔</span>` : '';
+      // 前泊の前日・後泊の翌日が×（2026-10-14・FBシート No.23）。候補には残す＝事情を聞いて頼むこともある。
+      const stayMsg = (c.stayNg || {})[p.id] || '';
+      const stayTag = stayMsg ? `<span class="cstat busy" title="${escHtml(stayMsg)}（⚡自動アサインでは選びません）">⚠ ${escHtml(stayMsg.replace(/（.*$/, ''))}</span>` : '';
       const statTag = picked ? '<span class="cstat done">✓ アサイン済み</span>' : st.tag;
       const rowCls  = picked ? 'picked' : (where ? 'busy' : st.cls);
       const addTitle = where ? busyTitle(p.name, where) + ' それでも入れるときは押してください。' : 'メンバーに入れる';
@@ -2985,7 +2994,7 @@
       // 本人が応募時に書いた一言。アサインの判断材料なので必ず見せる（2026-08-21 baba）。
       const cmt = (p.notes && p.notes[c.id]) ? p.notes[c.id] : '';
       const cmtHtml = cmt ? `<div class="cand-note" title="本人からの一言">💬 ${escHtml(cmt)}</div>` : '';
-      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${busyTag}${statTag}${addBtn}${cmtHtml}</div>`;
+      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${busyTag}${stayTag}${statTag}${addBtn}${cmtHtml}</div>`;
     }
 
     // ⚠ 社員は「基本イベントには出ない」ので、たたんでおく（2026-09-03 baba要望）。

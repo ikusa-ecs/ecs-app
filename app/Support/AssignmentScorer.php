@@ -49,6 +49,9 @@ class AssignmentScorer
     /** NGペアの判定（両方向・id で比べる）。正本＝App\Support\NgPairs。null＝判定しない。 */
     private ?NgPairs $ngPairs = null;
 
+    /** @var array<string, string> 前泊の前日・後泊の翌日が×の人（setStayNg） */
+    private array $stayNg = [];
+
     /**
      * @var array<int,string> 連日イベントの「ほかの日」にもエントリーしている staff_id
      *
@@ -105,6 +108,11 @@ class AssignmentScorer
         if ($avail === 'NG') {
             $blocked = true;
             $blockReason = 'この日は本人がNG';
+        }
+        // ①' 前泊の前日・後泊の翌日が×（2026-10-14・FBシート No.23）
+        if (isset($this->stayNg[$id])) {
+            $blocked = true;
+            $blockReason = $blockReason ?? $this->stayNg[$id];
         }
         // ② NGペアがこの案件にすでに入っている（同席させない）
         $ngHit = $this->ngConflict($p);
@@ -216,6 +224,17 @@ class AssignmentScorer
      *
      * @param  array<int,string>  $memberIds
      */
+    /**
+     * 前泊の前日・後泊の翌日が×の人（本人ID => 札の文字）。正本＝App\Support\StayDayCheck（2026-10-14・FBシート No.23）。
+     * 候補には残し、自動のおすすめからは外す。
+     */
+    public function setStayNg(array $stayNg): static
+    {
+        $this->stayNg = $stayNg;
+
+        return $this;
+    }
+
     public function setProjectMembers(array $memberIds, NgPairs $ngPairs): static
     {
         $this->projectMemberIds = array_values(array_map('strval', array_filter($memberIds)));

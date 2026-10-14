@@ -27,6 +27,7 @@ use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ShiftWish;
 use App\Support\ShareTags;
+use App\Support\StayDayCheck;
 use App\Support\RecruitStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -502,7 +503,10 @@ class AssignBoardController extends Controller
         $contentMaster = Content::pluck('content_name', 'id')->all();
         $validContentIds = array_keys($contentMaster);
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $sharesByProject, $office) {
+        // 前泊の前日・後泊の翌日が×の人（2026-10-14・FBシート No.23）。正本＝App\Support\StayDayCheck。
+        $stayNg = StayDayCheck::map($projects->map(fn ($pair) => $pair[0])->all());
+
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $sharesByProject, $office, $stayNg) {
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -677,6 +681,10 @@ class AssignBoardController extends Controller
                 'placeShort' => $p->location ?? '',
                 'meetPlace' => $p->assembly_type ?? '',
                 'tags' => $tags,
+                // 前泊の前日・後泊の翌日が×の人＝{本人ID: '前日10/24が×（前泊）'}。
+                // 希望者に札を出し、⚡自動アサインでは選ばない（2026-10-14・FBシート No.23）。
+                // ⚠ JSの詰め替え（cases.push）にも stayNg を足すこと（詰め替え漏れの事故が何度もある）。
+                'stayNg' => (object) ($stayNg[$p->id] ?? []),
                 'pos' => [],   // ポジション充足ランプは次段（まずメンバー実データを優先）。
                 // 必要ポジション（コンテンツ×規模）。⚠ 自動アサインがこれを見て枠を作る。
                 //   正本＝App\Support\PositionTemplate（アサイン画面・月まとめと同じもの）。
