@@ -62,6 +62,11 @@
 {{-- 目次（押すとそのブロックへ飛ぶ・縮めていたら開く）。中身は下の rkToc() が見出しから作る。 --}}
 <nav class="rk-toc" id="rkToc" aria-label="目次"></nav>
 
+{{-- OJT担当・チームリーダー欄の候補（全行で1つを使う）。 --}}
+<datalist id="rkEmpList">
+  @foreach ($employees as $e)<option value="{{ $e->name }}"></option>@endforeach
+</datalist>
+
 <div class="rk-card">
   <h3>🌱 新人の一覧（{{ $month->format('Y年n月') }}）</h3>
   <p class="sub">入社2年以内のイベプラ・セールスの社員と、手で入れた人が出ます。独り立ちしたら「卒業」を押してください（一覧から消えます・下で元に戻せます）。
@@ -75,15 +80,12 @@
         <td>
           @if ($canEdit)
             <form method="POST" action="/rookies/ojt">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
-              <select class="rk-in" name="ojt" onchange="rkRemember(); this.form.submit()" title="OJT担当">
-                <option value="">（OJT担当なし）</option>
-                @foreach ($employees as $e)<option value="{{ $e->id }}" @selected($e->id === $r['ojt'])>{{ $e->name }}</option>@endforeach
-              </select>
+              {{-- OJT担当・チームリーダーは名前を打つと候補が出る（2026-10-14 baba）。送るのは隠し欄のID＝名前は rkPickEmp() で引き当てる。 --}}
+              <input type="hidden" name="ojt" value="{{ $r['ojt'] }}">
+              <input class="rk-in rk-emp" type="text" list="rkEmpList" value="{{ optional($employees->firstWhere('id', $r['ojt']))->name }}" data-for="ojt" placeholder="OJT担当（名前を打つと候補）" title="OJT担当" autocomplete="off" style="width:150px;" onchange="rkPickEmp(this)">
               {{-- チームリーダー（2026-10-13 baba）。 --}}
-              <select class="rk-in" name="leader" onchange="rkRemember(); this.form.submit()" title="チームリーダー" style="margin-top:4px;">
-                <option value="">（チームリーダーなし）</option>
-                @foreach ($employees as $e)<option value="{{ $e->id }}" @selected($e->id === $r['leader'])>{{ $e->name }}</option>@endforeach
-              </select>
+              <input type="hidden" name="leader" value="{{ $r['leader'] }}">
+              <input class="rk-in rk-emp" type="text" list="rkEmpList" value="{{ optional($employees->firstWhere('id', $r['leader']))->name }}" data-for="leader" placeholder="チームリーダー（名前を打つと候補）" title="チームリーダー" autocomplete="off" style="margin-top:4px; width:150px;" onchange="rkPickEmp(this)">
               <input class="rk-in" type="text" name="note" value="{{ $r['note'] }}" maxlength="500" placeholder="メモ" style="margin-top:4px; width:150px;" onchange="rkRemember(); this.form.submit()">
             </form>
           @else
@@ -509,6 +511,30 @@
     mk('すべて縮める', true);
     mk('すべて開く', false);
   })();
+
+  // OJT担当・チームリーダー：打った名前を社員のIDに引き当てて保存する（2026-10-14 baba）。
+  // 空にしたら「なし」。名簿に無い名前なら保存せず元の名前に戻す。
+  var RK_EMP = @json($employees->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->values());
+  function rkPickEmp(input) {
+    var hidden = input.form.querySelector('input[type=hidden][name="' + input.dataset.for + '"]');
+    var name = input.value.replace(/[\s　]+/g, '');
+    var id = '';
+    if (name !== '') {
+      var hit = RK_EMP.filter(function (e) { return (e.name || '').replace(/[\s　]+/g, '') === name; })[0];
+      if (!hit) {
+        var cur = RK_EMP.filter(function (e) { return e.id === hidden.value; })[0];
+        input.value = cur ? cur.name : '';
+        alert('「' + name + '」は社員名簿に見つかりません。候補から選んでください。');
+        return;
+      }
+      id = hit.id;
+      input.value = hit.name;
+    }
+    if (id === hidden.value) return;
+    hidden.value = id;
+    rkRemember();
+    input.form.submit();
+  }
 
   function rkRemember() {
     try {
