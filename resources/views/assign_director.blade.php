@@ -368,6 +368,22 @@
     html[data-theme="dark"] .dcase.locked-chip.big { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
     html[data-theme="dark"] .dc-tip { background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
     html[data-theme="dark"] .cell-empty { color: var(--muted-dim); }
+    /* 日付で見る（2026-10-14）。イベプラ×その月の日付。 */
+    .dist-panel { margin-top: 14px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .dist-panel h3 { margin: 0 0 4px; font-size: 14px; }
+    .dist-wrap { overflow-x: auto; }
+    table.dist { border-collapse: collapse; font-size: 11px; }
+    table.dist th, table.dist td { border: 1px solid var(--line); padding: 2px 3px; text-align: center; min-width: 22px; white-space: nowrap; }
+    table.dist th.nm, table.dist td.nm { text-align: left; min-width: 80px; position: sticky; left: 0; background: var(--panel); }
+    table.dist .we { color: var(--warn); }
+    table.dist th.half, table.dist td.half { border-left: 2px solid var(--muted); }
+    table.dist th.today { background: var(--brand-fill); color: #fff; }
+    .dd-d, .dd-sd, .dd-f, .dd-o, .dd-off { display: inline-block; border-radius: 3px; padding: 0 3px; font-weight: 700; font-size: 10.5px; }
+    .dd-d { background: var(--brand-fill); color: #fff; }
+    .dd-sd { background: var(--brand-soft, var(--ok-soft)); color: var(--ink); border: 1px solid var(--brand); }
+    .dd-f { background: var(--ok-soft); color: var(--ink); }
+    .dd-o { background: var(--line); color: var(--ink); }
+    .dd-off { color: var(--muted); border: 1px dashed var(--line); font-weight: 400; }
     /* 担当バランス集計（右パネル） */
     html[data-theme="dark"] .agg-tbl tr.agg-total td { background: var(--surface-2); }
     html[data-theme="dark"] .agg-panel .live { color: var(--ok-ink); }
@@ -607,6 +623,15 @@
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
           </p>
         </div>
+      </div>
+
+      <!-- 日付で見る（2026-10-14 baba「新人ページの日付で見るがいい感じだからD決めでもイベプラだけで表で見たい」）。
+           イベプラの社員×いま見ている月の日付。D・SD・FC・ほかの役割・お休みを1マスずつ。中身は renderDist() が作る＝押して決めるとすぐ動く。
+           ⚠ この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
+      <div class="dist-panel">
+        <h3>🗓 日付で見る（イベプラ）</h3>
+        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　前半＝1〜15日・後半＝16日〜（数えるのはD・SD・FC・他）</p>
+        <div class="dist-wrap" id="distBox"></div>
       </div>
 @endverbatim
 @endsection
@@ -956,6 +981,67 @@
     }
 
     renderAgg();
+    renderDist();
+  }
+
+  // ===== 日付で見る（2026-10-14 baba「D決めでもイベプラだけで表で見たい」）=====
+  // イベプラの社員 × いま見ている月の日付。この画面の案件（D・SD・FC＝押すとその場で変わる）と、
+  // ほかの役割（EMP_BUSY＝OP・MCなど）、お休み（出勤可能日の×・希望休）を1マスずつ出す。
+  // ⚠ render() のたびに作り直す＝担当を決める・外す・月を移るとすぐ反映される。
+  function renderDist(){
+    const box = document.getElementById('distBox');
+    if (!box) return;
+    const y = TARGET.y, m = TARGET.m;
+    const last = new Date(y, m + 1, 0).getDate();
+    const wd = ['日','月','火','水','木','金','土'];
+    const people = EMP.filter(e => e.planner && sameOffice(e));
+    if (!people.length) { box.innerHTML = '<p class="agg-note">イベプラの社員がいません。</p>'; return; }
+    // 社員ID → 日(1〜) → [{k, label}]
+    const cell = {};
+    const add = (id, d, k, label) => { ((cell[id] = cell[id] || {})[d] = cell[id][d] || []).push({ k, label }); };
+    cases.forEach(c => {
+      const dt = addDays(c.off);
+      if (dt.getFullYear() !== y || dt.getMonth() !== m) return;
+      const d = dt.getDate();
+      const nm = c.content || c.name || '';
+      if (c.dirId) add(c.dirId, d, 'd', nm + '（D）');
+      (c.sdIds || []).forEach(id => add(id, d, 'sd', nm + '（SD）'));
+      (c.fcIds || []).forEach(id => add(id, d, 'f', nm + '（FC）'));
+    });
+    for (let d = 1; d <= last; d++) {
+      const busy = EMP_BUSY[realYmd(new Date(y, m, d))] || {};
+      Object.keys(busy).forEach(id => (busy[id] || []).forEach(r => add(id, d, 'o', r)));
+    }
+    const todayKey = realYmd(addDays(0));
+    let head = '<tr><th class="nm">社員</th>';
+    for (let d = 1; d <= last; d++) {
+      const dt = new Date(y, m, d), w = dt.getDay();
+      const cls = [(w === 0 || w === 6) ? 'we' : '', d === 16 ? 'half' : '', realYmd(dt) === todayKey ? 'today' : ''].join(' ');
+      head += `<th class="${cls}">${d}<br>${wd[w]}</th>`;
+    }
+    head += '<th>前半</th><th>後半</th><th>計</th><th>D</th></tr>';
+    let body = '';
+    people.forEach(e => {
+      let first = 0, second = 0, dN = 0;
+      let row = `<tr class="dep-${e.deptCode || 'plan'}"><td class="nm"><b class="e-nm">${escHtml(e.surname || e.name)}</b></td>`;
+      for (let d = 1; d <= last; d++) {
+        const items = ((cell[e.id] || {})[d]) || [];
+        let mark = '';
+        if (items.length) {
+          if (d <= 15) first += items.length; else second += items.length;
+          dN += items.filter(i => i.k === 'd').length;
+          const order = ['d', 'sd', 'f', 'o'];
+          const k = order.find(x => items.some(i => i.k === x));
+          const txt = { d: 'D', sd: 'SD', f: 'F', o: '他' }[k];
+          mark = `<span class="dd-${k}" title="${escAttrText(items.map(i => i.label).join(' / '))}">${txt}${items.length > 1 ? items.length : ''}</span>`;
+        } else if (isDayOff(e.id, y, m, d)) {
+          mark = '<span class="dd-off" title="出勤可能日が×・希望休">休</span>';
+        }
+        row += `<td${d === 16 ? ' class="half"' : ''}>${mark}</td>`;
+      }
+      body += row + `<td>${first}</td><td>${second}</td><td><b>${first + second}</b></td><td><b>${dN}</b></td></tr>`;
+    });
+    box.innerHTML = '<table class="dist">' + head + body + '</table>';
   }
 
   // ===== 担当ピッカー（社員名クリック→その日の案件を選んで D/SD 確定）=====
