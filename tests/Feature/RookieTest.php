@@ -248,7 +248,10 @@ class RookieTest extends TestCase
             ->assertSee('合計')
             // 案の新人を替える・外す・案に無い案件に入れる・日付で見る（2026-10-14 baba「案の人や案件を変えられない」）。
             ->assertSee('onchange="rkSwap(this)"', false)->assertSee('>外す</button>', false)
-            ->assertSee('id="rkAddCase"', false)->assertSee('id="rkDist"', false)->assertSee('window.rkDist = function', false);
+            ->assertSee('id="rkAddCase"', false)->assertSee('id="rkDist"', false)->assertSee('window.rkDist = function', false)
+            // タブ・新人ごとに見る（2026-10-14 baba「ページが長くて探しにくい」「新人ごとに見られない」）。
+            ->assertSee('id="rkTabs"', false)->assertSee('data-tab="settings"', false)
+            ->assertSee('id="rkWhoBar"', false)->assertSee('data-who="'.$rookie->id.'"', false)->assertSee('👟 この人のFCの案');
         // 手で入れられる案件＝空きのある案件（満員の水合戦は出ない）。もう入っている日も渡る。
         $plan = RookieFcPlan::build(Carbon::today(), '東京');
         $this->assertNotContains($done->id, array_column($plan['openCases'], 'projectId'), '満員は出ない');

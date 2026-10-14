@@ -38,6 +38,16 @@
   .rk-toc a:hover { border-color: var(--brand); }
   .rk-toc .sp { flex: 1; }
   .rk-card { scroll-margin-top: 64px; }
+  /* タブ（2026-10-14）。 */
+  .rk-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .rk-tabs button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 8px 8px 0 0; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .rk-tabs button.on { background: var(--brand-fill); color: #fff; border-color: var(--brand-fill); }
+  .rk-card.rk-hide, .rk-toc a.rk-hide { display: none; }
+  /* 新人ごとに見る（2026-10-14）。 */
+  .rk-who-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rk-who-bar .rk-btn.on { background: var(--brand-fill); color: #fff; border-color: var(--brand-fill); }
+  .rk-who-bar .rk-btn.on .rk-small { color: #fff; }
+  .rk-who-off { display: none !important; }
   /* 日付で見る（2026-10-14）。1マス＝1日。 */
   table.rk-dist { border-collapse: collapse; font-size: 11px; }
   table.rk-dist th, table.rk-dist td { border: 1px solid var(--line); padding: 2px 3px; text-align: center; min-width: 20px; white-space: nowrap; }
@@ -68,6 +78,13 @@
   <button class="rk-btn" type="submit">表示</button>
 </form>
 
+{{-- タブ（2026-10-14 baba「ページが長くて探しにくい」）。各ブロックの data-tab で出し分ける。選んだタブはこの端末で覚える。 --}}
+<div class="rk-tabs" id="rkTabs">
+  <button type="button" data-tab="people">👤 新人ごと</button>
+  <button type="button" data-tab="fc">👟 FCの案（全員）</button>
+  <button type="button" data-tab="settings">⚙ 設定（目標・難易度表・卒業した人）</button>
+</div>
+
 {{-- 目次（押すとそのブロックへ飛ぶ・縮めていたら開く）。中身は下の rkToc() が見出しから作る。 --}}
 <nav class="rk-toc" id="rkToc" aria-label="目次"></nav>
 
@@ -76,7 +93,18 @@
   @foreach ($employees as $e)<option value="{{ $e->name }}"></option>@endforeach
 </datalist>
 
-<div class="rk-card">
+{{-- 新人ごとに見る（2026-10-14 baba「新人ごとに見られない」）。押した人の行だけを、このタブの全ブロックで出す。 --}}
+@if ($rookies)
+  <div class="rk-card rk-who-bar" data-tab="people" id="rkWhoBar" style="padding:10px 12px;">
+    <span class="rk-small" style="font-weight:700; margin-right:4px;">新人：</span>
+    <button type="button" class="rk-btn" data-who="">全員</button>
+    @foreach ($rookies as $r)
+      <button type="button" class="rk-btn" data-who="{{ $r['id'] }}">{{ $r['name'] }}<span class="rk-small">（FC {{ $r['monthFc'] }}{{ $r['target'] ? '/'.$r['target']['fc'] : '' }}・案{{ count($r['myPicks']) }}）</span></button>
+    @endforeach
+  </div>
+@endif
+
+<div class="rk-card" data-tab="people">
   <h3>🌱 新人の一覧（{{ $month->format('Y年n月') }}）</h3>
   <p class="sub">入社2年以内のイベプラ・セールスの社員と、手で入れた人が出ます。独り立ちしたら「卒業」を押してください（一覧から消えます・下で元に戻せます）。
     「何ヶ月目」は入社日の月を1ヶ月目として数えます。</p>
@@ -84,7 +112,7 @@
   <table class="rk">
     <tr><th>名前</th><th>OJT担当・チームリーダー・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>入社日</th><th></th></tr>
     @forelse ($rookies as $r)
-      <tr>
+      <tr data-rookie="{{ $r['id'] }}">
         <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div></td>
         <td>
           @if ($canEdit)
@@ -130,7 +158,7 @@
           @endif
         </td>
       </tr>
-      <tr>
+      <tr data-rookie="{{ $r['id'] }}">
         <td colspan="8" style="border-top:0; padding-top:0;">
           {{-- この月に入っている案件（2026-10-09 baba「新人一覧で案件一覧が出るようにしてほしい」）。 --}}
           <details class="rk-exp">
@@ -197,8 +225,37 @@
   @endif
 </div>
 
+{{-- この人のFCの案（2026-10-14 baba「新人ごとに見られない」）。上の「新人：」で1人選んだときだけ中身が出る。
+     入れる・替えるは「👟 FCの案（全員）」のタブと同じ仕組み（rkAssign）。 --}}
+<div class="rk-card" data-tab="people">
+  <h3>👟 この人のFCの案</h3>
+  <p class="sub rk-who-none">上の「新人：」で1人選ぶと、その人のFCの案が出ます。人を替える・案に無い案件に入れるのは「👟 FCの案（全員）」のタブで。</p>
+  @foreach ($rookies as $r)
+    <div data-rookie="{{ $r['id'] }}" class="rk-who-only">
+      @if ($r['myPicks'])
+        <div class="rk-wrap">
+        <table class="rk" style="max-width:760px;">
+          <tr><th>日付</th><th>案件</th><th>必修</th><th>理由</th><th></th></tr>
+          @foreach ($r['myPicks'] as $p)
+            <tr data-project="{{ $p['projectId'] }}" data-staff="{{ $r['id'] }}">
+              <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($p['date'])->format('n/j') }}@if (($p['dayType'] ?? '本番') !== '本番')<div class="rk-small">{{ $p['dayType'] }}</div>@endif</td>
+              <td><a href="/project-assign?project={{ $p['projectId'] }}">{{ $p['name'] }}</a><div class="rk-small">{{ $p['client'] }}</div></td>
+              <td>{{ $p['mark'] ?: '' }}</td>
+              <td class="rk-small">{{ $p['why'] }}</td>
+              <td><button class="rk-btn" type="button" onclick="rkAssign([this.closest('tr')])">入れる</button><span class="rk-small rk-done"></span></td>
+            </tr>
+          @endforeach
+        </table>
+        </div>
+      @else
+        <p class="rk-small">{{ $r['name'] }}さんへの案はありません（目標に届いている・空きのある案件が無い、など）。</p>
+      @endif
+    </div>
+  @endforeach
+</div>
+
 {{-- Dの一覧（2026-10-13 baba「FCの案と一緒に、ディレクターの一覧（今アサインされている一覧）を見たい」）。 --}}
-<div class="rk-card">
+<div class="rk-card" data-tab="people">
   <h3>🎬 Dの一覧（{{ $month->format('n月') }}・新人がDで入っている案件）</h3>
   <p class="sub">いまアサインに入っている「D」だけを日付順に並べています（仮も確定も）。Dを決めるのは今までどおりD決め画面です。</p>
   @if ($dRows->isEmpty())
@@ -208,7 +265,7 @@
     <table class="rk" style="max-width:760px;">
       <tr><th>日付</th><th>新人</th><th>案件</th><th>状態</th></tr>
       @foreach ($dRows as $c)
-        <tr>
+        <tr data-rookie="{{ $c['rookieId'] }}">
           <td class="rk-num">{{ \Illuminate\Support\Carbon::parse($c['date'])->format('n/j') }}<div class="rk-small">{{ ['日','月','火','水','木','金','土'][\Illuminate\Support\Carbon::parse($c['date'])->dayOfWeek] }}{{ $c['dayType'] && $c['dayType'] !== '本番' ? '・'.$c['dayType'] : '' }}</div></td>
           <td><b>{{ $c['rookie'] }}</b></td>
           <td><a href="/project-assign?project={{ $c['projectId'] }}">{{ $c['name'] }}</a><div class="rk-small">{{ $c['client'] }}</div></td>
@@ -222,7 +279,7 @@
 
 {{-- チャットワークでOJT・本人に確認してもらう文（2026-10-13 baba「テキストですぐコピペできるように」）。
      文はサーバーが作ったもの（RookieFcPlan::copyText）をそのまま使う＝画面で組み立てない。 --}}
-<div class="rk-card">
+<div class="rk-card" data-tab="people">
   <h3>💬 OJT・本人への確認（チャットワーク用の文）</h3>
   <p class="sub">新人ごとに「Dで入っている案件／FC・そのほか／これからFCで入れる案」をまとめた文です。「コピー」を押してチャットワークに貼ってください。
     FCの案を「入れる」と、次に開いたときは「FC・そのほか」に移ります。</p>
@@ -232,7 +289,7 @@
       <button class="rk-btn main" type="button" onclick="rkCopy(this)">📋 全員分をまとめてコピー</button><span class="rk-small rk-copied"></span>
     </div>
     @foreach ($rookies as $r)
-      <details class="rk-exp">
+      <details class="rk-exp" data-rookie="{{ $r['id'] }}">
         <summary class="rk-small" style="cursor:pointer;"><b>{{ $r['name'] }}</b>（D {{ count($r['dCases']) }}件・FCの案 {{ count($r['myPicks']) }}件）</summary>
         <div class="rk-bar" style="margin:6px 0; align-items:flex-start;">
           <textarea class="rk-in rk-copy" readonly rows="{{ min(16, substr_count($r['copyText'], "\n") + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
@@ -245,7 +302,7 @@
   @endif
 </div>
 
-<div class="rk-card">
+<div class="rk-card" data-tab="fc">
   <h3>👟 FCに入れる案（{{ $month->format('n月') }}・今日から月末まで）</h3>
   <p class="sub">運営人数に空きがある案件に、その月のFC目標に届いていない新人を当てた案です。
     1案件に入れる新人は、ふつう1人・運営人数が8名を超える案件は2人・大型で12名以上なら空きの数まで。ARENA場所貸しには入れません。本番とリハ日・前日設営・予備日があるイベントは、出られる日は全部同じ新人を入れます。
@@ -347,7 +404,7 @@
   @endif
 </div>
 
-<details class="rk-card rk-more">
+<details class="rk-card rk-more" data-tab="settings">
   <summary>📋 月ごとの目標（何ヶ月目 → イベント数・うちD数）</summary>
   <p class="sub">シート「セールス新人イベントおよびD数」「イベプラ新人イベントおよびD数」の値です。所属がセールスの人はセールスの表、イベプラ（だけ）の人はイベプラの表を使います。
     FCの目標＝イベント数 − D数。<b>D数を空にした月</b>は「D数は決めない（DとFCを合わせてイベント数まで）」＝FCの目標はイベント数 − その月にやったD数です。12ヶ月目より先は12ヶ月目の数を使います。</p>
@@ -371,7 +428,7 @@
   </div>
 </details>
 
-<details class="rk-card rk-more" @if ($unlinked) open @endif>
+<details class="rk-card rk-more" data-tab="settings" @if ($unlinked) open @endif>
   <summary>📚 難易度表（コンテンツ難易度シート）・ECSより前の経験の取込</summary>
   <p class="sub">スプレッドシート「コンテンツ難易度」のリアル・オンラインをそれぞれCSVで取り込みます（入れ直すと上書き）。
     名前が台帳と合わない行は、右のプルダウンで台帳のコンテンツを選んでつないでください。つながっていない行は使いません。</p>
@@ -421,7 +478,7 @@
 </details>
 
 @if ($canEdit && $graduated->isNotEmpty())
-<details class="rk-card rk-more">
+<details class="rk-card rk-more" data-tab="settings">
   <summary>🎓 卒業した人（{{ $graduated->count() }}名）</summary>
   @foreach ($graduated as $g)
     <form class="rk-bar" method="POST" action="/rookies/state">@csrf
@@ -614,6 +671,7 @@
         else if (card.classList.contains('rk-folded')) { card.classList.remove('rk-folded'); delete folded[key]; save(); }
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
+      a.dataset.tab = card.dataset.tab || '';
       toc.appendChild(a);
     });
     var sp = document.createElement('span'); sp.className = 'sp'; toc.appendChild(sp);
@@ -635,6 +693,45 @@
     };
     mk('すべて縮める', true);
     mk('すべて開く', false);
+  })();
+
+  // タブ（2026-10-14 baba「ページが長くて探しにくい」）。目次もいまのタブのブロックだけにする。
+  (function rkTabs() {
+    var KEY = 'rk_tab';
+    var bar = document.getElementById('rkTabs');
+    if (!bar) return;
+    var show = function (tab) {
+      bar.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
+      document.querySelectorAll('.rk-card[data-tab], .rk-toc a[data-tab]').forEach(function (el) {
+        el.classList.toggle('rk-hide', el.dataset.tab !== '' && el.dataset.tab !== tab);
+      });
+      try { localStorage.setItem(KEY, tab); } catch (e) {}
+    };
+    bar.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.tab); }); });
+    var saved = 'people';
+    try { saved = localStorage.getItem(KEY) || 'people'; } catch (e) {}
+    show(bar.querySelector('button[data-tab="' + saved + '"]') ? saved : 'people');
+  })();
+
+  // 新人ごとに見る（2026-10-14 baba「新人ごとに見られない」）。「👤 新人ごと」タブの中だけ、選んだ人の行に絞る。
+  (function rkWho() {
+    var KEY = 'rk_who';
+    var bar = document.getElementById('rkWhoBar');
+    if (!bar) return;
+    var pick = function (who) {
+      if (who && !bar.querySelector('button[data-who="' + who + '"]')) who = '';   // 卒業などでいなくなった人
+      bar.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.who === who); });
+      document.querySelectorAll('.rk-card[data-tab="people"] [data-rookie]').forEach(function (el) {
+        var only = el.classList.contains('rk-who-only');
+        el.classList.toggle('rk-who-off', only ? el.dataset.rookie !== who : (who !== '' && el.dataset.rookie !== who));
+      });
+      document.querySelectorAll('.rk-who-none').forEach(function (el) { el.classList.toggle('rk-who-off', who !== ''); });
+      try { localStorage.setItem(KEY, who); } catch (e) {}
+    };
+    bar.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { pick(b.dataset.who); }); });
+    var saved = '';
+    try { saved = localStorage.getItem(KEY) || ''; } catch (e) {}
+    pick(saved);
   })();
 
   // OJT担当・チームリーダー：打った名前を社員のIDに引き当てて保存する（2026-10-14 baba）。
