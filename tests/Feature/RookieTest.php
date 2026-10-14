@@ -132,6 +132,30 @@ class RookieTest extends TestCase
         $this->assertCount(2, array_filter($picks, fn ($x) => $x['projectId'] === $big->id), '8名を超える案件は2人まで');
     }
 
+    /** 大型はいろいろ学べるので、FCで経験していても後回しにしない（2026-10-14 baba）。 */
+    public function test_大型は経験があっても後回しにしない(): void
+    {
+        $day = Carbon::today()->addDays(1);
+        if (! $day->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        Content::create(['id' => 'CT-B', 'content_name' => '戦国運動会', 'active' => true]);
+        $rookie = PersonFactory::new()->create(['name' => '経験ずみ新人', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'rookie_overrides' => ['CT-B' => ['fc' => 'done']]]);
+        $mk = fn (string $scale) => ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day->format('Y-m-d'),
+            'required_count' => 12, 'scale' => $scale, 'content_ids' => ['CT-B'], 'status' => '調整中']);
+
+        $big = $mk('大型');
+        $pick = collect(RookieFcPlan::build(Carbon::today(), '東京')['picks'])->firstWhere('projectId', $big->id);
+        $this->assertSame('経験ずみ新人', $pick['rookie']);
+        $this->assertStringContainsString('大型（経験があっても学べる）', $pick['why']);
+
+        $big->delete();
+        $mid = $mk('中型');
+        $pick = collect(RookieFcPlan::build(Carbon::today(), '東京')['picks'])->firstWhere('projectId', $mid->id);
+        $this->assertStringNotContainsString('大型', $pick['why'] ?? '', '大型でなければ今までどおり');
+    }
+
     /** 本番とリハ日・前日設営があるイベントは、出られる日は全部同じ新人（2026-10-09 baba）。 */
     public function test_同じイベントの日は全部同じ新人(): void
     {

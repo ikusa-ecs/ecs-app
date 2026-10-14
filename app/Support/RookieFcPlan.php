@@ -395,7 +395,8 @@ final class RookieFcPlan
             $diff = RookieDifficulty::ofProject($lead, $map);
 
             while ($room[$lead->id] > 0 && $cap[$lead->id] > 0) {
-                $pick = self::pickOne($state, $leadDay, $avail, $cids, $mustIds, $diff, self::preStayDay($lead));
+                $pick = self::pickOne($state, $leadDay, $avail, $cids, $mustIds, $diff, self::preStayDay($lead),
+                    ProjectScale::of($lead->scale) === '大型');
                 if ($pick === null) {
                     break;
                 }
@@ -462,7 +463,7 @@ final class RookieFcPlan
     }
 
     /** @return array{0: array, 1: list<array>}|null いちばん点の高い新人と、候補の一覧 */
-    private static function pickOne(array $state, string $day, $avail, array $cids, array $mustIds, ?int $diff, ?string $prevDay = null): ?array
+    private static function pickOne(array $state, string $day, $avail, array $cids, array $mustIds, ?int $diff, ?string $prevDay = null, bool $big = false): ?array
     {
         $cands = [];
         foreach ($state as $id => $s) {
@@ -484,6 +485,10 @@ final class RookieFcPlan
                 $isMust = (bool) array_filter($newC, fn ($x) => isset($mustIds[$x]));
                 $score += $isMust ? 3 : 2;
                 $why[] = $isMust ? 'まだFCでやっていない必修・推奨' : 'まだFCでやっていないコンテンツ';
+            } elseif ($big) {
+                // 大型はいろいろ学べるので、経験があっても後回しにしない（2026-10-14 baba）。
+                $score += 2;
+                $why[] = '大型（経験があっても学べる）';
             }
             if (in_array($av, ['稼働可', '希望'], true)) {
                 $score += 2;
