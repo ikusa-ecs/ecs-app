@@ -54,10 +54,11 @@ class PersonalCasesOffTest extends TestCase
     /** 開催日＝今日なら off=0、archived=false。 */
     public function test_today_project_has_zero_off(): void
     {
-        $today = Carbon::parse('2026-07-14');
+        // ⚠ 日付は今日から数える（固定の日付だと RecentWindow＝3か月の外に出て落ちる・2026-10-15に実際に落ちた）。
+        $today = Carbon::today();
 
         $p = ProjectFactory::new()->create([
-            'start_date' => '2026-07-14',
+            'start_date' => $today->toDateString(),
         ]);
 
         $case = PersonalCases::cases($today)->firstWhere('id', $p->id);
