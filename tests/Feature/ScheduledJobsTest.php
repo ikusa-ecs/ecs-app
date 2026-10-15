@@ -20,6 +20,8 @@ class ScheduledJobsTest extends TestCase
     private const ALLOWED = [
         // 届かなかった日に知らせるだけ（誰かへ一斉送信はしない）。
         'sheet-sync-watch',
+        // 謎解きの紙が120部を切ったら1回だけ知らせる（2026-10-15 baba要望＝自動で送ってほしい）。
+        'paper-stock-alert',
     ];
 
     private function names(): array

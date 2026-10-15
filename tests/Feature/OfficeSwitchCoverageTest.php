@@ -97,10 +97,10 @@ class OfficeSwitchCoverageTest extends TestCase
     }
 
     /**
-     * 紙の在庫だけは特別＝入庫数を拠点で分けて持っていない。
-     * 拠点を選んでいるあいだは在庫の列を出さない（「東京の在庫」という数字は存在しないため）。
+     * 紙の在庫は拠点ごと（2026-10-15〜）。
+     * 拠点を選ぶ＝その拠点の入庫数を直せる／全拠点＝コンテンツ×拠点を見比べるだけ（どの拠点の紙か決まらないので保存しない）。
      */
-    public function test_紙の在庫は拠点を選ぶと在庫の列を出さない(): void
+    public function test_紙の在庫は拠点を選ぶと入庫数を直せる_全拠点は見るだけ(): void
     {
         $me = $this->admin();
         // 紙が必要なコンテンツが1つも無いと表そのものが出ないので、1つ用意する。
@@ -108,12 +108,22 @@ class OfficeSwitchCoverageTest extends TestCase
 
         $this->actingAsPerson($me)->get('/paper-stock')
             ->assertOk()
-            ->assertViewHas('showStockCols', false)
-            ->assertDontSee('入庫数を保存');
+            ->assertViewHas('showStockCols', true)
+            ->assertSee('入庫数を保存');
 
         $this->actingAsPerson($me)->get('/paper-stock?office=all')
             ->assertOk()
-            ->assertViewHas('showStockCols', true)
-            ->assertSee('入庫数を保存');
+            ->assertViewHas('showStockCols', false)
+            ->assertSee('コンテンツ × 拠点')
+            ->assertDontSee('入庫数を保存');
+
+        // 保存は選んだ拠点のぶんとして残る。空欄は保存しない（未入力と0部を分ける）。
+        $this->actingAsPerson($me)->post('/paper-stock/receipts', [
+            'office' => '名古屋', 'received' => ['CT-PAPER' => '250'],
+        ])->assertRedirect('/paper-stock?office='.urlencode('名古屋'));
+        $this->assertDatabaseHas('content_paper_stocks', ['content_id' => 'CT-PAPER', 'office' => '名古屋', 'received_count' => 250]);
+
+        $this->actingAsPerson($me)->post('/paper-stock/receipts', ['office' => 'all', 'received' => ['CT-PAPER' => '9']]);
+        $this->assertDatabaseCount('content_paper_stocks', 1);
     }
 }

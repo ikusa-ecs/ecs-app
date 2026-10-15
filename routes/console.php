@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\CountDeadlineReminderService;
+use App\Support\PaperStockAlert;
 use App\Support\SheetSyncNotice;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -63,3 +64,22 @@ Schedule::call(function () {
         SheetSyncNotice::missingWarning(SheetSyncNotice::lastReceivedAt());
     }
 })->weekdays()->at(SheetSyncNotice::EXPECTED_BY)->timezone('Asia/Tokyo')->name('sheet-sync-watch');
+
+// ──────────────────────────────────────────────────────────────────────
+// 謎解きの紙が120部を切ったらチャットワークへ（2026-10-15 baba要望）。正本＝App\Support\PaperStockAlert。
+// ⚠ 切った時に1回だけ（毎朝見るが、同じものは二度送らない）。入庫して120部以上に戻ったら、また切ったときに送る。
+// ⚠ 在庫が減るのは開催日を過ぎたとき＝毎朝1回見れば足りる。土日の開催ぶんは月曜の朝に届く。
+// 手動でも試せる： php artisan paper-stock:alert
+Artisan::command('paper-stock:alert', function () {
+    $r = PaperStockAlert::run();
+    if (! $r['low']) {
+        $this->info('新しく120部を切ったものはありません。');
+
+        return;
+    }
+    $this->warn(implode("\n", $r['low']));
+    $this->info($r['sent'] ? 'チャットワークに知らせました。' : 'チャットワークの設定が無いので知らせていません（次の朝にもう一度見ます）。');
+})->purpose('謎解きの紙が120部を切ったら、チャットワークに1回だけ知らせる');
+
+Schedule::call(fn () => PaperStockAlert::run())
+    ->weekdays()->at('09:00')->timezone('Asia/Tokyo')->name('paper-stock-alert');

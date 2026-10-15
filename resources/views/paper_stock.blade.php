@@ -29,6 +29,11 @@
            border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; margin-bottom: 14px; }
   .tag-future { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--warn-soft); color: #b45309; font-weight: 600; }
   .tag-past { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: #ece3d4; color: #7a6a58; }
+  /* 120部を切った在庫（2026-10-15）。チャットワークに知らせるのと同じ基準。 */
+  .tag-low { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: #fde2e2; color: #b91c1c; font-weight: 700; margin-left: 4px; }
+  td.none { color: var(--muted); }
+  .ps-filter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; font-size: 13px; }
+  .ps-filter select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; font-family: inherit; font-size: 13px; }
 
   /* =====================================================================
      スマホ幅（720px以下）だけに効く指定。PCの見た目は一切変わりません。
@@ -127,34 +132,99 @@
   謎解き系コンテンツの <strong>紙（謎解きシート）</strong> の在庫を、案件データから自動で集計します。<br>
   <strong>必要数(今後)</strong>＝これから開催する分・<strong>消費数</strong>＝開催済みの分（どちらも自動）／
   <strong>入庫数</strong>＝印刷して用意した枚数（手入力）。<strong>在庫＝入庫−消費</strong>、<strong>過不足＝在庫−必要数(今後)</strong>。<br>
-  対象にするコンテンツは <a href="/masters#contents">マスタ管理</a> の「紙」で切り替えます。チーム数が未入力の案件は、お客様人数÷{{ $teamSize }}で推定します。
+  対象にするコンテンツは <a href="/masters#contents">マスタ管理</a> の「紙」で切り替えます。チーム数が未入力の案件は、お客様人数÷{{ $teamSize }}で推定します。<br>
+  <strong>在庫は拠点ごと</strong>です。巻き取られた案件は巻き取った拠点の紙、ヘルプの案件は登録した拠点の紙として数えます。
+  在庫が <strong>{{ $alertBelow }}部を切ると、毎朝チャットワークに1回だけ</strong>知らせます（入庫数を入れたところだけ）。
 </div>
 
-{{-- 拠点の切替（2026-09-15 baba要望）。この画面だけ切替が無かった。 --}}
+{{-- 拠点の切替（2026-09-15 baba要望）。 --}}
 @include('partials.office_switch')
 
-@unless ($showStockCols)
-  {{-- ⚠ 紙そのものは拠点で分けて管理していない（入庫数はコンテンツごとに1つだけ）。
-       「東京の在庫」という数字は存在しないので、拠点を選んでいるあいだは出さない。 --}}
-  <div class="ps-intro" style="border-left:4px solid var(--brand);">
-    いまは <b>{{ $officeScope }}</b> の案件だけで数えています（必要数・消費数・月別・明細）。<br>
-    <b>入庫数・在庫数・過不足は出していません。</b>紙は拠点で分けて持っていない（入庫数はコンテンツごとに1つ）ので、
-    拠点ごとの在庫という数字が存在しないためです。<b>在庫を見る・入庫数を直すときは、上の「全拠点」を選んでください。</b>
-  </div>
-@endunless
-
-{{-- ── 在庫表（入庫数は手入力） ── --}}
-<div class="ps-card">
-  <h3>在庫一覧（コンテンツ＝印刷物ごと）</h3>
-  <p class="sub">「入庫数」欄に用意した枚数を入れて「保存」を押してください。数字はコンテンツごとに記憶され、集計しても消えません。</p>
-
-  @if(count($stock) === 0)
+@if(count($stock) === 0)
+  <div class="ps-card">
     <div class="ps-empty">
       「紙が必要」なコンテンツがまだありません。<a href="/masters#contents">マスタ管理</a> でコンテンツの「紙」にチェックを入れてください。
     </div>
-  @else
+  </div>
+@elseif (! $showStockCols)
+{{-- ── 全拠点：コンテンツ×拠点の在庫（見るだけ）。入庫数は拠点を選んで直す。 ── --}}
+<div class="ps-card">
+  <h3>在庫一覧（コンテンツ × 拠点）</h3>
+  <p class="sub">いま手元にある数（入庫−消費）と、( )内はこれからの予定をぜんぶやった後の残りです。
+    「—」＝入庫数をまだ入れていない拠点。<b>入庫数を直すときは、上で拠点を選んでください。</b></p>
+  <div class="table-scroll">
+  <table class="ps ps-sticky">
+    <thead>
+      <tr>
+        <th class="l">コンテンツ（印刷物）</th>
+        @foreach($offices as $o)<th>{{ $o }}</th>@endforeach
+      </tr>
+    </thead>
+    <tbody>
+      @foreach($stock as $r)
+        <tr>
+          <td class="l">{{ $r['name'] }}@if($r['perTeam'] > 1)<span class="est">（{{ $r['perTeam'] }}枚/組）</span>@endif</td>
+          @foreach($offices as $o)
+            @php($c = $byOffice[$o][$r['id']] ?? null)
+            @if ($c === null || (! $c['hasReceived'] && $c['future'] === 0))
+              <td class="none">—</td>
+            @elseif (! $c['hasReceived'])
+              <td class="none">— <span class="est">（今後{{ $c['future'] }}部使う）</span></td>
+            @else
+              <td class="{{ $c['excess'] < 0 ? 'short' : '' }}">
+                {{ $c['zaiko'] }}@if($c['low'])<span class="tag-low">{{ $alertBelow }}部切れ</span>@endif
+                <span class="est">（{{ $c['excess'] >= 0 ? '+'.$c['excess'] : $c['excess'] }}）</span>
+              </td>
+            @endif
+          @endforeach
+        </tr>
+      @endforeach
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{{-- ── 拠点×月（必要枚数） ── --}}
+@if(count($months) > 0)
+<div class="ps-card">
+  <h3>拠点 × 月（使う枚数）</h3>
+  <p class="sub">開催月ごとに、どの拠点で何枚使うか（今後・開催済みの合計・全コンテンツの合計）。</p>
+  <div class="table-scroll">
+  <table class="ps ps-sticky">
+    <thead>
+      <tr>
+        <th class="l">拠点</th>
+        @foreach($months as $m)
+          <th>{{ $m === '未定' ? '未定' : \Illuminate\Support\Str::of($m)->replace('-', '/') }}</th>
+        @endforeach
+        <th>合計</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach($offices as $o)
+        @php($perMonth = $byOfficeMonth[$o] ?? [])
+        <tr>
+          <td class="l"><a href="/paper-stock?office={{ urlencode($o) }}">{{ $o }}</a></td>
+          @foreach($months as $m)
+            <td>{{ $perMonth[$m] ?? 0 }}</td>
+          @endforeach
+          <td><strong>{{ array_sum($perMonth) }}</strong></td>
+        </tr>
+      @endforeach
+    </tbody>
+  </table>
+  </div>
+</div>
+@endif
+@else
+{{-- ── 拠点を選んでいるとき：その拠点の在庫表（入庫数は手入力） ── --}}
+<div class="ps-card">
+  <h3>{{ $officeScope }}の在庫（コンテンツ＝印刷物ごと）</h3>
+  <p class="sub">「入庫数」欄に{{ $officeScope }}で用意した枚数を入れて「保存」を押してください。数字は拠点×コンテンツごとに記憶され、集計しても消えません。空欄＝まだ在庫を管理していない（知らせも出ません）。</p>
+
     <form method="post" action="/paper-stock/receipts">
       @csrf
+      <input type="hidden" name="office" value="{{ $officeScope }}">
       {{-- 表が画面より広いとき、ページごと横に伸びずに表の中だけ横スクロールさせる入れ物 --}}
       <div class="table-scroll">
       <table class="ps ps-sticky">
@@ -172,10 +242,10 @@
             <tr>
               <td class="l">{{ $r['name'] }}@if($r['perTeam'] > 1)<span class="est">（{{ $r['perTeam'] }}枚/組）</span>@endif</td>
               <td>{{ $r['future'] }}</td>
-              @if ($showStockCols)<td><input class="ps-recv" type="number" name="received[{{ $r['id'] }}]" value="{{ $r['received'] }}" min="0" max="99999"></td>@endif
+              @if ($showStockCols)<td><input class="ps-recv" type="number" name="received[{{ $r['id'] }}]" value="{{ $r['hasReceived'] ? $r['received'] : '' }}" placeholder="未入力" min="0" max="99999"></td>@endif
               <td>{{ $r['past'] }}</td>
               @if ($showStockCols)
-                <td>{{ $r['zaiko'] }}</td>
+                <td>{{ $r['zaiko'] }}@if($r['low'])<span class="tag-low">{{ $alertBelow }}部切れ</span>@endif</td>
                 <td class="{{ $r['excess'] < 0 ? 'short' : 'ok' }}">
                   {{ $r['excess'] >= 0 ? '+' . $r['excess'] : $r['excess'] }}
                   @if($r['excess'] < 0)（{{ $r['short'] }}枚不足）@endif
@@ -210,13 +280,13 @@
         ※ 印刷物はコンテンツごとに別物のため、コンテンツをまたいだ合計（在庫の総枚数）には意味がありません。合計行は目安です。
       </p>
     </form>
-  @endif
 </div>
+@endif
 
 {{-- ── コンテンツ×月（必要・消費あわせた枚数） ── --}}
 @if(count($stock) > 0 && count($months) > 0)
 <div class="ps-card">
-  <h3>コンテンツ × 月（必要枚数）</h3>
+  <h3>コンテンツ × 月（必要枚数）@if($officeScope !== null)<span class="est">　{{ $officeScope }}の紙だけ</span>@endif</h3>
   <p class="sub">開催月ごとの枚数です（今後・開催済みの合計）。次にいつ・何枚要るかの見通しに使えます。</p>
   {{-- 月が増えるほど横に長くなる表なので、表の中だけ横スクロールさせる --}}
   <div class="table-scroll">
@@ -248,15 +318,32 @@
 @endif
 
 {{-- ── 明細（案件ごと） ── --}}
-@if(count($detail) > 0)
+@if($detailAll > 0)
 <div class="ps-card">
-  <h3>明細（案件ごと・{{ count($detail) }}件）</h3>
-  {{-- 列が8つある表なので、表の中だけ横スクロールさせる --}}
+  <h3>明細（案件ごと・{{ count($detail) }}件@if(count($detail) !== $detailAll)／全{{ $detailAll }}件@endif）</h3>
+  {{-- コンテンツ・月で絞る（2026-10-15 baba要望）。拠点は上の切替で絞る。 --}}
+  <form method="get" action="/paper-stock" class="ps-filter">
+    <input type="hidden" name="office" value="{{ \App\Support\OfficeScope::param($officeScope) }}">
+    <select name="content" onchange="this.form.submit()">
+      <option value="">コンテンツ：すべて</option>
+      @foreach($names as $cid => $nm)
+        <option value="{{ $cid }}" @selected($fContent === (string) $cid)>{{ $nm }}</option>
+      @endforeach
+    </select>
+    <select name="month" onchange="this.form.submit()">
+      <option value="">月：すべて</option>
+      @foreach($months as $m)
+        <option value="{{ $m }}" @selected($fMonth === $m)>{{ $m === '未定' ? '未定' : \Illuminate\Support\Str::of($m)->replace('-', '/') }}</option>
+      @endforeach
+    </select>
+    @if($fContent !== '' || $fMonth !== '')<a href="/paper-stock?office={{ urlencode(\App\Support\OfficeScope::param($officeScope)) }}">絞り込みを外す</a>@endif
+  </form>
+  {{-- 列が9つある表なので、表の中だけ横スクロールさせる --}}
   <div class="table-scroll">
   <table class="ps">
     <thead>
       <tr>
-        <th class="l">状況</th><th class="l">開催日</th><th class="l">コンテンツ</th><th class="l">クライアント</th>
+        <th class="l">状況</th><th class="l">開催日</th><th class="l">紙の拠点</th><th class="l">コンテンツ</th><th class="l">クライアント</th>
         <th>お客様人数</th><th>チーム数</th><th>必要枚数</th><th class="l">備考</th>
       </tr>
     </thead>
@@ -267,6 +354,7 @@
             @if($d['status'] === '今後')<span class="tag-future">今後</span>@else<span class="tag-past">開催済み</span>@endif
           </td>
           <td class="l">{{ $d['dateStr'] }}</td>
+          <td class="l">{{ $d['office'] }}</td>
           <td class="l">{{ $d['content'] }}</td>
           <td class="l">{{ $d['client'] !== '' ? $d['client'] : '—' }}</td>
           <td>{{ $d['guest'] !== null ? $d['guest'] : '—' }}</td>

@@ -40,6 +40,9 @@ final class ChatworkRooms
     /** アサイン表の自動取り込みの結果。 */
     public const SHEET_SYNC = 'sheet_sync';
 
+    /** 謎解きの紙が120部を切った知らせ（2026-10-15）。 */
+    public const PAPER_STOCK = 'paper_stock';
+
     /**
      * 設定画面に出す一覧。[種類 => [見出し, 説明]]。
      * ⚠ 並び順がそのまま画面の並びになる。
@@ -47,7 +50,7 @@ final class ChatworkRooms
     public const KINDS = [
         self::COMMON => [
             '共通（個別に決めていないもの）',
-            '下の3つで番号を入れなかった知らせは、すべてこの部屋へ送ります。',
+            '下の知らせで番号を入れなかったものは、すべてこの部屋へ送ります。',
         ],
         self::COUNT_DEADLINE => [
             '人数確定リマインド',
@@ -60,6 +63,10 @@ final class ChatworkRooms
         self::SHEET_SYNC => [
             'アサイン表の自動取り込み',
             '毎朝の取り込みの結果と、届かなかった日の警告を知らせます。',
+        ],
+        self::PAPER_STOCK => [
+            '謎解きの紙の在庫',
+            '紙の在庫（いま手元にある数）が120部を切ったときに、拠点・コンテンツごとに1回だけ知らせます。',
         ],
         self::TEST => [
             'テスト送信用',

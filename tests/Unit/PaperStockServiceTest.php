@@ -53,7 +53,7 @@ class PaperStockServiceTest extends TestCase
         ]);
 
         // 入庫 15枚（手入力）。入れはじめたのは30日前＝10日前の案件の消費は数える。
-        $s = ContentPaperStock::create(['content_id' => 'CT-P01', 'received_count' => 15]);
+        $s = ContentPaperStock::create(['content_id' => 'CT-P01', 'office' => '東京', 'received_count' => 15]);
         $s->forceFill(['created_at' => now()->subDays(30)])->save();
 
         // 入れはじめる前（60日前）の案件は消費に数えない（2026-10-09 過去の取込で在庫が減って見えないように）。
@@ -65,7 +65,7 @@ class PaperStockServiceTest extends TestCase
             'format' => '対面',
         ]);
 
-        $result = (new PaperStockService())->compute();
+        $result = (new PaperStockService())->compute('東京');
         $row = collect($result['stock'])->firstWhere('id', 'CT-P01');
 
         $this->assertSame(6, $row['future'], '必要数(今後)');
@@ -150,5 +150,77 @@ class PaperStockServiceTest extends TestCase
             collect($result['stock'])->firstWhere('id', 'CT-NOPAPER'),
             '紙不要コンテンツが在庫表に混ざっている'
         );
+    }
+
+    /**
+     * 在庫は拠点ごと（2026-10-15）。巻き取りは巻き取った拠点の紙・ヘルプは登録した拠点の紙。
+     */
+    public function test_在庫は拠点ごと_巻き取りは巻き取った拠点から減らす(): void
+    {
+        ContentFactory::new()->create(['id' => 'CT-P04', 'needs_paper' => true, 'sheets_per_team' => 1]);
+        $past = now()->subDays(3)->format('Y-m-d');
+
+        // 東京の案件（10枚）・名古屋が巻き取った東京の案件（7枚）・名古屋がヘルプに入った東京の案件（5枚）
+        ProjectFactory::new()->create(['content_ids' => ['CT-P04'], 'start_date' => $past, 'team_count' => 10, 'status' => '確定', 'format' => '対面']);
+        $taken = ProjectFactory::new()->create(['content_ids' => ['CT-P04'], 'start_date' => $past, 'team_count' => 7, 'status' => '確定', 'format' => '対面', 'office' => '東京']);
+        \App\Models\ProjectShare::create(['project_id' => $taken->id, 'office' => '名古屋', 'kind' => '巻き取り']);
+        $help = ProjectFactory::new()->create(['content_ids' => ['CT-P04'], 'start_date' => $past, 'team_count' => 5, 'status' => '確定', 'format' => '対面', 'office' => '東京']);
+        \App\Models\ProjectShare::create(['project_id' => $help->id, 'office' => '名古屋', 'kind' => 'ヘルプ']);
+
+        foreach (['東京' => 200, '名古屋' => 100] as $o => $n) {
+            $s = ContentPaperStock::create(['content_id' => 'CT-P04', 'office' => $o, 'received_count' => $n]);
+            $s->forceFill(['created_at' => now()->subDays(30)])->save();
+        }
+
+        $r = (new PaperStockService())->compute();
+        $this->assertSame(185, $r['byOffice']['東京']['CT-P04']['zaiko'], '東京＝200−10−5（ヘルプは東京の紙）');
+        $this->assertSame(93, $r['byOffice']['名古屋']['CT-P04']['zaiko'], '名古屋＝100−7（巻き取りは名古屋の紙）');
+        $this->assertFalse($r['byOffice']['東京']['CT-P04']['low']);
+        $this->assertTrue($r['byOffice']['名古屋']['CT-P04']['low'], '120部切れ');
+
+        // 名古屋を選ぶと、名古屋の紙の案件だけが明細に出る。
+        $nagoya = (new PaperStockService())->compute('名古屋');
+        $this->assertSame([$taken->id], array_column($nagoya['detail'], 'projectId'));
+    }
+
+    /** 120部を切ったら1回だけ知らせる・入庫して戻ったら、また切ったときに知らせる。 */
+    public function test_120部を切ったら1回だけ知らせる(): void
+    {
+        config(['services.chatwork.token' => 'cw-test-token', 'services.chatwork.room' => '999']);
+        \Illuminate\Support\Facades\Http::fake(['api.chatwork.com/*' => \Illuminate\Support\Facades\Http::response(['message_id' => '1'], 200)]);
+
+        ContentFactory::new()->create(['id' => 'CT-P05', 'content_name' => '謎解きB', 'needs_paper' => true, 'sheets_per_team' => 1]);
+        ProjectFactory::new()->create(['content_ids' => ['CT-P05'], 'start_date' => now()->subDays(2)->format('Y-m-d'), 'team_count' => 30, 'status' => '確定', 'format' => '対面']);
+        $s = ContentPaperStock::create(['content_id' => 'CT-P05', 'office' => '東京', 'received_count' => 140]);
+        $s->forceFill(['created_at' => now()->subDays(30)])->save();
+        // 入庫数を入れていない拠点は知らせない（在庫を管理していない）
+        ContentFactory::new()->create(['id' => 'CT-P06', 'needs_paper' => true]);
+
+        $first = \App\Support\PaperStockAlert::run();   // 140−30＝110部
+        $this->assertTrue($first['sent']);
+        $this->assertCount(1, $first['low']);
+        $this->assertStringContainsString('東京／謎解きB：残り 110部', $first['low'][0]);
+
+        $this->assertSame([], \App\Support\PaperStockAlert::run()['low'], '2回目は送らない');
+
+        $s->update(['received_count' => 300]);   // 入庫して戻った
+        \App\Support\PaperStockAlert::run();
+        $this->assertNull($s->fresh()->alerted_at, '戻ったら印を外す');
+
+        $s->update(['received_count' => 100]);   // また切った
+        $this->assertCount(1, \App\Support\PaperStockAlert::run()['low'], 'また切ったら送る');
+        \Illuminate\Support\Facades\Http::assertSentCount(2);
+    }
+
+    /** 送れなかった（鍵が無い）ときは印を付けない＝次の朝にもう一度送る。 */
+    public function test_送れなかったら次の朝にもう一度(): void
+    {
+        config(['services.chatwork.token' => '']);
+        ContentFactory::new()->create(['id' => 'CT-P07', 'needs_paper' => true]);
+        ContentPaperStock::create(['content_id' => 'CT-P07', 'office' => '東京', 'received_count' => 50]);
+
+        $r = \App\Support\PaperStockAlert::run();
+        $this->assertFalse($r['sent']);
+        $this->assertNull(ContentPaperStock::first()->alerted_at);
     }
 }
