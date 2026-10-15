@@ -254,6 +254,30 @@ class PaperStockServiceTest extends TestCase
         $this->assertSame(1, \App\Models\PaperOrder::count());
     }
 
+    /** タブ（2026-10-15 baba「縦に長くて使いづらい」）＝押したものだけ出す。はじめは在庫・発注。 */
+    public function test_タブで分けて出す(): void
+    {
+        $me = \Database\Factories\PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        ContentFactory::new()->create(['id' => 'CT-P10', 'content_name' => '謎解きE', 'needs_paper' => true]);
+        ProjectFactory::new()->create(['content_ids' => ['CT-P10'], 'start_date' => now()->addDays(5)->format('Y-m-d'),
+            'team_count' => 4, 'status' => '確定', 'format' => '対面', 'client' => '明細の会社']);
+
+        $this->actingAsPerson($me)->get('/paper-stock')->assertOk()
+            ->assertSee('東京の在庫')->assertSee('追加発注（東京）')
+            ->assertDontSee('コンテンツ × 月')->assertDontSee('明細の会社');
+
+        $this->actingAsPerson($me)->get('/paper-stock?tab=month')->assertOk()
+            ->assertSee('コンテンツ × 月')->assertDontSee('東京の在庫')->assertDontSee('明細の会社');
+
+        $this->actingAsPerson($me)->get('/paper-stock?tab=detail')->assertOk()
+            ->assertSee('明細の会社')->assertDontSee('東京の在庫');
+
+        $this->actingAsPerson($me)->get('/paper-stock?office=all&tab=month')->assertOk()
+            ->assertSee('拠点 × 月')->assertDontSee('コンテンツ × 拠点');
+    }
+
     /** 120部の知らせに「発注中」を添える（二重に発注しないように）。 */
     public function test_知らせに発注中を添える(): void
     {

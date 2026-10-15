@@ -57,7 +57,11 @@ class PaperStockController extends Controller
         $pendingOrders = $orderQ()->pending()->orderBy('ordered_on')->orderBy('id')->get()->map($orderRow)->all();
         $arrivedOrders = $orderQ()->whereNotNull('arrived_on')->orderByDesc('arrived_on')->orderByDesc('id')->limit(10)->get()->map($orderRow)->all();
 
+        // タブ（2026-10-15 baba「縦に長くて使いづらい」）＝在庫・発注／月ごと／明細。はじめは在庫・発注。
+        $tab = in_array($request->query('tab'), ['month', 'detail'], true) ? $request->query('tab') : 'stock';
+
         return view('paper_stock', [
+            'tab' => $tab,
             'pendingOrders' => $pendingOrders,
             'arrivedOrders' => $arrivedOrders,
             'stock' => $data['stock'],
