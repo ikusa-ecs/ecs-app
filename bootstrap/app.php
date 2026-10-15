@@ -41,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // ⚠ 入れられる画面が4つあるので、組み立てはここ1か所に集める（各画面に書き写すと食い違う）。
         $middleware->web(append: [
             \App\Http\Middleware\NormalizeHireDate::class,
+            // ログイン中の画面はブラウザに写しを取らせない（2026-10-15 FBシートNo.24・25＝古い画面・別の人の画面が一瞬見えた）。
+            \App\Http\Middleware\NoStoreWhenSignedIn::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

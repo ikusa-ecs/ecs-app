@@ -404,10 +404,12 @@
       <!-- プロフィール -->
       <div class="panel mp-wrap">
         <div class="prof-card">
-          <div class="prof-avatar" id="profAvatar">馬</div>
+          <!-- ⚠ 名前・メールは下のJS（fillProfile）が本人の値を入れる。ここに見本の値を書かない
+               （「馬」「baba@…」が残っていて、開くたび一瞬 別の人に見えていた＝2026-10-15 FBシートNo.25）。 -->
+          <div class="prof-avatar" id="profAvatar"></div>
           <div class="prof-main">
             <div class="prof-name"><span id="profName">—</span> さん <span class="dept none" id="profDept">未設定</span></div>
-            <div class="prof-sub"><span id="profEmail">baba@ikusa.co.jp</span></div>
+            <div class="prof-sub"><span id="profEmail"></span></div>
           </div>
           <button class="line-btn" onclick="location.href='/mypage-finance'">💰 収支を入力する</button>
           <a class="line-btn" href="/profile" style="text-decoration:none; display:inline-block;">氏名・所属などを編集</a>
@@ -753,7 +755,7 @@
             <span class="set-label">ログイン中のメールアドレス</span>
             <span class="set-note">ログインに使うメールアドレスです。</span>
           </div>
-          <div><span class="acct-value" id="acctEmail">baba@ikusa.co.jp</span></div>
+          <div><span class="acct-value" id="acctEmail"></span></div>
         </div>
 
         <div class="set-row">
@@ -838,8 +840,8 @@
 @verbatim
 <script>
   // ===== ログイン中の本人（MyPageController が Auth から渡す）=====
-  // DB（window.ECS_ME）があればその名前、無ければ 'baba'。
-  const ME = (window.ECS_ME && window.ECS_ME.name) ? window.ECS_ME.name : 'baba';
+  // DB（window.ECS_ME）の名前。⚠ 無いときに見本の名前（baba）を入れない＝別の人の担当案件が出てしまう。
+  const ME = (window.ECS_ME && window.ECS_ME.name) ? window.ECS_ME.name : '';
   const WK = ['日','月','火','水','木','金','土'];
 
   // 自分のアサイン（案件ID→自分のポジション）。MyPageController が assignments から作る。

@@ -1275,13 +1275,34 @@
        スタッフに配るアカウントを増やすので、見本に戻る道をなくす（baba要望）。
        この画面が使っていたのは日付計算の関数だけなので、下で定義する。 --}}
   <script>
+    // 日付の基準＝このページを作ったときのサーバーの今日（2026-10-15 FBシートNo.24）。
+    // ⚠ スマホの今日（new Date()）を使わない。off は「サーバーの今日から何日後」なので、
+    //   数日前に開いたページが再表示されると、その日数ぶん日付がずれる（11/1が11/3に見えた）。
+    window.ECS_TODAY = @json($serverToday);
+    window.ECS_baseToday = function () {
+      var p = String(window.ECS_TODAY || '').split('-');
+      var x = p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : new Date();
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
     // 今日から off 日後の日付。凍結モックにあった ECS_caseDate と同じ動き。
     window.ECS_caseDate = function (off) {
-      var x = new Date();
-      x.setHours(0, 0, 0, 0);
+      var x = window.ECS_baseToday();
       x.setDate(x.getDate() + (off || 0));
       return x;
     };
+    // 古いページを開き直さずに見ている（戻るボタン・タブを開いたまま日をまたいだ）ときは、読み込み直す。
+    // ⚠ 開いた直後には読み込み直さない＝スマホの時計がずれていても、何度も読み込み直す輪にならない。
+    (function () {
+      function localYmd() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      }
+      window.addEventListener('pageshow', function (e) { if (e.persisted) location.reload(); });
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && localYmd() !== window.ECS_TODAY) location.reload();
+      });
+    })();
   </script>
   <!-- DBから渡された、本人が「確定」の案件（2026-10-05から非公開でも出す）。確定アサイン表示の元データ。 -->
   <script>window.ECS_PUBLISHED = @json($published);</script>
@@ -1325,7 +1346,7 @@
     // ※応募（エントリー）は本物保存です（DB=applicationsへ）。「エントリーする／取り消す」を押すと保存されます。
     const _jobSrc = window.ECS_RECRUIT_JOBS || [];
     const jobs = _jobSrc.filter(c => c.recruit && !c.archived && !c.draft).map(c => {
-      const _dl = new Date(); _dl.setHours(0,0,0,0); _dl.setDate(_dl.getDate() + c.off - 4);
+      const _dl = ECS_caseDate(c.off - 4);
       return {
         id:c.id, content:c.content, client:c.client, place:c.place, meetPlace:c.meetPlace,
         area:c.area, format:c.fmt, fmtText:c.fmtText, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
@@ -1353,7 +1374,7 @@
     const DOW_CIRCLE = ['㈰','㈪','㈫','㈬','㈭','㈮','㈯'];
     function atMidnight(d){ const x = new Date(d); x.setHours(0,0,0,0); return x; }
     function addDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
-    const today = atMidnight(new Date());
+    const today = ECS_baseToday();   // ⚠ new Date() にしない（上の ECS_TODAY の説明）
     jobs.forEach((j,i) => { j._i = i; j.date = addDays(today, j.offset); j.state = calcState(j); });
     const jobById = {};
     jobs.forEach(j => { jobById[j.id] = j; });

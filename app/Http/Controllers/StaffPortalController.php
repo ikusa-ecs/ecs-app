@@ -186,6 +186,10 @@ class StaffPortalController extends Controller
         $prefPeriod = $this->prefPeriod();
 
         return view('staff_portal', [
+            // 画面の日付の基準＝**サーバーの今日**（2026-10-15 FBシートNo.24）。
+            // 案件の日付は「今日から何日後(off)」で渡しているので、JSがスマホの今日に足すと、
+            // 数日前に開いたページが出たときにその日数ぶんずれる（11/1が11/3に見えた）。
+            'serverToday' => $today->toDateString(),
             'published' => $published,
             // 終わった案件（新しい順）。⚠ カレンダーの「イベント」印には使わない
             //   （使うと過去の月まで印が付いて、希望の入力と紛らわしくなる）。
