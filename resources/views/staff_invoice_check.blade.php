@@ -101,7 +101,7 @@
     <span class="sp"></span>
   @endif
   {{-- 名前で探す（2026-10-15 baba要望）。空白は無視＝「山田太郎」でも「山田 太郎」でも見つかる。 --}}
-  <input type="search" id="siSearch" oninput="siFilter()" placeholder="🔍 スタッフの名前で探す" autocomplete="off"
+  <input type="search" id="siSearch" oninput="siFilter()" placeholder="🔍 名前・よみがなで探す" autocomplete="off"
          style="width:200px; max-width:60vw; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink);">
 </div>
 
@@ -164,7 +164,7 @@
     <th class="hide-sp">件数</th>
   </tr>
   @foreach ($list as $r)
-    <tr class="si-row {{ $r['checked'] ? 'done' : '' }}" data-id="{{ $r['id'] }}" data-name="{{ $r['name'] }}">
+    <tr class="si-row {{ $r['checked'] ? 'done' : '' }}" data-id="{{ $r['id'] }}" data-name="{{ $r['name'] }}" data-kana="{{ $r['kana'] }}">
       @foreach (['received' => '請求書が届いた', 'checked' => '明細と見比べて合っていた'] as $field => $title)
         <td class="box">
           <input type="checkbox" title="{{ $title }}" data-field="{{ $field }}" @checked($r[$field]) onchange="siMark(this)">
@@ -274,7 +274,7 @@
       {{-- 並び（2026-10-13 baba）：日付・案件・企業様名・スタッフ・手当（＋メモ）・金額・入れた人・消す --}}
       <tr><th>日付</th><th>案件</th><th class="hide-sp">企業様名</th><th>スタッフ</th><th>手当・メモ</th><th style="text-align:right;">金額</th><th class="hide-sp">入れた人</th><th></th></tr>
       @foreach ($allowances as $a)
-        <tr class="al-row" data-name="{{ $a['staff'] }}">
+        <tr class="al-row" data-name="{{ $a['staff'] }}" data-kana="{{ $staffKana[$a['staffId']] ?? '' }}">
           <td>{{ $a['md'] }}</td>
           <td>{{ $a['project'] !== '' ? $a['project'] : '—' }}</td>
           <td class="hide-sp">{{ $a['client'] }}</td>
@@ -418,15 +418,19 @@
       })
       .then(function () { siBusy--; });
   }
-  // 名前の比べ方：空白（全角・半角）を無視・英字の大小を無視。
-  function siNorm(s) { return String(s || '').replace(/[\s　]+/g, '').toLowerCase(); }
+  // 名前の比べ方：空白（全角・半角）を無視・英字の大小を無視・カタカナはひらがなにそろえる。
+  // よみがな（名簿の name_kana）でも探せる（2026-10-15 baba要望）＝「やまだ」「ヤマダ」でも見つかる。
+  function siNorm(s) {
+    return String(s || '').replace(/[\s　]+/g, '').toLowerCase()
+      .replace(/[ァ-ヶ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0x60); });
+  }
   function siFilter() {
     var only = document.getElementById('siOnlyOpen');
     var qEl = document.getElementById('siSearch');
     var q = siNorm(qEl ? qEl.value : '');
     document.querySelectorAll('tr.si-row, tr.al-row').forEach(function (tr) {
       var hide = (only && only.checked && tr.classList.contains('done'))
-        || (q !== '' && siNorm(tr.dataset.name).indexOf(q) === -1);
+        || (q !== '' && siNorm(tr.dataset.name).indexOf(q) === -1 && siNorm(tr.dataset.kana).indexOf(q) === -1);
       tr.style.display = hide ? 'none' : '';
     });
   }

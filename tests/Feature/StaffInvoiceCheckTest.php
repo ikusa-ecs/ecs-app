@@ -41,6 +41,7 @@ class StaffInvoiceCheckTest extends TestCase
             // 名前で探す（2026-10-15）＝行に名前の印が付いていること
             ->assertSee('id="siSearch"', false)
             ->assertSee('data-name="請求太郎"', false)
+            ->assertSee('data-kana="', false)   // よみがなでも探せる（2026-10-15）
             ->assertSee('明細 2件')
             ->assertSee('戦国運動会')
             ->assertSee('案件中止')

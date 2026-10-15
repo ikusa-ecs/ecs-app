@@ -118,6 +118,8 @@ class StaffInvoiceCheckController extends Controller
             'folderUrl' => (string) Setting::get(self::FOLDER_KEY, ''),
             // 手当の記録（この月・全員ぶん）と、入力欄の選択肢（2026-10-13）。
             'allowances' => $allowRows,
+            // よみがな（名前で探す欄で、ひらがなでも探せるように・2026-10-15 baba要望）
+            'staffKana' => $people->map(fn ($p) => (string) ($p->name_kana ?? ''))->all(),
             'allowanceKinds' => StaffAllowances::KINDS,
             'allowanceHints' => StaffAllowances::HINTS,
             'allowanceSwitchable' => StaffAllowances::SWITCHABLE,
