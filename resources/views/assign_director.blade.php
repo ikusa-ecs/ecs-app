@@ -378,6 +378,8 @@
     table.dist .we { color: var(--warn); }
     table.dist th.half, table.dist td.half { border-left: 2px solid var(--muted); }
     table.dist th.today { background: var(--brand-fill); color: #fff; }
+    /* 前後1週間（2026-10-15）＝いま見ている月の外の日。薄く出す（前半・後半・計には数えない）。 */
+    table.dist th.adj, table.dist td.adj { background: var(--surface-2, #f4f1ec); opacity: .75; }
     .dd-d, .dd-sd, .dd-f, .dd-o, .dd-off { display: inline-block; border-radius: 3px; padding: 0 3px; font-weight: 700; font-size: 10.5px; }
     .dd-d { background: var(--brand-fill); color: #fff; }
     .dd-sd { background: var(--brand-soft, var(--ok-soft)); color: var(--ink); border: 1px solid var(--brand); }
@@ -583,6 +585,16 @@
       </form>
 @verbatim
 
+      <!-- 日付で見る（2026-10-14 baba「新人ページの日付で見るがいい感じだからD決めでもイベプラだけで表で見たい」）。
+           イベプラの社員×いま見ている月の日付。D・SD・FC・ほかの役割・お休みを1マスずつ。中身は renderDist() が作る＝押して決めるとすぐ動く。
+           2026-10-15 baba要望＝カレンダーの上へ移した＋月の前後1週間も並べる（薄い列・数には入れない）。
+           ⚠ この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
+      <div class="dist-panel" style="margin:0 0 14px;">
+        <h3>🗓 日付で見る（イベプラ）</h3>
+        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　前半＝1〜15日・後半＝16日〜（数えるのはD・SD・FC・他）。<b>薄い列＝前後の月の1週間</b>（前半・後半・計・Dには数えません）</p>
+        <div class="dist-wrap" id="distBox"></div>
+      </div>
+
       <div class="dir-layout">
         <!-- カレンダー -->
         <div class="cal">
@@ -623,15 +635,6 @@
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
           </p>
         </div>
-      </div>
-
-      <!-- 日付で見る（2026-10-14 baba「新人ページの日付で見るがいい感じだからD決めでもイベプラだけで表で見たい」）。
-           イベプラの社員×いま見ている月の日付。D・SD・FC・ほかの役割・お休みを1マスずつ。中身は renderDist() が作る＝押して決めるとすぐ動く。
-           ⚠ この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
-      <div class="dist-panel">
-        <h3>🗓 日付で見る（イベプラ）</h3>
-        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　前半＝1〜15日・後半＝16日〜（数えるのはD・SD・FC・他）</p>
-        <div class="dist-wrap" id="distBox"></div>
       </div>
 @endverbatim
 @endsection
@@ -996,49 +999,62 @@
     const wd = ['日','月','火','水','木','金','土'];
     const people = EMP.filter(e => e.planner && sameOffice(e));
     if (!people.length) { box.innerHTML = '<p class="agg-note">イベプラの社員がいません。</p>'; return; }
-    // 社員ID → 日(1〜) → [{k, label}]
+    // 並べる日＝その月の前後1週間も（2026-10-15 baba要望）。前後の日は薄く出し、前半・後半・計・Dには数えない。
+    const ADJ = 7;
+    const days = [];
+    for (let i = -ADJ; i < last + ADJ; i++) {
+      const dt = new Date(y, m, 1 + i);
+      days.push({ dt, key: realYmd(dt), inMonth: dt.getMonth() === m, d: dt.getDate() });
+    }
+    // 社員ID → 実日付(Y-m-d) → [{k, label}]
     const cell = {};
-    const add = (id, d, k, label) => { ((cell[id] = cell[id] || {})[d] = cell[id][d] || []).push({ k, label }); };
+    const add = (id, key, k, label) => { ((cell[id] = cell[id] || {})[key] = cell[id][key] || []).push({ k, label }); };
+    const shown = new Set(days.map(x => x.key));
     cases.forEach(c => {
-      const dt = addDays(c.off);
-      if (dt.getFullYear() !== y || dt.getMonth() !== m) return;
-      const d = dt.getDate();
+      const key = realYmd(addDays(c.off));
+      if (!shown.has(key)) return;
       const nm = c.content || c.name || '';
-      if (c.dirId) add(c.dirId, d, 'd', nm + '（D）');
-      (c.sdIds || []).forEach(id => add(id, d, 'sd', nm + '（SD）'));
-      (c.fcIds || []).forEach(id => add(id, d, 'f', nm + '（FC）'));
+      if (c.dirId) add(c.dirId, key, 'd', nm + '（D）');
+      (c.sdIds || []).forEach(id => add(id, key, 'sd', nm + '（SD）'));
+      (c.fcIds || []).forEach(id => add(id, key, 'f', nm + '（FC）'));
     });
-    for (let d = 1; d <= last; d++) {
-      const busy = EMP_BUSY[realYmd(new Date(y, m, d))] || {};
-      Object.keys(busy).forEach(id => (busy[id] || []).forEach(r => add(id, d, 'o', r)));
-    }
+    days.forEach(x => {
+      const busy = EMP_BUSY[x.key] || {};
+      Object.keys(busy).forEach(id => (busy[id] || []).forEach(r => add(id, x.key, 'o', r)));
+    });
     const todayKey = realYmd(addDays(0));
+    // 区切りの線＝月のはじめ・16日・翌月のはじめ
+    const sep = x => (x.inMonth && (x.d === 1 || x.d === 16)) || (!x.inMonth && x.d === 1 && x.dt > new Date(y, m, 1));
     let head = '<tr><th class="nm">社員</th>';
-    for (let d = 1; d <= last; d++) {
-      const dt = new Date(y, m, d), w = dt.getDay();
-      const cls = [(w === 0 || w === 6) ? 'we' : '', d === 16 ? 'half' : '', realYmd(dt) === todayKey ? 'today' : ''].join(' ');
-      head += `<th class="${cls}">${d}<br>${wd[w]}</th>`;
-    }
+    days.forEach(x => {
+      const w = x.dt.getDay();
+      const cls = [(w === 0 || w === 6) ? 'we' : '', sep(x) ? 'half' : '', x.inMonth ? '' : 'adj', x.key === todayKey ? 'today' : ''].join(' ');
+      const label = x.inMonth ? x.d : (x.dt.getMonth() + 1) + '/' + x.d;
+      head += `<th class="${cls}">${label}<br>${wd[w]}</th>`;
+    });
     head += '<th>前半</th><th>後半</th><th>計</th><th>D</th></tr>';
     let body = '';
     people.forEach(e => {
       let first = 0, second = 0, dN = 0;
       let row = `<tr class="dep-${e.deptCode || 'plan'}"><td class="nm"><b class="e-nm">${escHtml(e.surname || e.name)}</b></td>`;
-      for (let d = 1; d <= last; d++) {
-        const items = ((cell[e.id] || {})[d]) || [];
+      days.forEach(x => {
+        const items = ((cell[e.id] || {})[x.key]) || [];
         let mark = '';
         if (items.length) {
-          if (d <= 15) first += items.length; else second += items.length;
-          dN += items.filter(i => i.k === 'd').length;
+          if (x.inMonth) {
+            if (x.d <= 15) first += items.length; else second += items.length;
+            dN += items.filter(i => i.k === 'd').length;
+          }
           const order = ['d', 'sd', 'f', 'o'];
-          const k = order.find(x => items.some(i => i.k === x));
+          const k = order.find(z => items.some(i => i.k === z));
           const txt = { d: 'D', sd: 'SD', f: 'F', o: '他' }[k];
           mark = `<span class="dd-${k}" title="${escAttrText(items.map(i => i.label).join(' / '))}">${txt}${items.length > 1 ? items.length : ''}</span>`;
-        } else if (isDayOff(e.id, y, m, d)) {
+        } else if (isDayOff(e.id, x.dt.getFullYear(), x.dt.getMonth(), x.d)) {
           mark = '<span class="dd-off" title="出勤可能日が×・希望休">休</span>';
         }
-        row += `<td${d === 16 ? ' class="half"' : ''}>${mark}</td>`;
-      }
+        const cls = [sep(x) ? 'half' : '', x.inMonth ? '' : 'adj'].join(' ').trim();
+        row += `<td${cls ? ` class="${cls}"` : ''}>${mark}</td>`;
+      });
       body += row + `<td>${first}</td><td>${second}</td><td><b>${first + second}</b></td><td><b>${dN}</b></td></tr>`;
     });
     box.innerHTML = '<table class="dist">' + head + body + '</table>';
