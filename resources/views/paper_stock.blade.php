@@ -174,6 +174,7 @@
               <td class="{{ $c['excess'] < 0 ? 'short' : '' }}">
                 {{ $c['zaiko'] }}@if($c['low'])<span class="tag-low">{{ $alertBelow }}部切れ</span>@endif
                 <span class="est">（{{ $c['excess'] >= 0 ? '+'.$c['excess'] : $c['excess'] }}）</span>
+                @if($c['ordered'] > 0)<span class="tag-future" title="発注中（まだ届いていない）">📦{{ $c['ordered'] }}</span>@endif
               </td>
             @endif
           @endforeach
@@ -183,6 +184,15 @@
   </table>
   </div>
 </div>
+
+{{-- ── 発注中（全拠点・見るだけ）。「届いた」は拠点を選んで押す。 ── --}}
+@if(count($pendingOrders) > 0 || count($arrivedOrders) > 0)
+<div class="ps-card">
+  <h3>📦 追加発注（全拠点）</h3>
+  <p class="sub">発注を記録する・「届いた」を押すときは、上で拠点を選んでください。</p>
+  @include('partials.paper_orders', ['pendingOrders' => $pendingOrders, 'arrivedOrders' => $arrivedOrders, 'canEdit' => false])
+</div>
+@endif
 
 {{-- ── 拠点×月（必要枚数） ── --}}
 @if(count($months) > 0)
@@ -217,6 +227,31 @@
 </div>
 @endif
 @else
+{{-- ── 追加発注（2026-10-15 baba要望）。発注を記録→届いたら「届いた」で入庫数に足す。 ── --}}
+<div class="ps-card">
+  <h3>📦 追加発注（{{ $officeScope }}）</h3>
+  <p class="sub">印刷を発注したら、ここに記録してください。<b>届いたら「届いた」を押すと、{{ $officeScope }}の入庫数に部数が足されます</b>（入庫数を自分で計算し直さなくてよい）。発注中のものは、{{ $alertBelow }}部の知らせにも「発注中」と添えます。</p>
+  <form method="post" action="/paper-stock/orders" class="ps-filter">
+    @csrf
+    <input type="hidden" name="office" value="{{ $officeScope }}">
+    <select name="content_id" required>
+      <option value="">コンテンツを選ぶ</option>
+      @foreach($names as $cid => $nm)
+        <option value="{{ $cid }}" @selected(old('content_id') === (string) $cid)>{{ $nm }}</option>
+      @endforeach
+    </select>
+    <label><input class="ps-recv" type="number" name="count" min="1" max="99999" required value="{{ old('count') }}" placeholder="部数"> 部</label>
+    <label>届く予定日 <input type="date" name="expected_on" value="{{ old('expected_on') }}" class="ps-recv" style="width:150px;"></label>
+    <input type="text" name="note" maxlength="200" value="{{ old('note') }}" placeholder="メモ（印刷会社・第◯刷など）" class="ps-recv" style="width:220px; text-align:left;">
+    <button type="submit" class="ps-btn">発注を記録</button>
+  </form>
+  @if ($errors->any())
+    <p class="ps-note" style="color:#b91c1c;">⚠ {{ $errors->first() }}</p>
+  @endif
+
+  @include('partials.paper_orders', ['pendingOrders' => $pendingOrders, 'arrivedOrders' => $arrivedOrders, 'canEdit' => true])
+</div>
+
 {{-- ── 拠点を選んでいるとき：その拠点の在庫表（入庫数は手入力） ── --}}
 <div class="ps-card">
   <h3>{{ $officeScope }}の在庫（コンテンツ＝印刷物ごと）</h3>
@@ -245,7 +280,8 @@
               @if ($showStockCols)<td><input class="ps-recv" type="number" name="received[{{ $r['id'] }}]" value="{{ $r['hasReceived'] ? $r['received'] : '' }}" placeholder="未入力" min="0" max="99999"></td>@endif
               <td>{{ $r['past'] }}</td>
               @if ($showStockCols)
-                <td>{{ $r['zaiko'] }}@if($r['low'])<span class="tag-low">{{ $alertBelow }}部切れ</span>@endif</td>
+                <td>{{ $r['zaiko'] }}@if($r['low'])<span class="tag-low">{{ $alertBelow }}部切れ</span>@endif
+                  @if($r['ordered'] > 0)<span class="tag-future" title="発注中（まだ届いていない）">📦発注中{{ $r['ordered'] }}</span>@endif</td>
                 <td class="{{ $r['excess'] < 0 ? 'short' : 'ok' }}">
                   {{ $r['excess'] >= 0 ? '+' . $r['excess'] : $r['excess'] }}
                   @if($r['excess'] < 0)（{{ $r['short'] }}枚不足）@endif

@@ -38,6 +38,9 @@ class StaffInvoiceCheckTest extends TestCase
         $res = $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10&tab=check');
         $res->assertOk()
             ->assertSee('請求太郎')
+            // 名前で探す（2026-10-15）＝行に名前の印が付いていること
+            ->assertSee('id="siSearch"', false)
+            ->assertSee('data-name="請求太郎"', false)
             ->assertSee('明細 2件')
             ->assertSee('戦国運動会')
             ->assertSee('案件中止')

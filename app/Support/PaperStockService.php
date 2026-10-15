@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Content;
 use App\Models\ContentPaperStock;
+use App\Models\PaperOrder;
 use App\Models\Project;
 use Illuminate\Support\Carbon;
 
@@ -86,6 +87,12 @@ class PaperStockService
             $received[$o][(string) $r->content_id] = (int) $r->received_count;
             $countFrom[$o][(string) $r->content_id] = $r->created_at ? $r->created_at->copy()->startOfDay() : $today;
         }
+        // 発注中（まだ届いていない）の部数を [拠点][content_id] で（2026-10-15）。在庫には足さない＝届いてから足す。
+        $ordered = [];
+        foreach (PaperOrder::pending()->get(['content_id', 'office', 'count']) as $o) {
+            $ordered[(string) $o->office][(string) $o->content_id] = ($ordered[(string) $o->office][(string) $o->content_id] ?? 0) + (int) $o->count;
+        }
+
         $earliest = $today;
         foreach ($countFrom as $perContent) {
             foreach ($perContent as $d) {
@@ -95,7 +102,7 @@ class PaperStockService
 
         // 並べる拠点＝有効な拠点＋入庫数が入っている拠点（拠点マスタから外れても在庫は見えるように）
         $offices = OfficeScope::options();
-        foreach (array_keys($received) as $o) {
+        foreach (array_merge(array_keys($received), array_keys($ordered)) as $o) {
             if ($o !== '' && ! in_array($o, $offices, true)) {
                 $offices[] = $o;
             }
@@ -211,7 +218,8 @@ class PaperStockService
                 $byOffice[$o][$cid] = $this->row(
                     $c,
                     $use[$o][$cid] ?? ['future' => 0, 'past' => 0],
-                    $received[$o][(string) $cid] ?? null
+                    $received[$o][(string) $cid] ?? null,
+                    $ordered[$o][(string) $cid] ?? 0
                 );
             }
         }
@@ -225,14 +233,16 @@ class PaperStockService
             } else {
                 $sum = ['future' => 0, 'past' => 0];
                 $recv = null;
+                $ord = 0;
                 foreach ($offices as $o) {
                     $sum['future'] += $use[$o][$cid]['future'] ?? 0;
                     $sum['past'] += $use[$o][$cid]['past'] ?? 0;
+                    $ord += $ordered[$o][(string) $cid] ?? 0;
                     if (isset($received[$o][(string) $cid])) {
                         $recv = ($recv ?? 0) + $received[$o][(string) $cid];
                     }
                 }
-                $r = $this->row($c, $sum, $recv);
+                $r = $this->row($c, $sum, $recv, $ord);
             }
             $rows[] = $r;
 
@@ -260,8 +270,9 @@ class PaperStockService
      *
      * @param  array{future:int, past:int}  $use
      * @param  int|null  $recv  入庫数（null＝まだ入れていない）
+     * @param  int  $ordered  発注中（まだ届いていない）の部数
      */
-    private function row(Content $c, array $use, ?int $recv): array
+    private function row(Content $c, array $use, ?int $recv, int $ordered = 0): array
     {
         $r = (int) ($recv ?? 0);
         $zaiko = $r - $use['past'];        // 在庫＝入庫−消費
@@ -275,6 +286,7 @@ class PaperStockService
             'past' => $use['past'],
             'received' => $r,
             'hasReceived' => $recv !== null,
+            'ordered' => $ordered,
             'zaiko' => $zaiko,
             'excess' => $excess,
             'short' => $excess < 0 ? -$excess : 0,

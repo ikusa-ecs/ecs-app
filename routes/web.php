@@ -255,6 +255,10 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // 謎解きの紙 在庫・必要数
     Route::get('/paper-stock', [PaperStockController::class, 'index']);
     Route::post('/paper-stock/receipts', [PaperStockController::class, 'updateReceipts']);
+    // 追加発注（2026-10-15）＝記録する／届いた（入庫数に足す）／取り消す
+    Route::post('/paper-stock/orders', [PaperStockController::class, 'storeOrder']);
+    Route::post('/paper-stock/orders/{id}/arrive', [PaperStockController::class, 'arriveOrder'])->whereNumber('id');
+    Route::post('/paper-stock/orders/{id}/cancel', [PaperStockController::class, 'cancelOrder'])->whereNumber('id');
     // 希望まとめ（別ウィンドウ）。対象月の希望者一覧を DB（希望＋アサイン＋ポジション可否）から作る。
     Route::get('/assign-wishlist', [AssignWishlistController::class, 'index']);
 

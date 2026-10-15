@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Content;
 use App\Models\ContentPaperStock;
+use App\Models\PaperOrder;
 use App\Support\OfficeScope;
 use App\Support\PaperStockService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * 謎解きの紙（印刷物）在庫（/paper-stock）。
@@ -36,7 +39,27 @@ class PaperStockController extends Controller
         $detail = array_values(array_filter($data['detail'], fn ($d) => ($fContent === '' || $d['contentId'] === $fContent)
             && ($fMonth === '' || $d['ym'] === $fMonth)));
 
+        // 追加発注（2026-10-15）＝発注中は全部・届いたものは新しい順に10件（拠点を選んでいればその拠点だけ）。
+        $orderRow = fn (PaperOrder $o) => [
+            'id' => $o->id,
+            'content' => (string) ($names[$o->content_id] ?? $o->content_id),
+            'office' => (string) $o->office,
+            'count' => $o->count,
+            'ordered' => $o->ordered_on?->format('n/j'),
+            'expected' => $o->expected_on?->format('n/j'),
+            'late' => $o->arrived_on === null && $o->expected_on !== null && $o->expected_on->lt(today()),
+            'arrived' => $o->arrived_on?->format('n/j'),
+            'note' => (string) ($o->note ?? ''),
+            'by' => (string) ($o->ordered_by ?? ''),
+            'arrivedBy' => (string) ($o->arrived_by ?? ''),
+        ];
+        $orderQ = fn () => PaperOrder::query()->when($office !== null, fn ($q) => $q->where('office', $office));
+        $pendingOrders = $orderQ()->pending()->orderBy('ordered_on')->orderBy('id')->get()->map($orderRow)->all();
+        $arrivedOrders = $orderQ()->whereNotNull('arrived_on')->orderByDesc('arrived_on')->orderByDesc('id')->limit(10)->get()->map($orderRow)->all();
+
         return view('paper_stock', [
+            'pendingOrders' => $pendingOrders,
+            'arrivedOrders' => $arrivedOrders,
             'stock' => $data['stock'],
             'offices' => $data['offices'],
             'byOffice' => $data['byOffice'],
@@ -83,5 +106,74 @@ class PaperStockController extends Controller
         }
 
         return redirect('/paper-stock?office='.urlencode($office))->with('status', $office.'の入庫数を保存しました。');
+    }
+
+    /** 追加発注を記録する（2026-10-15）。在庫にはまだ足さない＝届いてから足す。 */
+    public function storeOrder(Request $request)
+    {
+        $office = OfficeScope::fromValue($request->input('office'));
+        if ($office === null) {
+            return redirect('/paper-stock?office='.OfficeScope::ALL)
+                ->with('status', '発注は拠点を選んでから記録してください。');
+        }
+
+        $v = $request->validate([
+            'content_id' => ['required', 'string', 'exists:contents,id'],
+            'count' => ['required', 'integer', 'min:1', 'max:99999'],
+            'expected_on' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:200'],
+        ], [], ['content_id' => 'コンテンツ', 'count' => '部数', 'expected_on' => '届く予定日']);
+
+        PaperOrder::create($v + [
+            'office' => $office,
+            'ordered_on' => today(),
+            'ordered_by' => (string) (Auth::user()->name ?? ''),
+        ]);
+
+        return redirect('/paper-stock?office='.urlencode($office))
+            ->with('status', $office.'の発注（'.$v['count'].'部）を記録しました。届いたら「届いた」を押してください。');
+    }
+
+    /** 届いた＝その拠点の入庫数に部数を足す（2026-10-15）。二度押しても二重に足さない。 */
+    public function arriveOrder(Request $request, int $id)
+    {
+        $msg = DB::transaction(function () use ($id) {
+            $o = PaperOrder::lockForUpdate()->findOrFail($id);
+            $this->guardOffice($o);
+            if ($o->arrived_on !== null) {
+                return 'この発注は、もう「届いた」になっています。';
+            }
+
+            $s = ContentPaperStock::firstOrNew(['content_id' => $o->content_id, 'office' => $o->office]);
+            $s->received_count = (int) ($s->received_count ?? 0) + $o->count;
+            $s->save();
+
+            $o->update(['arrived_on' => today(), 'arrived_by' => (string) (Auth::user()->name ?? '')]);
+
+            return $o->office.'の入庫数に'.$o->count.'部を足しました（入庫数 '.$s->received_count.'部）。';
+        });
+
+        return redirect('/paper-stock?office='.urlencode((string) PaperOrder::find($id)?->office))->with('status', $msg);
+    }
+
+    /** 発注の記録を取り消す（まだ届いていないものだけ・入れ間違い用）。 */
+    public function cancelOrder(Request $request, int $id)
+    {
+        $o = PaperOrder::findOrFail($id);
+        $this->guardOffice($o);
+        if ($o->arrived_on !== null) {
+            return back()->with('status', '届いた発注は取り消せません（入庫数を直してください）。');
+        }
+        $o->delete();
+
+        return redirect('/paper-stock?office='.urlencode($o->office))->with('status', '発注の記録を取り消しました。');
+    }
+
+    /** 自分の拠点しか見られない人が、よその拠点の発注を触れないように。 */
+    private function guardOffice(PaperOrder $o): void
+    {
+        if (! OfficeScope::canSeeAll()) {
+            abort_unless($o->office === (OfficeScope::fromValue(null) ?? ''), 403);
+        }
     }
 }

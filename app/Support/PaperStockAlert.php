@@ -47,7 +47,9 @@ final class PaperStockAlert
             if ($s->alerted_at === null) {
                 $newlyLow[] = $s;
                 $lines[] = '・'.$s->office.'／'.$r['name'].'：残り '.$r['zaiko'].'部'
-                    .'（これからの予定で '.$r['future'].'部 使う見込み）';
+                    .'（これからの予定で '.$r['future'].'部 使う見込み）'
+                    // 発注ずみなら添える＝二重に発注しないように（2026-10-15）
+                    .($r['ordered'] > 0 ? '　📦発注中 '.$r['ordered'].'部あり' : '');
             }
         }
 
@@ -82,7 +84,7 @@ final class PaperStockAlert
         }
 
         $title = '謎解きの紙が '.PaperStockService::ALERT_BELOW.'部を切りました';
-        $body = implode("\n", $lines)."\n\n印刷の手配をお願いします。入庫したら「謎解きの紙 在庫」の入庫数を直してください。\n"
+        $body = implode("\n", $lines)."\n\n印刷の手配をお願いします。発注したら「謎解きの紙 在庫」の「追加発注」に記録し、届いたら「届いた」を押してください。\n"
             .rtrim((string) config('app.url'), '/').'/paper-stock';
         $head = ChatworkMentions::head(ChatworkRooms::PAPER_STOCK);
 

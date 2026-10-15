@@ -212,6 +212,61 @@ class PaperStockServiceTest extends TestCase
         \Illuminate\Support\Facades\Http::assertSentCount(2);
     }
 
+    /** 追加発注：記録しても在庫は増えない（発注中）→「届いた」で入庫数に足す・二度押しても1回だけ。 */
+    public function test_追加発注は届いたら入庫数に足す(): void
+    {
+        $me = \Database\Factories\PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '管理者', 'permission' => 'admin', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        ContentFactory::new()->create(['id' => 'CT-P08', 'content_name' => '謎解きC', 'needs_paper' => true]);
+        ContentPaperStock::create(['content_id' => 'CT-P08', 'office' => '名古屋', 'received_count' => 100]);
+
+        $this->actingAsPerson($me)->post('/paper-stock/orders', [
+            'office' => '名古屋', 'content_id' => 'CT-P08', 'count' => 200, 'expected_on' => now()->addDays(5)->toDateString(), 'note' => '第2刷',
+        ])->assertRedirect('/paper-stock?office='.urlencode('名古屋'));
+
+        $o = \App\Models\PaperOrder::firstOrFail();
+        $this->assertSame('管理者', $o->ordered_by);
+        $row = (new PaperStockService())->compute('名古屋')['byOffice']['名古屋']['CT-P08'];
+        $this->assertSame(100, $row['received'], '発注しただけでは在庫は増えない');
+        $this->assertSame(200, $row['ordered']);
+
+        $this->actingAsPerson($me)->get('/paper-stock?office='.urlencode('名古屋'))
+            ->assertOk()->assertSee('📦 発注中')->assertSee('第2刷')->assertSee('届いた');
+
+        $this->actingAsPerson($me)->post("/paper-stock/orders/{$o->id}/arrive");
+        $this->actingAsPerson($me)->post("/paper-stock/orders/{$o->id}/arrive");   // 二度押し
+        $this->assertSame(300, ContentPaperStock::where('office', '名古屋')->value('received_count'), '100＋200（1回だけ）');
+        $this->assertNotNull($o->fresh()->arrived_on);
+        $this->assertSame(0, (new PaperStockService())->compute()['byOffice']['名古屋']['CT-P08']['ordered']);
+        $this->actingAsPerson($me)->get('/paper-stock?office=all')
+            ->assertOk()->assertSee('追加発注（全拠点）')->assertSee('届いた発注')->assertDontSee('>発注を記録</button>', false);
+
+        // 届いたものは取り消せない／発注中なら取り消せる
+        $this->actingAsPerson($me)->post("/paper-stock/orders/{$o->id}/cancel");
+        $this->assertNotNull(\App\Models\PaperOrder::find($o->id));
+        $o2 = \App\Models\PaperOrder::create(['content_id' => 'CT-P08', 'office' => '名古屋', 'count' => 5, 'ordered_on' => today()]);
+        $this->actingAsPerson($me)->post("/paper-stock/orders/{$o2->id}/cancel");
+        $this->assertNull(\App\Models\PaperOrder::find($o2->id));
+
+        // 全拠点では見るだけ（記録はできない）
+        $this->actingAsPerson($me)->post('/paper-stock/orders', ['office' => 'all', 'content_id' => 'CT-P08', 'count' => 1]);
+        $this->assertSame(1, \App\Models\PaperOrder::count());
+    }
+
+    /** 120部の知らせに「発注中」を添える（二重に発注しないように）。 */
+    public function test_知らせに発注中を添える(): void
+    {
+        config(['services.chatwork.token' => 'cw-test-token', 'services.chatwork.room' => '999']);
+        \Illuminate\Support\Facades\Http::fake(['api.chatwork.com/*' => \Illuminate\Support\Facades\Http::response(['message_id' => '1'], 200)]);
+        ContentFactory::new()->create(['id' => 'CT-P09', 'content_name' => '謎解きD', 'needs_paper' => true]);
+        ContentPaperStock::create(['content_id' => 'CT-P09', 'office' => '東京', 'received_count' => 50]);
+        \App\Models\PaperOrder::create(['content_id' => 'CT-P09', 'office' => '東京', 'count' => 300, 'ordered_on' => today()]);
+
+        $r = \App\Support\PaperStockAlert::run();
+        $this->assertStringContainsString('📦発注中 300部あり', $r['low'][0]);
+    }
+
     /** 送れなかった（鍵が無い）ときは印を付けない＝次の朝にもう一度送る。 */
     public function test_送れなかったら次の朝にもう一度(): void
     {
