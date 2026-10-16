@@ -528,7 +528,7 @@
       // ⚠ 書き写さないと「他拠点の案件」と見分けが付かない（混じって見える元）。
       office: c.office || '', otherOffice: !!c.otherOffice, shareTags: (c.shareTags || []).slice(),
       // 連日イベント（2026-10-16）。⚠ 書き写さないと札が出ない（この画面はカードを作り直すつくり）。
-      series: c.series || null, seriesRoot: c.seriesRoot || '',
+      series: c.series || null, seriesRoot: c.seriesRoot || '', groupDays: c.groupDays || null,
       staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
       // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
       meetDetail: c.meetDetail || '', belongings: c.belongings || '',
@@ -812,16 +812,43 @@
   // ===== 連日イベント（2026-10-16 baba要望）=====
   // 「🗓 連日 1日目／全4日」と「公開 3/4日」を出す。
   // ⚠ 公開は1日ずつ＝公開し忘れた日はスタッフの「まとめてエントリー」に入らない。だから何日公開したかを見せる。
+  // ⚠ 「全日」はリハ日・前日設営・予備日も含めた全部の日（groupDays）で数える（2026-10-16 baba）。
+  //   本番だけで数えると、リハ日を公開し忘れても「✅ 全日公開」に見える。
   function seriesMates(c){
-    return c.series ? CASES.filter(x => x.series && x.seriesRoot === c.seriesRoot) : [];
+    return c.groupDays ? CASES.filter(x => x.groupDays && x.seriesRoot === c.seriesRoot) : [];
+  }
+  // この案件が同じイベントの中で何と呼ばれるか（「1日目」「本番」「リハ」など）。
+  // ⚠ c.series はリハ日の行では空なので、groupDays から数える。
+  function groupLabelOf(c){
+    let n = 0, out = '';
+    const mains = (c.groupDays || []).filter(g => (g.type || '本番') === '本番').length;
+    (c.groupDays || []).forEach(g => {
+      const isMain = (g.type || '本番') === '本番';
+      if (isMain) n++;
+      if (g.id === c.id) out = isMain ? (mains > 1 ? n + '日目' : '本番') : g.type;
+    });
+    return out;
+  }
+  function groupDaysText(c){
+    let n = 0;
+    const mains = (c.groupDays || []).filter(g => (g.type || '本番') === '本番').length;
+    return (c.groupDays || []).map(g => {
+      const isMain = (g.type || '本番') === '本番';
+      if (isMain) n++;
+      return (isMain ? (mains > 1 ? n + '日目' : '本番') : g.type) + ' ' + g.md;
+    }).join('・');
   }
   function seriesHtml(c){
-    if (!c.series) return '';
-    const total = c.series.total;
+    if (!c.groupDays) return '';
+    const total = c.groupDays.length;
     const pub = seriesMates(c).filter(x => isPublished(x.id)).length;
     const all = pub >= total;
-    return '<span class="badge series" title="連日イベント：' + escapeHtml((c.series.dates || []).join('・')) + '">🗓 連日 '
-      + c.series.idx + '日目／全' + total + '日</span> '
+    const subs = Array.from(new Set(c.groupDays.filter(g => (g.type || '本番') !== '本番').map(g => g.type)));
+    // 例：「🗓 連日 1日目／本番2日＋リハ」「🗓 連日 リハ／本番2日＋リハ」「🗓 前日設営／本番1日＋前日設営」
+    const mains = c.groupDays.filter(g => (g.type || '本番') === '本番').length;
+    const label = '🗓 ' + (mains > 1 ? '連日 ' : '') + groupLabelOf(c) + '／本番' + mains + '日'
+      + (subs.length ? '＋' + subs.join('・') : '');
+    return '<span class="badge series" title="同じイベントの日：' + escapeHtml(groupDaysText(c)) + '">' + escapeHtml(label) + '</span> '
       + '<span class="badge ' + (all ? 'series-pub-all' : 'series-pub-part') + '" title="この連日イベントのうち、この拠点のスタッフに公開している日数">'
       + (all ? '✅ 全日公開' : '公開 ' + pub + '/' + total + '日') + '</span> ';
   }
@@ -1029,7 +1056,7 @@
     const others = seriesMates(c).filter(x => x.id !== id && isPublished(x.id) !== willPublish);
     if (others.length > 0) {
       const days = others.map(x => (x.date.getMonth() + 1) + '/' + x.date.getDate()).join('・');
-      if (confirm(`この案件は連日イベントです（全${c.series.total}日）。\nほかの ${others.length}日（${days}）も一緒に${willPublish ? '公開' : '非公開に'}しますか？\n\n［OK］＝全日まとめて\n［キャンセル］＝この日だけ`)) {
+      if (confirm(`この案件は同じイベントの日が全${c.groupDays.length}日あります（リハ日なども含む）。\nほかの ${others.length}日（${days}）も一緒に${willPublish ? '公開' : '非公開に'}しますか？\n\n［OK］＝全日まとめて\n［キャンセル］＝この日だけ`)) {
         persistPublish([id].concat(others.map(x => x.id)), willPublish);
         return;
       }

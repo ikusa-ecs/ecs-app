@@ -960,9 +960,12 @@ class AssignBoardController extends Controller
 
         // 連日イベント（2026-10-16 baba要望）＝「全日エントリーなのか1日だけなのか」を人ごとに出す。
         // ⚠ 数え方の正本＝ProjectSeries（画面で数え直さない）。一覧に出ていない日のエントリーも数える。
+        // ⚠ 「全日」は**リハ日・前日設営・予備日も含めた全部の日**で数える（daysFor・スタッフ画面と同じ）。
+        //   本番だけで数えると、リハに来ない人まで「全日」に見える（2026-10-16 baba）。
+        //   「◯日目／全◯日」の見出しだけは本番で数える（groupFor・positionOf）。
         $seriesGroups = ProjectSeries::groupFor($projects);
-        $seriesIds = collect($seriesGroups)->filter(fn ($rows) => count($rows) > 1)
-            ->flatten(1)->pluck('id')->all();
+        $groupDays = collect(ProjectSeries::daysFor($projects))->filter(fn ($rows) => count($rows) > 1)->all();
+        $seriesIds = collect($groupDays)->flatten(1)->pluck('id')->all();
         // [staff_id => [project_id => true]]
         $seriesApps = [];
         if ($seriesIds) {
@@ -971,14 +974,15 @@ class AssignBoardController extends Controller
             }
         }
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office, $seriesGroups, $seriesApps) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office, $seriesGroups, $seriesApps, $groupDays) {
             $series = ProjectSeries::positionOf($p, $seriesGroups);
-            $seriesRows = $series ? ($seriesGroups[ProjectSeries::rootId($p)] ?? []) : [];
-            // その人がエントリーしている日（"11/5" の形・開催日順）。連日イベントでなければ null。
-            $seriesOn = fn (string $sid) => $series
+            // 同じイベントの全部の日（本番＋リハ日など）。1日だけの案件は空。
+            $days = $groupDays[ProjectSeries::rootId($p)] ?? [];
+            // その人がエントリーしている日（"11/5" の形・開催日順）。同じイベントに他の日が無ければ null。
+            $seriesOn = fn (string $sid) => $days
                 ? array_values(array_map(
-                    fn ($row) => (string) optional($row->start_date)->format('n/j'),
-                    array_filter($seriesRows, fn ($row) => isset($seriesApps[$sid][$row->id]))
+                    fn ($d) => $d['md'],
+                    array_filter($days, fn ($d) => isset($seriesApps[$sid][$d['id']]))
                 ))
                 : null;
             $assignedIds = $assignedByProject->get($p->id, []);
@@ -1064,8 +1068,10 @@ class AssignBoardController extends Controller
                 'filled' => count($assignedIds) + ($dispatched[$p->id] ?? 0),   // 派遣10名＝10名（2026-09-29）
                 'status' => $p->status ?? '未着手',
                 'dayType' => $p->date_type ?? '本番',
-                // 連日イベント（◯日目／全◯日・全日程）。1日だけの案件は null。
+                // 連日イベント（◯日目／全◯日・本番だけで数える）。1日だけの案件は null。
                 'series' => $series,
+                // 同じイベントの全部の日（本番＋リハ日など）＝「全日エントリー」の数え方。無ければ null。
+                'groupDays' => $days ?: null,
                 'state' => $this->boardState($p),
                 'recruit' => (bool) $p->is_recruiting,
                 'archived' => $off < 0,   // 過去の案件は出さない（画面の !archived フィルタで除外）

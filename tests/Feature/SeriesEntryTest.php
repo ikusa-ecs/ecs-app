@@ -116,6 +116,35 @@ class SeriesEntryTest extends TestCase
         $this->assertEqualsCanonicalizing(['P-R', 'P-M1'], Application::where('staff_id', 'S-001')->pluck('project_id')->all());
     }
 
+    /**
+     * 社員側（エントリー一覧・公開ボード）の「全日」はリハ日も含めて数える（スタッフ画面とそろえる・2026-10-16）。
+     * 本番2日だけエントリーしてリハに来ない人を「全日」にしない。
+     */
+    public function test_社員側の全日はリハ日も含めて数える(): void
+    {
+        $this->staff();
+        $emp = PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '担当', 'permission' => 'manager', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        $d1 = Carbon::today()->addDays(60);
+        ProjectFactory::new()->published()->create(['id' => 'P-M1', 'start_date' => $d1->format('Y-m-d'), 'office' => '東京']);
+        ProjectFactory::new()->published()->create(['id' => 'P-M2', 'start_date' => $d1->copy()->addDay()->format('Y-m-d'), 'office' => '東京', 'parent_project_id' => 'P-M1']);
+        ProjectFactory::new()->create(['id' => 'P-R', 'start_date' => $d1->copy()->subDays(35)->format('Y-m-d'), 'office' => '東京', 'parent_project_id' => 'P-M1', 'date_type' => 'リハ']);
+        foreach (['P-M1', 'P-M2'] as $pid) {
+            Application::create(['staff_id' => 'S-001', 'project_id' => $pid, 'intent' => '希望', 'applied_at' => now()]);
+        }
+
+        $cases = $this->actingAsPerson($emp)->get('/entries')->assertOk()->original->getData()['entriesCases'];
+        $case = collect($cases)->firstWhere('id', 'P-M1');
+        $this->assertCount(3, $case['groupDays'], 'リハ日が全日の数に入っていない');
+        $this->assertCount(2, collect($case['entrants'])->firstWhere('id', 'S-001')['seriesOn']);   // 3日中2日
+        $this->assertSame(2, $case['series']['total']);   // 「◯日目／本番◯日」は本番だけ
+
+        $pub = collect($this->actingAsPerson($emp)->get('/assign-publish')->assertOk()->original->getData()['cases'])
+            ->firstWhere('id', 'P-M2');
+        $this->assertSame(['P-R', 'P-M1', 'P-M2'], array_column($pub['groupDays'], 'id'));
+    }
+
     /** 社員のエントリー一覧でも「全日なのか何日だけなのか」が分かる。 */
     public function test_エントリー一覧に全日か何日だけかが出る(): void
     {

@@ -761,11 +761,46 @@
   }
   // 連日イベントで、その人が何日エントリーしているか（2026-10-16 baba要望）。
   // 全日＝緑「🗓 全4日」／一部＝橙「🗓 4日中2日（11/5・11/6）」／1日もなし＝出さない。
+  // ⚠ 「全日」はリハ日・前日設営・予備日も含めた全部の日（c.groupDays）で数える＝スタッフ画面と同じ。
+  //   本番だけで数えると、リハに来ない人まで「全日」に見える（2026-10-16 baba）。
+  function groupTotal(c){ return (c.groupDays || []).length; }
+  // 日の並び（リハ 11/24・1日目 12/29 …）。見出しの title に出す。
+  // この案件が同じイベントの中で何と呼ばれるか（「1日目」「本番」「リハ」など）。
+  // ⚠ c.series はリハ日の行では空なので、groupDays から数える。
+  function groupLabelOf(c){
+    let n = 0, out = '';
+    const mains = (c.groupDays || []).filter(g => (g.type || '本番') === '本番').length;
+    (c.groupDays || []).forEach(g => {
+      const isMain = (g.type || '本番') === '本番';
+      if (isMain) n++;
+      if (g.id === c.id) out = isMain ? (mains > 1 ? n + '日目' : '本番') : g.type;
+    });
+    return out;
+  }
+  function groupDaysText(c){
+    let n = 0;
+    const mains = (c.groupDays || []).filter(g => (g.type || '本番') === '本番').length;
+    return (c.groupDays || []).map(g => {
+      const isMain = (g.type || '本番') === '本番';
+      if (isMain) n++;
+      return (isMain ? (mains > 1 ? n + '日目' : '本番') : g.type) + ' ' + g.md;
+    }).join('・');
+  }
+  // 見出しの札：連日（本番が複数日）なら「🗓 連日 1日目／本番2日＋リハ」、本番1日＋リハ日などなら「🗓 本番1日＋リハ（全2日）」。
+  function groupBadge(c){
+    if (!c.groupDays) return '';
+    const subs = Array.from(new Set(c.groupDays.filter(g => (g.type || '本番') !== '本番').map(g => g.type)));
+    // 例：「🗓 連日 1日目／本番2日＋リハ」「🗓 連日 リハ／本番2日＋リハ」「🗓 前日設営／本番1日＋前日設営」
+    const mains = c.groupDays.filter(g => (g.type || '本番') === '本番').length;
+    const text = '🗓 ' + (mains > 1 ? '連日 ' : '') + groupLabelOf(c) + '／本番' + mains + '日'
+      + (subs.length ? '＋' + subs.join('・') : '');
+    return `<span class="e-badge series-badge" title="同じイベントの日：${escAttr(groupDaysText(c))}">${esc(text)}</span>`;
+  }
   function seriesTag(c, e){
-    if (!c.series) return '';
+    if (!c.groupDays) return '';
     const on = e.seriesOn || [];
     if (!on.length) return '';
-    const total = c.series.total;
+    const total = groupTotal(c);
     return on.length >= total
       ? `<br><span class="e-series all" title="連日イベントの全日程にエントリーしています">🗓 全${total}日</span>`
       : `<br><span class="e-series part" title="連日イベントのうち、エントリーしている日">🗓 ${total}日中${on.length}日（${esc(on.join('・'))}）</span>`;
@@ -1007,9 +1042,8 @@
       const entryCount = all.filter(e => (e.src || 'entry') === 'entry').length;
       const calCount = all.length - entryCount;
       const dt = (c.dayType && c.dayType !== '本番') ? `<span class="e-badge dt-badge">${c.dayType}</span>` : '';
-      const sr = c.series
-        ? `<span class="e-badge series-badge" title="連日イベント：${escAttr((c.series.dates || []).join('・'))}">🗓 連日 ${c.series.idx}日目／全${c.series.total}日</span>` : '';
-      const fullCount = c.series ? all.filter(e => (e.seriesOn || []).length >= c.series.total).length : 0;
+      const sr = groupBadge(c);
+      const fullCount = c.groupDays ? all.filter(e => (e.seriesOn || []).length >= groupTotal(c)).length : 0;
       const shortCls = c.filled < c.need ? ' short' : '';
       const rows = ents.map((e, i) => `
         <tr class="${e.assigned?'assigned':''}${(e.src === 'cal') ? ' fromcal' : ''}">
@@ -1040,7 +1074,7 @@
           <div class="ecase-counts">
             <span class="c">必要 <b>${c.need}</b>名</span>
             <span class="c">🙋 エントリー <b>${entryCount}</b>名</span>
-            ${c.series ? `<span class="c">🗓 全${c.series.total}日エントリー <b>${fullCount}</b>名</span>` : ''}
+            ${c.groupDays ? `<span class="c" title="${escAttr(groupDaysText(c))}">🗓 全${groupTotal(c)}日エントリー <b>${fullCount}</b>名</span>` : ''}
             <span class="c">📅 その日空いている <b>${calCount}</b>名</span>
             <span class="c${shortCls}">アサイン済み <b>${Math.min(c.filled,c.need)}</b>名</span>
             ${ents.length !== all.length ? `<span class="c filtered">絞り込み中：<b>${ents.length}</b>名を表示</span>` : ''}
@@ -1159,8 +1193,8 @@
         head += `<th title="${escAttr(caseLabel(c))}"><span class="coldate">${dateLabel(c.off)}</span><br>`
           + (c.client ? `<span class="colclient" title="${escAttr(c.client)}">${esc(c.client)}</span><br>` : '')
           + `<span class="colname">${esc(c.name)}</span><br>`
-          + (c.series
-              ? `<span class="colseries" title="連日イベント：${escAttr((c.series.dates || []).join('・'))}／全日エントリー＝全日程にエントリーしている人数">🗓 ${c.series.idx}/${c.series.total}日目・全日${all.filter(e => (e.seriesOn || []).length >= c.series.total).length}名</span><br>`
+          + (c.groupDays
+              ? `<span class="colseries" title="同じイベントの日：${escAttr(groupDaysText(c))}／全日＝全部の日にエントリーしている人数">🗓 ${esc(groupLabelOf(c))}・全日${all.filter(e => (e.seriesOn || []).length >= groupTotal(c)).length}名</span><br>`
               : '')
           + `<span class="colmeta">必${c.need}/応${entCnt}/空${calCnt}</span></th>`;
       });
@@ -1187,11 +1221,12 @@
                      : '<span class="m-ent">〇</span>';
           const lock = (st === 'fix' && pub) ? '<span class="m-lock" title="確定＋公開済み">🔒</span>' : '';
           // 連日イベント：全日エントリーなら「全」、一部なら「1/4」（2026-10-16 baba要望）。
-          const srOn = c.series ? e.seriesOn.length : 0;
+          const srOn = c.groupDays ? e.seriesOn.length : 0;
+          const srTotal = groupTotal(c);
           const sr = !srOn ? ''
-            : (srOn >= c.series.total
-                ? `<span class="m-sr all" title="連日イベントの全${c.series.total}日にエントリー">全</span>`
-                : `<span class="m-sr part" title="連日イベント${c.series.total}日のうち ${srOn}日だけエントリー（${escAttr(e.seriesOn.join('・'))}）">${srOn}/${c.series.total}</span>`);
+            : (srOn >= srTotal
+                ? `<span class="m-sr all" title="同じイベントの全${srTotal}日（リハ日なども含む）にエントリー">全</span>`
+                : `<span class="m-sr part" title="同じイベント${srTotal}日のうち ${srOn}日だけエントリー（${escAttr(e.seriesOn.join('・'))}）">${srOn}/${srTotal}</span>`);
           const rmBtn = (st === 'fix' || st === 'tmp') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';
           const tip = st === 'fix' ? (pub ? '確定＋公開済み（×で解除・確認あり）' : '確定（外すには×）')
                     : st === 'tmp' ? 'クリックで確定／×で外す'
