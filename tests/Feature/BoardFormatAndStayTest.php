@@ -76,7 +76,7 @@ class BoardFormatAndStayTest extends TestCase
         // ⚠ 置き場所＝コンテンツ名の横（2026-09-18 baba「前泊とかリアルとかはコンテンツの横に表示で」）。
         //   カードの下に離して置くと、横に並んだカードを目で追うときに見落とす。
         $this->assertStringContainsString(
-            'titleBlockHtml(c, scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)',
+            'titleBlockHtml(c, groupBadgeHtml(c) + scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)',
             $html,
             '実施形態と札がコンテンツ名の横に出ていません'
         );
