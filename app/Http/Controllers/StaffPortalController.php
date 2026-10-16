@@ -814,6 +814,16 @@ class StaffPortalController extends Controller
         $seriesGroups = ProjectSeries::groupFor($projects);
         // 同じイベントの全部の日（本番＋リハ日・前日設営・予備日）。1枚のカードから日を選んでエントリーするため（2026-10-16）。
         $groupDays = ProjectSeries::daysFor($projects);
+        // ⚠ リハ日・前日設営・予備日は、**この人に公開している日だけ**並べる（2026-10-16 baba決定）。
+        //   社員だけで出る日（スタッフに募集しない日）が「募集前」と出続けると紛らわしいため。
+        //   本番の日は非公開でも残す（「何日のイベントか」が分かるように＝「募集前」と出る）。
+        $visibleIds = $projects->pluck('id')->flip();
+        foreach ($groupDays as $root => $days) {
+            $groupDays[$root] = array_values(array_filter(
+                $days,
+                fn ($d) => $d['type'] === '本番' || isset($visibleIds[$d['id']])
+            ));
+        }
 
         return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups, $groupDays) {
             $off = $p->start_date

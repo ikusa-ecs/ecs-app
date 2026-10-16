@@ -161,6 +161,24 @@ class SeriesEntryTest extends TestCase
         $res->assertSee('function groupBadgeHtml', false);
     }
 
+    /**
+     * 非公開のリハ日・前日設営・予備日はスタッフ画面に並べない（社員だけで出る日がある・2026-10-16 baba決定）。
+     * 本番の日は非公開でも残す（「募集前」と出す＝何日のイベントか分かるように）。
+     */
+    public function test_非公開のリハ日はスタッフ画面に出さない(): void
+    {
+        $me = $this->staff();
+        $d1 = Carbon::today()->addDays(30);
+        ProjectFactory::new()->published()->create(['id' => 'P-M1', 'start_date' => $d1->format('Y-m-d'), 'office' => '東京']);
+        ProjectFactory::new()->create(['id' => 'P-M2', 'start_date' => $d1->copy()->addDay()->format('Y-m-d'), 'office' => '東京', 'parent_project_id' => 'P-M1', 'staff_published' => false]);
+        ProjectFactory::new()->create(['id' => 'P-SET', 'start_date' => $d1->copy()->subDay()->format('Y-m-d'), 'office' => '東京', 'parent_project_id' => 'P-M1', 'date_type' => '前日設営', 'staff_published' => false]);
+        ProjectFactory::new()->published()->create(['id' => 'P-R', 'start_date' => $d1->copy()->subDays(10)->format('Y-m-d'), 'office' => '東京', 'parent_project_id' => 'P-M1', 'date_type' => 'リハ日']);
+
+        $jobs = $this->actingAsPerson($me)->get('/staff-portal')->assertOk()->original->getData()['recruitJobs'];
+        $days = collect($jobs)->firstWhere('id', 'P-M1')['groupDays'];
+        $this->assertSame(['P-R', 'P-M1', 'P-M2'], array_column($days, 'id'), '非公開の前日設営は外し、非公開の本番は残す');
+    }
+
     /** 社員のエントリー一覧でも「全日なのか何日だけなのか」が分かる。 */
     public function test_エントリー一覧に全日か何日だけかが出る(): void
     {
