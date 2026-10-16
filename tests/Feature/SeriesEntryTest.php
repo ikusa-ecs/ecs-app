@@ -93,6 +93,6 @@ class SeriesEntryTest extends TestCase
 
         $this->actingAsPerson($me)->get('/staff-portal')->assertOk()
             ->assertSee('"seriesRoot":"P-D1"', false)
-            ->assertSee('function armSeries', false);
+            ->assertSee('function openSeriesModal', false);
     }
 }

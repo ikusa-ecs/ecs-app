@@ -313,6 +313,38 @@
     .applied-mark { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
                     background: #15803d; color: #fff; font-size: 11px; font-weight: 700; }
 
+    /* ===== 連日イベント（2026-10-16 baba要望）=====
+       ・カードの上に青い帯＝1日だけの仕事と見分けがつくように。
+       ・日ごとのエントリー状況（✅/―/満員/募集前）を並べる＝全日なのか1日だけなのか分かるように。
+       ・まとめてエントリーは、全日程の詳細を出してから聞き直す（下の .sr-modal）。 */
+    .job-row.series { border-top: 4px solid var(--info-ink, #1d4e89); }
+    .sr-ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: -2px 0 6px;
+                 font-size: 12px; font-weight: 700; color: var(--info-ink, #1d4e89); }
+    .sr-box { margin-top: 6px; padding: 8px 10px; border: 1px solid var(--info-line, #bcd0ea); border-radius: 8px;
+              background: var(--info-soft, #eef4fb); color: var(--ink); font-size: 12px; line-height: 1.6; }
+    .sr-days { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+    .sr-day { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; border: 1px solid var(--line);
+              background: var(--panel); color: var(--muted); white-space: nowrap; }
+    .sr-day.on { background: #15803d; border-color: #15803d; color: #fff; font-weight: 700; }
+    .sr-day.me { outline: 2px solid var(--info-ink, #1d4e89); outline-offset: 1px; }
+    .sr-sum { font-weight: 700; }
+    .sr-sum.all { color: #15803d; }
+    .sr-sum.part { color: #b45309; }
+    .sr-modal-bg { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.45);
+                   display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .sr-modal { background: var(--panel); color: var(--ink); border-radius: 14px; width: 100%; max-width: 460px;
+                max-height: 85vh; overflow: auto; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .sr-modal h3 { margin: 0 0 4px; font-size: 16px; }
+    .sr-modal .sr-lead { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+    .sr-item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; font-size: 12.5px; line-height: 1.6; }
+    .sr-item .sr-h { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13.5px; }
+    .sr-item .sr-st { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+    .sr-item .sr-st.go { color: var(--info-ink, #1d4e89); }
+    .sr-item .sr-st.done { color: #15803d; }
+    .sr-item .sr-st.ng { color: var(--danger-ink, #b91c1c); }
+    .sr-item.ng { opacity: .65; }
+    .sr-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+
     /* ===== 稼働希望カレンダー（既存スマホ画面から移植） ===== */
     .pref-wrap { max-width: 460px; margin: 0 auto; }
     .m-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
@@ -1452,35 +1484,108 @@
     }
 
     // ── 連日イベントの「全日まとめてエントリー」（2026-10-16 baba要望＝4日間出られる人を募集したい） ──
-    // ⚠ 押すのは2段階（1日ずつのボタンと同じ＝誤タップで何日分も入らないように）。
+    // ⚠ 押すと、全日程の詳細（日付・時間・会場・集合）を出してから「エントリーしますか？」と聞き直す
+    //   （baba要望＝何日分の仕事か分かったうえで押してもらう）。誤タップでは何日分も入らない。
     // ⚠ どの日に入れるかはサーバーが決める（非公開・満員の日は飛ばして返ってくる）。
     function seriesSiblings(j) {
       return jobs.filter(x => x.series && x.seriesRoot === j.seriesRoot);
     }
-    function seriesBtn(j) {
-      const rest = seriesSiblings(j).filter(x => !x.applied);
-      if (rest.length === 0) {
-        return '<br><span class="applied-mark">✅ 募集中の日はすべてエントリー済み</span>';
-      }
-      const armed = applyArmed === 'S:' + j.seriesRoot;
-      return '<br><button type="button" class="apply-btn-sm' + (armed ? ' confirm' : '') + '" style="margin-top:6px;" onclick="armSeries(' + j._i + ')">'
-        + (armed ? '⚠ もう一度押すと全日にエントリー' : '🗓 全' + j.series.total + '日まとめてエントリー') + '</button>';
+    function mdOf(d) { return (d.getMonth() + 1) + '/' + d.getDate(); }
+    /**
+     * 連日イベントの日ごとの状況。j.series.dates（全日程・"11/1" の形）を並びの正とする。
+     * st … on＝エントリー済み / go＝これから入れる / full＝満員 / none＝募集していない（非公開・他拠点など）
+     */
+    function seriesDays(j) {
+      const sibs = seriesSiblings(j);
+      return (j.series.dates || []).map((md, k) => {
+        const x = sibs.find(s => mdOf(s.date) === md) || null;
+        let st = 'none';
+        if (x && x.applied) st = 'on';
+        else if (x && x.state === 'closed') st = 'full';
+        else if (x) st = 'go';
+        return { md: md, idx: k + 1, job: x, st: st };
+      });
     }
-    function armSeries(i) {
+    function seriesBox(j) {
+      const days = seriesDays(j);
+      const on = days.filter(d => d.st === 'on');
+      const go = days.filter(d => d.st === 'go');
+      let sum;
+      if (on.length === days.length) {
+        sum = '<span class="sr-sum all">✅ 全' + days.length + '日にエントリー済み</span>';
+      } else if (on.length > 0 && go.length === 0) {
+        // 残りは満員・募集前だけ＝本人がやれることはやってある。
+        sum = '<span class="sr-sum all">✅ 募集中の日はすべてエントリー済み（' + days.length + '日のうち ' + on.length + '日）</span>';
+      } else if (on.length > 0) {
+        sum = '<span class="sr-sum part">⚠ ' + days.length + '日のうち ' + on.length + '日だけエントリー中（' + on.map(d => d.md).join('・') + '）</span>';
+      } else {
+        sum = '<span class="sr-sum">まだエントリーしていません</span>';
+      }
+      const chips = days.map(d => {
+        const label = d.st === 'on' ? '✅' : d.st === 'full' ? '満員' : d.st === 'none' ? '募集前' : '―';
+        return '<span class="sr-day' + (d.st === 'on' ? ' on' : '') + (d.job && d.job.id === j.id ? ' me' : '') + '">'
+          + d.idx + '日目 ' + escAttr(d.md) + ' ' + label + '</span>';
+      }).join('');
+      const btn = go.length > 0
+        ? '<button type="button" class="apply-btn-sm" style="margin-top:6px;" onclick="openSeriesModal(' + j._i + ')">🗓 全' + days.length + '日の詳細を見てエントリー</button>'
+        : '';
+      return '<div class="sr-box">'
+        + '<div><b>全日程に出られる方を優先します。</b>全日出られる方は下のボタンから、一部の日だけの方は1日ずつエントリーしてください。</div>'
+        + '<div class="sr-days">' + chips + '</div>'
+        + sum + (btn ? '<br>' + btn : '')
+        + '</div>';
+    }
+    // 全日程の詳細を出して、エントリーするか聞き直す画面。
+    function openSeriesModal(i) {
       const j = jobs[i];
-      if (!j) return;
-      const key = 'S:' + j.seriesRoot;
-      if (applyArmed === key) {   // 2回目＝本当に実行
-        disarmApply();
-        applySeries(j);
-        return;
-      }
+      if (!j || !j.series) return;
+      closeSeriesModal();
       disarmApply();
-      applyArmed = key;
-      seriesSiblings(j).forEach(x => keepVisible.add(x.id));
-      applyArmedTimer = setTimeout(function () { applyArmed = null; applyArmedTimer = null; renderJobs(); }, 5000);
-      renderJobs();
+      const days = seriesDays(j);
+      const go = days.filter(d => d.st === 'go');
+      const items = days.map(d => {
+        const x = d.job;
+        const dow = x ? '（' + '日月火水木金土'[x.date.getDay()] + '）' : '';
+        const st = d.st === 'go' ? '<span class="sr-st go">エントリーします</span>'
+          : d.st === 'on' ? '<span class="sr-st done">✅ エントリー済み</span>'
+          : d.st === 'full' ? '<span class="sr-st ng">満員のため入れません</span>'
+          : '<span class="sr-st ng">まだ募集していません</span>';
+        const body = x
+          ? '⏰ 集合〜解散 ' + escAttr(staffMeetOf(x.id, x.meet)) + '〜' + escAttr(x.leave)
+            + (x.evTbd ? '（本番時間未定）' : '（本番 ' + escAttr(x.evStart) + '〜' + escAttr(x.evEnd) + '）')
+            + '<br>📍 ' + escAttr(x.place) + '<br>🚩 集合 ' + escAttr(x.meetPlace)
+          : '<span style="color:var(--muted);">この日の詳細は、募集が始まると出ます。</span>';
+        return '<div class="sr-item' + (d.st === 'full' || d.st === 'none' ? ' ng' : '') + '">'
+          + '<div class="sr-h"><span>' + d.idx + '日目　' + escAttr(d.md) + dow + '</span>' + st + '</div>'
+          + body + '</div>';
+      }).join('');
+      const ngCount = days.filter(d => d.st === 'full' || d.st === 'none').length;
+      const bg = document.createElement('div');
+      bg.className = 'sr-modal-bg';
+      bg.id = 'srModal';
+      bg.onclick = function (e) { if (e.target === bg) closeSeriesModal(); };
+      bg.innerHTML = '<div class="sr-modal" role="dialog" aria-modal="true">'
+        + '<h3>🗓 ' + escAttr(j.content) + '（全' + days.length + '日）</h3>'
+        + '<div class="sr-lead">' + escAttr(j.client) + '　連日イベントです。全部の日程を確かめてからエントリーしてください。'
+        + (ngCount > 0 ? '<br><b>入れない日が ' + ngCount + '日あります。</b>入れる ' + go.length + '日分にエントリーします。' : '') + '</div>'
+        + items
+        + '<div class="sr-actions">'
+        + '<button type="button" class="apply-btn-sm cancel" onclick="closeSeriesModal()">やめる</button>'
+        + '<button type="button" class="apply-btn-sm" id="srModalOk">' + go.length + '日分にエントリーする</button>'
+        + '</div></div>';
+      document.body.appendChild(bg);
+      document.getElementById('srModalOk').onclick = function () {
+        this.disabled = true;
+        closeSeriesModal();
+        seriesSiblings(j).forEach(x => keepVisible.add(x.id));
+        applySeries(j);
+      };
     }
+    function closeSeriesModal() {
+      const m = document.getElementById('srModal');
+      if (m) m.remove();
+    }
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSeriesModal(); });
     function applySeries(j) {
       const body = new URLSearchParams();
       body.append('project_id', j.id);
@@ -1610,11 +1715,12 @@
         //   （カレンダー表示のときはリストを作らない）。
         row.id = 'job-' + j.id;
         // ⚠ 緑の印は「自分が応募したか」なので j.applied で付ける（満員でも付く）。
-        row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.applied ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '');
+        row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.applied ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '') + (j.series ? ' series' : '');
         row.innerHTML = `
+          ${j.series ? `<div class="sr-ribbon">🗓 連日イベント（全${j.series.total}日）<span>この日は ${j.series.idx}日目</span></div>` : ''}
           <div class="jr-head">
             <span class="jr-date">${dateStr}</span>
-            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.applied ? '<span class="applied-mark">✅ エントリー済み</span>' : ''}</span>
+            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.applied ? '<span class="applied-mark">✅ ' + (j.series ? 'この日' : '') + 'エントリー済み</span>' : ''}</span>
             <span class="j-badge ${sb.c}">${sb.t}</span>
           </div>
           <div class="jr-tags">${tags}</div>
@@ -1625,8 +1731,7 @@
           </div>
           ${String(j.staffNotes || '').trim() !== ''
             ? `<div class="jr-note"><span class="ic">📣</span><span>${escLines(j.staffNotes)}</span></div>` : ''}
-          ${j.series
-            ? `<div class="jr-note"><span class="ic">🗓</span><span><b>連日イベントです</b>（${escAttr(j.series.dates.join('・'))} の全${j.series.total}日。これは${j.series.idx}日目）。<br><b>全日程に出られる方を優先します。</b>全日出られる方は「まとめてエントリー」を押してください（1日ずつのエントリーもできます）。${seriesBtn(j)}</span></div>` : ''}
+          ${j.series ? seriesBox(j) : ''}
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
           ${j.saveError ? `<div class="jr-error">⚠ ${escAttr(j.saveError)}</div>` : ''}
           <div class="jr-foot">
