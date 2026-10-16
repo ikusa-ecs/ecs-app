@@ -112,7 +112,7 @@ class SeriesEntryTest extends TestCase
         $this->assertCount(4, $byId['S-001']['seriesOn']);
         $d1 = Carbon::today()->addDays(20);
         $this->assertSame([$d1->format('n/j'), $d1->copy()->addDays(2)->format('n/j')], $byId['S-002']['seriesOn']);
-        $res->assertSee('function seriesTag', false);
+        $res->assertSee('function seriesTag', false)->assertSee('class="m-sr all"', false);
     }
 
     public function test_画面に連日イベントのまとめボタンの材料が渡る(): void

@@ -147,6 +147,12 @@
     .e-series.all  { background:#15803d; color:#fff; }
     .e-series.part { background:#fff4e0; color:#b45309; border:1px solid #f0d3a6; }
     .e-badge.series-badge { background:#1d4e89; color:#fff; }
+    /* 月ごとの表：見出しの「🗓 1/4日目・全日◯名」とマスの「全」「1/4」 */
+    table.mtx .colseries { font-size:10px; font-weight:700; color:#1d4e89; white-space:nowrap; }
+    table.mtx .m-sr { display:inline-block; margin-left:2px; padding:0 4px; border-radius:6px; font-size:9.5px; font-weight:700; line-height:1.5; vertical-align:middle; }
+    table.mtx .m-sr.all  { background:#15803d; color:#fff; }
+    table.mtx .m-sr.part { background:#fff4e0; color:#b45309; border:1px solid #f0d3a6; }
+    html[data-theme="dark"] table.mtx .colseries { color:var(--info-ink); }
     /* カレンダーの〇だけの人の行は、少し薄くして「まだ応募はしていない」と分かるようにする。 */
     .ent-table tr.fromcal td { background:#fbfbfd; }
     .ecase-counts .c.filtered { color:#b45309; font-weight:700; }
@@ -1134,7 +1140,7 @@
                    : (e.status === '仮' ? 'tmp'
                    : (e.wish === 'ng' ? 'ng'
                    : ((e.src === 'cal') ? 'cal' : 'ent')));
-          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name };
+          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [] };
         });
         return m;
       });
@@ -1153,6 +1159,9 @@
         head += `<th title="${escAttr(caseLabel(c))}"><span class="coldate">${dateLabel(c.off)}</span><br>`
           + (c.client ? `<span class="colclient" title="${escAttr(c.client)}">${esc(c.client)}</span><br>` : '')
           + `<span class="colname">${esc(c.name)}</span><br>`
+          + (c.series
+              ? `<span class="colseries" title="連日イベント：${escAttr((c.series.dates || []).join('・'))}／全日エントリー＝全日程にエントリーしている人数">🗓 ${c.series.idx}/${c.series.total}日目・全日${all.filter(e => (e.seriesOn || []).length >= c.series.total).length}名</span><br>`
+              : '')
           + `<span class="colmeta">必${c.need}/応${entCnt}/空${calCnt}</span></th>`;
       });
       head += '</tr></thead>';
@@ -1177,6 +1186,12 @@
                      : st === 'cal' ? '<span class="m-cal">空</span>'
                      : '<span class="m-ent">〇</span>';
           const lock = (st === 'fix' && pub) ? '<span class="m-lock" title="確定＋公開済み">🔒</span>' : '';
+          // 連日イベント：全日エントリーなら「全」、一部なら「1/4」（2026-10-16 baba要望）。
+          const srOn = c.series ? e.seriesOn.length : 0;
+          const sr = !srOn ? ''
+            : (srOn >= c.series.total
+                ? `<span class="m-sr all" title="連日イベントの全${c.series.total}日にエントリー">全</span>`
+                : `<span class="m-sr part" title="連日イベント${c.series.total}日のうち ${srOn}日だけエントリー（${escAttr(e.seriesOn.join('・'))}）">${srOn}/${c.series.total}</span>`);
           const rmBtn = (st === 'fix' || st === 'tmp') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';
           const tip = st === 'fix' ? (pub ? '確定＋公開済み（×で解除・確認あり）' : '確定（外すには×）')
                     : st === 'tmp' ? 'クリックで確定／×で外す'
@@ -1189,9 +1204,9 @@
             body += `<td class="cell assignable ${cls}${(st==='fix'&&pub)?' is-pub':''}"`
               + ` data-pid="${esc(c.id)}" data-sid="${esc(e.id)}" data-role="${esc(e.role)}" data-state="${st}"`
               + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${escAttr(caseLabel(c))}"`
-              + ` title="${tip}">` + mark + lock + rmBtn + '</td>';
+              + ` title="${tip}">` + mark + sr + lock + rmBtn + '</td>';
           } else {
-            body += `<td class="cell">${mark}</td>`;
+            body += `<td class="cell">${mark}${sr}</td>`;
           }
         });
         body += `</tr>`;
