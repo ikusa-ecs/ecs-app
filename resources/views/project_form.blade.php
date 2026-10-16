@@ -501,14 +501,15 @@
             <label>連日イベント</label>
             <div class="check-row">
               <input type="checkbox" id="hasSeries" name="has_series" onchange="toggleSeries()">
-              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント）</label>
+              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント・リハ日などもまとめて登録）</label>
             </div>
             <div class="sub-msg" id="seriesMsg">チェックしない場合、この案件は <b>1日だけ</b> の開催として登録されます。</div>
 
             <div class="expand-box" id="seriesBox">
               <div class="hint" style="margin-bottom:8px;">
-                上の「開催日」が<b>1日目</b>です。2日目からの日程をここに足してください。<br>
-                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（人数・コンテンツ・時間などの中身は同じ内容で入ります。<b>日ごとに時間が違うときは、保存したあと案件一覧からその日の案件を開いて直してください</b>）。<br>
+                上の「開催日」が<b>本番1日目</b>です。ほかの日をここに足してください。<b>リハ日・前日設営・予備日も、種別を選べばここで一緒に登録できます。</b><br>
+                集合・解散・人数は<b>空なら1日目と同じ</b>です。日によって違うときだけ入れてください。<br>
+                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（コンテンツ・会場などの中身は1日目と同じ内容で入ります）。<br>
                 ※ スタッフ画面には「連日イベント（全◯日）」の帯と「全◯日の詳細を見てエントリー」ボタンが出て、<b>全日程に出られる方を優先します</b>と案内します。
               </div>
               <div id="seriesDates"></div>
@@ -1210,34 +1211,54 @@
       if (!document.querySelector('#seriesDates input')) addSeriesDate();
     }
   }
-  // 2日目からの日程を1行足す。行は何行でも足せる（送るときは series_dates[] の配列）。
+  // 日程を1行足す。行は何行でも足せる（送るときは series_dates[] などの配列＝同じ順番で並ぶ）。
+  // 2026-10-16 baba要望「1つの案件は1回の登録で完結させたい」：
+  //   行ごとに 種別（本番／リハ日／前日設営／予備日）・集合／解散・運営人数 を入れられる。
+  //   時間と人数は空なら1日目と同じ（サーバーの createSeriesDays が正）。
   function addSeriesDate() {
     const box = document.getElementById('seriesDates');
     if (!box) return;
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
-    const n = box.children.length + 2;   // 1日目は上の「開催日」なので2から数える
+    row.className = 'series-row';
+    row.style.cssText = 'display:flex; gap:6px 8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--line, #e5ddd0);';
     const label = document.createElement('span');
-    label.style.cssText = 'font-size:12.5px; color:#6b5544; min-width:4.5em;';
-    label.textContent = n + '日目';
+    label.className = 'series-label';
+    label.style.cssText = 'font-size:12.5px; font-weight:700; color:var(--ink, #6b5544); min-width:5.5em;';
     const input = document.createElement('input');
     input.type = 'date';
     input.name = 'series_dates[]';
+    const type = document.createElement('select');
+    type.name = 'series_types[]';
+    ['本番', 'リハ日', '前日設営', '予備日'].forEach(function (t) {
+      const o = document.createElement('option'); o.value = t; o.textContent = t; type.appendChild(o);
+    });
+    type.onchange = renumberSeries;
+    const mk = function (tag, attrs) { const el = document.createElement(tag); Object.keys(attrs).forEach(function (k) { el[k] = attrs[k]; }); return el; };
+    const st = mk('input', { type: 'time', name: 'series_start[]', title: '集合（空なら1日目と同じ）' });
+    const en = mk('input', { type: 'time', name: 'series_end[]', title: '解散（空なら1日目と同じ）' });
+    const cnt = mk('input', { type: 'number', name: 'series_count[]', min: '0', placeholder: '人数', title: '運営人数（空なら1日目と同じ）' });
+    cnt.style.width = '5.5em';
+    const small = function (t) { const sp = document.createElement('span'); sp.style.cssText = 'font-size:12px; color:var(--muted, #8a7a66);'; sp.textContent = t; return sp; };
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'btn ghost sm';
     del.textContent = '消す';
     del.onclick = function () { row.remove(); renumberSeries(); };
-    row.appendChild(label); row.appendChild(input); row.appendChild(del);
+    [label, input, type, small('集合'), st, small('〜 解散'), en, small('人数'), cnt, del].forEach(function (el) { row.appendChild(el); });
     box.appendChild(row);
+    renumberSeries();
   }
-  // 行を消したあと「◯日目」を振り直す（消した行の番号が飛んだままだと分かりにくい）。
+  // 行の呼び名を振り直す＝本番は「本番◯日目」（1日目は上の開催日なので2から）、それ以外は種別の名前。
   function renumberSeries() {
     const box = document.getElementById('seriesDates');
     if (!box) return;
-    Array.prototype.forEach.call(box.children, function (row, i) {
-      const sp = row.querySelector('span');
-      if (sp) sp.textContent = (i + 2) + '日目';
+    let n = 1;
+    Array.prototype.forEach.call(box.children, function (row) {
+      const sp = row.querySelector('.series-label');
+      const sel = row.querySelector('select');
+      if (!sp || !sel) return;
+      if (sel.value === '本番') { n++; sp.textContent = '本番' + n + '日目'; }
+      else { sp.textContent = sel.value; }
     });
   }
 

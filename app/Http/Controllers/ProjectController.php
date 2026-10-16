@@ -1497,6 +1497,14 @@ class ProjectController extends Controller
      *  ・公開は1日ずつ担当が行う＝作った時点では全部 非公開。
      *  ・⚠ 読めない日付・1日目と同じ日・重複した日は黙って飛ばす（変な案件を増やさない）。
      *
+     * 【2026-10-16 追加（baba要望「1つの案件は1回の登録で完結させたい」）】
+     *  ・行ごとに**種別**（本番／リハ日／前日設営／予備日＝series_types[]）を選べる。
+     *    例：本番3日＋リハ1日を1回の保存で作る。リハ日なども1日目に結ぶ（同じイベント）。
+     *  ・行ごとに**集合・解散の時間**（series_start[]／series_end[]）と**運営人数**（series_count[]）を入れられる。
+     *    空なら1日目と同じ（baba決定 2026-10-16「行ごとに入れる・空なら本番と同じ」）。
+     *    ⚠ 時間を変えたら、スタッフだけ別の集合・解散（staff_meet/leave_time）は空に戻す
+     *      ＝1日目のスタッフ時間が残ると、違う日の時間がスタッフに出る。
+     *
      * @param  array<string, mixed>  $attributes  1日目の中身
      * @return int 作った日数
      */
@@ -1510,17 +1518,43 @@ class ProjectController extends Controller
         $seen = [$first => true];
         $made = 0;
 
-        foreach ((array) $request->input('series_dates', []) as $raw) {
+        $types = (array) $request->input('series_types', []);
+        $starts = (array) $request->input('series_start', []);
+        $ends = (array) $request->input('series_end', []);
+        $counts = (array) $request->input('series_count', []);
+
+        foreach ((array) $request->input('series_dates', []) as $i => $raw) {
             $date = trim((string) $raw);
             if ($date === '' || ! $this->isRealDate($date) || isset($seen[$date])) {
                 continue;
             }
             $seen[$date] = true;
 
+            $type = (string) ($types[$i] ?? '本番');
+            if (! SubDateProject::isType($type)) {
+                $type = '本番';
+            }
+
             $day = $attributes;
             $day['id'] = $this->nextProjectId($date);
             $day['start_date'] = $date;
-            $day['date_type'] = '本番';
+            $day['date_type'] = $type;
+            // 行ごとの時間・人数（空なら1日目と同じ）。
+            $st = trim((string) ($starts[$i] ?? ''));
+            $en = trim((string) ($ends[$i] ?? ''));
+            if (preg_match('/^\d{1,2}:\d{2}$/', $st)) {
+                $day['start_time'] = $st;
+                $day['staff_meet_time'] = null;
+            }
+            if (preg_match('/^\d{1,2}:\d{2}$/', $en)) {
+                $day['end_time'] = $en;
+                $day['staff_leave_time'] = null;
+            }
+            $cnt = trim((string) ($counts[$i] ?? ''));
+            if ($cnt !== '' && ctype_digit($cnt)) {
+                $day['required_count'] = (int) $cnt;
+                $day['required_count_min'] = null;
+            }
             $day['parent_project_id'] = $firstId;
             $day['staff_published'] = false;
             // 運営シートは日ごとに別物。コピーすると1日目のシートを見て作業してしまう。

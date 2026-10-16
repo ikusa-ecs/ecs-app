@@ -160,4 +160,56 @@ class ProjectSeriesTest extends TestCase
         );
         $this->assertContains('連日イベントの他の日にもエントリー', $staff['S-201']['reasons']);
     }
+
+    /**
+     * 本番3日＋リハ1日を1回の保存で作る（2026-10-16 baba要望「1つの案件は1回で完結させたい」）。
+     * 行ごとの時間・人数は、空なら1日目と同じ。
+     */
+    public function test_本番3日とリハ日を1回で登録できる(): void
+    {
+        $me = $this->manager();
+        $d1 = Carbon::today()->addDays(60);
+
+        $this->actingAsPerson($me)->post('/project-form', [
+            'client' => 'テスト株式会社',
+            'content_names' => '謎解き',
+            'required_count' => '10',
+            'start_date' => $d1->format('Y-m-d'),
+            'start_time' => '09:00',
+            'end_time' => '18:00',
+            'office' => '東京',
+            'ikusa_count' => '5',
+            'intent' => 'publish',
+            'has_series' => '1',
+            'series_dates' => [
+                $d1->copy()->addDay()->format('Y-m-d'),
+                $d1->copy()->addDays(2)->format('Y-m-d'),
+                $d1->copy()->subDays(30)->format('Y-m-d'),
+            ],
+            'series_types' => ['本番', '本番', 'リハ日'],
+            'series_start' => ['', '10:00', '13:00'],
+            'series_end' => ['', '', '17:00'],
+            'series_count' => ['', '', '3'],
+        ])->assertRedirect('/projects');
+
+        $this->assertSame(4, Project::count());
+        $first = Project::whereNull('parent_project_id')->first();
+        $rows = Project::where('parent_project_id', $first->id)->orderBy('start_date')->get();
+
+        $reha = $rows->first();
+        $this->assertSame('リハ日', $reha->date_type);
+        $this->assertSame('13:00', substr((string) $reha->start_time, 0, 5));
+        $this->assertSame('17:00', substr((string) $reha->end_time, 0, 5));
+        $this->assertSame(3, (int) $reha->required_count);
+
+        $day2 = $rows->get(1);
+        $this->assertSame('本番', $day2->date_type);
+        $this->assertSame('09:00', substr((string) $day2->start_time, 0, 5), '空なら1日目と同じ');
+        $this->assertSame(10, (int) $day2->required_count);
+        $this->assertSame('10:00', substr((string) $rows->get(2)->start_time, 0, 5));
+
+        // 本番は3日（リハ日は「◯日目」に数えない）＋同じイベントの日は4日。
+        $this->assertSame(3, ProjectSeries::positionOf($first, ProjectSeries::groupFor([$first]))['total']);
+        $this->assertCount(4, ProjectSeries::daysFor([$first])[$first->id]);
+    }
 }
