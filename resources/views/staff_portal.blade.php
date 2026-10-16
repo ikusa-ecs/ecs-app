@@ -336,7 +336,10 @@
                 max-height: 85vh; overflow: auto; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
     .sr-modal h3 { margin: 0 0 4px; font-size: 16px; }
     .sr-modal .sr-lead { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
-    .sr-item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; font-size: 12.5px; line-height: 1.6; }
+    .sr-item { display: block; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; font-size: 12.5px; line-height: 1.6; }
+    .sr-item.can { cursor: pointer; }
+    .sr-item.can:has(.sr-pick:checked) { border-color: #15803d; background: var(--ok-soft, #e7f6ec); }
+    .sr-item .sr-pick { width: 18px; height: 18px; vertical-align: -3px; margin: 0 4px 0 0; }
     .sr-item .sr-h { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13.5px; }
     .sr-item .sr-st { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
     .sr-item .sr-st.go { color: var(--info-ink, #1d4e89); }
@@ -1385,7 +1388,7 @@
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
         // 連日イベント（◯日目／全◯日）。1日だけの案件は null。
         // ⚠ ここで詰め替え忘れると、サーバーが送っていても画面に出ない。
-        series:c.series || null, seriesRoot:c.seriesRoot || '',
+        series:c.series || null, seriesRoot:c.seriesRoot || '', groupDays:c.groupDays || null,
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
         // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
@@ -1483,31 +1486,59 @@
       renderJobs();
     }
 
-    // ── 連日イベントの「全日まとめてエントリー」（2026-10-16 baba要望＝4日間出られる人を募集したい） ──
-    // ⚠ 押すと、全日程の詳細（日付・時間・会場・集合）を出してから「エントリーしますか？」と聞き直す
-    //   （baba要望＝何日分の仕事か分かったうえで押してもらう）。誤タップでは何日分も入らない。
-    // ⚠ どの日に入れるかはサーバーが決める（非公開・満員の日は飛ばして返ってくる）。
-    function seriesSiblings(j) {
-      return jobs.filter(x => x.series && x.seriesRoot === j.seriesRoot);
+    // ── 連日イベント・リハ日つきの案件を「1枚のカードから日を選んで」エントリーする（2026-10-16 baba要望） ──
+    // ・4日間出られる人を募集したい → 全日程の詳細を出してから聞き直す。
+    // ・1日だけでも、その日のカードを探すのは大変 → 同じ画面で日を選べる（外すと取り消し）。
+    // ・リハ日 11/24・本番 12/29・12/30 のように離れていることがある → リハ日・前日設営・予備日も一緒に並べる。
+    // ⚠ 日の並びの正＝サーバーの groupDays（ProjectSeries::daysFor・募集していない日も入る）。
+    // ⚠ どの日に入れるかは最後にサーバーが決める（非公開・満員の日は飛ばして返ってくる）。
+    function groupJobs(j) {
+      return jobs.filter(x => x.seriesRoot === j.seriesRoot);
     }
     function mdOf(d) { return (d.getMonth() + 1) + '/' + d.getDate(); }
     /**
-     * 連日イベントの日ごとの状況。j.series.dates（全日程・"11/1" の形）を並びの正とする。
+     * 同じイベントの日ごとの状況。
      * st … on＝エントリー済み / go＝これから入れる / full＝満員 / none＝募集していない（非公開・他拠点など）
+     * label … 本番は「◯日目」、それ以外は「リハ」「前日設営」「予備日」
      */
-    function seriesDays(j) {
-      const sibs = seriesSiblings(j);
-      return (j.series.dates || []).map((md, k) => {
-        const x = sibs.find(s => mdOf(s.date) === md) || null;
+    function groupDaysOf(j) {
+      const mine = groupJobs(j);
+      const mains = mainDayCount(j);
+      let n = 0;
+      return (j.groupDays || []).map(g => {
+        const x = mine.find(s => s.id === g.id) || null;
         let st = 'none';
         if (x && x.applied) st = 'on';
         else if (x && x.state === 'closed') st = 'full';
         else if (x) st = 'go';
-        return { md: md, idx: k + 1, job: x, st: st };
+        const isMain = (g.type || '本番') === '本番';
+        if (isMain) n++;
+        // 本番が1日だけ（前日設営・リハ日つき）なら「1日目」ではなく「本番」と出す。
+        const label = isMain ? (mains > 1 ? n + '日目' : '本番') : g.type;
+        return { id: g.id, md: g.md, ymd: g.ymd, type: g.type, label: label, job: x, st: st };
       });
     }
+    function dowOfYmd(ymd) {
+      const p = String(ymd || '').split('-');
+      if (p.length !== 3) return '';
+      return '（' + '日月火水木金土'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + '）';
+    }
+    // 本番が何日あるか。⚠ j.series はリハ日のカードでは空なので、groupDays から数える。
+    function mainDayCount(j) {
+      return (j.groupDays || []).filter(g => (g.type || '本番') === '本番').length;
+    }
+    // カードの上の帯の文言。
+    function groupTitle(j) {
+      const days = j.groupDays || [];
+      const subs = days.filter(g => (g.type || '本番') !== '本番').map(g => g.type);
+      const mains = mainDayCount(j);
+      if (mains > 1) {
+        return '🗓 連日イベント（本番' + mains + '日' + (subs.length ? '＋' + Array.from(new Set(subs)).join('・') : '') + '）';
+      }
+      return '🗓 ' + Array.from(new Set(subs)).join('・') + 'つきの案件（全' + days.length + '日）';
+    }
     function seriesBox(j) {
-      const days = seriesDays(j);
+      const days = groupDaysOf(j);
       const on = days.filter(d => d.st === 'on');
       const go = days.filter(d => d.st === 'go');
       let sum;
@@ -1522,73 +1553,110 @@
         sum = '<span class="sr-sum">まだエントリーしていません</span>';
       }
       const chips = days.map(d => {
-        const label = d.st === 'on' ? '✅' : d.st === 'full' ? '満員' : d.st === 'none' ? '募集前' : '―';
-        return '<span class="sr-day' + (d.st === 'on' ? ' on' : '') + (d.job && d.job.id === j.id ? ' me' : '') + '">'
-          + d.idx + '日目 ' + escAttr(d.md) + ' ' + label + '</span>';
+        const mark = d.st === 'on' ? '✅' : d.st === 'full' ? '満員' : d.st === 'none' ? '募集前' : '―';
+        return '<span class="sr-day' + (d.st === 'on' ? ' on' : '') + (d.id === j.id ? ' me' : '') + '">'
+          + escAttr(d.label) + ' ' + escAttr(d.md) + ' ' + mark + '</span>';
       }).join('');
-      const btn = go.length > 0
-        ? '<button type="button" class="apply-btn-sm" style="margin-top:6px;" onclick="openSeriesModal(' + j._i + ')">🗓 全' + days.length + '日の詳細を見てエントリー</button>'
+      const canEdit = go.length > 0 || on.length > 0;
+      const btn = canEdit
+        ? '<button type="button" class="apply-btn-sm" style="margin-top:6px;" onclick="openSeriesModal(' + j._i + ')">🗓 日程を見てエントリー（全' + days.length + '日）</button>'
         : '';
+      const lead = mainDayCount(j) > 1
+        ? '<b>全日程に出られる方を優先します。</b>下のボタンから、出られる日を選んでエントリーできます（このカードだけで全部の日を選べます）。'
+        : '<b>リハ日などがある案件です。</b>下のボタンから、出られる日を選んでエントリーできます。';
       return '<div class="sr-box">'
-        + '<div><b>全日程に出られる方を優先します。</b>全日出られる方は下のボタンから、一部の日だけの方は1日ずつエントリーしてください。</div>'
+        + '<div>' + lead + '</div>'
         + '<div class="sr-days">' + chips + '</div>'
         + sum + (btn ? '<br>' + btn : '')
         + '</div>';
     }
-    // 全日程の詳細を出して、エントリーするか聞き直す画面。
+    // 全部の日の詳細を出して、出られる日を選んでもらう画面。
+    // ⚠ はじめは「いまエントリーしている日」だけにチェック＝何も触らずに保存しても何も変わらない。
     function openSeriesModal(i) {
       const j = jobs[i];
-      if (!j || !j.series) return;
+      if (!j || !j.groupDays) return;
       closeSeriesModal();
       disarmApply();
-      const days = seriesDays(j);
-      const go = days.filter(d => d.st === 'go');
+      const days = groupDaysOf(j);
       const items = days.map(d => {
         const x = d.job;
-        const dow = x ? '（' + '日月火水木金土'[x.date.getDay()] + '）' : '';
-        const st = d.st === 'go' ? '<span class="sr-st go">エントリーします</span>'
-          : d.st === 'on' ? '<span class="sr-st done">✅ エントリー済み</span>'
+        const can = d.st === 'go' || d.st === 'on';
+        const st = d.st === 'on' ? '<span class="sr-st done">✅ エントリー済み</span>'
           : d.st === 'full' ? '<span class="sr-st ng">満員のため入れません</span>'
-          : '<span class="sr-st ng">まだ募集していません</span>';
+          : d.st === 'none' ? '<span class="sr-st ng">まだ募集していません</span>'
+          : '';
         const body = x
           ? '⏰ 集合〜解散 ' + escAttr(staffMeetOf(x.id, x.meet)) + '〜' + escAttr(x.leave)
             + (x.evTbd ? '（本番時間未定）' : '（本番 ' + escAttr(x.evStart) + '〜' + escAttr(x.evEnd) + '）')
             + '<br>📍 ' + escAttr(x.place) + '<br>🚩 集合 ' + escAttr(x.meetPlace)
           : '<span style="color:var(--muted);">この日の詳細は、募集が始まると出ます。</span>';
-        return '<div class="sr-item' + (d.st === 'full' || d.st === 'none' ? ' ng' : '') + '">'
-          + '<div class="sr-h"><span>' + d.idx + '日目　' + escAttr(d.md) + dow + '</span>' + st + '</div>'
-          + body + '</div>';
+        return '<label class="sr-item' + (can ? ' can' : ' ng') + '">'
+          + '<div class="sr-h"><span>'
+          + (can ? '<input type="checkbox" class="sr-pick" data-id="' + escAttr(d.id) + '" data-was="' + (d.st === 'on' ? '1' : '') + '"' + (d.st === 'on' ? ' checked' : '') + '> ' : '')
+          + escAttr(d.label) + '　' + escAttr(d.md) + dowOfYmd(d.ymd) + '</span>' + st + '</div>'
+          + body + '</label>';
       }).join('');
-      const ngCount = days.filter(d => d.st === 'full' || d.st === 'none').length;
+      const canCount = days.filter(d => d.st === 'go' || d.st === 'on').length;
       const bg = document.createElement('div');
       bg.className = 'sr-modal-bg';
       bg.id = 'srModal';
       bg.onclick = function (e) { if (e.target === bg) closeSeriesModal(); };
       bg.innerHTML = '<div class="sr-modal" role="dialog" aria-modal="true">'
         + '<h3>🗓 ' + escAttr(j.content) + '（全' + days.length + '日）</h3>'
-        + '<div class="sr-lead">' + escAttr(j.client) + '　連日イベントです。全部の日程を確かめてからエントリーしてください。'
-        + (ngCount > 0 ? '<br><b>入れない日が ' + ngCount + '日あります。</b>入れる ' + go.length + '日分にエントリーします。' : '') + '</div>'
+        + '<div class="sr-lead">' + escAttr(j.client) + '　出られる日にチェックを入れて「保存する」を押してください。'
+        + (mainDayCount(j) > 1 ? '<br><b>全日程に出られる方を優先します。</b>' : '')
+        + '<br>チェックを外すと、その日のエントリーを取り消します。</div>'
+        + (canCount > 1 ? '<div style="margin-bottom:8px;"><button type="button" class="apply-btn-sm cancel" onclick="srPickAll(true)">すべて選ぶ</button> <button type="button" class="apply-btn-sm cancel" onclick="srPickAll(false)">すべて外す</button></div>' : '')
         + items
         + '<div class="sr-actions">'
         + '<button type="button" class="apply-btn-sm cancel" onclick="closeSeriesModal()">やめる</button>'
-        + '<button type="button" class="apply-btn-sm" id="srModalOk">' + go.length + '日分にエントリーする</button>'
+        + '<button type="button" class="apply-btn-sm" id="srModalOk" disabled>変更はありません</button>'
         + '</div></div>';
       document.body.appendChild(bg);
+      bg.querySelectorAll('.sr-pick').forEach(cb => cb.addEventListener('change', srUpdateOk));
       document.getElementById('srModalOk').onclick = function () {
+        const ch = srChanges();
+        if (!ch.apply.length && !ch.cancel.length) return;
         this.disabled = true;
         closeSeriesModal();
-        seriesSiblings(j).forEach(x => keepVisible.add(x.id));
-        applySeries(j);
+        groupJobs(j).forEach(x => keepVisible.add(x.id));
+        applySeries(j, ch.apply, ch.cancel);
       };
+    }
+    // チェックの付け外しから「エントリーする日」「取り消す日」を出す。
+    function srChanges() {
+      const apply = [], cancel = [];
+      document.querySelectorAll('#srModal .sr-pick').forEach(cb => {
+        const was = cb.dataset.was === '1';
+        if (cb.checked && !was) apply.push(cb.dataset.id);
+        if (!cb.checked && was) cancel.push(cb.dataset.id);
+      });
+      return { apply: apply, cancel: cancel };
+    }
+    function srUpdateOk() {
+      const ok = document.getElementById('srModalOk');
+      if (!ok) return;
+      const ch = srChanges();
+      const parts = [];
+      if (ch.apply.length) parts.push('エントリー ' + ch.apply.length + '日');
+      if (ch.cancel.length) parts.push('取り消し ' + ch.cancel.length + '日');
+      ok.disabled = parts.length === 0;
+      ok.textContent = parts.length ? '保存する（' + parts.join('・') + '）' : '変更はありません';
+    }
+    function srPickAll(on) {
+      document.querySelectorAll('#srModal .sr-pick').forEach(cb => { cb.checked = on; });
+      srUpdateOk();
     }
     function closeSeriesModal() {
       const m = document.getElementById('srModal');
       if (m) m.remove();
     }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSeriesModal(); });
-    function applySeries(j) {
+    function applySeries(j, applyIds, cancelIds) {
       const body = new URLSearchParams();
       body.append('project_id', j.id);
+      (applyIds || []).forEach(id => body.append('apply_ids[]', id));
+      (cancelIds || []).forEach(id => body.append('cancel_ids[]', id));
       fetch('/staff-portal/entry-series', {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1601,19 +1669,21 @@
           alert(res.message || 'このアカウントは体験用のため、エントリーは保存されません（見本）。');
           return;
         }
-        (res.applied || []).forEach(id => {
+        const mark = (id, on) => {
           const x = jobs.find(y => y.id === id);
-          if (!x || x.applied) return;
-          x.applied = true;
+          if (!x || x.applied === on) return;
+          x.applied = on;
           x.saveError = '';
           x.state = calcState(x);
           keepVisible.add(x.id);
-          if (typeof refreshEntryDay === 'function') refreshEntryDay(x, true);
-        });
+          if (typeof refreshEntryDay === 'function') refreshEntryDay(x, on);
+        };
+        (res.applied || []).forEach(id => mark(id, true));
+        (res.cancelled || []).forEach(id => mark(id, false));
         renderJobs();
         const skipped = (res.skipped || []).length;
         if (skipped > 0) {
-          alert('エントリーしました。ただし ' + skipped + '日分は満員または募集していないため、エントリーできませんでした。');
+          alert('保存しました。ただし ' + skipped + '日分は満員または募集していないため、エントリーできませんでした。');
         }
       })
       .catch(err => alert(saveErrorMessage(err)));
@@ -1715,12 +1785,12 @@
         //   （カレンダー表示のときはリストを作らない）。
         row.id = 'job-' + j.id;
         // ⚠ 緑の印は「自分が応募したか」なので j.applied で付ける（満員でも付く）。
-        row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.applied ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '') + (j.series ? ' series' : '');
+        row.className = 'job-row' + (j.extra ? ' extra' : '') + (j.applied ? ' applied' : '') + (j.state === 'closed' ? ' closed' : '') + (j.groupDays ? ' series' : '');
         row.innerHTML = `
-          ${j.series ? `<div class="sr-ribbon">🗓 連日イベント（全${j.series.total}日）<span>この日は ${j.series.idx}日目</span></div>` : ''}
+          ${j.groupDays ? `<div class="sr-ribbon">${escAttr(groupTitle(j))}<span>この日は ${escAttr((groupDaysOf(j).find(d => d.id === j.id) || {}).label || '')}</span></div>` : ''}
           <div class="jr-head">
             <span class="jr-date">${dateStr}</span>
-            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.applied ? '<span class="applied-mark">✅ ' + (j.series ? 'この日' : '') + 'エントリー済み</span>' : ''}</span>
+            <span class="jr-title">${(j.dayType === '予備日' || j.dayType === 'リハ') ? '<span style="color:var(--muted);">↳ </span>' : ''}${j.content}<span class="jr-client">${j.client}</span>${j.applied ? '<span class="applied-mark">✅ ' + (j.groupDays ? 'この日' : '') + 'エントリー済み</span>' : ''}</span>
             <span class="j-badge ${sb.c}">${sb.t}</span>
           </div>
           <div class="jr-tags">${tags}</div>
@@ -1731,7 +1801,7 @@
           </div>
           ${String(j.staffNotes || '').trim() !== ''
             ? `<div class="jr-note"><span class="ic">📣</span><span>${escLines(j.staffNotes)}</span></div>` : ''}
-          ${j.series ? seriesBox(j) : ''}
+          ${j.groupDays ? seriesBox(j) : ''}
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
           ${j.saveError ? `<div class="jr-error">⚠ ${escAttr(j.saveError)}</div>` : ''}
           <div class="jr-foot">

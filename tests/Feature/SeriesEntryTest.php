@@ -86,6 +86,36 @@ class SeriesEntryTest extends TestCase
         $this->assertEqualsCanonicalizing(['P-D1', 'P-D3'], Application::where('staff_id', 'S-001')->pluck('project_id')->all());
     }
 
+    /**
+     * 1枚のカードから日を選んでエントリー・取り消しできる（2026-10-16）。
+     * リハ日が本番から離れていても（11/24 と 12/29・12/30 のように）同じイベントとして並ぶ。
+     */
+    public function test_日を選んでエントリーと取り消しができる_リハ日も入る(): void
+    {
+        $me = $this->staff();
+        $d1 = Carbon::today()->addDays(60);
+        ProjectFactory::new()->published()->create(['id' => 'P-M1', 'start_date' => $d1->format('Y-m-d'), 'office' => '東京', 'required_count' => 5]);
+        ProjectFactory::new()->published()->create(['id' => 'P-M2', 'start_date' => $d1->copy()->addDay()->format('Y-m-d'), 'office' => '東京', 'required_count' => 5, 'parent_project_id' => 'P-M1']);
+        ProjectFactory::new()->published()->create(['id' => 'P-R', 'start_date' => $d1->copy()->subDays(35)->format('Y-m-d'), 'office' => '東京', 'required_count' => 5, 'parent_project_id' => 'P-M1', 'date_type' => 'リハ']);
+        ProjectFactory::new()->published()->create(['id' => 'P-OTHER', 'start_date' => $d1->format('Y-m-d'), 'office' => '東京']);
+        Application::create(['staff_id' => 'S-001', 'project_id' => 'P-M2', 'intent' => '希望', 'applied_at' => now()]);
+
+        // 画面に「同じイベントの全部の日」が開催日順で渡る（リハ日が先頭）。
+        $jobs = $this->actingAsPerson($me)->get('/staff-portal')->assertOk()->original->getData()['recruitJobs'];
+        $days = collect($jobs)->firstWhere('id', 'P-M1')['groupDays'];
+        $this->assertSame(['P-R', 'P-M1', 'P-M2'], array_column($days, 'id'));
+        $this->assertSame('リハ', $days[0]['type']);
+
+        // リハ日と1日目にエントリー・2日目は取り消し。よその案件IDは無視する。
+        $this->actingAsPerson($me)->postJson('/staff-portal/entry-series', [
+            'project_id' => 'P-M2',
+            'apply_ids' => ['P-R', 'P-M1', 'P-OTHER'],
+            'cancel_ids' => ['P-M2'],
+        ])->assertOk()->assertJson(['saved' => true, 'cancelled' => ['P-M2']]);
+
+        $this->assertEqualsCanonicalizing(['P-R', 'P-M1'], Application::where('staff_id', 'S-001')->pluck('project_id')->all());
+    }
+
     /** 社員のエントリー一覧でも「全日なのか何日だけなのか」が分かる。 */
     public function test_エントリー一覧に全日か何日だけかが出る(): void
     {

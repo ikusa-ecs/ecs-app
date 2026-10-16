@@ -115,6 +115,48 @@ final class ProjectSeries
     }
 
     /**
+     * 同じイベントの「全部の日」（本番＋リハ日・前日設営・予備日）を、根っこごとに開催日順で返す
+     * （2026-10-16 baba要望＝スタッフが1枚のカードから日を選んでエントリーできるように）。
+     *
+     * ⚠ 「◯日目／全◯日」（{@see group()}）とは別もの。あちらは本番だけを数える。
+     *   こちらは「エントリーする日を選ぶ」ための一覧なので、リハ日なども入れる
+     *   （リハ 11/24・本番 12/29・12/30 のように離れていることがある）。
+     * ⚠ キャンセルになった日は入れない。
+     *
+     * @param  iterable<Project>  $projects
+     * @return array<string, list<array{id:string, ymd:string, md:string, type:string}>>
+     */
+    public static function daysFor(iterable $projects): array
+    {
+        $roots = [];
+        foreach ($projects as $p) {
+            $roots[self::rootId($p)] = true;
+        }
+        if (! $roots) {
+            return [];
+        }
+        $keys = array_keys($roots);
+
+        $out = [];
+        Project::query()
+            ->where(fn ($q) => $q->whereIn('id', $keys)->orWhereIn('parent_project_id', $keys))
+            ->notCancelled()
+            ->whereNotNull('start_date')
+            ->get()
+            ->sortBy(fn (Project $p) => $p->start_date->format('Y-m-d').'|'.$p->id)
+            ->each(function (Project $p) use (&$out) {
+                $out[self::rootId($p)][] = [
+                    'id' => $p->id,
+                    'ymd' => $p->start_date->format('Y-m-d'),
+                    'md' => $p->start_date->format('n/j'),
+                    'type' => (string) ($p->date_type ?: '本番'),
+                ];
+            });
+
+        return $out;
+    }
+
+    /**
      * まとめて引くための補助：案件の集まりから、関係する根っこの本番案件を全部取り直す。
      * ⚠ 画面に出ている案件だけで数えると、絞り込みで隠れた日が抜けて「全2日」になる。
      *

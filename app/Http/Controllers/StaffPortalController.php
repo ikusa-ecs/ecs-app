@@ -600,12 +600,25 @@ class StaffPortalController extends Controller
      * ⚠ エントリーできる日は「この人の募集中タブに出ている日」だけ（recruitJobs と同じ判定）。
      *   非公開の日・他拠点の日・終わった日・満員の日は飛ばして、飛ばした日を返す（画面で知らせる）。
      * ⚠ すでにエントリーしている日はそのまま（コメントを消さない）。
+     *
+     * 2026-10-16 追加（baba要望「1日だけでも、その日のカードを探すのが大変」）：
+     *   apply_ids／cancel_ids を送ると、**選んだ日だけ**エントリー・取り消しする。
+     *   対象は同じイベントの日（本番＋リハ日・前日設営・予備日＝ProjectSeries::daysFor）だけ。
+     *   送らなければ、これまでどおり本番の全日程。
      */
     public function saveSeriesEntry(Request $request)
     {
         $data = $request->validate([
             'project_id' => ['required', 'string', 'exists:projects,id'],
+            'apply_ids' => ['nullable', 'array'],
+            'apply_ids.*' => ['string'],
+            'cancel_ids' => ['nullable', 'array'],
+            'cancel_ids.*' => ['string'],
         ]);
+
+        if ($request->has('apply_ids') || $request->has('cancel_ids')) {
+            return $this->saveGroupChoice($data);
+        }
 
         $user = Auth::user();
         if (! $user || TestAccounts::isMockOnly($user)) {
@@ -658,6 +671,74 @@ class StaffPortalController extends Controller
         ]);
 
         return response()->json(['ok' => true, 'saved' => true, 'applied' => $applied, 'skipped' => $skipped]);
+    }
+
+    /**
+     * 同じイベントの中から「選んだ日」だけエントリー／取り消しする（saveSeriesEntry から呼ぶ）。
+     * ⚠ 同じイベント以外の案件IDが混ざっていても触らない（よその案件を書き換えない）。
+     */
+    private function saveGroupChoice(array $data)
+    {
+        $user = Auth::user();
+        if (! $user || TestAccounts::isMockOnly($user)) {
+            return response()->json([
+                'ok' => true,
+                'saved' => false,
+                'message' => 'テスト用アカウントのため保存されません（見本）。',
+            ]);
+        }
+
+        $base = Project::findOrFail($data['project_id']);
+        $groupIds = array_column(ProjectSeries::daysFor([$base])[ProjectSeries::rootId($base)] ?? [], 'id');
+
+        $visible = $this->recruitJobs(Carbon::today(), $user)
+            ->filter(fn ($j) => in_array($j['id'], $groupIds, true) && ! $j['archived'])
+            ->keyBy('id');
+
+        $applied = [];
+        $skipped = [];
+        foreach (array_unique($data['apply_ids'] ?? []) as $pid) {
+            if (! in_array($pid, $groupIds, true)) {
+                continue;
+            }
+            $j = $visible->get($pid);
+            if (! $j || (! $j['applied'] && $j['filled'] >= $j['need'])) {
+                $skipped[] = $pid;   // 非公開・他拠点・終わった日・満員
+                continue;
+            }
+            if (! $j['applied']) {
+                Application::create([
+                    'staff_id' => $user->id,
+                    'project_id' => $pid,
+                    'intent' => '希望',
+                    'note' => null,
+                    'applied_at' => now(),
+                ]);
+            }
+            $applied[] = $pid;
+        }
+
+        $cancelled = [];
+        foreach (array_unique($data['cancel_ids'] ?? []) as $pid) {
+            if (! in_array($pid, $groupIds, true) || in_array($pid, $applied, true)) {
+                continue;
+            }
+            Application::where('staff_id', $user->id)->where('project_id', $pid)->delete();
+            $cancelled[] = $pid;
+        }
+
+        Log::info('staff group entry saved', [
+            'staff_id' => $user->id,
+            'staff_name' => $user->name,
+            'applied' => $applied,
+            'cancelled' => $cancelled,
+            'skipped' => $skipped,
+        ]);
+
+        return response()->json([
+            'ok' => true, 'saved' => true,
+            'applied' => $applied, 'cancelled' => $cancelled, 'skipped' => $skipped,
+        ]);
     }
 
     /**
@@ -731,8 +812,10 @@ class StaffPortalController extends Controller
         // ⚠ 画面に出ている案件だけで数えない（groupFor が取り直す）。
         //   拠点や公開の絞り込みで隠れた日が抜けると「全3日なのに全2日」と出る。
         $seriesGroups = ProjectSeries::groupFor($projects);
+        // 同じイベントの全部の日（本番＋リハ日・前日設営・予備日）。1枚のカードから日を選んでエントリーするため（2026-10-16）。
+        $groupDays = ProjectSeries::daysFor($projects);
 
-        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups) {
+        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups, $groupDays) {
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
@@ -771,6 +854,8 @@ class StaffPortalController extends Controller
                 'series' => ProjectSeries::positionOf($p, $seriesGroups),
                 // 同じ連日イベントの日をまとめるための印（「全日まとめてエントリー」で使う）。
                 'seriesRoot' => ProjectSeries::rootId($p),
+                // 同じイベントの全部の日（2日以上あるときだけ）。⚠ 募集していない日も入る＝画面で「募集前」と出す。
+                'groupDays' => count($groupDays[ProjectSeries::rootId($p)] ?? []) > 1 ? $groupDays[ProjectSeries::rootId($p)] : null,
                 'off' => $off,
                 // 募集人数は本来セールスが案件登録で入れる項目。まだ未定（空欄・0）のときは
                 // 画面が「満員」に見えてエントリーできなくなるので、既定 5名 として見せる（2026-08-20 baba）。
