@@ -303,6 +303,10 @@
     .m-type.emp   { background: #e3edf7; color: #2c6ca0; }   /* 社員 */
     .m-type.haken { background: #efe6f6; color: #6d28d9; }   /* 派遣 */
     /* 確度（Aヨミ/Bヨミ/Cヨミ）の印。⚠ 案件一覧と同じ見た目にそろえる（画面ごとに変えない）。 */
+    /* 連日イベント・リハ日つきの札（2026-10-16） */
+    .grp-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px;
+                 background: #1d4e89; color: #fff; white-space: nowrap; vertical-align: middle; }
+    html[data-theme="dark"] .grp-badge { background: var(--info-soft); color: var(--info-ink); }
     .ymk { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
     .ymk.a { background: var(--brand-soft); color: var(--brand-dark); }
     .ymk.b { background: var(--warn-soft);  color: #b45309; }
@@ -794,6 +798,8 @@
       //   （保存はできていた。bRecruit() が「無ければ募集中」とみなすため）。
       recruit:c.recruit,
       yomi:c.yomi,   // 確度（Aヨミ/Bヨミ/Cヨミ）。詰め替え忘れるとカードに出ない。
+      // 同じイベントの全部の日（連日イベント・リハ日つき・2026-10-16）。⚠ 詰め替え忘れると札が出ない。
+      groupDays:c.groupDays || null,
       needStaff:c.needStaff,   // スタッフ画面で使っている必要人数（未入力なら既定）。締切の判定に使う。
       meet:c.meet, leave:c.leave, enter:c.enter, evStart:c.evStart, evEnd:c.evEnd,
       place:c.place, placeShort:c.placeShort, meetPlace:c.meetPlace,
@@ -1958,6 +1964,26 @@
       + ` title="この案件の詳細（登録・編集画面）を開きます。時間・会場・運営人数・備考などはそこで直せます。">📄 案件の詳細 →</a>`;
   }
 
+  // 連日イベント・リハ日つきの札（2026-10-16 baba要望＝日別ボードでも複数日程だと分かるように）。
+  // 例：「🗓 連日 1日目／本番2日＋リハ日」「🗓 前日設営／本番1日＋前日設営」。マウスを乗せると全部の日が出る。
+  // ⚠ 日の一覧の正本＝サーバーの groupDays（ProjectSeries::daysFor）。ここで数え直さない。
+  function groupBadgeHtml(c){
+    const days = c.groupDays;
+    if (!days || days.length < 2) return '';
+    const isMain = g => (g.type || '本番') === '本番';
+    const mains = days.filter(isMain).length;
+    let n = 0, me = '';
+    const list = days.map(g => {
+      if (isMain(g)) n++;
+      const label = isMain(g) ? (mains > 1 ? n + '日目' : '本番') : g.type;
+      if (g.id === c.id) me = label;
+      return label + ' ' + g.md;
+    });
+    const subs = Array.from(new Set(days.filter(g => !isMain(g)).map(g => g.type)));
+    const text = '🗓 ' + (mains > 1 ? '連日 ' : '') + me + '／本番' + mains + '日' + (subs.length ? '＋' + subs.join('・') : '');
+    return `<span class="grp-badge" title="同じイベントの日：${escAttr(list.join('・'))}">${escAttr(text)}</span>`;
+  }
+
   // 案件名（コンテンツ）のブロック。
   // ⚠ 実施形態（リアル／ロング／オンライン）と札（前泊・前日設営など）は
   //   **コンテンツ名の横**に出す（2026-09-18 baba要望）。カードの下のほうに離して置くと、
@@ -3075,7 +3101,7 @@
       <div class="cc-head">
         ${bulkDelBoxHtml(c)}
         <div class="cc-headmain">
-          ${titleBlockHtml(c, scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)}
+          ${titleBlockHtml(c, groupBadgeHtml(c) + scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)}
           <div class="cc-client">${c.client}</div>
           <div class="cc-meta">
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>

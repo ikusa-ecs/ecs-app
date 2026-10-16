@@ -145,6 +145,22 @@ class SeriesEntryTest extends TestCase
         $this->assertSame(['P-R', 'P-M1', 'P-M2'], array_column($pub['groupDays'], 'id'));
     }
 
+    /** 日別ボードでも複数日程だと分かる（ボードの期間の外の日も一覧に入る）。 */
+    public function test_日別ボードに同じイベントの日が渡る(): void
+    {
+        $emp = PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '担当', 'permission' => 'manager', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        $d1 = Carbon::today()->addDays(3);
+        ProjectFactory::new()->create(['id' => 'P-M1', 'start_date' => $d1->format('Y-m-d'), 'office' => '東京']);
+        ProjectFactory::new()->create(['id' => 'P-R', 'start_date' => $d1->copy()->addDays(40)->format('Y-m-d'), 'office' => '東京', 'parent_project_id' => 'P-M1', 'date_type' => 'リハ日']);
+
+        $res = $this->actingAsPerson($emp)->get('/assign')->assertOk();
+        $case = collect($res->original->getData()['boardCases'])->firstWhere('id', 'P-M1');
+        $this->assertSame(['P-M1', 'P-R'], array_column($case['groupDays'], 'id'));
+        $res->assertSee('function groupBadgeHtml', false);
+    }
+
     /** 社員のエントリー一覧でも「全日なのか何日だけなのか」が分かる。 */
     public function test_エントリー一覧に全日か何日だけかが出る(): void
     {

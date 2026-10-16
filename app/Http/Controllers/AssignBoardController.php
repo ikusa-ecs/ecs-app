@@ -507,7 +507,12 @@ class AssignBoardController extends Controller
         // 前泊の前日・後泊の翌日が×の人（2026-10-14・FBシート No.23）。正本＝App\Support\StayDayCheck。
         $stayNg = StayDayCheck::map($projects->map(fn ($pair) => $pair[0])->all());
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $sharesByProject, $office, $stayNg) {
+        // 連日イベント・リハ日つきの案件（2026-10-16 baba要望＝日別ボードでも複数日程と分かるように）。
+        // ⚠ 日の一覧の正本＝ProjectSeries::daysFor（ボードの期間の外の日も入る）。
+        $groupDays = collect(ProjectSeries::daysFor($projects->map(fn ($pair) => $pair[0])->all()))
+            ->filter(fn ($rows) => count($rows) > 1)->all();
+
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $sharesByProject, $office, $stayNg, $groupDays) {
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -658,6 +663,8 @@ class AssignBoardController extends Controller
                 //   （画面ごとに判定を書くと、片方だけ直して食い違う）。
                 'format' => (string) ($p->format ?? ''),
                 'fmtCls' => \App\Support\ProjectFormats::badgeCode($p->format),
+                // 同じイベントの全部の日（本番＋リハ日など）。1日だけの案件は null。
+                'groupDays' => $groupDays[ProjectSeries::rootId($p)] ?? null,
                 // ⚠ スタッフの画面で使っている必要人数（未入力なら既定の人数）。正本＝RecruitStatus。
                 //   これで「締切（満員）／募集中」を判定する＝社員とスタッフで言うことを合わせる。
                 //   運営人数を増やせば、その場でまた「募集中」に戻る（公開し直さなくてよい）。
