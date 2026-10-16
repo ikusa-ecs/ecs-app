@@ -27,8 +27,11 @@ class EmployeeAssignmentsController extends Controller
             : Carbon::today()->startOfMonth();
 
         // 社歴順（社員名簿と同じ並び）。
-        $employees = OfficeScope::applyToPeople(Person::employees()->where('active', true), $office)
-            ->bySeniority()->get(['id', 'name', 'office', 'department', 'hire_date']);
+        // ⚠ 退職した人も読む（2026-10-16 baba決定）＝**その月にアサインがあれば出す**。
+        //   以前は在籍中だけを読んでいたので、退職すると**過去の月からも消えて**いた。
+        //   アサインが無い月は出さない（「アサインなし」の欄にも並べない）。
+        $employees = OfficeScope::applyToPeople(Person::employees(), $office)
+            ->bySeniority()->get(['id', 'name', 'office', 'department', 'hire_date', 'active']);
         $built = PersonMonthCases::build($employees->pluck('id')->all(), $month);
 
         $list = [];
@@ -36,6 +39,9 @@ class EmployeeAssignmentsController extends Controller
         foreach ($employees as $p) {
             $cases = $built['byPerson'][$p->id] ?? [];
             if (! $cases) {
+                if ($p->active === false) {
+                    continue;   // 退職してその月に仕事が無い人は出さない
+                }
                 $none[] = (string) $p->name;
 
                 continue;

@@ -172,6 +172,8 @@ class AssignmentController extends Controller
         // スタッフ名簿。区分・できる役割・NG・この日の希望＋「おすすめ度（点数・理由）」も一緒に。
         // 並びは「おすすめ順（点数の高い順）」。NG該当（この日NG・NGペア同席）は末尾へ回す。
         $staff = OfficeScope::applyToPeople(Person::staff(), $officeScope, $assignedIds)
+            // 退職した人は候補に出さない。この案件に入っている人は残す（2026-10-16 baba決定・正本＝Person::inService）。
+            ->inService($assignedIds)
             ->with(['roleEligibilities', 'ngRelations'])
             ->orderByDesc('experience_count')
             ->get()

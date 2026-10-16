@@ -59,7 +59,12 @@ class StaffStatusController extends Controller
         $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
         $appsByStaff = Application::all()->groupBy('staff_id');
 
-        $status = Person::staff()->orderByDesc('experience_count')->get()
+        // 退職した人は外す。ただし今月アサインがある人は残す（2026-10-16 baba決定・正本＝Person::inService）。
+        $workingThisMonth = Assignment::where('status', '!=', 'キャンセル')
+            ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d').' 23:59:59'])
+            ->distinct()->pluck('staff_id')->all();
+
+        $status = Person::staff()->inService($workingThisMonth)->orderByDesc('experience_count')->get()
             ->map(function (Person $p) use ($today, $monthStart, $monthEnd, $projectType, $eventDays, $assignsByStaff, $prefByStaff, $appsByStaff) {
                 $myAssigns = $assignsByStaff->get($p->id, collect());
 

@@ -152,6 +152,26 @@ class Person extends Model implements AuthenticatableContract
         });
     }
 
+    /**
+     * 在籍中の人だけに絞るクエリスコープ（退職＝active が false の人を外す）。2026-10-16 baba決定。
+     *
+     * 【決まり】退職した人は、**その月（その案件）にアサイン・担当がある場合だけ**出す。
+     *   ＝過去の実績は消さず、これからの一覧・候補からは消える。
+     *   ⚠ 「その月に仕事がある人」は画面ごとに違うので、呼ぶ側が $keepIds で渡す。
+     *   ⚠ active が空（NULL）の人は在籍あつかい（古いデータに空がある）。
+     *
+     * @param  list<string>  $keepIds  退職していても残すID（その月・その案件に担当がある人）
+     */
+    public function scopeInService($query, array $keepIds = [])
+    {
+        return $query->where(function ($q) use ($keepIds) {
+            $q->where('active', true)->orWhereNull('active');
+            if ($keepIds) {
+                $q->orWhereIn('id', $keepIds);
+            }
+        });
+    }
+
     /** スタッフだけを取り出すクエリスコープ（Person::staff()->get()） */
     public function scopeStaff($query)
     {

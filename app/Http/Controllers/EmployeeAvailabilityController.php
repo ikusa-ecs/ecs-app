@@ -79,6 +79,8 @@ class EmployeeAvailabilityController extends Controller
 
         $employees = Person::employees()
             ->inAssignPool($me ? [$me->id] : [])
+            // 退職した人は外す（2026-10-16 baba決定・正本＝Person::inService）。自分は必ず残す（先頭行＝自分の決まり）。
+            ->inService($me ? [$me->id] : [])
             ->byKana()
             ->get(['id', 'name', 'name_kana', 'office', 'department', 'hire_date'])
             // 拠点で絞って見られるように office も渡す（2026-08-26 baba要望）。

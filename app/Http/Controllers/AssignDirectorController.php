@@ -114,6 +114,8 @@ class AssignDirectorController extends Controller
         //   ただし すでにD/SD/FCに入っている人（$keepIds）は残す＝保存で担当が外れないように。
         $employees = OfficeScope::applyToPeople(Person::employees(), $officeScope, $keepIds)
             ->inAssignPool($keepIds)
+            // 退職した人は外す。ただしこの期間にD/SD/FCに入っている人は残す（2026-10-16 baba決定・正本＝Person::inService）。
+            ->inService($keepIds)
             ->plannersOfOfficeFirst($officeScope)
             ->get()
             ->map(fn (Person $p) => [

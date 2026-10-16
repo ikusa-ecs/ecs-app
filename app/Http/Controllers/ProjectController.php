@@ -238,6 +238,8 @@ class ProjectController extends Controller
 
         $employees = Person::employees()
             ->inAssignPool($assignedIds)
+            // 退職した人は外す。いま担当に入っている人は残す（2026-10-16 baba決定・正本＝Person::inService）。
+            ->inService($assignedIds)
             ->plannersOfOfficeFirst($officeScope ?: $myOffice)
             ->get(['id', 'name', 'office', 'department'])
             ->map(fn (Person $e) => ['id' => $e->id, 'name' => $e->name])
@@ -443,7 +445,9 @@ class ProjectController extends Controller
 
         // 営業担当プルダウン用：社員（role=employee）の名前一覧。
         // 並びは社歴順（入社日の古い人が上・未入力は末尾）＝baba要望 2026-08-24。
+        // ⚠ 退職した人は候補に出さない（2026-10-16）。欄は手で打てるので、保存ずみの名前は消えない。
         $salesOwners = Person::employees()
+            ->inService()
             ->bySeniority()
             ->pluck('name')
             ->filter()

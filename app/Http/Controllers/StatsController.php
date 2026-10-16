@@ -396,7 +396,9 @@ class StatsController extends Controller
 
         // 社員は「登録している全員」を出す＝アサインの有無に関係なく表示（baba 2026-07-28）。
         // スタッフは人数が多いので、この期間に出勤した人だけ。氏名・部署・拠点をまとめて引く。
-        $neededIds = Person::where('role', 'employee')->pluck('id')
+        // ⚠ 退職した社員は外す。ただしこの期間に出勤・D/SDがある人は残す（2026-10-16 baba決定・正本＝Person::inService）。
+        $workedIds = $countByStaff->keys()->merge(array_keys($dirStats))->map(fn ($v) => (string) $v)->unique()->values()->all();
+        $neededIds = Person::where('role', 'employee')->inService($workedIds)->pluck('id')
             ->merge($countByStaff->keys())->unique()->values();
         $people = Person::whereIn('id', $neededIds->all())
             ->get(['id', 'name', 'role', 'department', 'office', 'hire_date'])
@@ -479,7 +481,9 @@ class StatsController extends Controller
         // 集計の単位は4グループ（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
         // 所属で絞っているときは、その所属のカードだけ出す（他は0名0件になり、絞ったのか0なのか分からないため）。
         $deptDefs = $scopeDept !== '' ? [$scopeDept] : Departments::GROUPS;
+        // ⚠ 退職した社員は分母に数えない（この期間に出勤した人は数える・2026-10-16）。
         $headByDept = Person::where('role', 'employee')
+            ->inService($workedIds)
             ->get(['id', 'department'])
             // ⚠ 「経営管理」など、まとめ先が「その他」になる所属の人も数に入れる（Departments::group が正本）。
             //   ここで department をそのまま突き合わせていたころは、その人たちの出勤が

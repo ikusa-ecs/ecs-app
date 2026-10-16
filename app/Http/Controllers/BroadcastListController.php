@@ -123,7 +123,9 @@ class BroadcastListController extends Controller
             'urlFuture' => '/broadcast-list'.$qs(),
             'urlPast' => '/broadcast-list'.$qs(['past' => 1]),
             // 担当のプルダウン。⚠ 全拠点の社員（拠点で絞らない）。
+            // ⚠ 退職した人は選べない。いま担当に入っている人は残す（2026-10-16・正本＝Person::inService）。
             'employees' => Person::employees()
+                ->inService($rows->pluck('ownerId')->filter()->unique()->values()->all())
                 ->orderBy('name')
                 ->get(['id', 'name', 'office'])
                 ->map(fn (Person $e) => [

@@ -145,7 +145,9 @@ final class ChatworkMentions
             return collect();
         }
 
+        // ⚠ 退職した人は呼ばない（選ばれたままでも外す・2026-10-16 baba決定・正本＝Person::inService）。
         $people = Person::whereIn('id', $ids)
+            ->inService()
             ->whereNotNull('chatwork_id')
             ->where('chatwork_id', '!=', '')
             ->get(['id', 'name', 'chatwork_id'])
@@ -182,7 +184,9 @@ final class ChatworkMentions
      */
     public static function options(): array
     {
+        // 退職した人は選べないようにする（2026-10-16）。
         return Person::employees()
+            ->inService()
             ->orderBy('name')
             ->get(['id', 'name', 'office', 'chatwork_id'])
             ->map(fn (Person $p) => [
