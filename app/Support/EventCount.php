@@ -19,6 +19,8 @@ use App\Models\Project;
  * ■ 自動のルール
  *   ・実施形態が EXCLUDED_FORMATS に入っている（＝体験会）→ 数えない
  *   ・案件名・クライアント名に EXCLUDED_WORDS の語が入っている（＝EXPO）→ 数えない
+ *   ・日程種別が本番でない（リハ日・前日設営・予備日）→ 数えない（2026-10-16 baba決定）
+ *     ＝スタッフの「回数」と同じ決まり（設計書 11章F）。連日イベントの本番は日数ぶん数える（baba決定）。
  *     ※ EXPO は入力欄（実施形態など）に無いため、名前で拾うしかない。
  *       間違って外れたら、その案件で「数える」を選べば上書きできる。
  *   ・それ以外 → 数える
@@ -60,6 +62,13 @@ class EventCount
         // 実施していないので「イベント数」に入れてはいけない。
         if ($project->is_cancelled) {
             return 'キャンセルのため';
+        }
+
+        // リハ日・前日設営・予備日は数えない（2026-10-16 baba決定）。
+        // ⚠ 古い案件には「リハ」「予備日」の書き方もあるので、「本番」以外はまとめて外す（空＝本番あつかい）。
+        $dayType = trim((string) ($project->date_type ?? ''));
+        if ($dayType !== '' && $dayType !== '本番') {
+            return $dayType . 'のため';
         }
 
         $format = trim((string) ($project->format ?? ''));

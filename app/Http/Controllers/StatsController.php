@@ -187,7 +187,7 @@ class StatsController extends Controller
         $allProjects = Project::whereNotNull('start_date')
             ->whereNotIn('status', ['下書き', 'キャンセル', '中止'])
             ->get(['id', 'start_date', 'format', 'base_locations', 'scale', 'office',
-                'project_name', 'client', 'count_as_event']);
+                'project_name', 'client', 'count_as_event', 'date_type', 'is_cancelled']);
 
         // ⚠ さらに「イベント数として数える案件」だけに絞る（先-2・2026-08-20）。
         //   社内の数え方では体験会・EXPO を数えないため、全部数えると社内の言い方とズレる。

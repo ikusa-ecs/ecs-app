@@ -147,4 +147,26 @@ class EventCountTest extends TestCase
             'new_value'   => '数えない',
         ]);
     }
+
+    /**
+     * リハ日・前日設営・予備日は自動で数えない（2026-10-16 baba決定）。連日イベントの本番は日数ぶん数える。
+     * 手動で「数える」にすれば数える。
+     */
+    public function test_sub_days_are_not_counted_automatically(): void
+    {
+        $main = ProjectFactory::new()->create(['date_type' => '本番', 'format' => 'リアル', 'project_name' => '水合戦']);
+        $main2 = ProjectFactory::new()->create(['date_type' => '本番', 'format' => 'リアル', 'project_name' => '水合戦', 'parent_project_id' => $main->id]);
+        $reha = ProjectFactory::new()->create(['date_type' => 'リハ日', 'format' => 'リアル', 'project_name' => '水合戦', 'parent_project_id' => $main->id]);
+        $setup = ProjectFactory::new()->create(['date_type' => '前日設営', 'format' => 'リアル', 'project_name' => '水合戦']);
+        $spare = ProjectFactory::new()->create(['date_type' => '予備日', 'format' => 'リアル', 'project_name' => '水合戦']);
+        $forced = ProjectFactory::new()->create(['date_type' => 'リハ日', 'format' => 'リアル', 'project_name' => '水合戦', 'count_as_event' => true]);
+
+        $this->assertTrue(EventCount::counts($main));
+        $this->assertTrue(EventCount::counts($main2), '連日イベントの本番は日数ぶん数える');
+        $this->assertFalse(EventCount::counts($reha));
+        $this->assertFalse(EventCount::counts($setup));
+        $this->assertFalse(EventCount::counts($spare));
+        $this->assertTrue(EventCount::counts($forced), '手動の「数える」が優先');
+        $this->assertSame('数えない（自動・リハ日のため）', EventCount::label($reha));
+    }
 }

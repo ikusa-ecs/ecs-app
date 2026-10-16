@@ -602,7 +602,7 @@
               <label><input type="radio" name="count_as_event" value="yes"> 数える</label>
               <label><input type="radio" name="count_as_event" value="no"> 数えない</label>
             </div>
-            <div class="hint" id="countAsEventHint">社内の数え方にあわせて、<b>体験会</b>と<b>案件名にEXPOを含む案件</b>は「自動」だと数えません。それ以外は数えます。ここで <b>数える／数えない</b> を選ぶと自動より優先されます。</div>
+            <div class="hint" id="countAsEventHint">社内の数え方にあわせて、<b>体験会</b>・<b>案件名にEXPOを含む案件</b>・<b>リハ日／前日設営／予備日</b>は「自動」だと数えません（連日イベントの本番は日数ぶん数えます）。それ以外は数えます。ここで <b>数える／数えない</b> を選ぶと自動より優先されます。</div>
           </div>
           <div class="form-row">
             <label>営業担当<span class="req-mark red">必須</span></label>
