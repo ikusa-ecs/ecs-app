@@ -212,4 +212,17 @@ class ProjectSeriesTest extends TestCase
         $this->assertSame(3, ProjectSeries::positionOf($first, ProjectSeries::groupFor([$first]))['total']);
         $this->assertCount(4, ProjectSeries::daysFor([$first])[$first->id]);
     }
+
+    /** 「紐づく本番案件」は探せる欄＋企業名と日付を渡す（今日以降だけ・同じ企業を先頭は画面側）。 */
+    public function test_紐づく本番案件に企業名と日付が渡り探す欄がある(): void
+    {
+        $me = $this->manager();
+        ProjectFactory::new()->create(['id' => 'P-A', 'client' => '山田商事', 'start_date' => Carbon::today()->addDays(10)->format('Y-m-d')]);
+
+        $res = $this->actingAsPerson($me)->get('/project-form')->assertOk();
+        $opt = collect($res->original->getData()['parentProjects'])->firstWhere('id', 'P-A');
+        $this->assertSame('山田商事', $opt['client']);
+        $this->assertSame(Carbon::today()->addDays(10)->format('Y-m-d'), $opt['ymd']);
+        $res->assertSee('id="parentSearch"', false)->assertSee('function buildParentOptions', false);
+    }
 }

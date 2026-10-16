@@ -541,9 +541,14 @@
                 </div>
                 <div class="form-row">
                   <label>紐づく本番案件</label>
+                  <!-- 2026-10-16 baba要望：打った文字で絞る・上で入れた企業名と同じ案件を先頭に・今日以降だけ。 -->
+                  <input type="text" id="parentSearch" placeholder="企業名・案件名・日付（例 12/29）で探す" oninput="buildParentOptions()" style="margin-bottom:6px;">
                   <select name="parent_project_id" id="parentProject">
                     <option value="">（選択してください）</option>
                   </select>
+                  <label style="display:inline-flex; gap:4px; align-items:center; font-weight:400; font-size:12px; margin-top:4px;">
+                    <input type="checkbox" id="parentShowPast" onchange="buildParentOptions()"> 終わった案件も出す
+                  </label>
                 </div>
               </div>
               <div class="hint">※ 予備日・リハ日・前日設営は「回数」には数えませんが、連勤チェックには含めます（設計書 11章F）。チェックすると、保存後に同じ内容で次の日程を追加できます。</div>
@@ -1160,6 +1165,7 @@
 </script>
 {{-- 「紐づく本番案件」の選択肢＝本物の本番案件一覧（id と表示名）。 --}}
 <script>window.ECS_PARENTS = @json($parentProjects ?? []);</script>
+<script>window.ECS_TODAY_YMD = @json(now()->toDateString());</script>
 {{-- 営業担当プルダウンの選択肢＝社員（role=employee）の名前一覧。 --}}
 <script>window.ECS_SALES = @json($salesOwners ?? []);</script>
 {{-- 新規登録のときの営業担当の初期値＝ログイン中の社員（2026-09-01）。
@@ -2050,16 +2056,43 @@
   }
   // ===== 「紐づく本番案件」の選択肢を本物の案件一覧（window.ECS_PARENTS）から作る =====
   // 新規でも編集でも使うので、applyEdit より先に作っておく。
-  (function buildParentOptions() {
+  // 2026-10-16 baba要望「8月からの案件が残っていて分かりにくい」：
+  //   ・ふだんは**今日以降**の本番だけ（「終わった案件も出す」で過去も）。⚠ いま選んでいる案件は必ず残す。
+  //   ・上で入れた**企業名と同じ案件を先頭**に（★を付ける）。
+  //   ・探す欄に打った文字（企業名・案件名・日付）で絞る。
+  function buildParentOptions() {
     const sel = document.getElementById('parentProject');
     if (!sel || !Array.isArray(window.ECS_PARENTS)) return;
-    window.ECS_PARENTS.forEach(function (p) {
+    // いま選んでいる案件（編集・複製で開いたときは保存されている親）は、絞り込みで消さない。
+    const keep = sel.value || ((window.ECS_EDIT || {}).parent_project_id || '');
+    const q = ((document.getElementById('parentSearch') || {}).value || '').trim();
+    const past = !!(document.getElementById('parentShowPast') || {}).checked;
+    const clientEl = document.getElementById('client');
+    const norm = function (t) { return String(t || '').replace(/[\s　]/g, '').replace(/(株式会社|（株）|\(株\)|有限会社|様)/g, ''); };
+    const myClient = norm(clientEl ? clientEl.value : '');
+    const today = window.ECS_TODAY_YMD || new Date().toISOString().slice(0, 10);
+    const same = function (p) { const c = norm(p.client); return myClient !== '' && c !== '' && (c.indexOf(myClient) >= 0 || myClient.indexOf(c) >= 0); };
+    const list = window.ECS_PARENTS.filter(function (p) {
+      if (p.id === keep) return true;
+      if (!past && p.ymd && p.ymd < today) return false;
+      return q === '' || p.label.indexOf(q) >= 0;
+    }).sort(function (a, b) {
+      const sa = same(a) ? 0 : 1, sb = same(b) ? 0 : 1;
+      return sa !== sb ? sa - sb : String(a.ymd).localeCompare(String(b.ymd));
+    });
+    while (sel.options.length > 1) sel.remove(1);
+    list.forEach(function (p) {
       const opt = document.createElement('option');
       opt.value = p.id;
-      opt.textContent = p.label;
+      opt.textContent = (same(p) ? '★ ' : '') + p.label;
       sel.appendChild(opt);
     });
-  })();
+    sel.options[0].textContent = list.length ? '（選択してください：' + list.length + '件）' : '（見つかりません）';
+    if (keep) sel.value = keep;
+  }
+  buildParentOptions();
+  // 企業名を入れ直したら並びも直す（同じ企業を先頭に）。
+  (function () { const c = document.getElementById('client'); if (c) c.addEventListener('input', buildParentOptions); })();
 
   // ===== 営業担当：名前を打つと候補が絞られる欄（2026-09-01 スタッフからのご意見）=====
   // ⚠ それまではプルダウンだけで、社員が増えると目で探すしかなかった。

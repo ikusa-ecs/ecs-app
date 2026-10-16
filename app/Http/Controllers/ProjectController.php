@@ -433,6 +433,10 @@ class ProjectController extends Controller
                     'label' => trim(($p->project_name ?: '（名称未定）')
                         .($client !== '' ? '／'.$client : '')
                         .($p->start_date ? '（'.$p->start_date->format('n/j').'）' : '')),
+                    // 探しやすくする材料（2026-10-16 baba「8月からの案件が残っていて分かりにくい」）。
+                    // 画面は「今日以降」だけを並べ、上で入れた企業名と同じ案件を先頭にする。
+                    'client' => $client,
+                    'ymd' => $p->start_date ? $p->start_date->format('Y-m-d') : '',
                 ];
             })
             ->values();
