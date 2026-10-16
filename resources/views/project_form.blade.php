@@ -452,6 +452,33 @@
             <div class="hint">通常は募集します。すでにメンバーが決まっている等で募集が不要なときだけチェックを入れてください。</div>
           </div>
 
+          <!-- 連日イベント（2026-09-15・FBシート No.16 桑江さん）。
+               同じ案件を何日かに分けて開催するとき、ここで日程をまとめて足すと
+               1件ずつ登録し直さなくてよい。足した日程は自動で「同じイベント」として結ばれ、
+               スタッフ画面に「◯日目／全◯日」と出る。
+               2026-10-16 baba要望で開催日の上へ移した（日付を入れる前に「何日あるか」を決める流れ）。
+               ⚠ 下の「予備日・リハ日・前日設営」とは別もの。あちらは本番に付属する日、
+                  こちらは**本番そのものが複数日**という意味。
+               ⚠ ここは「そのまま出す区間」の中なので、Blade のコメント記号は使えない。 -->
+          <div class="form-row full non-arena" id="seriesRow">
+            <label>連日イベント</label>
+            <div class="check-row">
+              <input type="checkbox" id="hasSeries" name="has_series" onchange="toggleSeries()">
+              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント）</label>
+            </div>
+            <div class="sub-msg" id="seriesMsg">チェックしない場合、この案件は <b>1日だけ</b> の開催として登録されます。</div>
+
+            <div class="expand-box" id="seriesBox">
+              <div class="hint" style="margin-bottom:8px;">
+                すぐ下の「開催日」が<b>1日目</b>です。2日目からの日程をここに足してください。<br>
+                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（人数・コンテンツなどの中身は同じ内容で入ります）。<br>
+                ※ スタッフ画面には「◯日目／全◯日」と「全◯日まとめてエントリー」ボタンが出て、<b>全日程に出られる方を優先します</b>と案内します。
+              </div>
+              <div id="seriesDates"></div>
+              <button type="button" class="btn ghost sm" onclick="addSeriesDate()">＋ 日程を足す</button>
+            </div>
+          </div>
+
           <!-- 3. 開催日 ｜ 宿泊 -->
           <div class="form-row">
             <label>開催日<span class="req-mark red">必須</span></label>
@@ -743,32 +770,6 @@
                 </div>
               </div>
               <div class="hint">※ 予備日・リハ日・前日設営は「回数」には数えませんが、連勤チェックには含めます（設計書 11章F）。チェックすると、保存後に同じ内容で次の日程を追加できます。</div>
-            </div>
-          </div>
-
-          <!-- 連日イベント（2026-09-15・FBシート No.16 桑江さん）。
-               同じ案件を何日かに分けて開催するとき、ここで日程をまとめて足すと
-               1件ずつ登録し直さなくてよい。足した日程は自動で「同じイベント」として結ばれ、
-               スタッフ画面に「◯日目／全◯日」と出る。
-               ⚠ 上の「予備日・リハ日・前日設営」とは別もの。あちらは本番に付属する日、
-                  こちらは**本番そのものが複数日**という意味。
-               ⚠ ここは「そのまま出す区間」の中なので、Blade のコメント記号は使えない。 -->
-          <div class="form-row full non-arena" id="seriesRow">
-            <label>連日イベント</label>
-            <div class="check-row">
-              <input type="checkbox" id="hasSeries" name="has_series" onchange="toggleSeries()">
-              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント）</label>
-            </div>
-            <div class="sub-msg" id="seriesMsg">チェックしない場合、この案件は <b>1日だけ</b> の開催として登録されます。</div>
-
-            <div class="expand-box" id="seriesBox">
-              <div class="hint" style="margin-bottom:8px;">
-                上の「開催日」が<b>1日目</b>です。2日目からの日程をここに足してください。<br>
-                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（人数・コンテンツなどの中身は同じ内容で入ります）。<br>
-                ※ スタッフ画面には「◯日目／全◯日」と出て、<b>複数の日に出られる方を優先します</b>と案内します。
-              </div>
-              <div id="seriesDates"></div>
-              <button type="button" class="btn ghost sm" onclick="addSeriesDate()">＋ 日程を足す</button>
             </div>
           </div>
 
