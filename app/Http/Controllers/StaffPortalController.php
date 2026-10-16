@@ -595,6 +595,72 @@ class StaffPortalController extends Controller
     }
 
     /**
+     * 連日イベントの全日程に、まとめてエントリーする（2026-10-16 baba要望＝「4日間出られる人」を募集したい）。
+     *
+     * ⚠ エントリーできる日は「この人の募集中タブに出ている日」だけ（recruitJobs と同じ判定）。
+     *   非公開の日・他拠点の日・終わった日・満員の日は飛ばして、飛ばした日を返す（画面で知らせる）。
+     * ⚠ すでにエントリーしている日はそのまま（コメントを消さない）。
+     */
+    public function saveSeriesEntry(Request $request)
+    {
+        $data = $request->validate([
+            'project_id' => ['required', 'string', 'exists:projects,id'],
+        ]);
+
+        $user = Auth::user();
+        if (! $user || TestAccounts::isMockOnly($user)) {
+            return response()->json([
+                'ok' => true,
+                'saved' => false,
+                'message' => 'テスト用アカウントのため保存されません（見本）。',
+            ]);
+        }
+
+        $base = Project::findOrFail($data['project_id']);
+        $seriesIds = array_merge([$base->id], ProjectSeries::siblingIds($base));
+
+        // この人の募集中タブに出ている日（＝エントリーできる日）だけを対象にする。
+        $visible = $this->recruitJobs(Carbon::today(), $user)
+            ->filter(fn ($j) => in_array($j['id'], $seriesIds, true) && ! $j['archived'])
+            ->keyBy('id');
+
+        $applied = [];
+        $skipped = [];
+        foreach ($seriesIds as $pid) {
+            $j = $visible->get($pid);
+            if (! $j) {
+                $skipped[] = $pid;   // 非公開・他拠点・終わった日
+                continue;
+            }
+            if ($j['applied']) {
+                $applied[] = $pid;   // もうエントリー済み＝触らない
+                continue;
+            }
+            if ($j['filled'] >= $j['need']) {
+                $skipped[] = $pid;   // 満員
+                continue;
+            }
+            Application::create([
+                'staff_id' => $user->id,
+                'project_id' => $pid,
+                'intent' => '希望',
+                'note' => null,
+                'applied_at' => now(),
+            ]);
+            $applied[] = $pid;
+        }
+
+        Log::info('staff series entry saved', [
+            'staff_id' => $user->id,
+            'staff_name' => $user->name,
+            'project_ids' => $applied,
+            'skipped' => $skipped,
+        ]);
+
+        return response()->json(['ok' => true, 'saved' => true, 'applied' => $applied, 'skipped' => $skipped]);
+    }
+
+    /**
      * 募集中タブに出す案件リスト（projects から）。
      * 「募集する・完了/下書きでない」案件を、画面の jobs 変換がそのまま読める項目名で返す。
      * 本人がログイン中なら「自分が応募済みか（applied）＋intent/コメント」も案件ごとに載せる。
@@ -703,6 +769,8 @@ class StaffPortalController extends Controller
                 // 連日イベント（⑦日目／全⑦日）。1日だけの案件は null。
                 // 数え方の正本＝App\Support\ProjectSeries（画面で数え直さない）。
                 'series' => ProjectSeries::positionOf($p, $seriesGroups),
+                // 同じ連日イベントの日をまとめるための印（「全日まとめてエントリー」で使う）。
+                'seriesRoot' => ProjectSeries::rootId($p),
                 'off' => $off,
                 // 募集人数は本来セールスが案件登録で入れる項目。まだ未定（空欄・0）のときは
                 // 画面が「満員」に見えてエントリーできなくなるので、既定 5名 として見せる（2026-08-20 baba）。

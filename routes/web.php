@@ -112,6 +112,8 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     Route::post('/staff-portal/availability', [StaffPortalController::class, 'saveAvailability']);
     // 案件へのエントリー（応募＋一言コメント）をDB(applications)へ本物保存。
     Route::post('/staff-portal/entry', [StaffPortalController::class, 'saveEntry']);
+    // 連日イベントの全日程にまとめてエントリー（2026-10-16）。
+    Route::post('/staff-portal/entry-series', [StaffPortalController::class, 'saveSeriesEntry']);
     // 使い方ガイド（社内向け・全役割）。サイドバー（社員以上）から開く。
     // ⚠ 社員以上だけ（2026-09-07）。中身が「社員側の全画面の使い方」なので、スタッフには出さない。
     //   スタッフ向けは下の /guide-staff（こちらは誰でも開ける）。

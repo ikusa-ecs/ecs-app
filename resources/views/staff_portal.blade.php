@@ -1353,7 +1353,7 @@
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
         // 連日イベント（◯日目／全◯日）。1日だけの案件は null。
         // ⚠ ここで詰め替え忘れると、サーバーが送っていても画面に出ない。
-        series:c.series || null,
+        series:c.series || null, seriesRoot:c.seriesRoot || '',
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
         // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
@@ -1449,6 +1449,69 @@
       keepVisible.add(j.id);
       applyArmedTimer = setTimeout(function () { applyArmed = null; applyArmedTimer = null; renderJobs(); }, 5000);
       renderJobs();
+    }
+
+    // ── 連日イベントの「全日まとめてエントリー」（2026-10-16 baba要望＝4日間出られる人を募集したい） ──
+    // ⚠ 押すのは2段階（1日ずつのボタンと同じ＝誤タップで何日分も入らないように）。
+    // ⚠ どの日に入れるかはサーバーが決める（非公開・満員の日は飛ばして返ってくる）。
+    function seriesSiblings(j) {
+      return jobs.filter(x => x.series && x.seriesRoot === j.seriesRoot);
+    }
+    function seriesBtn(j) {
+      const rest = seriesSiblings(j).filter(x => !x.applied);
+      if (rest.length === 0) {
+        return '<br><span class="applied-mark">✅ 募集中の日はすべてエントリー済み</span>';
+      }
+      const armed = applyArmed === 'S:' + j.seriesRoot;
+      return '<br><button type="button" class="apply-btn-sm' + (armed ? ' confirm' : '') + '" style="margin-top:6px;" onclick="armSeries(' + j._i + ')">'
+        + (armed ? '⚠ もう一度押すと全日にエントリー' : '🗓 全' + j.series.total + '日まとめてエントリー') + '</button>';
+    }
+    function armSeries(i) {
+      const j = jobs[i];
+      if (!j) return;
+      const key = 'S:' + j.seriesRoot;
+      if (applyArmed === key) {   // 2回目＝本当に実行
+        disarmApply();
+        applySeries(j);
+        return;
+      }
+      disarmApply();
+      applyArmed = key;
+      seriesSiblings(j).forEach(x => keepVisible.add(x.id));
+      applyArmedTimer = setTimeout(function () { applyArmed = null; applyArmedTimer = null; renderJobs(); }, 5000);
+      renderJobs();
+    }
+    function applySeries(j) {
+      const body = new URLSearchParams();
+      body.append('project_id', j.id);
+      fetch('/staff-portal/entry-series', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      })
+      .then(readJson)
+      .then(res => {
+        if (!res || !res.ok) { alert((res && res.message) || '保存できませんでした。もう一度お試しください。'); return; }
+        if (res.saved === false) {
+          alert(res.message || 'このアカウントは体験用のため、エントリーは保存されません（見本）。');
+          return;
+        }
+        (res.applied || []).forEach(id => {
+          const x = jobs.find(y => y.id === id);
+          if (!x || x.applied) return;
+          x.applied = true;
+          x.saveError = '';
+          x.state = calcState(x);
+          keepVisible.add(x.id);
+          if (typeof refreshEntryDay === 'function') refreshEntryDay(x, true);
+        });
+        renderJobs();
+        const skipped = (res.skipped || []).length;
+        if (skipped > 0) {
+          alert('エントリーしました。ただし ' + skipped + '日分は満員または募集していないため、エントリーできませんでした。');
+        }
+      })
+      .catch(err => alert(saveErrorMessage(err)));
     }
 
     // カレンダーの青い「確定」を押したとき＝「確定アサイン」タブへ移る（2026-09-07）。
@@ -1563,7 +1626,7 @@
           ${String(j.staffNotes || '').trim() !== ''
             ? `<div class="jr-note"><span class="ic">📣</span><span>${escLines(j.staffNotes)}</span></div>` : ''}
           ${j.series
-            ? `<div class="jr-note"><span class="ic">🗓</span><span><b>連日イベントです</b>（${escAttr(j.series.dates.join('・'))} の全${j.series.total}日。これは${j.series.idx}日目）。<br><b>複数の日に出られる方を優先します。</b>出られる日はそれぞれエントリーしてください。</span></div>` : ''}
+            ? `<div class="jr-note"><span class="ic">🗓</span><span><b>連日イベントです</b>（${escAttr(j.series.dates.join('・'))} の全${j.series.total}日。これは${j.series.idx}日目）。<br><b>全日程に出られる方を優先します。</b>全日出られる方は「まとめてエントリー」を押してください（1日ずつのエントリーもできます）。${seriesBtn(j)}</span></div>` : ''}
           <div class="jr-sub">${deadlineChip}${slotChip}</div>
           ${j.saveError ? `<div class="jr-error">⚠ ${escAttr(j.saveError)}</div>` : ''}
           <div class="jr-foot">
