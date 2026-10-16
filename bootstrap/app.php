@@ -43,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\NormalizeHireDate::class,
             // ログイン中の画面はブラウザに写しを取らせない（2026-10-15 FBシートNo.24・25＝古い画面・別の人の画面が一瞬見えた）。
             \App\Http\Middleware\NoStoreWhenSignedIn::class,
+            // 退職にした人は、ログイン中でもその場でログアウトさせる（2026-10-16 baba要望）。
+            \App\Http\Middleware\LogoutRetired::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

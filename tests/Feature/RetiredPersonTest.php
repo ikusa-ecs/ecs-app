@@ -40,6 +40,23 @@ class RetiredPersonTest extends TestCase
         $this->actingAsPerson($me)->get('/employee-assignments?ym=2026-10')->assertOk()->assertDontSee('退職花子');
     }
 
+    /** 退職にした人は、ログイン中でも次に画面を開いた・保存した時点でログアウトされる（2026-10-16）。 */
+    public function test_retired_person_is_logged_out(): void
+    {
+        $me = PersonFactory::new()->create(['role' => 'staff', 'permission' => 'staff', 'office' => '東京', 'must_onboard' => false]);
+        $this->actingAsPerson($me)->get('/staff-portal')->assertOk();
+
+        $me->update(['active' => false]);
+
+        $this->get('/staff-portal')->assertRedirect('/');
+        $this->assertGuest();
+
+        // 画面の中からの保存（fetch）は JSON で理由を返す。
+        $this->actingAsPerson($me->fresh())->postJson('/staff-portal/entry', ['project_id' => 'x'])
+            ->assertStatus(401)->assertJson(['reauth' => true]);
+        $this->assertGuest();
+    }
+
     /** D決め・出勤可能日：退職した社員は並べない。 */
     public function test_director_board_and_availability_hide_retired(): void
     {
