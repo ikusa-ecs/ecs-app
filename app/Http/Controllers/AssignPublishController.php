@@ -8,6 +8,7 @@ use App\Models\ProjectShare;
 use App\Support\OfficeCounts;
 use App\Support\OfficePublish;
 use App\Support\OfficeScope;
+use App\Support\ProjectSeries;
 use App\Support\RecentWindow;
 use App\Support\OfficeSettings;
 use App\Support\ShareTags;
@@ -66,7 +67,11 @@ class AssignPublishController extends Controller
             ? collect()
             : ProjectShare::whereIn('project_id', $cases->pluck('id')->all())->get()->groupBy('project_id');
 
-        $cases = $cases->map(function (Project $p) use ($today, $office, $sharesByProject) {
+        // 連日イベント（2026-10-16 baba要望）＝公開ボードでも「◯日目／全◯日」と、何日公開したかを見せる。
+        // ⚠ 公開は1日ずつ＝公開し忘れた日はスタッフの「まとめてエントリー」にも入らない。
+        $seriesGroups = ProjectSeries::groupFor($cases);
+
+        $cases = $cases->map(function (Project $p) use ($today, $office, $sharesByProject, $seriesGroups) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400)
@@ -113,6 +118,9 @@ class AssignPublishController extends Controller
                 'memo'      => $p->note ?? '',
                 // スタッフ本人に伝えること（本人の確定アサインにそのまま出る）
                 'staffNotes' => $p->staff_notes ?? '',   // スタッフに伝えること（1欄・備考のような自由記入）
+                // 連日イベント（◯日目／全◯日）。1日だけの案件は null。正本＝ProjectSeries。
+                'series' => ProjectSeries::positionOf($p, $seriesGroups),
+                'seriesRoot' => ProjectSeries::rootId($p),
             ];
         })->values();
 

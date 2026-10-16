@@ -306,6 +306,11 @@
     /* 他拠点の案件（2026-09-18）。⚠ 気づいてほしい情報なので、募集なしより色を付ける。 */
     .badge.other-office { background: #e1f1ee; color: #0f766e; }
     html[data-theme="dark"] .badge.other-office { background: var(--info-soft); color: var(--info-ink); }
+    /* 連日イベント（2026-10-16）：「◯日目／全◯日」と、何日公開したか */
+    .badge.series { background: #1d4e89; color: #fff; }
+    .badge.series-pub-all  { background: #e7f6ec; color: #15803d; }
+    .badge.series-pub-part { background: #fff4e0; color: #b45309; border: 1px solid #f0d3a6; }
+    html[data-theme="dark"] .badge.series { background: var(--info-soft); color: var(--info-ink); }
 
     /* 未公開＝赤。⚠ いままで公開ボタンと同じ橙で、状態（未公開）と操作（公開する）の
        区別が付かなかった。橙は公開ボタン側に残し、状態は赤で見せる。 */
@@ -522,6 +527,8 @@
       // 登録拠点と、その案件への関わりの札（2026-09-18）。
       // ⚠ 書き写さないと「他拠点の案件」と見分けが付かない（混じって見える元）。
       office: c.office || '', otherOffice: !!c.otherOffice, shareTags: (c.shareTags || []).slice(),
+      // 連日イベント（2026-10-16）。⚠ 書き写さないと札が出ない（この画面はカードを作り直すつくり）。
+      series: c.series || null, seriesRoot: c.seriesRoot || '',
       staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
       // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
       meetDetail: c.meetDetail || '', belongings: c.belongings || '',
@@ -802,6 +809,22 @@
   // 他の拠点の案件だと分かる札（2026-09-18 baba指摘「名古屋の案件が混じってた」）。
   // ⚠ 混ざるのは決まりどおり＝その案件に自分の拠点がヘルプ／巻き取りで関わっているため。
   //   関わりの文言はサーバー（App\Support\ShareTags）が作る。ここで文字をつなげない。
+  // ===== 連日イベント（2026-10-16 baba要望）=====
+  // 「🗓 連日 1日目／全4日」と「公開 3/4日」を出す。
+  // ⚠ 公開は1日ずつ＝公開し忘れた日はスタッフの「まとめてエントリー」に入らない。だから何日公開したかを見せる。
+  function seriesMates(c){
+    return c.series ? CASES.filter(x => x.series && x.seriesRoot === c.seriesRoot) : [];
+  }
+  function seriesHtml(c){
+    if (!c.series) return '';
+    const total = c.series.total;
+    const pub = seriesMates(c).filter(x => isPublished(x.id)).length;
+    const all = pub >= total;
+    return '<span class="badge series" title="連日イベント：' + escapeHtml((c.series.dates || []).join('・')) + '">🗓 連日 '
+      + c.series.idx + '日目／全' + total + '日</span> '
+      + '<span class="badge ' + (all ? 'series-pub-all' : 'series-pub-part') + '" title="この連日イベントのうち、この拠点のスタッフに公開している日数">'
+      + (all ? '✅ 全日公開' : '公開 ' + pub + '/' + total + '日') + '</span> ';
+  }
   function otherOfficeHtml(c){
     if (!c.otherOffice) return '';
     const how = (c.shareTags || []).map(t => t.label).join('・');
@@ -830,7 +853,7 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
@@ -1000,6 +1023,16 @@
       if (!confirm(`「${c.name}」をスタッフに公開します。\nスタッフの「確定アサイン」に表示されます。\n\n公開してよろしいですか？`)) return;
     } else {
       if (!confirm(`「${c.name}」の公開を取り消します。\nスタッフの画面から見えなくなります。\n\n取り消してよろしいですか？`)) return;
+    }
+    // 連日イベントは、ほかの日もそろえるか聞く（2026-10-16）。
+    // ⚠ 公開し忘れた日があると、スタッフの「まとめてエントリー」でその日だけ入らない。
+    const others = seriesMates(c).filter(x => x.id !== id && isPublished(x.id) !== willPublish);
+    if (others.length > 0) {
+      const days = others.map(x => (x.date.getMonth() + 1) + '/' + x.date.getDate()).join('・');
+      if (confirm(`この案件は連日イベントです（全${c.series.total}日）。\nほかの ${others.length}日（${days}）も一緒に${willPublish ? '公開' : '非公開に'}しますか？\n\n［OK］＝全日まとめて\n［キャンセル］＝この日だけ`)) {
+        persistPublish([id].concat(others.map(x => x.id)), willPublish);
+        return;
+      }
     }
     persistPublish([id], willPublish);
   }

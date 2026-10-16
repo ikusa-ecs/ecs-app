@@ -115,6 +115,21 @@ class SeriesEntryTest extends TestCase
         $res->assertSee('function seriesTag', false)->assertSee('class="m-sr all"', false);
     }
 
+    /** スタッフ公開ボードでも連日イベントと分かる（何日公開したかを出す材料）。 */
+    public function test_公開ボードに連日イベントの印が渡る(): void
+    {
+        $emp = PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '担当', 'permission' => 'manager', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        $this->fourDays();
+
+        $res = $this->actingAsPerson($emp)->get('/assign-publish')->assertOk();
+        $case = collect($res->original->getData()['cases'])->firstWhere('id', 'P-D2');
+        $this->assertSame(['idx' => 2, 'total' => 4], array_intersect_key($case['series'], ['idx' => 0, 'total' => 0]));
+        $this->assertSame('P-D1', $case['seriesRoot']);
+        $res->assertSee('function seriesHtml', false);
+    }
+
     public function test_画面に連日イベントのまとめボタンの材料が渡る(): void
     {
         $me = $this->staff();
