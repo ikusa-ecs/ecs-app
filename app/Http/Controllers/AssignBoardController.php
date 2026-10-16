@@ -25,6 +25,7 @@ use App\Support\OfficeScope;
 use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
+use App\Support\ProjectSeries;
 use App\Support\ShiftWish;
 use App\Support\ShareTags;
 use App\Support\StayDayCheck;
@@ -957,7 +958,29 @@ class AssignBoardController extends Controller
         // 派遣で埋まっている人数（依頼中＋確定・派遣10名＝10名）。正本＝DispatchRows（2026-09-29）。
         $dispatched = DispatchRows::liveCountsFor($projects->pluck('id'));
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office) {
+        // 連日イベント（2026-10-16 baba要望）＝「全日エントリーなのか1日だけなのか」を人ごとに出す。
+        // ⚠ 数え方の正本＝ProjectSeries（画面で数え直さない）。一覧に出ていない日のエントリーも数える。
+        $seriesGroups = ProjectSeries::groupFor($projects);
+        $seriesIds = collect($seriesGroups)->filter(fn ($rows) => count($rows) > 1)
+            ->flatten(1)->pluck('id')->all();
+        // [staff_id => [project_id => true]]
+        $seriesApps = [];
+        if ($seriesIds) {
+            foreach (Application::whereIn('project_id', $seriesIds)->get(['project_id', 'staff_id']) as $a) {
+                $seriesApps[$a->staff_id][$a->project_id] = true;
+            }
+        }
+
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office, $seriesGroups, $seriesApps) {
+            $series = ProjectSeries::positionOf($p, $seriesGroups);
+            $seriesRows = $series ? ($seriesGroups[ProjectSeries::rootId($p)] ?? []) : [];
+            // その人がエントリーしている日（"11/5" の形・開催日順）。連日イベントでなければ null。
+            $seriesOn = fn (string $sid) => $series
+                ? array_values(array_map(
+                    fn ($row) => (string) optional($row->start_date)->format('n/j'),
+                    array_filter($seriesRows, fn ($row) => isset($seriesApps[$sid][$row->id]))
+                ))
+                : null;
             $assignedIds = $assignedByProject->get($p->id, []);
             $assignedStatus = $statusByProject->get($p->id, []);   // [staff_id => '確定'|'仮']
             $entryNotes = $noteByProject->get($p->id, []);         // [staff_id => 本人の応募メモ]
@@ -971,7 +994,7 @@ class AssignBoardController extends Controller
                 ->filter(fn ($sid) => in_array($sid, $assignedIds, true)
                     || OfficeScope::personIn($people->get($sid), $office))
                 ->values()
-                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p) {
+                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p, $seriesOn) {
                     $person = $people->get($sid);
 
                     return [
@@ -990,6 +1013,8 @@ class AssignBoardController extends Controller
                         'remark' => $remarks[$sid] ?? '',            // 担当メモ＝アサインの備考(remark)と同期
                         // どこから来た人か（2026-09-07 baba要望）。'entry'＝この案件にエントリーした人。
                         'src' => 'entry',
+                        // 連日イベントでエントリーしている日（全日なのか1日だけなのか）。
+                        'seriesOn' => $seriesOn((string) $sid),
                     ];
                 })->all();
 
@@ -1023,6 +1048,7 @@ class AssignBoardController extends Controller
                     'remark' => $remarks[$sid] ?? '',
                     // 'cal'＝カレンダーで終日〇を出しているだけ（この案件には応募していない）。
                     'src' => 'cal',
+                    'seriesOn' => $seriesOn((string) $sid),
                 ];
             }
 
@@ -1038,6 +1064,8 @@ class AssignBoardController extends Controller
                 'filled' => count($assignedIds) + ($dispatched[$p->id] ?? 0),   // 派遣10名＝10名（2026-09-29）
                 'status' => $p->status ?? '未着手',
                 'dayType' => $p->date_type ?? '本番',
+                // 連日イベント（◯日目／全◯日・全日程）。1日だけの案件は null。
+                'series' => $series,
                 'state' => $this->boardState($p),
                 'recruit' => (bool) $p->is_recruiting,
                 'archived' => $off < 0,   // 過去の案件は出さない（画面の !archived フィルタで除外）

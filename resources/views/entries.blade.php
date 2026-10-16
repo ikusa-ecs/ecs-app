@@ -142,6 +142,11 @@
     .e-src { font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; white-space:nowrap; }
     .e-src.ent { background:#e7f6ec; color:#15803d; }
     .e-src.cal { background:#eef2ff; color:#4338ca; }
+    /* 連日イベント（2026-10-16）：全日エントリーか、何日だけか */
+    .e-series { display:inline-block; margin-top:2px; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; white-space:nowrap; }
+    .e-series.all  { background:#15803d; color:#fff; }
+    .e-series.part { background:#fff4e0; color:#b45309; border:1px solid #f0d3a6; }
+    .e-badge.series-badge { background:#1d4e89; color:#fff; }
     /* カレンダーの〇だけの人の行は、少し薄くして「まだ応募はしていない」と分かるようにする。 */
     .ent-table tr.fromcal td { background:#fbfbfd; }
     .ecase-counts .c.filtered { color:#b45309; font-weight:700; }
@@ -748,6 +753,17 @@
       ? '<span class="e-src cal" title="この案件には応募していませんが、稼働希望カレンダーでその日を「終日〇」にしています">📅 空いてる</span>'
       : '<span class="e-src ent" title="この案件に「エントリーする」を押してくれた人です">🙋 エントリー</span>';
   }
+  // 連日イベントで、その人が何日エントリーしているか（2026-10-16 baba要望）。
+  // 全日＝緑「🗓 全4日」／一部＝橙「🗓 4日中2日（11/5・11/6）」／1日もなし＝出さない。
+  function seriesTag(c, e){
+    if (!c.series) return '';
+    const on = e.seriesOn || [];
+    if (!on.length) return '';
+    const total = c.series.total;
+    return on.length >= total
+      ? `<br><span class="e-series all" title="連日イベントの全日程にエントリーしています">🗓 全${total}日</span>`
+      : `<br><span class="e-series part" title="連日イベントのうち、エントリーしている日">🗓 ${total}日中${on.length}日（${esc(on.join('・'))}）</span>`;
+  }
 
   // 状態バッジ
   function stateBadge(c){
@@ -985,11 +1001,14 @@
       const entryCount = all.filter(e => (e.src || 'entry') === 'entry').length;
       const calCount = all.length - entryCount;
       const dt = (c.dayType && c.dayType !== '本番') ? `<span class="e-badge dt-badge">${c.dayType}</span>` : '';
+      const sr = c.series
+        ? `<span class="e-badge series-badge" title="連日イベント：${escAttr((c.series.dates || []).join('・'))}">🗓 連日 ${c.series.idx}日目／全${c.series.total}日</span>` : '';
+      const fullCount = c.series ? all.filter(e => (e.seriesOn || []).length >= c.series.total).length : 0;
       const shortCls = c.filled < c.need ? ' short' : '';
       const rows = ents.map((e, i) => `
         <tr class="${e.assigned?'assigned':''}${(e.src === 'cal') ? ' fromcal' : ''}">
           <td>${i + 1}</td>
-          <td>${esc(e.name)}</td>
+          <td>${esc(e.name)}${seriesTag(c, e)}</td>
           <td>${srcTag(e)}</td>
           <td>${wishTag(e.wish)}</td>
           <td><span class="e-lv ${e.lv}">${lvLabel[e.lv]}</span></td>
@@ -1010,11 +1029,12 @@
             <span class="ecase-name">${esc(c.name)}</span>
             <span class="ecase-client">${esc(c.client)}</span>
             <span class="e-badge cat-${c.cat}">${c.cat}</span>
-            ${dt} ${recBadge(c)} ${stateBadge(c)}
+            ${dt} ${sr} ${recBadge(c)} ${stateBadge(c)}
           </div>
           <div class="ecase-counts">
             <span class="c">必要 <b>${c.need}</b>名</span>
             <span class="c">🙋 エントリー <b>${entryCount}</b>名</span>
+            ${c.series ? `<span class="c">🗓 全${c.series.total}日エントリー <b>${fullCount}</b>名</span>` : ''}
             <span class="c">📅 その日空いている <b>${calCount}</b>名</span>
             <span class="c${shortCls}">アサイン済み <b>${Math.min(c.filled,c.need)}</b>名</span>
             ${ents.length !== all.length ? `<span class="c filtered">絞り込み中：<b>${ents.length}</b>名を表示</span>` : ''}

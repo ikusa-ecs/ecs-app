@@ -86,6 +86,35 @@ class SeriesEntryTest extends TestCase
         $this->assertEqualsCanonicalizing(['P-D1', 'P-D3'], Application::where('staff_id', 'S-001')->pluck('project_id')->all());
     }
 
+    /** 社員のエントリー一覧でも「全日なのか何日だけなのか」が分かる。 */
+    public function test_エントリー一覧に全日か何日だけかが出る(): void
+    {
+        $this->staff();
+        PersonFactory::new()->create([
+            'id' => 'S-002', 'name' => '一部だけ', 'role' => 'staff', 'permission' => 'staff',
+            'office' => '東京', 'must_onboard' => false, 'active' => true,
+        ]);
+        $emp = PersonFactory::new()->create([
+            'id' => 'E-001', 'name' => '担当', 'permission' => 'manager', 'office' => '東京', 'must_onboard' => false,
+        ]);
+        $ids = $this->fourDays();
+        foreach ($ids as $pid) {
+            Application::create(['staff_id' => 'S-001', 'project_id' => $pid, 'intent' => '希望', 'applied_at' => now()]);
+        }
+        Application::create(['staff_id' => 'S-002', 'project_id' => 'P-D1', 'intent' => '希望', 'applied_at' => now()]);
+        Application::create(['staff_id' => 'S-002', 'project_id' => 'P-D3', 'intent' => '希望', 'applied_at' => now()]);
+
+        $res = $this->actingAsPerson($emp)->get('/entries')->assertOk();
+        $case = collect($res->original->getData()['entriesCases'])->firstWhere('id', 'P-D1');
+
+        $this->assertSame(4, $case['series']['total']);
+        $byId = collect($case['entrants'])->keyBy('id');
+        $this->assertCount(4, $byId['S-001']['seriesOn']);
+        $d1 = Carbon::today()->addDays(20);
+        $this->assertSame([$d1->format('n/j'), $d1->copy()->addDays(2)->format('n/j')], $byId['S-002']['seriesOn']);
+        $res->assertSee('function seriesTag', false);
+    }
+
     public function test_画面に連日イベントのまとめボタンの材料が渡る(): void
     {
         $me = $this->staff();
