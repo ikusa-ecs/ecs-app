@@ -452,33 +452,6 @@
             <div class="hint">通常は募集します。すでにメンバーが決まっている等で募集が不要なときだけチェックを入れてください。</div>
           </div>
 
-          <!-- 連日イベント（2026-09-15・FBシート No.16 桑江さん）。
-               同じ案件を何日かに分けて開催するとき、ここで日程をまとめて足すと
-               1件ずつ登録し直さなくてよい。足した日程は自動で「同じイベント」として結ばれ、
-               スタッフ画面に「◯日目／全◯日」と出る。
-               2026-10-16 baba要望で開催日の上へ移した（日付を入れる前に「何日あるか」を決める流れ）。
-               ⚠ 下の「予備日・リハ日・前日設営」とは別もの。あちらは本番に付属する日、
-                  こちらは**本番そのものが複数日**という意味。
-               ⚠ ここは「そのまま出す区間」の中なので、Blade のコメント記号は使えない。 -->
-          <div class="form-row full non-arena" id="seriesRow">
-            <label>連日イベント</label>
-            <div class="check-row">
-              <input type="checkbox" id="hasSeries" name="has_series" onchange="toggleSeries()">
-              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント）</label>
-            </div>
-            <div class="sub-msg" id="seriesMsg">チェックしない場合、この案件は <b>1日だけ</b> の開催として登録されます。</div>
-
-            <div class="expand-box" id="seriesBox">
-              <div class="hint" style="margin-bottom:8px;">
-                すぐ下の「開催日」が<b>1日目</b>です。2日目からの日程をここに足してください。<br>
-                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（人数・コンテンツなどの中身は同じ内容で入ります）。<br>
-                ※ スタッフ画面には「連日イベント（全◯日）」の帯と「全◯日の詳細を見てエントリー」ボタンが出て、<b>全日程に出られる方を優先します</b>と案内します。
-              </div>
-              <div id="seriesDates"></div>
-              <button type="button" class="btn ghost sm" onclick="addSeriesDate()">＋ 日程を足す</button>
-            </div>
-          </div>
-
           <!-- 3. 開催日 ｜ 宿泊 -->
           <div class="form-row">
             <label>開催日<span class="req-mark red">必須</span></label>
@@ -514,6 +487,66 @@
               <option>後泊あり</option>
               <option>前後泊あり</option>
             </select>
+          </div>
+
+          <!-- 連日イベント（2026-09-15・FBシート No.16 桑江さん）。
+               同じ案件を何日かに分けて開催するとき、ここで日程をまとめて足すと
+               1件ずつ登録し直さなくてよい。足した日程は自動で「同じイベント」として結ばれ、
+               スタッフ画面に「◯日目／全◯日」と出る。
+               2026-10-16 baba要望で開催日のすぐ下へ（「日程種別」も一緒に日付の下へ集めた＝日付まわりの選択を1か所に）。
+               ⚠ すぐ下の「日程種別（予備日・リハ日・前日設営）」とは別もの。あちらは本番に付属する日、
+                  こちらは**本番そのものが複数日**という意味。
+               ⚠ ここは「そのまま出す区間」の中なので、Blade のコメント記号は使えない。 -->
+          <div class="form-row full non-arena" id="seriesRow">
+            <label>連日イベント</label>
+            <div class="check-row">
+              <input type="checkbox" id="hasSeries" name="has_series" onchange="toggleSeries()">
+              <label for="hasSeries">同じ案件を複数の日程で開催する（連日イベント）</label>
+            </div>
+            <div class="sub-msg" id="seriesMsg">チェックしない場合、この案件は <b>1日だけ</b> の開催として登録されます。</div>
+
+            <div class="expand-box" id="seriesBox">
+              <div class="hint" style="margin-bottom:8px;">
+                上の「開催日」が<b>1日目</b>です。2日目からの日程をここに足してください。<br>
+                保存すると<b>日程のぶんだけ案件ができ、同じイベントとして結ばれます</b>（人数・コンテンツ・時間などの中身は同じ内容で入ります。<b>日ごとに時間が違うときは、保存したあと案件一覧からその日の案件を開いて直してください</b>）。<br>
+                ※ スタッフ画面には「連日イベント（全◯日）」の帯と「全◯日の詳細を見てエントリー」ボタンが出て、<b>全日程に出られる方を優先します</b>と案内します。
+              </div>
+              <div id="seriesDates"></div>
+              <button type="button" class="btn ghost sm" onclick="addSeriesDate()">＋ 日程を足す</button>
+            </div>
+          </div>
+
+          <!-- 日程種別（予備日・リハ日・前日設営）。2026-10-16 baba要望で開催日の下へ移した（もとは「複数案件・配信種別」の下）。 -->
+          <div class="form-row full non-arena">
+            <label>日程種別</label>
+            <div class="check-row">
+              <input type="checkbox" id="hasSub" name="has_sub" onchange="toggleSub()">
+              <label for="hasSub">予備日・リハ日・前日設営として登録する（本番案件に紐づけます）</label>
+            </div>
+            <div class="sub-msg" id="subMsg">チェックしない場合、この案件は <b>「本番」</b> として登録されます。</div>
+
+            <div class="expand-box" id="subBox">
+              <div class="form-grid">
+                <div class="form-row">
+                  <label>種別</label>
+                  <!-- ⚠ 「前日設営」を足した（2026-09-15・FBシート No.13 桑江さん）。
+                       本番の前の日に会場を作りに行く日。人は出るが「回数」には数えない
+                       ＝予備日・リハ日と同じ扱いになる。 -->
+                  <select name="date_type_sub" id="dateTypeSub">
+                    <option>予備日</option>
+                    <option>リハ日</option>
+                    <option>前日設営</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label>紐づく本番案件</label>
+                  <select name="parent_project_id" id="parentProject">
+                    <option value="">（選択してください）</option>
+                  </select>
+                </div>
+              </div>
+              <div class="hint">※ 予備日・リハ日・前日設営は「回数」には数えませんが、連勤チェックには含めます（設計書 11章F）。チェックすると、保存後に同じ内容で次の日程を追加できます。</div>
+            </div>
           </div>
 
           <!-- 前泊の集合時間（2026-09-15・FBシート No.14）。
@@ -724,14 +757,15 @@
             <div class="hint">代理店を挟む場合に入力します。直接取引なら空欄でOKです。</div>
           </div>
 
-          <!-- 8. 複数案件 ｜ 配信種別 → 日程種別（近くに配置） -->
+          <!-- 8. 複数案件 ｜ 配信種別（日程種別は 2026-10-16 に開催日の下へ移した） -->
           <div class="form-row">
             <label>複数案件（同じ企業で複数日程）</label>
             <div class="radio-row">
               <label><input type="radio" name="multi" value="あり" onchange="onMultiChange()"> あり</label>
               <label><input type="radio" name="multi" value="なし" checked onchange="onMultiChange()"> なし</label>
             </div>
-            <div class="hint">「あり」にすると、保存後に同じ内容をコピーして次の日程を登録できます（違う所だけ直す）。</div>
+            <div class="hint">「あり」にすると、保存後に同じ内容をコピーして次の日程を登録できます（違う所だけ直す）。<br>
+              ※ <b>別々の案件</b>として登録されます（連日イベントとしては結ばれません）。同じイベントの複数日なら、開催日の下の「連日イベント」を使ってください。</div>
           </div>
           <div class="form-row non-arena">
             <label>配信種別</label>
@@ -739,37 +773,6 @@
               <label><input type="radio" name="broadcast" value="なし" checked> なし</label>
               <label><input type="radio" name="broadcast" value="配信"> 配信</label>
               <label><input type="radio" name="broadcast" value="中継"> 中継</label>
-            </div>
-          </div>
-          <div class="form-row full non-arena">
-            <label>日程種別</label>
-            <div class="check-row">
-              <input type="checkbox" id="hasSub" name="has_sub" onchange="toggleSub()">
-              <label for="hasSub">予備日・リハ日・前日設営として登録する（本番案件に紐づけます）</label>
-            </div>
-            <div class="sub-msg" id="subMsg">チェックしない場合、この案件は <b>「本番」</b> として登録されます。</div>
-
-            <div class="expand-box" id="subBox">
-              <div class="form-grid">
-                <div class="form-row">
-                  <label>種別</label>
-                  <!-- ⚠ 「前日設営」を足した（2026-09-15・FBシート No.13 桑江さん）。
-                       本番の前の日に会場を作りに行く日。人は出るが「回数」には数えない
-                       ＝予備日・リハ日と同じ扱いになる。 -->
-                  <select name="date_type_sub" id="dateTypeSub">
-                    <option>予備日</option>
-                    <option>リハ日</option>
-                    <option>前日設営</option>
-                  </select>
-                </div>
-                <div class="form-row">
-                  <label>紐づく本番案件</label>
-                  <select name="parent_project_id" id="parentProject">
-                    <option value="">（選択してください）</option>
-                  </select>
-                </div>
-              </div>
-              <div class="hint">※ 予備日・リハ日・前日設営は「回数」には数えませんが、連勤チェックには含めます（設計書 11章F）。チェックすると、保存後に同じ内容で次の日程を追加できます。</div>
             </div>
           </div>
 
