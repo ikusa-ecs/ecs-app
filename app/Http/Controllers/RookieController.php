@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Content;
 use App\Models\ContentDifficulty;
 use App\Models\Person;
+use App\Models\ShiftPreference;
 use App\Support\OfficeScope;
 use App\Support\RookieDifficulty;
 use App\Support\RookieExperienceSheet;
@@ -36,6 +37,19 @@ class RookieController extends Controller
             'picks' => $plan['picks'],
             'openCases' => $plan['openCases'],
             'busy' => $plan['busy'],
+            // 新人のお休み（2026-10-17 baba「新入社員のところにもお休みが分かるように」）。
+            // D決めと同じ＝出勤可能日の「NG」と「希望休」だけ（△は入れるかもしれないので休みにしない）。
+            // 形： { "E-001": { "2026-10-06": true } }（日付で見るのJSのキーに合わせてゼロ埋め）
+            'dayOff' => ShiftPreference::query()
+                ->whereIn('staff_id', collect($plan['rookies'])->pluck('id')->all())
+                ->whereIn('availability', ['NG', '希望休'])
+                // ⚠ whereBetween(…, 月末)だと日時で入っている行は月末が落ちる＝翌月1日「より前」で切る。
+                ->where('date', '>=', $month->toDateString())
+                ->where('date', '<', $month->copy()->addMonth()->toDateString())
+                ->get(['staff_id', 'date'])
+                ->filter(fn (ShiftPreference $sp) => $sp->date)
+                ->groupBy('staff_id')
+                ->map(fn ($rows) => $rows->mapWithKeys(fn ($sp) => [$sp->date->toDateString() => true])),
             // 新人がDで入っている案件を日付順に（2026-10-13 baba「ディレクターの一覧を見たい」）。
             'dRows' => collect($plan['rookies'])
                 ->flatMap(fn ($r) => collect($r['dCases'])->map(fn ($c) => $c + ['rookie' => $r['name'], 'rookieId' => $r['id']]))

@@ -57,6 +57,12 @@
   table.rk-dist .d { background: var(--brand-fill); color: #fff; font-weight: 700; border-radius: 3px; padding: 0 3px; }
   table.rk-dist .f { background: var(--ok-soft); color: var(--ink); font-weight: 700; border-radius: 3px; padding: 0 3px; }
   table.rk-dist .p { border: 1px dashed var(--brand); color: var(--brand); font-weight: 700; border-radius: 3px; padding: 0 3px; }
+  /* お休み（2026-10-17）＝出勤可能日の×・希望休。D決めの「お休み ◯名」と同じ色。 */
+  table.rk-dist .off { background: #fdecd9; color: #b4530a; font-weight: 700; border-radius: 3px; padding: 0 3px; }
+  html[data-theme="dark"] table.rk-dist .off { background: var(--warn-soft); color: var(--warn-ink); }
+  /* 前半・後半・計を名前の横に（2026-10-17 baba「前後半と合計の数字は名前の横に」） */
+  table.rk-dist .cnt { font-size: 10.5px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  table.rk-dist .cnt b { color: var(--ink); }
 </style>
 @endpush
 
@@ -346,7 +352,7 @@
   {{-- 日付で見る（2026-10-14 baba「この人が前半に多いから…後半に固まってるからチェンジ…が見られる一覧」）。
        新人×その月の日付。中身はJS（rkDist）が、入っている案件と下の案の表から作る＝新人を替えるとすぐ動く。 --}}
   @if ($rookies)
-    <div class="rk-small" style="font-weight:700; margin:8px 0 4px;">🗓 日付で見る（{{ $month->format('n月') }}）　<span style="font-weight:400;">■D／■FC・そのほか（入っている）／□案　前半＝1〜15日・後半＝16日〜</span></div>
+    <div class="rk-small" style="font-weight:700; margin:8px 0 4px;">🗓 日付で見る（{{ $month->format('n月') }}）　<span style="font-weight:400;">■D／■FC・そのほか（入っている）／□案／休＝出勤可能日が×・希望休　名前の横＝前半（1〜15日）・後半（16日〜）・計の件数</span></div>
     <div class="rk-wrap" id="rkDist" style="margin-bottom:8px;"></div>
   @endif
   {{-- 案に無い案件にも手で入れる（2026-10-14 baba「案の人や案件を変えられない」）。
@@ -528,6 +534,7 @@
   // 入っている案件（サーバー）＋下の案の表（いまの新人）から作る。新人を替えたり外したりしたら作り直す。
   var RK_CASES = @json(collect($rookies)->mapWithKeys(fn ($r) => [$r['id'] => collect($r['cases'])->map(fn ($c) => ['date' => $c['date'], 'role' => $c['role'], 'name' => $c['name']])->values()]));
   var RK_MONTH = '{{ $month->format('Y-m') }}';
+  var RK_DAYOFF = @json((object) $dayOff->all());  // 新人のお休み {社員ID:{"Y-m-d":true}}
   window.rkDist = function () {
     var box = document.getElementById('rkDist');
     if (!box) return;
@@ -555,13 +562,16 @@
       var w = new Date(y, m - 1, d).getDay();
       head += '<th class="' + (w === 0 || w === 6 ? 'we' : '') + (d === 16 ? ' half' : '') + '">' + d + '<br>' + wd[w] + '</th>';
     }
-    head += '<th>前半</th><th>後半</th><th>計</th></tr>';
+    head += '</tr>';
     var body = '';
     Object.keys(RK_NAMES).forEach(function (sid) {
-      var row = '<tr><td class="nm"><b>' + esc(RK_NAMES[sid]) + '</b></td>';
+      var row = '';
       var first = 0, second = 0;
       for (var d = 1; d <= last; d++) {
-        var items = ((cell[sid] || {})[RK_MONTH + '-' + pad(d)]) || [];
+        var key = RK_MONTH + '-' + pad(d);
+        var items = ((cell[sid] || {})[key]) || [];
+        // お休み（出勤可能日の×・希望休・2026-10-17）。入っている日でも出す＝休みの日に入れてしまったのに気づけるように。
+        var off = !!(RK_DAYOFF[sid] && RK_DAYOFF[sid][key]);
         if (items.length) { if (d <= 15) first++; else second++; }
         var mark = '';
         if (items.length) {
@@ -569,9 +579,12 @@
           mark = '<span class="' + k + '" title="' + esc(items.map(function (i) { return i.name; }).join(' / ')) + '">'
             + (k === 'd' ? 'D' : (k === 'f' ? 'F' : '案')) + (items.length > 1 ? items.length : '') + '</span>';
         }
+        if (off) mark += '<span class="off" title="出勤可能日が×・希望休">休</span>';
         row += '<td' + (d === 16 ? ' class="half"' : '') + '>' + mark + '</td>';
       }
-      body += row + '<td class="rk-num">' + first + '</td><td class="rk-num">' + second + '</td><td class="rk-num"><b>' + (first + second) + '</b></td></tr>';
+      // 前半・後半・計は名前の横（2026-10-17 baba）。右端だと横にスクロールしないと見えないため。
+      body += '<tr><td class="nm"><b>' + esc(RK_NAMES[sid]) + '</b><span class="cnt">前' + first + '・後' + second + '・計<b>' + (first + second) + '</b></span></td>'
+        + row + '</tr>';
     });
     box.innerHTML = '<table class="rk-dist">' + head + body + '</table>';
   };

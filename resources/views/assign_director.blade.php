@@ -385,7 +385,12 @@
     .dd-sd { background: var(--brand-soft, var(--ok-soft)); color: var(--ink); border: 1px solid var(--brand); }
     .dd-f { background: var(--ok-soft); color: var(--ink); }
     .dd-o { background: var(--line); color: var(--ink); }
-    .dd-off { color: var(--muted); border: 1px dashed var(--line); font-weight: 400; }
+    /* お休み＝「お休み ◯名」と同じ色（2026-10-17 baba「お休みもわかるように」＝薄い灰色の点線では気づけなかった） */
+    .dd-off { background: #fdecd9; color: #b4530a; }
+    html[data-theme="dark"] .dd-off { background: var(--warn-soft); color: var(--warn-ink); }
+    /* 前半・後半・計・Dを名前の横に（2026-10-17 baba「前後半と合計の数字は名前の横に」） */
+    table.dist .cnt { font-size: 10.5px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+    table.dist .cnt b { color: var(--ink); }
     /* 担当バランス集計（右パネル） */
     html[data-theme="dark"] .agg-tbl tr.agg-total td { background: var(--surface-2); }
     html[data-theme="dark"] .agg-panel .live { color: var(--ok-ink); }
@@ -591,7 +596,7 @@
            ⚠ この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
       <div class="dist-panel" style="margin:0 0 14px;">
         <h3>🗓 日付で見る（イベプラ）</h3>
-        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　前半＝1〜15日・後半＝16日〜（数えるのはD・SD・FC・他）。<b>薄い列＝前後の月の1週間</b>（前半・後半・計・Dには数えません）</p>
+        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　名前の横＝前半（1〜15日）・後半（16日〜）・計・Dの件数（数えるのはD・SD・FC・他）。<b>薄い列＝前後の月の1週間</b>（前半・後半・計・Dには数えません）</p>
         <div class="dist-wrap" id="distBox"></div>
       </div>
 
@@ -1032,11 +1037,11 @@
       const label = x.inMonth ? x.d : (x.dt.getMonth() + 1) + '/' + x.d;
       head += `<th class="${cls}">${label}<br>${wd[w]}</th>`;
     });
-    head += '<th>前半</th><th>後半</th><th>計</th><th>D</th></tr>';
+    head += '</tr>';
     let body = '';
     people.forEach(e => {
       let first = 0, second = 0, dN = 0;
-      let row = `<tr class="dep-${e.deptCode || 'plan'}"><td class="nm"><b class="e-nm">${escHtml(e.surname || e.name)}</b></td>`;
+      let row = '';
       days.forEach(x => {
         const items = ((cell[e.id] || {})[x.key]) || [];
         let mark = '';
@@ -1049,13 +1054,17 @@
           const k = order.find(z => items.some(i => i.k === z));
           const txt = { d: 'D', sd: 'SD', f: 'F', o: '他' }[k];
           mark = `<span class="dd-${k}" title="${escAttrText(items.map(i => i.label).join(' / '))}">${txt}${items.length > 1 ? items.length : ''}</span>`;
-        } else if (isDayOff(e.id, x.dt.getFullYear(), x.dt.getMonth(), x.d)) {
-          mark = '<span class="dd-off" title="出勤可能日が×・希望休">休</span>';
+        }
+        // お休み（×・希望休）。⚠ 入っている日でも出す（2026-10-17）＝休みの日に入れてしまったのに気づけるように。
+        if (isDayOff(e.id, x.dt.getFullYear(), x.dt.getMonth(), x.d)) {
+          mark += '<span class="dd-off" title="出勤可能日が×・希望休">休</span>';
         }
         const cls = [sep(x) ? 'half' : '', x.inMonth ? '' : 'adj'].join(' ').trim();
         row += `<td${cls ? ` class="${cls}"` : ''}>${mark}</td>`;
       });
-      body += row + `<td>${first}</td><td>${second}</td><td><b>${first + second}</b></td><td><b>${dN}</b></td></tr>`;
+      // 前半・後半・計・Dは名前の横（2026-10-17 baba）。右端だと横にスクロールしないと見えないため。
+      body += `<tr class="dep-${e.deptCode || 'plan'}"><td class="nm"><b class="e-nm">${escHtml(e.surname || e.name)}</b>`
+        + `<span class="cnt">前${first}・後${second}・計<b>${first + second}</b>・D<b>${dN}</b></span></td>` + row + '</tr>';
     });
     box.innerHTML = '<table class="dist">' + head + body + '</table>';
   }

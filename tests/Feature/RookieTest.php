@@ -400,4 +400,24 @@ class RookieTest extends TestCase
         $this->assertSame(['CT-3' => ['fc' => 'none'], 'CT-1' => ['fc' => 'done'], 'CT-ON' => ['fc' => 'done', 'd' => 'done']],
             $p2->fresh()->rookie_overrides, 'オンラインの部分も同じ1枚で入る');
     }
+
+    /** 日付で見るに新人のお休み（2026-10-17 baba「新入社員のところにもお休みが分かるように」）。 */
+    public function test_日付で見るに新人のお休みを渡す(): void
+    {
+        $rookie = PersonFactory::new()->create(['name' => '新人H', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'must_onboard' => false]);
+        $month = Carbon::today()->startOfMonth();
+        $last = $month->copy()->endOfMonth();
+        foreach ([[$month, 'NG'], [$last, '希望休'], [$month->copy()->addDay(), '未定'], [$month->copy()->addMonth(), 'NG']] as [$d, $a]) {
+            ShiftPreference::create(['staff_id' => $rookie->id, 'period' => $d->format('Y-m'), 'date' => $d->toDateString(), 'availability' => $a]);
+        }
+
+        $html = $this->actingAsPerson($rookie)->get('/rookies')->assertOk()->getContent();
+        $this->assertStringContainsString('var RK_DAYOFF = ', $html);
+        $this->assertStringContainsString('"'.$month->toDateString().'":true', $html, '×は休み');
+        $this->assertStringContainsString('"'.$last->toDateString().'":true', $html, '月末の希望休も落とさない');
+        $this->assertStringNotContainsString('"'.$month->copy()->addDay()->toDateString().'":true', $html, '△は休みにしない');
+        $this->assertStringNotContainsString('"'.$month->copy()->addMonth()->toDateString().'":true', $html, 'ほかの月は入れない');
+        $this->assertStringContainsString('<span class="cnt">前', $html, '前半・後半・計は名前の横');
+    }
 }
