@@ -172,6 +172,9 @@ class RookieTest extends TestCase
 
         $html = $this->actingAsPerson($fcMan)->get('/rookies')->assertOk()->getContent();
         $this->assertStringContainsString('data-tab="matrix">📚 難易度表と経験', $html);
+        // 名前（見出し）はスクロールしても見える＝枠の中で縦にスクロール（2026-10-17 baba）。
+        $this->assertStringContainsString('<div class="rk-mx-wrap">', $html);
+        $this->assertStringContainsString('table.rk-mx th { position: sticky; top: 0;', $html);
         $this->assertSame(1, substr_count($html, '<span class="fc">FC</span>'), 'アサインからFC1回');
         $this->assertSame(1, substr_count($html, '<span class="d">D</span>'), '手で直したD');
         $this->assertGreaterThan(0, substr_count($html, '<td class="c todo">'), '必修なのにまだ＝薄い赤');

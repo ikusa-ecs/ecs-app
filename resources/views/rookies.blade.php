@@ -44,6 +44,13 @@
   .rk-tabs button.on { background: var(--brand-fill); color: #fff; border-color: var(--brand-fill); }
   .rk-card.rk-hide, .rk-toc a.rk-hide { display: none; }
   /* 難易度表と経験（2026-10-17）。 */
+  /* 名前（見出しの行）は下にスクロールしても見えるように（2026-10-17 baba）。
+     ⚠ 横スクロールの枠の中では position:sticky の top がページに効かない＝枠に高さを決めて枠の中で縦にスクロールさせる。
+     コンテンツ名（左端の列）も横にスクロールしても残す。 */
+  .rk-mx-wrap { overflow: auto; max-height: 75vh; }
+  table.rk-mx th { position: sticky; top: 0; z-index: 2; background: var(--panel); box-shadow: 0 1px 0 var(--line); }
+  table.rk-mx td.nm { position: sticky; left: 0; z-index: 1; background: var(--panel); }
+  table.rk-mx th.nm { left: 0; z-index: 3; }
   table.rk-mx th.who { min-width: 64px; font-size: 11.5px; }
   table.rk-mx td.c { text-align: center; white-space: nowrap; font-size: 11.5px; }
   table.rk-mx td.c .fc { background: var(--ok-soft); color: var(--ink); font-weight: 700; border-radius: 3px; padding: 0 4px; }
@@ -456,18 +463,18 @@
   @elseif (! $rookies)
     <p class="rk-small">新人はいません。</p>
   @else
-    <div class="rk-wrap">
+    <div class="rk-mx-wrap">
     <table class="rk rk-mx">
-      <tr><th>種類</th><th>分類</th><th>コンテンツ</th><th>難易度</th><th>必修</th><th>推奨</th>
+      <tr><th class="nm">コンテンツ</th><th>種類</th><th>分類</th><th>難易度</th><th>必修</th><th>推奨</th>
         @foreach ($rookies as $r)
           <th class="who">{{ $r['name'] }}<div class="rk-small" title="必修の済み／全部">必修 {{ $r['progress']['must']['done'] }}/{{ $r['progress']['must']['total'] }}</div></th>
         @endforeach
       </tr>
       @foreach ($difficulties as $d)
         <tr class="{{ $d->must ? 'must' : '' }}">
+          <td class="nm">{{ $d->sheet_name }}</td>
           <td class="rk-small">{{ $d->kind }}</td>
           <td class="rk-small">{{ $d->category }}</td>
-          <td class="nm">{{ $d->sheet_name }}</td>
           <td class="rk-num">{{ $d->difficulty ?? '—' }}</td>
           <td>{{ $d->must ? ($d->one_of ? '◻︎' : '●') : '' }}</td>
           <td>{{ $d->recommend ? ($d->one_of ? '◻︎' : '●') : '' }}</td>
