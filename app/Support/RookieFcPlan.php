@@ -129,6 +129,8 @@ final class RookieFcPlan
                 // チームリーダー（2026-10-13 baba）。
                 'leader' => (string) ($p->rookie_leader_id ?? ''),
                 'note' => (string) ($p->rookie_note ?? ''),
+                // 参加したいイベント（2026-10-17 baba）＝コンテンツIDの並び。
+                'wishes' => array_values(array_map('strval', (array) ($p->rookie_wishes ?? []))),
                 'monthNo' => $no,
                 'target' => $target,
                 'monthEvents' => $monthEvents,
@@ -145,6 +147,7 @@ final class RookieFcPlan
                 'fcDone' => $fcDone,
                 'busy' => $busy,
                 'plan' => in_array('イベプラ', $p->departmentList(), true),
+                'wishes' => array_flip(array_map('strval', (array) ($p->rookie_wishes ?? []))),
             ];
         }
 
@@ -532,6 +535,12 @@ final class RookieFcPlan
                 // 大型はいろいろ学べるので、経験があっても後回しにしない（2026-10-14 baba）。
                 $score += 2;
                 $why[] = '大型（経験があっても学べる）';
+            }
+            // 本人が参加したいイベント（2026-10-17 baba「希望を優先に」）。
+            // 強さは「まだFCでやっていないコンテンツ」と同じ＋2（baba「同じくらいでOK」）。強くしすぎると必修が後回しになる。
+            if ($cids && array_filter($cids, fn ($x) => isset($s['wishes'][$x]))) {
+                $score += 2;
+                $why[] = '本人の希望';
             }
             if (in_array($av, ['稼働可', '希望'], true)) {
                 $score += 2;

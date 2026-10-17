@@ -57,6 +57,9 @@
   table.rk-dist .d { background: var(--brand-fill); color: #fff; font-weight: 700; border-radius: 3px; padding: 0 3px; }
   table.rk-dist .f { background: var(--ok-soft); color: var(--ink); font-weight: 700; border-radius: 3px; padding: 0 3px; }
   table.rk-dist .p { border: 1px dashed var(--brand); color: var(--brand); font-weight: 700; border-radius: 3px; padding: 0 3px; }
+  /* 参加したいイベントの札（2026-10-17） */
+  .rk-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; background: var(--ok-soft); color: var(--ink); border-radius: 10px; padding: 1px 4px 1px 8px; }
+  .rk-chip-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0 2px; }
   /* お休み（2026-10-17）＝出勤可能日の×・希望休。D決めの「お休み ◯名」と同じ色。 */
   table.rk-dist .off { background: #fdecd9; color: #b4530a; font-weight: 700; border-radius: 3px; padding: 0 3px; }
   html[data-theme="dark"] table.rk-dist .off { background: var(--warn-soft); color: var(--warn-ink); }
@@ -97,6 +100,10 @@
 {{-- OJT担当・チームリーダー欄の候補（全行で1つを使う）。 --}}
 <datalist id="rkEmpList">
   @foreach ($employees as $e)<option value="{{ $e->name }}"></option>@endforeach
+</datalist>
+{{-- 参加したいイベント欄の候補＝コンテンツ台帳（2026-10-17）。 --}}
+<datalist id="rkContentList">
+  @foreach ($contents as $c)<option value="{{ $c->content_name }}"></option>@endforeach
 </datalist>
 
 {{-- 新人ごとに見る（2026-10-14 baba「新人ごとに見られない」）。押した人の行だけを、このタブの全ブロックで出す。 --}}
@@ -166,6 +173,22 @@
       </tr>
       <tr data-rookie="{{ $r['id'] }}">
         <td colspan="8" style="border-top:0; padding-top:0;">
+          {{-- 参加したいイベント（2026-10-17 baba「希望を優先にアサインできるか」）。FCの案で「まだやっていない」と同じくらい加点する。
+               入れ方＝名前を少し打つと台帳の候補が出る（baba「ちょっと入力したら出るように」）→選ぶとすぐ保存。✕で外す。 --}}
+          <div class="rk-bar rk-wish" style="margin:4px 0;">
+            <b class="rk-small">🙋 参加したいイベント：</b>
+            @if ($canEdit)
+              <form method="POST" action="/rookies/wishes" style="display:contents;">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
+                <input type="hidden" name="wishes[]" value="">
+                @foreach ($r['wishes'] as $wid)
+                  <span class="rk-chip"><input type="hidden" name="wishes[]" value="{{ $wid }}">{{ optional($contents->firstWhere('id', $wid))->content_name ?? $wid }}<button type="button" class="rk-chip-x" title="外す" onclick="rkDropWish(this)">✕</button></span>
+                @endforeach
+                <input class="rk-in" type="text" list="rkContentList" placeholder="コンテンツ名を少し打つと候補" autocomplete="off" style="width:200px;" onchange="rkAddWish(this)">
+              </form>
+            @else
+              <span class="rk-small">{{ collect($r['wishes'])->map(fn ($w) => optional($contents->firstWhere('id', $w))->content_name ?? $w)->implode('、') ?: 'なし' }}</span>
+            @endif
+          </div>
           {{-- この月に入っている案件（2026-10-09 baba「新人一覧で案件一覧が出るようにしてほしい」）。 --}}
           <details class="rk-exp">
             <summary class="rk-small" style="cursor:pointer;">📋 {{ $month->format('n月') }}の案件（{{ count($r['cases']) }}件）</summary>
@@ -770,6 +793,32 @@
     hidden.value = id;
     rkRemember();
     input.form.submit();
+  }
+
+  // 参加したいイベント（2026-10-17 baba）：打った名前を台帳のIDに引き当てて足す・✕で外す。どちらもすぐ保存。
+  var RK_CONTENTS = @json($contents->map(fn ($c) => ['id' => (string) $c->id, 'name' => $c->content_name])->values());
+  function rkAddWish(input) {
+    var name = input.value.replace(/[\s　]+/g, '');
+    if (name === '') return;
+    var hit = RK_CONTENTS.filter(function (c) { return (c.name || '').replace(/[\s　]+/g, '') === name; })[0];
+    if (!hit) {
+      alert('「' + input.value + '」はコンテンツ台帳に見つかりません。候補から選んでください。');
+      input.value = '';
+      return;
+    }
+    var have = Array.from(input.form.querySelectorAll('input[name="wishes[]"]')).some(function (h) { return h.value === hit.id; });
+    if (have) { input.value = ''; return; }
+    var h = document.createElement('input');
+    h.type = 'hidden'; h.name = 'wishes[]'; h.value = hit.id;
+    input.form.appendChild(h);
+    rkRemember();
+    input.form.submit();
+  }
+  function rkDropWish(btn) {
+    var form = btn.closest('form');
+    btn.closest('.rk-chip').remove();
+    rkRemember();
+    form.submit();
   }
 
   function rkRemember() {

@@ -156,6 +156,39 @@ class RookieTest extends TestCase
         $this->assertStringNotContainsString('大型', $pick['why'] ?? '', '大型でなければ今までどおり');
     }
 
+    /** 本人が参加したいイベントを優先（2026-10-17 baba「希望を優先に」・強さは「まだやっていない」と同じ）。 */
+    public function test_参加したいイベントを優先して画面から入れられる(): void
+    {
+        $day = Carbon::today()->addDays(1);
+        if (! $day->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        Content::create(['id' => 'CT-W', 'content_name' => 'チャンバラ合戦', 'active' => true]);
+        $mk = fn (string $name) => PersonFactory::new()->create(['name' => $name, 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'must_onboard' => false,
+            'rookie_overrides' => ['CT-W' => ['fc' => 'done']]]);
+        $mk('希望なし新人');
+        $wisher = $mk('希望あり新人');   // あとに作る＝点が同じなら負ける側
+        $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day->format('Y-m-d'),
+            'required_count' => 12, 'content_ids' => ['CT-W'], 'status' => '調整中']);
+
+        // 画面から保存（台帳に無いIDは捨てる・同じものは1つ）。
+        $this->actingAsPerson($wisher)->post('/rookies/wishes', ['id' => $wisher->id, 'wishes' => ['', 'CT-W', 'CT-NONE', 'CT-W']])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['CT-W'], $wisher->fresh()->rookie_wishes);
+
+        $pick = collect(RookieFcPlan::build(Carbon::today(), '東京')['picks'])->firstWhere('projectId', $project->id);
+        $this->assertSame('希望あり新人', $pick['rookie']);
+        $this->assertStringContainsString('本人の希望', $pick['why']);
+
+        $this->actingAsPerson($wisher)->get('/rookies')->assertOk()
+            ->assertSee('🙋 参加したいイベント')->assertSee('id="rkContentList"', false)
+            ->assertSee('<option value="チャンバラ合戦">', false)->assertSee('onclick="rkDropWish(this)"', false);
+
+        // 全部外す＝希望なし。
+        $this->actingAsPerson($wisher)->post('/rookies/wishes', ['id' => $wisher->id, 'wishes' => ['']])->assertRedirect();
+        $this->assertNull($wisher->fresh()->rookie_wishes);
+    }
+
     /** 本番とリハ日・前日設営があるイベントは、出られる日は全部同じ新人（2026-10-09 baba）。 */
     public function test_同じイベントの日は全部同じ新人(): void
     {

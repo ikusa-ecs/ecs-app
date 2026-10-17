@@ -109,6 +109,28 @@ class RookieController extends Controller
     }
 
     /**
+     * 参加したいイベント（2026-10-17 baba「希望を優先にアサインできるか候補を」）。
+     * 受け取り：id＋wishes[]＝コンテンツ台帳のID（空＝希望なし）。台帳に無いIDは捨てる。
+     */
+    public function setWishes(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'exists:people,id'],
+            'wishes' => ['nullable', 'array'],
+            // ⚠ 画面は「全部外した」を伝えるため空の wishes[] を必ず送る＝空は null になって届く（nullable が要る）。
+            'wishes.*' => ['nullable', 'string'],
+        ]);
+        $ids = array_values(array_unique(array_filter($data['wishes'] ?? [])));
+        $ids = Content::whereIn('id', $ids)->pluck('id')->map(fn ($x) => (string) $x)
+            ->sortBy(fn ($x) => array_search($x, $ids, true))->values()->all();
+        $p = Person::findOrFail($data['id']);
+        $p->rookie_wishes = $ids ?: null;
+        $p->save();
+
+        return back()->with('ok', $p->name.'さんの参加したいイベントを保存しました。');
+    }
+
+    /**
      * 経験を手で直す（2026-10-09 baba「大型で受付だったから実は経験していない、みたいなことがある」）。
      * 受け取り：id＋ov[コンテンツID][fc|d]＝''（アサインから自動）／done（やった）／none（やっていない）。
      */
