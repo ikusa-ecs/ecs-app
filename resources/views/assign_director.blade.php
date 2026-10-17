@@ -1002,7 +1002,11 @@
     const y = TARGET.y, m = TARGET.m;
     const last = new Date(y, m + 1, 0).getDate();
     const wd = ['日','月','火','水','木','金','土'];
-    const people = EMP.filter(e => e.planner && sameOffice(e));
+    // 並びは社歴の長い順＝入社日の古い順（2026-10-17 baba「名前順じゃなくて歴順」）。入社日が未入力の人はいちばん下（その中は今までの並び）。
+    const people = EMP.filter(e => e.planner && sameOffice(e))
+      .map((e, i) => ({ e, i }))
+      .sort((a, b) => ((a.e.hire || '9999') < (b.e.hire || '9999') ? -1 : (a.e.hire || '9999') > (b.e.hire || '9999') ? 1 : a.i - b.i))
+      .map(x => x.e);
     if (!people.length) { box.innerHTML = '<p class="agg-note">イベプラの社員がいません。</p>'; return; }
     // 並べる日＝その月の前後1週間も（2026-10-15 baba要望）。前後の日は薄く出し、前半・後半・計・Dには数えない。
     const ADJ = 7;

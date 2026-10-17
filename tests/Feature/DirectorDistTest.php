@@ -24,5 +24,14 @@ class DirectorDistTest extends TestCase
         $this->assertStringContainsString('function renderDist()', $html);
         $this->assertStringContainsString("renderAgg();\n    renderDist();", str_replace("\r\n", "\n", $html), 'カレンダーを描き直すたびに作り直す');
         $this->assertStringContainsString('EMP.filter(e => e.planner && sameOffice(e))', $html, 'イベプラだけ・見ている拠点だけ');
+        $this->assertStringContainsString("(a.e.hire || '9999')", $html, '並びは社歴の長い順（2026-10-17 baba）');
+    }
+
+    public function test_社員に入社日を渡す(): void
+    {
+        $me = PersonFactory::new()->create(['office' => '東京', 'must_onboard' => false, 'role' => 'employee',
+            'department' => 'イベプラ', 'hire_date' => '2019-04-01']);
+        $html = $this->actingAsPerson($me)->get('/assign-director')->assertOk()->getContent();
+        $this->assertStringContainsString('"hire":"2019-04-01"', $html);
     }
 }

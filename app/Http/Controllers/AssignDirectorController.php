@@ -132,6 +132,8 @@ class AssignDirectorController extends Controller
                 // 既定表示の対象＝イベプラ。兼務でイベプラに入っている人も含める。
                 'planner' => $p->hasDepartment(Departments::PLANNER),
                 'newbie' => $p->skill_level === '新人',       // 在籍1年未満＝既定表示の対象
+                // 入社日（2026-10-17 baba「日付で見るは名前順じゃなくて歴順」）。空＝未入力。
+                'hire' => optional($p->hire_date)->format('Y-m-d') ?? '',
             ])
             ->values();
 
