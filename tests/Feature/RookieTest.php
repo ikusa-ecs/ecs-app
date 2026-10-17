@@ -156,6 +156,28 @@ class RookieTest extends TestCase
         $this->assertStringNotContainsString('大型', $pick['why'] ?? '', '大型でなければ今までどおり');
     }
 
+    /** 難易度表と経験（2026-10-17 baba「難易度表プラス誰がどれを経験したかがわかるところ」）。 */
+    public function test_難易度表と経験の表(): void
+    {
+        Content::create(['id' => 'CT-1', 'content_name' => 'ある会議室からの脱出', 'active' => true]);
+        RookieDifficulty::import(self::REAL_CSV, RookieDifficulty::REAL);   // 「ある会議室」だけ台帳につながる
+        $mk = fn (string $name, array $ov = []) => PersonFactory::new()->create(['name' => $name, 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'must_onboard' => false, 'rookie_overrides' => $ov]);
+        $fcMan = $mk('FCやった人');
+        $mk('Dやった人', ['CT-1' => ['d' => 'done']]);
+        $mk('まだの人');
+        $past = ProjectFactory::new()->create(['office' => '東京', 'start_date' => Carbon::today()->subMonths(2)->format('Y-m-d'),
+            'content_ids' => ['CT-1'], 'status' => '調整中']);
+        Assignment::create(['project_id' => $past->id, 'staff_id' => $fcMan->id, 'role' => 'FC', 'status' => '確定', 'date' => $past->start_date->format('Y-m-d')]);
+
+        $html = $this->actingAsPerson($fcMan)->get('/rookies')->assertOk()->getContent();
+        $this->assertStringContainsString('data-tab="matrix">📚 難易度表と経験', $html);
+        $this->assertSame(1, substr_count($html, '<span class="fc">FC</span>'), 'アサインからFC1回');
+        $this->assertSame(1, substr_count($html, '<span class="d">D</span>'), '手で直したD');
+        $this->assertGreaterThan(0, substr_count($html, '<td class="c todo">'), '必修なのにまだ＝薄い赤');
+        $this->assertGreaterThan(0, substr_count($html, '<td class="c rk-small">—</td>'), '台帳につながっていない行');
+    }
+
     /** 本人が参加したいイベントを優先（2026-10-17 baba「希望を優先に」・強さは「まだやっていない」と同じ）。 */
     public function test_参加したいイベントを優先して画面から入れられる(): void
     {

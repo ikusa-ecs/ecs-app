@@ -43,6 +43,13 @@
   .rk-tabs button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 8px 8px 0 0; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
   .rk-tabs button.on { background: var(--brand-fill); color: #fff; border-color: var(--brand-fill); }
   .rk-card.rk-hide, .rk-toc a.rk-hide { display: none; }
+  /* 難易度表と経験（2026-10-17）。 */
+  table.rk-mx th.who { min-width: 64px; font-size: 11.5px; }
+  table.rk-mx td.c { text-align: center; white-space: nowrap; font-size: 11.5px; }
+  table.rk-mx td.c .fc { background: var(--ok-soft); color: var(--ink); font-weight: 700; border-radius: 3px; padding: 0 4px; }
+  table.rk-mx td.c .d { background: var(--brand-fill); color: #fff; font-weight: 700; border-radius: 3px; padding: 0 4px; }
+  table.rk-mx tr.must td.nm { font-weight: 700; }
+  table.rk-mx td.c.todo { background: var(--danger-soft); }
   /* 新人ごとに見る（2026-10-14）。 */
   .rk-who-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .rk-who-bar .rk-btn.on { background: var(--brand-fill); color: #fff; border-color: var(--brand-fill); }
@@ -91,6 +98,7 @@
 <div class="rk-tabs" id="rkTabs">
   <button type="button" data-tab="people">👤 新人ごと</button>
   <button type="button" data-tab="fc">👟 FCの案（全員）</button>
+  <button type="button" data-tab="matrix">📚 難易度表と経験</button>
   <button type="button" data-tab="settings">⚙ 設定（目標・難易度表・卒業した人）</button>
 </div>
 
@@ -430,6 +438,52 @@
     <div class="rk-bar" style="margin-top:10px;">
       <button class="rk-btn main" type="button" onclick="rkAssign(Array.from(document.querySelectorAll('tr.rk-pick')).filter(function (tr) { return tr.querySelector('.rk-pick-cb').checked; }))">チェックしたものを入れる</button>
       <span class="rk-small">FC・<b>仮</b>で入ります（確定は日別ボードやアサイン画面で）。入れたあと、この表を作り直します。</span>
+    </div>
+  @endif
+</div>
+
+{{-- 難易度表と経験（2026-10-17 baba「難易度表プラス誰がどれを経験したかがわかるところがほしい」）。
+     行＝難易度表・列＝新人。経験は手で直したぶんも入れた回数（RookieFcPlan の fcDone/dDone＝FCの案と同じ数え方）。
+     必修・推奨なのにまだの所は薄い赤。台帳につながっていない行は数えられないので「—」。 --}}
+<div class="rk-card" data-tab="matrix">
+  <h3>📚 難易度表と経験</h3>
+  <p class="sub"><span style="background:var(--brand-fill); color:#fff; border-radius:3px; padding:0 4px; font-weight:700;">D</span>＝Dでやった
+    <span style="background:var(--ok-soft); border-radius:3px; padding:0 4px; font-weight:700;">FC</span>＝FCでやった（数字は回数）
+    <span style="background:var(--danger-soft); padding:0 6px;">　</span>＝必修・推奨なのにまだ　—＝台帳につながっていない（⚙ 設定の難易度表でつなぐと出ます）。
+    数えるのは開催済みのアサインと、各人の「経験を見る・手で直す」・ECSより前の経験の取込です。</p>
+  @if ($difficulties->isEmpty())
+    <p class="rk-small">難易度表をまだ取り込んでいません（⚙ 設定から取り込めます）。</p>
+  @elseif (! $rookies)
+    <p class="rk-small">新人はいません。</p>
+  @else
+    <div class="rk-wrap">
+    <table class="rk rk-mx">
+      <tr><th>種類</th><th>分類</th><th>コンテンツ</th><th>難易度</th><th>必修</th><th>推奨</th>
+        @foreach ($rookies as $r)
+          <th class="who">{{ $r['name'] }}<div class="rk-small" title="必修の済み／全部">必修 {{ $r['progress']['must']['done'] }}/{{ $r['progress']['must']['total'] }}</div></th>
+        @endforeach
+      </tr>
+      @foreach ($difficulties as $d)
+        <tr class="{{ $d->must ? 'must' : '' }}">
+          <td class="rk-small">{{ $d->kind }}</td>
+          <td class="rk-small">{{ $d->category }}</td>
+          <td class="nm">{{ $d->sheet_name }}</td>
+          <td class="rk-num">{{ $d->difficulty ?? '—' }}</td>
+          <td>{{ $d->must ? ($d->one_of ? '◻︎' : '●') : '' }}</td>
+          <td>{{ $d->recommend ? ($d->one_of ? '◻︎' : '●') : '' }}</td>
+          @foreach ($rookies as $r)
+            @if (! $d->content_id)
+              <td class="c rk-small">—</td>
+            @else
+              <td class="c {{ empty($r['fcDone'][$d->content_id]) && empty($r['dDone'][$d->content_id]) && ($d->must || $d->recommend) ? 'todo' : '' }}">
+                @if (! empty($r['dDone'][$d->content_id]))<span class="d">D{{ $r['dDone'][$d->content_id] > 1 ? $r['dDone'][$d->content_id] : '' }}</span>@endif
+                @if (! empty($r['fcDone'][$d->content_id]))<span class="fc">FC{{ $r['fcDone'][$d->content_id] > 1 ? $r['fcDone'][$d->content_id] : '' }}</span>@endif
+              </td>
+            @endif
+          @endforeach
+        </tr>
+      @endforeach
+    </table>
     </div>
   @endif
 </div>

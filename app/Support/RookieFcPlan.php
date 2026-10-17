@@ -138,6 +138,9 @@ final class RookieFcPlan
                 'monthFc' => $fcThisMonth,
                 'progress' => $progress,
                 'exp' => $exp,
+                // 手で直したぶんも入れた経験の回数（コンテンツID → 回数）。「📚 難易度表と経験」の表で使う（2026-10-17 baba）。
+                'fcDone' => array_map('intval', $fcDone),
+                'dDone' => array_map('intval', $dDone),
                 'cases' => collect($monthCases)->sortBy('date')->values()->all(),
                 // アサインチャットに貼る文は、FCの案がそろってから作る（下・copyText）。
             ];
