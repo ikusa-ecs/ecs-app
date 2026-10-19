@@ -174,13 +174,15 @@ final class RookieFcPlan
             // OJT・本人に確認してもらう文（2026-10-13 baba「チャットワークでOJTと本人に確認したい・すぐコピペ」）。
             $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month, (string) ($ojtNames[$r['leader']] ?? ''), (string) ($ojtNames[$r['ojtSales']] ?? ''));
             // 先頭にメンション（2026-10-19 baba「チャトワのIDも出してそのままメンションできるように」）。
-            // 本人・OJT・リーダーのうち、名簿にチャットワークIDがある人だけ。無い人は付けない（名簿で登録すれば付く）。
-            $to = self::mentionLine([$r['id'], $r['ojt'], $r['ojtSales'], $r['leader']], $cwPeople);
+            // 宛先＝本人＋OJT1人（同日 baba）。リーダーには付けない。セールスの新人はセールス側のOJTだけ（イベプラ側には付けない）。
+            // 名簿にチャットワークIDがある人だけ。無い人は付けない（名簿で登録すれば付く）。
+            $mentionIds = [$r['id'], $r['sales'] ? $r['ojtSales'] : $r['ojt']];
+            $to = self::mentionLine($mentionIds, $cwPeople);
             if ($to !== '') {
                 $r['copyText'] = $to."\n".$r['copyText'];
             }
             // IDが無くてメンションが付かない人（画面に「名簿で登録を」と出す）。
-            $r['cwMissing'] = collect([$r['id'], $r['ojt'], $r['ojtSales'], $r['leader']])->filter()->unique()
+            $r['cwMissing'] = collect($mentionIds)->filter()->unique()
                 ->map(fn ($id) => $cwPeople->get($id))->filter()
                 ->filter(fn ($p) => trim((string) $p->chatwork_id) === '')
                 ->pluck('name')->values()->all();
