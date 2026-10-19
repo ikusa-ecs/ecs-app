@@ -571,7 +571,7 @@
     }
     if (data.unknownRoles && data.unknownRoles.length) {
       w += '<div class="pj-flash warn"><b>知らないポジションの書き方：</b>' + pjEsc(data.unknownRoles.join('・'))
-        + '<br>勝手に決めずに入れていません。この書き方も使うなら教えてください（対応を足します）。</div>';
+        + '<br>この人たちは<b>FCとして入れて、書いてあったとおりを担当メモに残します</b>（人は落としません）。決まったポジションとして数えたい書き方があれば教えてください。</div>';
     }
     // 「似た案件があるので選んでほしい」件数。
     var askCount = rows.filter(function (r) { return r.dup && r.dup.kind === 'similar'; }).length;

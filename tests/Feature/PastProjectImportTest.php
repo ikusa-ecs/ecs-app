@@ -797,8 +797,11 @@ class PastProjectImportTest extends TestCase
         $this->assertSame(0, Project::count());
     }
 
-    /** 知らないポジションの書き方は、勝手に決めずに入れないで知らせる。 */
-    public function test_unknown_position_is_reported_not_guessed(): void
+    /**
+     * 知らないポジションの書き方は、知らせたうえで、人は落とさずFCで入れて書き方を担当メモに残す
+     * （2026-10-19 baba決定。それまでは「入れないで知らせる」だった）。
+     */
+    public function test_unknown_position_is_reported_and_kept_as_fc(): void
     {
         $me = $this->manager();
         $this->staff('S-001', '鈴木 彩');
@@ -807,7 +810,8 @@ class PastProjectImportTest extends TestCase
             'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'なにか']]),
         ])->assertRedirect('/past-import');
 
-        $this->assertSame(0, Assignment::count());
+        $a = Assignment::firstOrFail();
+        $this->assertSame(['FC', 'なにか'], [$a->role, $a->note]);
         $this->assertContains('なにか', $res->getSession()->get('past_unknown_roles'));
     }
 

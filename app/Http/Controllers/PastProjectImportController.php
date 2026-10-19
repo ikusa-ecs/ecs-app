@@ -898,7 +898,9 @@ class PastProjectImportController extends Controller
                     if ($row) {
                         // 確定している人は仮に戻さない（役割だけシートに合わせる）。
                         $status = $row->status === '確定' ? '確定' : $assignStatus;
-                        $row->update(['role' => $a['role'], 'status' => $status]
+                        // 読めない役割の書き方（BKなど）は担当メモへ。ECSで書いたメモがあれば上書きしない。
+                        $memo = isset($a['note']) && trim((string) $row->note) === '' ? ['note' => $a['note']] : [];
+                        $row->update(['role' => $a['role'], 'status' => $status] + $memo
                             + AssignmentStamp::forUpdate($row, $status));
                     } elseif (isset($wasConfirmed[(string) $a['id']])) {
                         Assignment::create([
@@ -907,6 +909,7 @@ class PastProjectImportController extends Controller
                             'date' => $date,
                             'role' => $a['role'],
                             'status' => '確定',
+                            'note' => $a['note'] ?? null,
                         ] + $wasConfirmed[(string) $a['id']]);
                     } else {
                         Assignment::create([
@@ -915,6 +918,7 @@ class PastProjectImportController extends Controller
                             'date' => $date,
                             'role' => $a['role'],
                             'status' => $assignStatus,
+                            'note' => $a['note'] ?? null,
                         ] + AssignmentStamp::forCreate($assignStatus));
                     }
                     $assignCount++;
@@ -1041,10 +1045,12 @@ class PastProjectImportController extends Controller
      * 月シート形式のアサイン＝1人ずつ「氏名＋役割」が書かれているのでそのまま使う。
      * list形式より正確に入る（list は「スタッフ」列がまとめて FC になる）。
      *
-     * ⚠ 知らない役割の書き方は、勝手に決めずに入れない＝一覧で知らせる（baba要望）。
+     * ⚠ 知らない役割の書き方（BK・赤サポ など）は、**FCとして入れて、書いてあったとおりを担当メモに残す**
+     *   （2026-10-19 baba決定。それまでは「入れずに知らせる」だったが、11/25 橘さん（BK＝バンカー）のように
+     *    アサイン表にいる人がECSから黙って外れていた）。一覧で知らせるのは今までどおり。
      *   役割が空欄のときは「現場」として FC で入れる（誰が入ったかは残したいため）。
      *
-     * @return list<array{id:string, role:string}>
+     * @return list<array{id:string, role:string, note?:string}>
      */
     private function assignmentsFromPeople(array $rows, array $people, array &$missing,
         array &$ambiguous, array &$unknownRoles): array
@@ -1063,19 +1069,20 @@ class PastProjectImportController extends Controller
             }
 
             $raw = trim((string) ($person['role'] ?? ''));
+            $note = '';
             if ($raw === '') {
                 $role = AssignmentRole::FC;      // 役割が空＝現場として残す
             } else {
                 $role = AssignmentRole::fromLabel($raw);
                 if ($role === null) {
-                    $unknownRoles[] = $raw;      // 知らない書き方＝入れずに知らせる
-
-                    continue;
+                    $unknownRoles[] = $raw;      // 知らない書き方＝知らせる
+                    $role = AssignmentRole::FC;  // 人は落とさずFCで入れ、書き方は担当メモに残す
+                    $note = $raw;
                 }
             }
 
             foreach ($found['ids'] as $id) {
-                $out[] = ['id' => $id, 'role' => $role];
+                $out[] = ['id' => $id, 'role' => $role] + ($note !== '' ? ['note' => $note] : []);
             }
         }
 

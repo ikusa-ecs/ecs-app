@@ -705,6 +705,24 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('株式会社タカラトミー様', $cases[0]['fields']['顧客名(代理店名)'] ?? null, 'あとの項目がずれていない');
     }
 
+    /** 読めないポジション（BK＝バンカー）でも人を落とさず、FCで入れて書き方を担当メモに残す（2026-10-19 baba）。 */
+    public function test_読めないポジションの人もFCで入り担当メモに残る(): void
+    {
+        $me = $this->manager();
+        $tachibana = PersonFactory::new()->create(['name' => '橘香奈', 'role' => 'staff', 'office' => '東京']);
+        $rows = $this->rows('SDGsWL', 'ショパール');
+        $rows[10][self::A] = '1';
+        $rows[10][self::A + 1] = '橘香奈';
+        $rows[10][self::A + 4] = 'BK';
+
+        $this->import($me, $rows);
+
+        $a = \App\Models\Assignment::where('staff_id', $tachibana->id)->first();
+        $this->assertNotNull($a, '読めないポジションの人が落ちている');
+        $this->assertSame('FC', $a->role);
+        $this->assertSame('BK', $a->note);
+    }
+
     public function test_顧客名の比べ方(): void
     {
         $this->assertSame(ImportContents::clientKey('株式会社テスト'), ImportContents::clientKey('テスト 様'));
