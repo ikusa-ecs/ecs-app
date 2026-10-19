@@ -221,6 +221,9 @@
               <textarea class="rk-in rk-copy" readonly rows="{{ min(16, substr_count($r['copyText'], "\n") + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
               <button class="rk-btn" type="button" onclick="rkCopy(this)" title="アサインチャットに貼って、OJTに見てもらう文をコピーします">📋 コピー</button><span class="rk-small rk-copied"></span>
             </div>
+            @if ($r['cwMissing'])
+              <div class="rk-small">⚠ チャットワークIDが名簿に無いのでメンションが付きません：{{ implode('・', $r['cwMissing']) }}</div>
+            @endif
             @if ($r['cases'])
               <table class="rk" style="max-width:720px;">
                 <tr><th>日付</th><th>案件</th><th>役割</th><th>状態</th></tr>
@@ -349,6 +352,10 @@
           <textarea class="rk-in rk-copy" readonly rows="{{ min(16, substr_count($r['copyText'], "\n") + 1) }}" style="width:100%; max-width:720px; font-size:12px;">{{ $r['copyText'] }}</textarea>
           <button class="rk-btn" type="button" onclick="rkCopy(this)">📋 コピー</button><span class="rk-small rk-copied"></span>
         </div>
+        {{-- メンションが付かない人（チャットワークIDが名簿に無い・2026-10-19）。 --}}
+        @if ($r['cwMissing'])
+          <div class="rk-small">⚠ チャットワークIDが名簿に無いのでメンションが付きません：{{ implode('・', $r['cwMissing']) }}（スタッフ名簿・社員名簿で登録すると付きます）</div>
+        @endif
       </details>
     @endforeach
   @else

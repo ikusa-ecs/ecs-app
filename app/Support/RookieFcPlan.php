@@ -160,6 +160,9 @@ final class RookieFcPlan
         $picks = self::picks($month, $office, $state, $map, $contentNames);
         // 案のとおりに入れたら何件になるか（2026-10-09 baba）。数えるのはこの月の日だけ（月の外の同じイベントの日は別）。
         $ojtNames = Person::whereIn('id', array_filter(array_merge(array_column($out, 'ojt'), array_column($out, 'ojtSales'), array_column($out, 'leader'))))->pluck('name', 'id');
+        // メンション用（本人・OJT・リーダー）。名前とチャットワークIDを1回でまとめて引く。
+        $cwPeople = Person::whereIn('id', array_filter(array_merge(array_column($out, 'id'), array_column($out, 'ojt'), array_column($out, 'ojtSales'), array_column($out, 'leader'))))
+            ->get(['id', 'name', 'chatwork_id'])->keyBy('id');
         foreach ($out as &$r) {
             $mine = array_filter($picks, fn ($x) => $x['rookieId'] === $r['id']);
             $r['pickInMonth'] = count(array_filter($mine, fn ($x) => Carbon::parse($x['date'])->isSameMonth($month)));
@@ -170,6 +173,17 @@ final class RookieFcPlan
             $r['myPicks'] = array_values($mine);
             // OJT・本人に確認してもらう文（2026-10-13 baba「チャットワークでOJTと本人に確認したい・すぐコピペ」）。
             $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month, (string) ($ojtNames[$r['leader']] ?? ''), (string) ($ojtNames[$r['ojtSales']] ?? ''));
+            // 先頭にメンション（2026-10-19 baba「チャトワのIDも出してそのままメンションできるように」）。
+            // 本人・OJT・リーダーのうち、名簿にチャットワークIDがある人だけ。無い人は付けない（名簿で登録すれば付く）。
+            $to = self::mentionLine([$r['id'], $r['ojt'], $r['ojtSales'], $r['leader']], $cwPeople);
+            if ($to !== '') {
+                $r['copyText'] = $to."\n".$r['copyText'];
+            }
+            // IDが無くてメンションが付かない人（画面に「名簿で登録を」と出す）。
+            $r['cwMissing'] = collect([$r['id'], $r['ojt'], $r['ojtSales'], $r['leader']])->filter()->unique()
+                ->map(fn ($id) => $cwPeople->get($id))->filter()
+                ->filter(fn ($p) => trim((string) $p->chatwork_id) === '')
+                ->pluck('name')->values()->all();
         }
         unset($r);
 
@@ -235,6 +249,25 @@ final class RookieFcPlan
      *     11/20(金) 謎パ／◯◯［必修・初めて］
      *     この内容で問題ないか確認をお願いします。
      */
+    /**
+     * チャットワークのメンション行。例：`[To:1234567]山田 太郎さん[To:7654321]鈴木 花子さん`
+     * 同じ人（OJTとリーダーが同じ等）は1回だけ。IDが無い人は飛ばす。だれも付かなければ空文字。
+     * 書き方は App\Support\ChatworkMentions::head と同じ。
+     */
+    private static function mentionLine(array $ids, $people): string
+    {
+        $out = [];
+        foreach (array_unique(array_filter($ids)) as $id) {
+            $p = $people->get($id);
+            $cw = trim((string) ($p->chatwork_id ?? ''));
+            if ($p && $cw !== '') {
+                $out[] = '[To:'.$cw.']'.$p->name.'さん';
+            }
+        }
+
+        return implode('', $out);
+    }
+
     private static function copyText(array $r, string $ojt, Carbon $month, string $leader = '', string $ojtSales = ''): string
     {
         $line = function (array $c, string $tail) {

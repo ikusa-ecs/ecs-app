@@ -355,6 +355,14 @@ class RookieTest extends TestCase
 
         $rows = collect(\App\Support\RookieFcPlan::build(Carbon::today()->startOfMonth(), '東京')['rookies']);
         $this->assertStringContainsString('【新人】新人S（OJT：イベOJT（イベプラ）・セルOJT（セールス））', $rows->firstWhere('id', $sales->id)['copyText']);
+        // 先頭にメンション（2026-10-19 baba）。IDがある人だけ・同じ人は1回。IDの無い人は cwMissing に出る。
+        $sales->update(['chatwork_id' => '111']);
+        $ojtP->update(['chatwork_id' => '222']);
+        $this->post('/rookies/ojt', ['id' => $sales->id, 'ojt' => $ojtP->id, 'leader' => $ojtP->id])->assertRedirect();
+        $r = collect(\App\Support\RookieFcPlan::build(Carbon::today()->startOfMonth(), '東京')['rookies'])->firstWhere('id', $sales->id);
+        $this->assertStringStartsWith("[To:111]新人Sさん[To:222]イベOJTさん\n【新人】新人S", $r['copyText']);
+        $this->assertSame(['セルOJT'], $r['cwMissing']);
+        $this->get('/rookies')->assertOk()->assertSee('メンションが付きません：セルOJT', false);
 
         // 欄が2つ出るのはセールスの新人だけ。
         $html = $this->get('/rookies')->assertOk()->getContent();
