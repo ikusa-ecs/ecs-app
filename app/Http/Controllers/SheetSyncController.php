@@ -254,6 +254,14 @@ class SheetSyncController extends Controller
             }
         }
 
+        // 同じシートの全ブロック（IDが別のブロックのものか確かめるのに使う・SheetIdCheck::claimedByOther）。
+        $blocks = array_map(fn ($c) => [
+            'col' => isset($c['col']) ? (int) $c['col'] : null,
+            'date' => MonthlySheetReader::completeDate((string) ($c['fields']['日程'] ?? ''), $period),
+            'content' => (string) ($c['fields']['コンテンツ'] ?? ''),
+            'client' => (string) ($c['fields']['顧客名(代理店名)'] ?? ''),
+        ], $cases);
+
         foreach ($cases as $case) {
             $col = (int) ($case['col'] ?? -1);
             if ($col < 0) {
@@ -261,6 +269,7 @@ class SheetSyncController extends Controller
             }
             $date = MonthlySheetReader::completeDate((string) ($case['fields']['日程'] ?? ''), $period);
             $content = (string) ($case['fields']['コンテンツ'] ?? '');
+            $client = (string) ($case['fields']['顧客名(代理店名)'] ?? '');
 
             // ⚠ **シートに書いてあるIDが合っていれば、それが正**（触らない）。
             //   ブロック（列）を並べ替えると、IDはブロックと一緒に動く。一方「前回の列 → ID」の記録は古い位置のまま。
@@ -286,7 +295,9 @@ class SheetSyncController extends Controller
             }
             if ($onSheet !== '') {
                 $p = Project::find($onSheet);
-                if (! $p || ! SheetIdCheck::fits($p, $date, $content, $contents)) {
+                // 同じ日でも、その案件をシートの別のブロックがしっかり指していれば、ここのIDはずれている（2026-10-19 11/20餅つき）。
+                if (! $p || ! SheetIdCheck::fits($p, $date, $content, $contents)
+                    || SheetIdCheck::claimedByOther($p, $col, $date, $content, $client, $blocks, $contents)) {
                     $out[(string) $col] = '';   // ずれたID・消した案件のID＝空にさせる
                 }
 

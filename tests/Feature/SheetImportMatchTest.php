@@ -636,6 +636,75 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame(['まだ無い'], $r['unknown']);
     }
 
+    /**
+     * 同じ日でも、コンテンツも顧客もちがう案件のIDは使わない（2026-10-19 baba）。
+     * 実例＝11/20「餅つき／マクセル」の100行目に、同じ日の「OODAチャンバラ／キューアンドエー」のIDが付いていた。
+     */
+    public function test_同じ日でも別のブロックの案件のIDは使わない(): void
+    {
+        $me = $this->manager();
+        $ooda = $this->ecsProject(['id' => 'P-2026-0483', 'project_name' => 'OODAチャンバラ',
+            'content_names' => ['OODAチャンバラ'], 'client' => 'キューアンドエー株式会社']);
+        $mochi = $this->ecsProject(['id' => 'P-2026-0396', 'project_name' => '餅つき',
+            'content_names' => ['餅つき'], 'client' => 'マクセル株式会社']);
+
+        // 1つ目＝餅つき（100行目にOODAチャンバラのID）／2つ目＝OODAチャンバラ（100行目は空）。
+        $rows = $this->rows('餅つき', 'マクセル株式会社', 'P-2026-0483');
+        $b = self::A + self::BLOCK_WIDTH;
+        foreach ($rows as $i => $row) {
+            $rows[$i] = array_pad($row, $b + self::BLOCK_WIDTH + 2, '');
+            for ($k = 0; $k < self::BLOCK_WIDTH; $k++) {
+                $rows[$i][$b + $k] = $i === 99 ? '' : ($row[self::A + $k] ?? '');
+            }
+        }
+        $rows[4][$b + 3] = 'OODAチャンバラ';
+        $rows[6][$b + 3] = 'キューアンドエー株式会社様';
+
+        $this->import($me, $rows);
+
+        $this->assertSame('OODAチャンバラ', $ooda->fresh()->project_name, '別の案件を上書きしている');
+        $this->assertSame('マクセル株式会社', $mochi->fresh()->client);
+        $this->assertSame(2, Project::count(), '名前で正しい案件につながる＝増えない');
+
+        // 毎朝の書き戻しでも、餅つきのブロックのずれたIDは消させる。
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $res = $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $this->assertNotSame('P-2026-0483', SheetSync::firstOrFail()->rows[99][self::A], 'ずれたIDが残っている');
+    }
+
+    /** 名前が全部ちがっても、別のブロックが指していなければIDを信じる（手でつないだ行・2026-09-29 baba決定は変えない）。 */
+    public function test_別のブロックが指していなければ名前がちがってもIDを信じる(): void
+    {
+        $p = $this->ecsProject(['id' => 'P-2026-0042', 'project_name' => '昔の名前', 'client' => 'まったく別の顧客']);
+        $blocks = [['col' => 13, 'date' => '2026-09-01', 'content' => '新しい名前', 'client' => '別の書き方の顧客']];
+
+        $this->assertFalse(\App\Support\SheetIdCheck::claimedByOther($p, 13, '2026-09-01', '新しい名前', '別の書き方の顧客', $blocks));
+    }
+
+    /** コンテンツ名の中の「設営」を前日設営の印と読まない＝「会場設営のみ」（2026-10-19 baba）。 */
+    public function test_会場設営のみは前日設営ではない(): void
+    {
+        $this->assertNull(\App\Support\ScheduleMark::detect('会場設営のみ'));
+        $this->assertSame('前日設営', \App\Support\ScheduleMark::detect('運動会（前日設営）')['kind'], '今までの印はそのまま');
+
+        $me = $this->manager();
+        $isi = $this->ecsProject(['id' => 'P-2027-0001', 'project_name' => '会場設営のみ',
+            'content_names' => ['会場設営のみ'], 'client' => 'アイ・エス・アイ（ISI）', 'date_type' => '本番']);
+        $this->import($me, $this->rows('会場設営のみ', 'アイ・エス・アイ（ISI）'));
+
+        $this->assertSame(1, Project::count(), '同じ案件なのに新しく増えた');
+        $this->assertSame('本番', $isi->fresh()->date_type);
+    }
+
+    /** コンテンツが項目名と同じ文字（「ケータリング」）でも、コンテンツとして読む（2026-10-19 baba）。 */
+    public function test_コンテンツがケータリングでも読める(): void
+    {
+        $cases = \App\Support\MonthlySheetReader::read($this->rows('ケータリング', '株式会社タカラトミー様'))['cases'];
+
+        $this->assertSame('ケータリング', $cases[0]['fields']['コンテンツ'] ?? null);
+        $this->assertSame('株式会社タカラトミー様', $cases[0]['fields']['顧客名(代理店名)'] ?? null, 'あとの項目がずれていない');
+    }
+
     public function test_顧客名の比べ方(): void
     {
         $this->assertSame(ImportContents::clientKey('株式会社テスト'), ImportContents::clientKey('テスト 様'));

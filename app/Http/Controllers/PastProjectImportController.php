@@ -232,6 +232,13 @@ class PastProjectImportController extends Controller
                     (string) ($c['fields']['コンテンツ'] ?? ''), $this->importContents))) : [];
                 $dupOwner[$sid] = count($fit) === 1 ? ($fit[0]['col'] ?? null) : null;
             }
+            // 同じシートの全ブロック（IDが別のブロックのものか確かめるのに使う・SheetIdCheck::claimedByOther）。
+            $blocks = array_map(fn ($c) => [
+                'col' => $c['col'] ?? null,
+                'date' => MonthlySheetReader::completeDate((string) ($c['fields']['日程'] ?? ''), $period),
+                'content' => (string) ($c['fields']['コンテンツ'] ?? ''),
+                'client' => (string) ($c['fields']['顧客名(代理店名)'] ?? ''),
+            ], $read['cases']);
             foreach ($read['cases'] as $i => $case) {
                 $ecsId = $this->ecsIdAt($rows, $case['col'] ?? null);
                 $sheetId = $ecsId;   // 100行目に書いてあったそのままのID（あとで「別の案件につなぎ直した」かを見る）
@@ -254,6 +261,12 @@ class PastProjectImportController extends Controller
                     if ($byId && ! SheetIdCheck::fits($byId, $blockDate, $blockContent, $this->importContents ??= new ImportContents)) {
                         $idMismatch = '⚠ シートの100行目のID「'.$ecsId.'」は別の案件（'
                             .optional($byId->start_date)->format('n/j').'『'.$byId->project_name.'』）を指しているので使いませんでした';
+                        $ecsId = null;
+                    } elseif ($byId && SheetIdCheck::claimedByOther($byId, $case['col'] ?? null, $blockDate, $blockContent,
+                        (string) ($case['fields']['顧客名(代理店名)'] ?? ''), $blocks, $this->importContents)) {
+                        // 同じ日でも、そのIDの案件はシートの別のブロックのもの（2026-10-19 11/20餅つき）。
+                        $idMismatch = '⚠ シートの100行目のID「'.$ecsId.'」は、シートの別のブロックの案件（'
+                            .optional($byId->start_date)->format('n/j').'『'.$byId->project_name.'』）なので使いませんでした';
                         $ecsId = null;
                     }
                 }

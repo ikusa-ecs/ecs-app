@@ -50,6 +50,62 @@ final class SheetIdCheck
         return self::overlap($p, $contentRaw, $contents ?? new ImportContents);
     }
 
+    /**
+     * 100行目のIDの案件を、**シートの別のブロックが**しっかり指しているか（2026-10-19 baba）。
+     *
+     * 【なぜ要るか】11/20「餅つき／マクセル」の100行目に、同じ日の「OODAチャンバラ／キューアンドエー」のIDが付いていた
+     *   （OODAチャンバラのブロックの100行目は空）。同じ日なので fits() は通り、取り込むとOODAチャンバラが餅つきで上書きされるところだった。
+     * 【決まり】このブロックがその案件と「同じ日＋コンテンツか顧客が合う」なら、そのまま使う。
+     *   合わないのに、**別のブロックは合う**なら、そちらの案件＝このブロックのIDはずれている（使わない・書き戻しでは消す）。
+     * ⚠ 別のブロックも合わなければ、今までどおりIDを信じる（手でつないだ行は名前がちがうことがある＝2026-09-29 baba決定）。
+     *
+     * @param  list<array{col: int|null, date: ?string, content: string, client: string}>  $blocks  同じシートの全ブロック
+     */
+    public static function claimedByOther(Project $p, ?int $selfCol, ?string $date, string $content, string $client,
+        array $blocks, ?ImportContents $contents = null): bool
+    {
+        $contents ??= new ImportContents;
+        if (self::strong($p, $date, $content, $client, $contents)) {
+            return false;
+        }
+        foreach ($blocks as $b) {
+            if (($b['col'] ?? null) !== $selfCol && self::strong($p, $b['date'], $b['content'], $b['client'], $contents)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** 同じ日で、コンテンツが重なるか顧客が同じ（＝そのブロックの案件だと言いきれる）。 */
+    private static function strong(Project $p, ?string $date, string $content, string $client, ImportContents $contents): bool
+    {
+        return $date !== null && $date !== '' && optional($p->start_date)->format('Y-m-d') === $date
+            && (self::overlap($p, $content, $contents) || self::sameClient((string) $p->client, $client));
+    }
+
+    /**
+     * 顧客が同じか（株式会社・様・空白などの書き方の違いは無視・正本＝ImportContents::clientKey）。
+     * 「イオンタウンふじみ野様（イオンタウン株式会社様）」と「イオンタウンふじみ野」のように、
+     * 片方がもう片方を含んでいれば同じとみなす。シートの顧客名が分からない（null・空）ときは「同じ」にしない。
+     */
+    private static function sameClient(string $ecs, ?string $sheet): bool
+    {
+        $a = ImportContents::clientKey($ecs);
+        $b = ImportContents::clientKey((string) $sheet);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b) {
+            return true;
+        }
+        // 含む・含まれるで比べるのは2文字以上のときだけ（1文字だと何にでも当たる）。
+        $short = mb_strlen($a) <= mb_strlen($b) ? $a : $b;
+        $long = $short === $a ? $b : $a;
+
+        return mb_strlen($short) >= 2 && mb_strpos($long, $short) !== false;
+    }
+
     /** コンテンツが1つでも重なるか。台帳に無い名前でも、区切り記号で分けた1つずつも比べる。 */
     private static function overlap(Project $p, string $contentRaw, ImportContents $contents): bool
     {
