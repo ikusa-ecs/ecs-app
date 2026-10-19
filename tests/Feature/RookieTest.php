@@ -291,6 +291,8 @@ class RookieTest extends TestCase
         $this->assertCount(1, $r['cases']);
         $this->assertSame('水合戦', $r['cases'][0]['name']);
         $this->assertStringContainsString('【新人】新人F（OJT：先輩OJT）', $r['copyText']);
+        // 見出しのあとで改行（2026-10-19 baba）。
+        $this->assertStringContainsString("（OJT：先輩OJT）\n".Carbon::today()->startOfMonth()->format('n月').'のアサイン確認', $r['copyText']);
         $this->assertStringContainsString('水合戦／A社　FC（仮）', $r['copyText']);
         // D／FC／これから入れる案に分かれ、最後に確認のお願い（2026-10-13 baba）。
         $this->assertStringContainsString("■ D（ディレクター）\n（なし）", $r['copyText']);

@@ -224,7 +224,8 @@ final class RookieFcPlan
      * 新人の月のアサインを、チャットワークに貼ってOJT・本人に確認してもらう文にする
      * （2026-10-09 baba「コピペしてOJTに見てもらいたい」→ 10-13 D／FC／これから入れる案に分けた）。
      * ⚠ 表や罫線は使わない（チャットワークでそのまま読めるように）。
-     * 例：【新人】大霜 知弘（OJT：◯◯）11月のアサイン確認
+     * 例：【新人】大霜 知弘（OJT：◯◯）
+     *     11月のアサイン確認
      *     目標：イベント5件（うちD3件）／いま：D 1件・FC 2件
      *     ■ D（ディレクター）
      *     11/8(土) 戦国運動会／株式会社◯◯（仮）
@@ -250,7 +251,8 @@ final class RookieFcPlan
             ? array_filter([$ojt !== '' ? $ojt.'（イベプラ）' : '', $ojtSales !== '' ? $ojtSales.'（セールス）' : ''])
             : array_filter([$ojt]);
         $who = array_filter([$ojts ? 'OJT：'.implode('・', $ojts) : '', $leader !== '' ? 'リーダー：'.$leader : '']);
-        $lines = ['【新人】'.$r['name'].($who ? '（'.implode('／', $who).'）' : '').' '.$month->format('n月').'のアサイン確認'];
+        // 名前・OJT・リーダーのあとで改行（2026-10-19 baba「1行でわかりにくい」）。
+        $lines = ['【新人】'.$r['name'].($who ? '（'.implode('／', $who).'）' : ''), $month->format('n月').'のアサイン確認'];
         if ($r['target']) {
             $t = $r['target'];
             $lines[] = '目標：イベント'.$t['events'].'件'.($t['dFree'] ? '（DとFC合わせて）' : '（うちD'.$t['d'].'件）')
