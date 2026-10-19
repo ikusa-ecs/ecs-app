@@ -11,6 +11,7 @@ use App\Models\ProjectShare;
 use App\Models\ProjectSlot;
 use App\Support\AssignmentRole;
 use App\Support\AssignSlots;
+use App\Support\Departments;
 use App\Support\DispatchRows;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
@@ -105,7 +106,7 @@ class AssignSheetController extends Controller
 
         // 選んだ月の案件だけに絞る。
         $monthFrom = Carbon::createFromFormat('Y-m-d', $selectedMonth.'-01')->startOfDay();
-        $monthProjects = $base()->with(['director:id,name', 'goodsOwner:id,name'])
+        $monthProjects = $base()->with(['director:id,name,department', 'goodsOwner:id,name'])
             ->whereDate('start_date', '>=', $monthFrom->format('Y-m-d'))
             ->whereDate('start_date', '<=', $monthFrom->copy()->endOfMonth()->format('Y-m-d'))
             ->orderBy('start_date')
@@ -122,7 +123,7 @@ class AssignSheetController extends Controller
 
         // 関係する人の名前・区分・拠点をまとめて引く（毎回引かない）。拠点はヘルプ表示に使う。
         $people = Person::whereIn('id', $assignments->pluck('staff_id')->unique()->all())
-            ->get(['id', 'name', 'role', 'office'])
+            ->get(['id', 'name', 'role', 'office', 'department'])
             ->keyBy('id');
 
         $membersByProject = $assignments->groupBy('project_id');
@@ -172,6 +173,8 @@ class AssignSheetController extends Controller
                         'status' => $a->status,   // 仮/確定
                         'type' => ($person && $person->role === 'employee') ? 'emp' : 'staff',
                         'office' => $person->office ?? '',   // 本人の拠点（ヘルプ表示に使う）
+                        // 社員の名前の色＝部署（2026-10-19 baba）。スタッフは空＝色なし。正本＝Departments。
+                        'dept' => ($person && $person->role === 'employee') ? Departments::code($person->department) : '',
                     ];
                 })
                 ->sortBy(fn ($m) => $this->posRank($m['roleCode']))
@@ -191,6 +194,7 @@ class AssignSheetController extends Controller
                     'status' => null,
                     'type' => 'emp',
                     'office' => '',
+                    'dept' => Departments::code($p->director->department),
                 ]);
             }
 

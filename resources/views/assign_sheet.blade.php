@@ -110,6 +110,17 @@
     border-top: 1px solid #f7f3ec; }
   .mblk .c-nm { color: var(--ink); }
   .mblk .c-nm .emp { font-size: 9px; color: #b8875a; margin-left: 2px; }
+  /* 社員の名前は部署の色（2026-10-19 baba）。イベプラ＝オレンジ／セールス＝紺／クリエイティブ＝黄緑。
+     その他・未設定・スタッフは色なし。部署の見分けの正本＝App\Support\Departments::code。 */
+  .mblk .c-nm .nm-dep.dep-plan,
+  .mblk .c-nm .nm-dep.dep-sales,
+  .mblk .c-nm .nm-dep.dep-creative { font-weight: 700; }
+  .mblk .c-nm .nm-dep.dep-plan     { color: #c2410c; }
+  .mblk .c-nm .nm-dep.dep-sales    { color: #1e3a8a; }
+  .mblk .c-nm .nm-dep.dep-creative { color: #4d7c0f; }
+  html[data-theme="dark"] .mblk .c-nm .nm-dep.dep-plan     { color: #fb923c; }
+  html[data-theme="dark"] .mblk .c-nm .nm-dep.dep-sales    { color: #93a5f5; }
+  html[data-theme="dark"] .mblk .c-nm .nm-dep.dep-creative { color: #a3e635; }
   /* 空いている行＝うっすら。うるさくならないように罫線だけ見せる。 */
   .mrow.mblk.vacant { background: #fdfcfa; min-height: 15px; }
   .mrow.mblk.vacant .c-no { color: #d8cfc2; }
@@ -701,7 +712,7 @@
             <div class="mrow mblk" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
               <span class="c-no">{{ $line['no'] }}</span>
               @php $mSwap = ($m['roleCode'] !== 'D'); @endphp
-              <span class="c-nm {{ $mSwap ? 'm-swappable' : '' }}"><span class="m-nm-read">{{ $m['name'] }}@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
+              <span class="c-nm {{ $mSwap ? 'm-swappable' : '' }}"><span class="m-nm-read"><span class="nm-dep dep-{{ $m['dept'] ?? '' }}">{{ $m['name'] }}</span>@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
                 @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
                 @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
                 @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
