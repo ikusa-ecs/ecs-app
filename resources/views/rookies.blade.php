@@ -147,14 +147,24 @@
             <form method="POST" action="/rookies/ojt">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
               {{-- OJT担当・チームリーダーは名前を打つと候補が出る（2026-10-14 baba）。送るのは隠し欄のID＝名前は rkPickEmp() で引き当てる。 --}}
               <input type="hidden" name="ojt" value="{{ $r['ojt'] }}">
-              <input class="rk-in rk-emp" type="text" list="rkEmpList" value="{{ optional($employees->firstWhere('id', $r['ojt']))->name }}" data-for="ojt" placeholder="OJT担当（名前を打つと候補）" title="OJT担当" autocomplete="off" style="width:150px;" onchange="rkPickEmp(this)">
+              <input class="rk-in rk-emp" type="text" list="rkEmpList" value="{{ optional($employees->firstWhere('id', $r['ojt']))->name }}" data-for="ojt" placeholder="{{ $r['sales'] ? 'OJT（イベプラ）' : 'OJT担当' }}（名前を打つと候補）" title="{{ $r['sales'] ? 'OJT（イベプラ）' : 'OJT担当' }}" autocomplete="off" style="width:150px;" onchange="rkPickEmp(this)">
+              {{-- セールスの新人はOJTが2人＝イベプラ側とセールス側（2026-10-19 baba）。 --}}
+              @if ($r['sales'])
+                <input type="hidden" name="ojt_sales" value="{{ $r['ojtSales'] }}">
+                <input class="rk-in rk-emp" type="text" list="rkEmpList" value="{{ optional($employees->firstWhere('id', $r['ojtSales']))->name }}" data-for="ojt_sales" placeholder="OJT（セールス）（名前を打つと候補）" title="OJT（セールス）" autocomplete="off" style="margin-top:4px; width:150px;" onchange="rkPickEmp(this)">
+              @endif
               {{-- チームリーダー（2026-10-13 baba）。 --}}
               <input type="hidden" name="leader" value="{{ $r['leader'] }}">
               <input class="rk-in rk-emp" type="text" list="rkEmpList" value="{{ optional($employees->firstWhere('id', $r['leader']))->name }}" data-for="leader" placeholder="チームリーダー（名前を打つと候補）" title="チームリーダー" autocomplete="off" style="margin-top:4px; width:150px;" onchange="rkPickEmp(this)">
               <input class="rk-in" type="text" name="note" value="{{ $r['note'] }}" maxlength="500" placeholder="メモ" style="margin-top:4px; width:150px;" onchange="rkRemember(); this.form.submit()">
             </form>
           @else
-            OJT：{{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
+            @if ($r['sales'])
+              OJT（イベプラ）：{{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
+              <div>OJT（セールス）：{{ optional($employees->firstWhere('id', $r['ojtSales']))->name ?? '—' }}</div>
+            @else
+              OJT：{{ optional($employees->firstWhere('id', $r['ojt']))->name ?? '—' }}
+            @endif
             <div class="rk-small">リーダー：{{ optional($employees->firstWhere('id', $r['leader']))->name ?? '—' }}</div>
             @if ($r['note'])<div class="rk-small">{{ $r['note'] }}</div>@endif
           @endif

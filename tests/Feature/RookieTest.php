@@ -334,6 +334,33 @@ class RookieTest extends TestCase
         $this->assertFalse(RookieFcPlan::isArenaRental(ProjectFactory::new()->make(['format' => 'リアル', 'project_name' => '謎パ', 'content_names' => ['謎パ']])));
     }
 
+    public function test_セールスの新人はOJTが2人(): void
+    {
+        // 2026-10-19 baba「セールスのOJTはイベプラとセールスのOJTがつく」。イベプラ側＝ojt・セールス側＝ojt_sales。
+        $me = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京', 'must_onboard' => false]);
+        $sales = PersonFactory::new()->create(['name' => '新人S', 'role' => 'employee', 'department' => 'セールス',
+            'hire_date' => Carbon::today()->subMonth(), 'office' => '東京']);
+        $plan = PersonFactory::new()->create(['name' => '新人P', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->subMonth(), 'office' => '東京']);
+        $ojtP = PersonFactory::new()->create(['name' => 'イベOJT', 'role' => 'employee', 'office' => '東京']);
+        $ojtS = PersonFactory::new()->create(['name' => 'セルOJT', 'role' => 'employee', 'office' => '東京']);
+
+        $this->actingAsPerson($me)->post('/rookies/ojt', ['id' => $sales->id, 'ojt' => $ojtP->id, 'ojt_sales' => $ojtS->id])->assertRedirect();
+        $this->assertSame([$ojtP->id, $ojtS->id], [$sales->fresh()->rookie_ojt_id, $sales->fresh()->rookie_ojt_sales_id]);
+        // ojt_sales を送らない保存（イベプラの新人の欄など）では、セールス側は消さない。
+        $this->post('/rookies/ojt', ['id' => $sales->id, 'ojt' => $ojtP->id, 'note' => 'メモ'])->assertRedirect();
+        $this->assertSame($ojtS->id, $sales->fresh()->rookie_ojt_sales_id);
+
+        $rows = collect(\App\Support\RookieFcPlan::build(Carbon::today()->startOfMonth(), '東京')['rookies']);
+        $this->assertStringContainsString('【新人】新人S（OJT：イベOJT（イベプラ）・セルOJT（セールス））', $rows->firstWhere('id', $sales->id)['copyText']);
+
+        // 欄が2つ出るのはセールスの新人だけ。
+        $html = $this->get('/rookies')->assertOk()->getContent();
+        $this->assertSame(1, substr_count($html, 'name="ojt_sales"'));
+        $this->assertStringContainsString('value="セルOJT"', $html);
+        $this->assertFalse($rows->firstWhere('id', $plan->id)['sales']);
+    }
+
     public function test_画面と卒業ボタン(): void
     {
         $me = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京', 'must_onboard' => false]);

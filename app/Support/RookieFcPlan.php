@@ -126,6 +126,9 @@ final class RookieFcPlan
                 'state' => (string) ($p->rookie_state ?? ''),
                 // OJT担当とひとことメモ（2026-10-09 baba「新人とOJTを記載できるところもほしい」）。
                 'ojt' => (string) ($p->rookie_ojt_id ?? ''),
+                // セールスの新人はOJTが2人＝イベプラ側（ojt）とセールス側（ojtSales）（2026-10-19 baba）。
+                'sales' => in_array(Rookies::SALES, $p->departmentList(), true),
+                'ojtSales' => (string) ($p->rookie_ojt_sales_id ?? ''),
                 // チームリーダー（2026-10-13 baba）。
                 'leader' => (string) ($p->rookie_leader_id ?? ''),
                 'note' => (string) ($p->rookie_note ?? ''),
@@ -156,7 +159,7 @@ final class RookieFcPlan
 
         $picks = self::picks($month, $office, $state, $map, $contentNames);
         // 案のとおりに入れたら何件になるか（2026-10-09 baba）。数えるのはこの月の日だけ（月の外の同じイベントの日は別）。
-        $ojtNames = Person::whereIn('id', array_filter(array_merge(array_column($out, 'ojt'), array_column($out, 'leader'))))->pluck('name', 'id');
+        $ojtNames = Person::whereIn('id', array_filter(array_merge(array_column($out, 'ojt'), array_column($out, 'ojtSales'), array_column($out, 'leader'))))->pluck('name', 'id');
         foreach ($out as &$r) {
             $mine = array_filter($picks, fn ($x) => $x['rookieId'] === $r['id']);
             $r['pickInMonth'] = count(array_filter($mine, fn ($x) => Carbon::parse($x['date'])->isSameMonth($month)));
@@ -166,7 +169,7 @@ final class RookieFcPlan
             $r['dCases'] = array_values(array_filter($r['cases'], fn ($c) => $c['role'] === 'D'));
             $r['myPicks'] = array_values($mine);
             // OJT・本人に確認してもらう文（2026-10-13 baba「チャットワークでOJTと本人に確認したい・すぐコピペ」）。
-            $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month, (string) ($ojtNames[$r['leader']] ?? ''));
+            $r['copyText'] = self::copyText($r, (string) ($ojtNames[$r['ojt']] ?? ''), $month, (string) ($ojtNames[$r['leader']] ?? ''), (string) ($ojtNames[$r['ojtSales']] ?? ''));
         }
         unset($r);
 
@@ -231,7 +234,7 @@ final class RookieFcPlan
      *     11/20(金) 謎パ／◯◯［必修・初めて］
      *     この内容で問題ないか確認をお願いします。
      */
-    private static function copyText(array $r, string $ojt, Carbon $month, string $leader = ''): string
+    private static function copyText(array $r, string $ojt, Carbon $month, string $leader = '', string $ojtSales = ''): string
     {
         $line = function (array $c, string $tail) {
             $d = Carbon::parse($c['date']);
@@ -242,7 +245,11 @@ final class RookieFcPlan
                 .$tail;
         };
 
-        $who = array_filter([$ojt !== '' ? 'OJT：'.$ojt : '', $leader !== '' ? 'リーダー：'.$leader : '']);
+        // セールスの新人はOJTが2人＝「OJT：A（イベプラ）・B（セールス）」（2026-10-19 baba）。
+        $ojts = ($r['sales'] ?? false)
+            ? array_filter([$ojt !== '' ? $ojt.'（イベプラ）' : '', $ojtSales !== '' ? $ojtSales.'（セールス）' : ''])
+            : array_filter([$ojt]);
+        $who = array_filter([$ojts ? 'OJT：'.implode('・', $ojts) : '', $leader !== '' ? 'リーダー：'.$leader : '']);
         $lines = ['【新人】'.$r['name'].($who ? '（'.implode('／', $who).'）' : '').' '.$month->format('n月').'のアサイン確認'];
         if ($r['target']) {
             $t = $r['target'];
