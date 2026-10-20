@@ -102,4 +102,26 @@ class AssignmentRoleTest extends TestCase
             array_keys(AssignmentRole::ENGLISH)
         );
     }
+    /** 全角（ＳＤ）は半角と同じに読む（2026-10-19 baba）。 */
+    public function test_full_width_codes_are_read(): void
+    {
+        $this->assertSame('SD', AssignmentRole::fromLabel('ＳＤ'));
+        $this->assertSame('D', AssignmentRole::fromLabel('Ｄ'));
+    }
+
+    /**
+     * 読めない書き方から役割を推し量る（2026-10-19 baba決定）。実例はアサイン表に実際に書かれていたもの。
+     * 2つ＝先の役割／説明つき＝うしろの2文字コード／それ以外は null（呼ぶ側でFC＋担当メモ）。
+     */
+    public function test_guess_from_label(): void
+    {
+        $cases = [
+            'D・OP' => 'D', 'SD・OP' => 'SD', 'D/OP' => 'D', 'Ｄ/OP' => 'D', 'MC / FC' => 'MC', 'OPSD' => 'OP',
+            '運動会SD' => 'SD', 'WSSD' => 'SD', '全体MC' => 'MC', '懇親MC' => 'MC', '物品サポ' => null,
+            'AD' => null, 'BK' => null, '顧客' => null, 'WS' => null, 'dealer' => null, 'A・B' => null,
+        ];
+        foreach ($cases as $label => $want) {
+            $this->assertSame($want, AssignmentRole::guessFromLabel($label), $label);
+        }
+    }
 }

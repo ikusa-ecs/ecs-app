@@ -140,7 +140,8 @@ class AssignmentRole
      */
     public static function fromLabel(?string $text): ?string
     {
-        $t = preg_replace('/[\s　]+/u', '', trim((string) $text));
+        // 全角の英数字（ＳＤ・Ｄ）は半角と同じに読む（2026-10-19 baba）。
+        $t = preg_replace('/[\s　]+/u', '', trim(mb_convert_kana((string) $text, 'as')));
         if ($t === '') {
             return null;
         }
@@ -181,6 +182,52 @@ class AssignmentRole
         foreach (self::LABELS as $code => $label) {
             if ($t === preg_replace('/[\s　]+/u', '', $label)) {
                 return $code;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * fromLabel() で読めない書き方から、役割を**推し量る**（2026-10-19 baba決定）。読めなければ null。
+     *
+     * ・2つ書いてある（「D・OP」「SD・OP」「D/OP」「MC / FC」「OPSD」）＝**先に書いてある役割**
+     * ・説明つき（「運動会SD」「WSSD」「全体MC」「懇親MC」）＝**うしろの役割**
+     *   ⚠ うしろで見るのは2文字のコード（SD・MC・OP など）だけ。「AD」のように1文字の D で終わる語は D にしない。
+     *
+     * ⚠ 推し量った役割で入れたときは、呼ぶ側が**書いてあったとおりを担当メモに残す**こと（あとで人が見直せるように）。
+     */
+    public static function guessFromLabel(?string $text): ?string
+    {
+        $t = preg_replace('/[\s　]+/u', '', trim(mb_convert_kana((string) $text, 'as')));
+        if ($t === '') {
+            return null;
+        }
+
+        // ① 区切りで2つ以上 → 先頭から読めるものを使う。
+        $parts = array_values(array_filter(preg_split('/[・\/,、&+]+/u', $t) ?: [], fn ($p) => $p !== ''));
+        if (count($parts) >= 2) {
+            foreach ($parts as $p) {
+                if (($c = self::fromLabel($p)) !== null) {
+                    return $c;
+                }
+            }
+        }
+
+        $upper = mb_strtoupper($t);
+        $twoLetter = array_values(array_filter(self::all(), fn ($c) => strlen($c) === 2));
+
+        // ② 区切りなしでコードが2つ続く（OPSD）→ 先のコード。
+        foreach (self::all() as $c) {
+            if (str_starts_with($upper, $c) && self::isValid(substr($upper, strlen($c)))) {
+                return $c;
+            }
+        }
+
+        // ③ 説明＋うしろに2文字のコード（運動会SD・WSSD・全体MC）→ うしろのコード。
+        foreach ($twoLetter as $c) {
+            if (mb_strlen($upper) > 2 && str_ends_with($upper, $c)) {
+                return $c;
             }
         }
 

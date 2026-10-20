@@ -22,10 +22,12 @@ class PersonalCasesOffTest extends TestCase
     /** 未来の開催日は off が正の日数、archived=false。 */
     public function test_future_project_has_positive_off(): void
     {
-        $today = Carbon::parse('2026-07-14');
+        // ⚠ 日付は今日から数える（2026-10-21）。固定の日付（7/14→7/19）だと、
+        //   日がたって「3か月より前は読まない」の外に出たときに落ちる（隣のテストと同じ直し）。
+        $today = Carbon::today();
 
         $p = ProjectFactory::new()->create([
-            'start_date' => '2026-07-19',   // 5日後
+            'start_date' => $today->copy()->addDays(5)->format('Y-m-d'),   // 5日後
         ]);
 
         $case = PersonalCases::cases($today)->firstWhere('id', $p->id);

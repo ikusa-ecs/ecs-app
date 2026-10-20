@@ -714,6 +714,11 @@ class SheetImportMatchTest extends TestCase
         $rows[10][self::A] = '1';
         $rows[10][self::A + 1] = '橘香奈';
         $rows[10][self::A + 4] = 'BK';
+        // 2つ書いてある「D・OP」は先の役割（D）で入り、書き方は担当メモに残る。
+        $d = PersonFactory::new()->create(['name' => '兼務太郎', 'role' => 'employee', 'office' => '東京']);
+        $rows[11][self::A] = '2';
+        $rows[11][self::A + 1] = '兼務太郎';
+        $rows[11][self::A + 4] = 'D・OP';
 
         $this->import($me, $rows);
 
@@ -721,6 +726,8 @@ class SheetImportMatchTest extends TestCase
         $this->assertNotNull($a, '読めないポジションの人が落ちている');
         $this->assertSame('FC', $a->role);
         $this->assertSame('BK', $a->note);
+        $b = \App\Models\Assignment::where('staff_id', $d->id)->firstOrFail();
+        $this->assertSame(['D', 'D・OP'], [$b->role, $b->note]);
     }
 
     public function test_顧客名の比べ方(): void

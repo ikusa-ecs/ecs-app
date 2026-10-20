@@ -1076,7 +1076,9 @@ class PastProjectImportController extends Controller
                 $role = AssignmentRole::fromLabel($raw);
                 if ($role === null) {
                     $unknownRoles[] = $raw;      // 知らない書き方＝知らせる
-                    $role = AssignmentRole::FC;  // 人は落とさずFCで入れ、書き方は担当メモに残す
+                    // 「D・OP」「運動会SD」などは役割を推し量る。それでも読めなければFC。
+                    // どちらも人は落とさず、書いてあったとおりを担当メモに残す（2026-10-19 baba）。
+                    $role = AssignmentRole::guessFromLabel($raw) ?? AssignmentRole::FC;
                     $note = $raw;
                 }
             }
