@@ -497,6 +497,11 @@
           <b>{{ $officeScope }}</b>の案件だけを表示しています（{{ $officeScope }}に共有された他拠点の案件も含みます）。
         </p>
       @endif
+      {{-- エントリー一覧をCSVで落とす（2026-10-21 baba要望）。拠点は画面と同じものを渡す。1行＝案件×エントリーした人。 --}}
+      <p style="margin:6px 0 10px; font-size:13px;">
+        <a href="/entries/export.csv{{ request()->filled('office') ? '?office='.urlencode((string) request()->query('office')) : '' }}">⬇ エントリー一覧をCSVでダウンロード</a>
+        <span style="color:var(--muted); font-size:12px;">（1行＝案件 × エントリーした人。Excelで開けます）</span>
+      </p>
 @verbatim
       <div class="mock-note">
         <b>どの案件に、誰がエントリー（希望）してくれているか</b>を確認する画面です（DBの本物データ）。<br>

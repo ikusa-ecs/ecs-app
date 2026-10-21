@@ -332,6 +332,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/assign-publish/deadline', [AssignPublishController::class, 'setDeadline']);
     // 仮データの名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
     Route::get('/entries', [AssignBoardController::class, 'entries']);
+    // エントリー一覧のCSV（2026-10-21 baba要望）。1行＝案件×エントリーした人。拠点の絞り込みは画面と同じ。
+    Route::get('/entries/export.csv', [AssignBoardController::class, 'entriesCsv']);
     // エントリー新着＝応募が来た順（新しい順）に見る画面。追加案件の反応・新人の応募先を追うため。
     Route::get('/entry-feed', [EntryFeedController::class, 'index']);
     // エントリー一覧「月ごと」の表からの1人ぶんアサイン切替（A案）。assignments に追加/削除する。

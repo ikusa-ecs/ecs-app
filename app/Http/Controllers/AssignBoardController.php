@@ -860,6 +860,91 @@ class AssignBoardController extends Controller
     }
 
     /**
+     * エントリー一覧に並べる案件（画面とCSVで同じものを使う＝並ぶ案件がずれないように）。
+     * ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
+     *
+     * @return Collection<int, Project>
+     */
+    private function entriesProjects(?string $office): Collection
+    {
+        return RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))
+            ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
+            ->orderBy('start_date')
+            ->get()
+            ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))
+            ->values();
+    }
+
+    /**
+     * エントリー一覧をCSVで落とす（GET /entries/export.csv・2026-10-21 baba要望）。1行＝「案件 × エントリーした人」。
+     *
+     * ⚠ 出す案件と人は画面と同じ決まり：案件＝entriesProjects()／人＝見ている拠点のスタッフ（全拠点なら全員）。
+     *   ただし、すでにその案件に入っている人は他拠点でも出す（画面と同じ）。
+     * ⚠ Excelで開いたときに文字化けしないよう BOM を付ける（他のCSV出力と同じ）。
+     */
+    public function entriesCsv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $office = OfficeScope::filter($request);
+        $projects = $this->entriesProjects($office)->keyBy('id');
+        $ids = $projects->keys()->all();
+
+        $apps = $ids ? Application::whereIn('project_id', $ids)->orderBy('created_at')
+            ->get(['project_id', 'staff_id', 'intent', 'note', 'created_at']) : collect();
+        $asg = $ids ? Assignment::whereIn('project_id', $ids)->where('status', '!=', 'キャンセル')
+            ->get(['project_id', 'staff_id', 'status', 'role'])
+            ->groupBy('project_id')->map(fn ($rows) => $rows->keyBy('staff_id')) : collect();
+        $people = Person::whereIn('id', $apps->pluck('staff_id')->unique()->all())
+            ->get(['id', 'name', 'office', 'role'])->keyBy('id');
+        $contentNames = Content::pluck('content_name', 'id');
+        $week = ['日', '月', '火', '水', '木', '金', '土'];
+
+        $rows = [];
+        foreach ($apps as $a) {
+            $p = $projects->get($a->project_id);
+            $person = $people->get($a->staff_id);
+            $mine = $asg->get($a->project_id)?->get($a->staff_id);
+            if (! $p || (! $mine && ! OfficeScope::personIn($person, $office))) {
+                continue;   // 画面と同じ＝他拠点のスタッフの応募は出さない（入っている人は出す）
+            }
+            $d = $p->start_date;
+            $rows[] = [
+                $d ? $d->format('Y-m-d') : '',
+                $d ? $week[$d->dayOfWeek] : '',
+                (string) ($p->date_type ?: '本番'),
+                $p->id,
+                ProjectContentName::of($p, $contentNames, (string) $p->project_name),
+                (string) ($p->client ?? ''),
+                (string) ($p->office ?? ''),
+                (string) ($p->scale ?? ''),
+                (string) ($p->start_time ?? ''),
+                $a->staff_id,
+                (string) ($person->name ?? $a->staff_id),
+                (string) ($person->office ?? ''),
+                (string) ($a->intent ?? ''),
+                (string) ($a->note ?? ''),
+                optional($a->created_at)->format('Y-m-d H:i'),
+                $mine ? (string) $mine->status : '未',
+                $mine ? AssignmentRole::label((string) $mine->role) : '',
+            ];
+        }
+        usort($rows, fn ($x, $y) => [$x[0], $x[3], $x[14]] <=> [$y[0], $y[3], $y[14]]);
+
+        $head = ['開催日', '曜日', '日程種別', '案件ID', 'コンテンツ', '顧客', '登録拠点', '規模', '集合',
+            'スタッフ番号', '氏名', '本人の拠点', 'エントリー', '本人のコメント', 'エントリーした日時', 'アサイン', 'ポジション'];
+        $name = 'ecs_entries_'.Carbon::today()->format('Ymd').($office ? '_'.$office : '').'.csv';
+
+        return response()->streamDownload(function () use ($head, $rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $head);
+            foreach ($rows as $r) {
+                fputcsv($out, $r);
+            }
+            fclose($out);
+        }, $name, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
      * エントリー一覧用の案件データ（応募者込み）を DB から組み立てる。
      * /assign（日別ボードの期間）と違い、募集対象を月ごとに広く出すため完了/下書きのみ除外する。
      *
@@ -874,12 +959,7 @@ class AssignBoardController extends Controller
         //   向こうのスタッフは、向こうの拠点で見たときに出る（案件はヘルプで向こうの一覧にも出ている）。
         //   ※ すでにこの案件に入っている人は、他拠点でも出す（誰が入っているか分からなくなるため）。
         //   ※ 全拠点で見ているときは全員出す。拠点の見分けの正本＝OfficeScope::personIn。
-        // ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
-        $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))
-            ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
-            ->orderBy('start_date')
-            ->get()
-            ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true));
+        $projects = $this->entriesProjects($office);
 
         if ($projects->isEmpty()) {
             return collect();
