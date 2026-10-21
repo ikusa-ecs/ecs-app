@@ -108,10 +108,11 @@ class MonthAutoAssign
             ->all();
 
         // その月の既存アサイン（キャンセル以外）。件数と「その日どこに入っているか」を作る。
+        // ⚠ キャンセルになった案件のアサインは数えない＝その日は空いている扱い（2026-10-21 baba）。
         $existing = Assignment::whereBetween('date', [
             $this->monthStart->format('Y-m-d').' 00:00:00',
             $this->monthEnd->format('Y-m-d').' 23:59:59',
-        ])->where('status', '!=', 'キャンセル')->get(['project_id', 'staff_id', 'date', 'role']);
+        ])->where('status', '!=', 'キャンセル')->onLiveProject()->get(['project_id', 'staff_id', 'date', 'role']);
 
         $projectNames = Project::whereIn('id', $existing->pluck('project_id')->unique())
             ->pluck('project_name', 'id');
@@ -584,6 +585,7 @@ class MonthAutoAssign
         if ($p->is_repeat && $p->client) {
             $pastIds = Project::where('client', $p->client)->where('id', '!=', $p->id)->pluck('id');
             $repeatIds = $pastIds->isEmpty() ? [] : Assignment::whereIn('project_id', $pastIds)
+                ->where('status', '!=', 'キャンセル')->onLiveProject()
                 ->pluck('staff_id')->unique()->values()->all();
         }
 

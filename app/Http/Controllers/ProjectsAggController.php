@@ -71,6 +71,7 @@ class ProjectsAggController extends Controller
         // その月に開催する案件だけを対象にする。
         // ⚠ 数えるのは**案件の開催日**（アサインの日ではない）。2日案件でも1件として数えるため。
         $monthProjectIds = Project::whereBetween('start_date', [$from->toDateString(), $to->toDateString()])
+            ->notCancelled()   // キャンセルになった案件は担当数に入れない（2026-10-21）
             ->pluck('id')
             ->all();
 

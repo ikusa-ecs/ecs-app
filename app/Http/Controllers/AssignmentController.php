@@ -103,6 +103,7 @@ class AssignmentController extends Controller
             $otherRows = Assignment::where('date', $ymd)
                 ->where('project_id', '!=', $project->id)
                 ->where('status', '!=', 'キャンセル')
+                ->onLiveProject()   // キャンセルになった案件は「もう入っている」にしない（2026-10-21）
                 ->get(['project_id', 'staff_id']);
             $otherNames = Project::whereIn('id', $otherRows->pluck('project_id')->unique())
                 ->pluck('project_name', 'id');
@@ -115,6 +116,7 @@ class AssignmentController extends Controller
                 $date->copy()->endOfMonth()->format('Y-m-d'),
             ])
                 ->where('status', '!=', 'キャンセル')
+                ->onLiveProject()
                 ->selectRaw('staff_id, count(*) as c')
                 ->groupBy('staff_id')
                 ->pluck('c', 'staff_id')
@@ -131,6 +133,7 @@ class AssignmentController extends Controller
             if ($priorPids->isNotEmpty()) {
                 $repeatStaffIds = Assignment::whereIn('project_id', $priorPids)
                     ->where('status', '!=', 'キャンセル')
+                    ->onLiveProject()
                     ->pluck('staff_id')
                     ->unique()
                     ->values()

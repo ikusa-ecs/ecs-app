@@ -86,7 +86,9 @@ class StaffInvoiceCheckController extends Controller
                 'kana' => (string) ($p->name_kana ?? ''),
                 'office' => (string) ($p->office ?? ''),
                 'cases' => $cases,
-                'confirmed' => count(array_filter($cases, fn ($x) => $x['status'] === '確定')),
+                // 中止になった案件は数えない（一覧には【案件中止】で出す・2026-10-21 baba）。
+                'confirmed' => count(array_filter($cases, fn ($x) => $x['status'] === '確定' && empty($x['cancelled']))),
+                'liveCount' => count(array_filter($cases, fn ($x) => empty($x['cancelled']))),
                 'received' => $c?->received_at ? ['at' => $c->received_at->format('n/j H:i'), 'by' => (string) $c->received_by] : null,
                 'checked' => $c?->checked_at ? ['at' => $c->checked_at->format('n/j H:i'), 'by' => (string) $c->checked_by] : null,
                 'copyText' => self::copyText((string) $p->name, $month, $cases),
@@ -201,7 +203,10 @@ class StaffInvoiceCheckController extends Controller
     /** 1人ぶんの明細をコピーする文（請求書と見比べる・チャットに貼る用）。表や罫線は使わない。 */
     private static function copyText(string $name, Carbon $month, array $cases): string
     {
-        $lines = [$name.'さん '.$month->format('n月').'のアサイン '.count($cases).'件'];
+        // 件数には中止になった案件を入れない（一覧には【案件中止】で出す・2026-10-21 baba）。
+        $stopped = count(array_filter($cases, fn ($c) => ! empty($c['cancelled'])));
+        $lines = [$name.'さん '.$month->format('n月').'のアサイン '.(count($cases) - $stopped).'件'
+            .($stopped ? '（ほかに中止 '.$stopped.'件）' : '')];
         foreach ($cases as $c) {
             $lines[] = $c['date'].' '.$c['name'].($c['client'] !== '' ? '／'.$c['client'] : '')
                 .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')

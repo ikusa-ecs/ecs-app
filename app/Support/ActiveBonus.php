@@ -227,6 +227,7 @@ final class ActiveBonus
 
         $countByStaff = Assignment::query()
             ->confirmed()
+            ->onLiveProject()   // キャンセルになった案件は回数に入れない（2026-10-21）
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->whereIn('staff_id', $people->pluck('id')->all())
             ->get(['staff_id'])
@@ -300,6 +301,7 @@ final class ActiveBonus
 
         $count = Assignment::query()
             ->confirmed()
+            ->onLiveProject()   // キャンセルになった案件は回数に入れない（2026-10-21）
             ->where('staff_id', $staffId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->count();

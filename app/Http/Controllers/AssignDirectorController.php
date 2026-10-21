@@ -199,7 +199,7 @@ class AssignDirectorController extends Controller
         $empBusy = [];
         Assignment::whereIn('staff_id', $employees->pluck('id')->all())
             ->whereNotIn('role', [AssignmentRole::D, AssignmentRole::SD, AssignmentRole::FC])
-            ->where('status', '!=', 'キャンセル')
+            ->where('status', '!=', 'キャンセル')->onLiveProject()   // キャンセル案件の日は空いている扱い（2026-10-21）
             ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))   // 3か月より前の予定は使わない
             ->get(['staff_id', 'date', 'role'])
             ->each(function ($a) use (&$empBusy) {

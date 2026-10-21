@@ -47,20 +47,21 @@ class StaffStatusController extends Controller
         $projectType = Project::pluck('date_type', 'id');
 
         // 対象月の本番開催日数（活性度の分母）
-        $eventDays = Project::where('date_type', '本番')
+        $eventDays = Project::where('date_type', '本番')->notCancelled()
             ->whereBetween('start_date', [$monthStart, $monthEnd])
             ->get()
             ->map(fn (Project $p) => optional($p->start_date)->format('Y-m-d'))
             ->filter()->unique()->count();
 
         // キャンセルされたアサインは数えない（/assign・マイページ・スタッフ画面と同じ扱いにそろえる）。
+        // キャンセルになった案件のアサインも数えない（人は記録に残す・2026-10-21 baba）。
         // ここだけ全件を数えていると、同じ人の稼働数・連勤・選ばれた率が他画面とズレるため。
-        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->get()->groupBy('staff_id');
+        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->onLiveProject()->get()->groupBy('staff_id');
         $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
         $appsByStaff = Application::all()->groupBy('staff_id');
 
         // 退職した人は外す。ただし今月アサインがある人は残す（2026-10-16 baba決定・正本＝Person::inService）。
-        $workingThisMonth = Assignment::where('status', '!=', 'キャンセル')
+        $workingThisMonth = Assignment::where('status', '!=', 'キャンセル')->onLiveProject()
             ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d').' 23:59:59'])
             ->distinct()->pluck('staff_id')->all();
 

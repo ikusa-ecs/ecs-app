@@ -33,8 +33,8 @@ class AssignHistoryController extends Controller
 
     public function index(Request $request)
     {
-        // アサイン（キャンセルは数えない）をまとめて引く。
-        $assignments = Assignment::where('status', '!=', 'キャンセル')
+        // アサイン（キャンセルは数えない）をまとめて引く。キャンセルになった案件も出さない（行われていない・2026-10-21）。
+        $assignments = Assignment::where('status', '!=', 'キャンセル')->onLiveProject()
             ->get(['project_id', 'staff_id', 'role', 'status']);
 
         // アサインに登場する案件・人を、一括で引いておく（N+1を避ける）。

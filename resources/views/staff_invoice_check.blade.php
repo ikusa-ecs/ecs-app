@@ -175,7 +175,7 @@
         <span class="si-name">{{ $r['name'] }}</span>
         @if ($r['office'] !== '')<span class="si-who" style="display:inline; margin-left:6px;">{{ $r['office'] }}</span>@endif
         <details class="si-detail">
-          <summary>明細 {{ count($r['cases']) }}件</summary>
+          <summary>明細 {{ $r['liveCount'] }}件{{ count($r['cases']) - $r['liveCount'] ? '・中止 '.(count($r['cases']) - $r['liveCount']) : '' }}</summary>
           <textarea class="si-copytext" readonly style="position:absolute; left:-9999px; width:1px; height:1px;">{{ $r['copyText'] }}</textarea>
           <button type="button" class="si-copy" onclick="siCopy(this)">📋 コピー</button><span class="si-saving"></span>
           <ul class="si-cases">
@@ -213,7 +213,7 @@
           </div>
         </details>
       </td>
-      <td class="num hide-sp">{{ count($r['cases']) }}件<span class="si-who">うち確定 {{ $r['confirmed'] }}</span></td>
+      <td class="num hide-sp">{{ $r['liveCount'] }}件<span class="si-who">うち確定 {{ $r['confirmed'] }}</span></td>
     </tr>
   @endforeach
 </table>

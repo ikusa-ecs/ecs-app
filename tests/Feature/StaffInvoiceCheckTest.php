@@ -42,7 +42,7 @@ class StaffInvoiceCheckTest extends TestCase
             ->assertSee('id="siSearch"', false)
             ->assertSee('data-name="請求太郎"', false)
             ->assertSee('data-kana="', false)   // よみがなでも探せる（2026-10-15）
-            ->assertSee('明細 2件')
+            ->assertSee('明細 1件・中止 1')   // 中止の案件は一覧に出すが件数に数えない（2026-10-21 baba）
             ->assertSee('戦国運動会')
             ->assertSee('案件中止')
             // 実施形態・集合／解散・会場住所（2026-10-13）。コピーの文にも2行目で入る。

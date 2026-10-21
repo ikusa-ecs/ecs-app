@@ -56,7 +56,7 @@
         <span class="ea-name">{{ $r['name'] }}</span>
         <span class="ea-small">{{ $r['dept'] }}{{ $r['dept'] !== '' && $r['office'] !== '' ? '・' : '' }}{{ $r['office'] }}</span>
         <details class="ea-detail">
-          <summary>明細 {{ count($r['cases']) }}件{{ $r['tentative'] ? '（うち仮 '.$r['tentative'].'）' : '' }}</summary>
+          <summary>明細 {{ $r['liveCount'] }}件{{ $r['tentative'] ? '（うち仮 '.$r['tentative'].'）' : '' }}{{ count($r['cases']) - $r['liveCount'] ? '・中止 '.(count($r['cases']) - $r['liveCount']) : '' }}</summary>
           <textarea class="ea-copytext" readonly style="position:absolute; left:-9999px; width:1px; height:1px;">{{ $r['copyText'] }}</textarea>
           <button type="button" class="ea-copy" onclick="eaCopy(this)">📋 コピー</button><span class="ea-small"></span>
           <ul class="ea-cases">
@@ -76,7 +76,7 @@
           </ul>
         </details>
       </td>
-      <td class="num hide-sp">{{ count($r['cases']) }}件</td>
+      <td class="num hide-sp">{{ $r['liveCount'] }}件</td>
       <td class="num hide-sp">D {{ $r['d'] }}／SD {{ $r['sd'] }}</td>
     </tr>
   @endforeach

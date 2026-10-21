@@ -39,6 +39,7 @@ class AssignDetailController extends Controller
         $today = Carbon::today();
         $projects = Project::with('director:id,name')
             ->whereNotNull('start_date')
+            ->notCancelled()   // キャンセルになった案件は「アサインする案件」に並べない（2026-10-21）
             ->whereNotIn('status', ['完了', '下書き'])
             ->whereDate('start_date', '>=', $today->format('Y-m-d'))   // 下の filter と同じ＝DBで先に絞る（2026-10-09）
             ->orderBy('start_date')

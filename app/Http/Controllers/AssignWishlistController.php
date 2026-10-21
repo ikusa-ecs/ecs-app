@@ -64,7 +64,7 @@ class AssignWishlistController extends Controller
         $wishCount = WishCount::forMonth($period);
 
         // スタッフごとに一度だけ材料を引いておく（人数分のクエリを避ける）。
-        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')
+        $assignsByStaff = Assignment::where('status', '!=', 'キャンセル')->onLiveProject()   // キャンセル案件は数えない（2026-10-21）
             ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
             ->get()->groupBy('staff_id');
         $posByStaff = StaffRoleEligibility::all()->groupBy('staff_id');

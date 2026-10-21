@@ -46,7 +46,9 @@ class EmployeeAssignmentsController extends Controller
 
                 continue;
             }
-            $roles = array_count_values(array_column($cases, 'roleCode'));
+            // 数えるのは中止になっていない案件だけ（一覧には【案件中止】で出す・2026-10-21 baba）。
+            $live = array_values(array_filter($cases, fn ($c) => empty($c['cancelled'])));
+            $roles = array_count_values(array_column($live, 'roleCode'));
             $list[] = [
                 'id' => $p->id,
                 'name' => (string) $p->name,
@@ -55,7 +57,8 @@ class EmployeeAssignmentsController extends Controller
                 'cases' => $cases,
                 'd' => $roles['D'] ?? 0,
                 'sd' => $roles['SD'] ?? 0,
-                'tentative' => count(array_filter($cases, fn ($c) => $c['status'] === '仮')),
+                'tentative' => count(array_filter($live, fn ($c) => $c['status'] === '仮')),
+                'liveCount' => count($live),
                 'copyText' => self::copyText((string) $p->name, $month, $cases),
             ];
         }
@@ -68,14 +71,17 @@ class EmployeeAssignmentsController extends Controller
             'nextUrl' => '/employee-assignments?ym='.$month->copy()->addMonth()->format('Y-m').$officeQ,
             'list' => $list,
             'none' => $none,
-            'total' => array_sum(array_map(fn ($r) => count($r['cases']), $list)),
+            'total' => array_sum(array_column($list, 'liveCount')),
         ]);
     }
 
     /** 1人ぶんの明細をコピーする文（チャットに貼る用）。表や罫線は使わない。 */
     private static function copyText(string $name, Carbon $month, array $cases): string
     {
-        $lines = [$name.'さん '.$month->format('n月').'のアサイン '.count($cases).'件'];
+        // 件数には中止になった案件を入れない（一覧には【案件中止】で出す・2026-10-21 baba）。
+        $stopped = count(array_filter($cases, fn ($c) => ! empty($c['cancelled'])));
+        $lines = [$name.'さん '.$month->format('n月').'のアサイン '.(count($cases) - $stopped).'件'
+            .($stopped ? '（ほかに中止 '.$stopped.'件）' : '')];
         foreach ($cases as $c) {
             $lines[] = $c['date'].' '.$c['name'].($c['client'] !== '' ? '／'.$c['client'] : '')
                 .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')

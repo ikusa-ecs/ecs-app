@@ -38,8 +38,8 @@ final class RookieFcPlan
         $map = RookieDifficulty::map();
         $contentNames = Content::pluck('content_name', 'id')->all();
 
-        // 新人のアサイン（キャンセル以外）＋その案件。
-        $rows = Assignment::whereIn('staff_id', $ids)->where('status', '!=', 'キャンセル')->get();
+        // 新人のアサイン（キャンセル以外）＋その案件。キャンセルになった案件は経験にも月の件数にも入れない（2026-10-21）。
+        $rows = Assignment::whereIn('staff_id', $ids)->where('status', '!=', 'キャンセル')->onLiveProject()->get();
         $projects = Project::whereIn('id', $rows->pluck('project_id')->unique())->get()->keyBy('id');
 
         $mustRows = ContentDifficulty::whereNotNull('content_id')->where(fn ($q) => $q->where('must', true)->orWhere('recommend', true))->get();

@@ -39,6 +39,10 @@ class EventCount
     /** この案件はイベント数として数えるか（手動指定があればそれが優先）。 */
     public static function counts(Project $project): bool
     {
+        // キャンセルになった案件は、手で「数える」にしてあっても数えない（2026-10-21 baba）。
+        if ($project->is_cancelled) {
+            return false;
+        }
         if ($project->count_as_event !== null) {
             return (bool) $project->count_as_event;
         }

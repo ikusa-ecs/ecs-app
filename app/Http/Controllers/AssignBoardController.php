@@ -214,9 +214,9 @@ class AssignBoardController extends Controller
             return [];
         }
 
-        // その日すでにアサインされている人（キャンセル以外）。
+        // その日すでにアサインされている人（キャンセル以外）。キャンセルになった案件は「入っている」にしない（2026-10-21）。
         $asg = Assignment::whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
-            ->where('status', '!=', 'キャンセル')
+            ->where('status', '!=', 'キャンセル')->onLiveProject()
             ->get(['staff_id', 'date'])
             ->groupBy(fn ($a) => Carbon::parse($a->date)->format('Y-m-d'))
             ->map(fn ($rows) => array_flip($rows->pluck('staff_id')->all()))
@@ -840,7 +840,7 @@ class AssignBoardController extends Controller
         $end = $anchor->copy()->addDays(self::BOARD_DAYS);
 
         $rows = Assignment::whereBetween('date', [$anchor->format('Y-m-d'), $end->format('Y-m-d')])
-            ->where('status', '!=', 'キャンセル')
+            ->where('status', '!=', 'キャンセル')->onLiveProject()   // キャンセル案件は上限に数えない（2026-10-21）
             ->get(['staff_id']);
 
         if ($rows->isEmpty()) {

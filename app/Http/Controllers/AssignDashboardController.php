@@ -124,7 +124,9 @@ class AssignDashboardController extends Controller
         // ── 数値サマリ：希望0件 ＆ 平均稼働率 ＆ 要注意スタッフ ──────────────
         // 稼働状況画面と同じ定義：稼働率＝今月の本番アサイン数 ÷ 対象月の希望日数（希望0件は対象外）。
         // 今月のぶんだけ読む（使うのは今月の本番アサイン数だけ）。
+        // ⚠ キャンセルになった案件のアサインは数えない（2026-10-21 baba）。
         $assignsByStaff = Assignment::whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
+            ->onLiveProject()
             ->get()->groupBy('staff_id');
         $prefByStaff = ShiftPreference::where('period', $period)->available()->get()->groupBy('staff_id');
 
@@ -172,7 +174,7 @@ class AssignDashboardController extends Controller
             ? RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $office))->pluck('id')->all()
             : null;
 
-        $confirmedByProject = Assignment::where('status', '確定')
+        $confirmedByProject = Assignment::where('status', '確定')->onLiveProject()
             ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))
             ->when($officeProjectIds !== null, fn ($q) => $q->whereIn('project_id', $officeProjectIds))
             ->get()

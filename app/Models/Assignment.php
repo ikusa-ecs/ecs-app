@@ -59,4 +59,18 @@ class Assignment extends Model
     {
         return $query->where('status', '確定');
     }
+
+    /**
+     * キャンセルになった案件のアサインを外す（2026-10-21 baba決定）。
+     *
+     * 案件をキャンセルにしても、入っていた人の記録は消さない（別の案件へお引越しするときの参考にするため）。
+     * そのかわり、**人の回数・稼働率・同じ日の重なり・月の上限など、数えるところでは必ずこれを通す**。
+     * ⚠ 一覧に「案件中止」と出して見せたい画面（請求書チェック・社員別アサイン一覧）は、件数だけこれで数える。
+     * ⚠ アサインの status 'キャンセル'（人を外した）とは別物。こちらは案件ごとのキャンセル（projects.is_cancelled）。
+     */
+    public function scopeOnLiveProject($query)
+    {
+        return $query->whereNotIn($query->qualifyColumn('project_id'),
+            Project::query()->select('id')->where('is_cancelled', true));
+    }
 }
