@@ -21,6 +21,7 @@ use App\Support\RequiredCountEstimate;
 use App\Support\ScheduleMark;
 use App\Support\SheetDiff;
 use App\Support\SheetIdCheck;
+use App\Support\SheetSkipMemory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -529,6 +530,8 @@ class PastProjectImportController extends Controller
         $missingNames = [];
         $ambiguousNames = [];
         $unknownRoles = [];
+        // 前に「取り込まない」にした案件と、そのときの差分の指紋（2026-10-21・正本＝SheetSkipMemory）。
+        $skipMemory = SheetSkipMemory::all();
 
         foreach ($read['entries'] as $i => $entry) {
             $edit = $edits[$i] ?? [];
@@ -571,12 +574,26 @@ class PastProjectImportController extends Controller
             // ⚠ 入れる中身を作るのは**取込とまったく同じ projectAttributes**。
             //   画面用にここで作り直さない（作り直すと「変化なし」と出たのに書き換わる事故になる）。
             $diff = ['kind' => 'new', 'changes' => [], 'people' => ['add' => [], 'remove' => [], 'role' => []]];
+            $memo = null;
             if (! $info['errors']) {
                 $attrs = $this->projectAttributes($get, $info['name'], (string) $info['date'], $info['count'],
                     $info['client'], $info['meetTime'] ?? null, $office, $mode, $assignments !== [],
                     $this->countFor($get, $info['name'], $info['count']));
                 $target = SheetDiff::target($found, $edit);
                 $diff = SheetDiff::forCase($this->keepOnUpdate($target, $attrs, $info['name'], $get), $target, $assignments, $info['date']);
+
+                // 前回「取り込まない」にした案件か（2026-10-21）。覚えるのは「変わります」の案件だけ。
+                // remembered＝前回と同じ差分→画面ではじめから外す／changedSince＝前回外したあとアサイン表が変わった→いつもどおり見せる。
+                if ($target !== null && $diff['kind'] === 'changed') {
+                    $fp = SheetSkipMemory::fingerprint($diff);
+                    $was = $skipMemory[(string) $target->id] ?? null;
+                    $memo = [
+                        'target' => (string) $target->id,
+                        'fp' => $fp,
+                        'remembered' => $was === $fp,
+                        'changedSince' => $was !== null && $was !== $fp,
+                    ];
+                }
             }
 
             $rows[] = [
@@ -628,6 +645,8 @@ class PastProjectImportController extends Controller
                         ])->values()->all(),
                 // 取込で書き換わる項目・人（new＝新規／changed＝変わる／same＝変化なし）。
                 'diff' => $diff,
+                // 前回「取り込まない」にしたか（null＝覚える対象ではない）。正本＝SheetSkipMemory。
+                'skipMemo' => $memo,
                 'label' => $entry['label'],
                 'date' => $info['date'],
                 'name' => $info['name'],
@@ -721,6 +740,10 @@ class PastProjectImportController extends Controller
             // 「この件は取り込まない」に印が付いていれば、まるごと飛ばす。
             if (! empty($edit['skip'])) {
                 $skipped++;
+                // 「変わります」の案件を外した＝そのときの差分を覚える。次も同じ中身なら最初から外す（2026-10-21）。
+                if (isset($edit['keepTarget'], $edit['keepFp']) && Project::whereKey($edit['keepTarget'])->exists()) {
+                    SheetSkipMemory::remember($edit['keepTarget'], $edit['keepFp'], Auth::id() !== null ? (string) Auth::id() : null);
+                }
 
                 continue;
             }
@@ -784,6 +807,10 @@ class PastProjectImportController extends Controller
             $existing = SheetDiff::target($found, $edit);
             // 上書きのときに書き換えないもの（顧客名の書き方・台帳に無い名前のコンテンツ）を外す。
             $attrs = $this->keepOnUpdate($existing, $attrs, $name, $get);
+            // 取り込んだ＝もう「外している」案件ではない（2026-10-21・正本＝SheetSkipMemory）。
+            if ($existing !== null) {
+                SheetSkipMemory::forget((string) $existing->id);
+            }
 
             // アサインの状態＝これからの案件は「仮」（まだ動かせるように・2026-08-26 baba選択）。
             $assignStatus = $mode === self::MODE_FUTURE ? '仮' : '確定';
@@ -1315,6 +1342,13 @@ class PastProjectImportController extends Controller
             }
             if (! empty($edit['skip'])) {
                 $clean['skip'] = true;
+                // 外した「変わります」の案件と、そのときの差分の指紋（下見が返したもの・2026-10-21）。
+                $kt = is_scalar($edit['keepTarget'] ?? null) ? mb_substr(trim((string) $edit['keepTarget']), 0, 40) : '';
+                $kf = is_scalar($edit['keepFp'] ?? null) ? (string) $edit['keepFp'] : '';
+                if ($kt !== '' && preg_match('/^[0-9a-f]{32}$/', $kf)) {
+                    $clean['keepTarget'] = $kt;
+                    $clean['keepFp'] = $kf;
+                }
             }
             // 「似た案件があるけれど、別の案件として新しく登録する」（2026-09-01 baba要望）。
             // ⚠ 印が無いときは上書き＝二重登録を増やさない側に倒す。

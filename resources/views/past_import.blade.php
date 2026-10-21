@@ -506,10 +506,15 @@
     //    そのまま取り込むと、中身は同じでもアサインを消して入れ直すので
     //    「誰がいつ確定したか」の記録だけが毎日書き換わってしまう。
     // ⚠ 人がチェックを触った案件は、その判断を勝手に戻さない（pjSkipDecided に覚える）。
+    // 前回「取り込まない」にした案件で、差分も前回と同じものも、はじめから外す（2026-10-21 baba
+    // 「毎回すでにチェックしたことをチェック外すのめんどう」）。判定はサーバー（SheetSkipMemory）。
     rows.forEach(function (r) {
       var same = r.diff && r.diff.kind === 'same';
-      r._skip = !!r.skip || (same && !pjSkipDecided[r.index]);
+      var remembered = !!(r.skipMemo && r.skipMemo.remembered);
+      r._skip = !!r.skip || ((same || remembered) && !pjSkipDecided[r.index]);
     });
+    var memoCount = rows.filter(function (r) { return r.skipMemo && r.skipMemo.remembered; }).length;
+    var memoChanged = rows.filter(function (r) { return r.skipMemo && r.skipMemo.changedSince; }).length;
 
     var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0, cxlCount = 0;
     var newCount = 0, chgCount = 0, sameCount = 0;
@@ -549,6 +554,12 @@
           + (sameCount > 0
             ? '<br>✅ 変化のない ' + sameCount + '件は、はじめから<b>「取込」のチェックを外して</b>あります'
               + '（そのまま取り込んでも中身は変わらないため）。取り込みたいときはチェックを入れてください。'
+            : '')
+          + (memoCount > 0
+            ? '<br>🔕 前回も「取り込まない」にした ' + memoCount + '件（アサイン表がそのときから変わっていないもの）も、はじめから外してあります。'
+            : '')
+          + (memoChanged > 0
+            ? '<br>🔔 前回外したあとにアサイン表が変わった ' + memoChanged + '件は、チェックを入れて出しています。中身を見てください。'
             : '')
           + '</div>';
       }
@@ -603,8 +614,11 @@
       if (r.idMismatch) { notes.unshift(r.idMismatch); }
       var cls = (r._skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
       // data-kind / data-date＝上の「まとめてチェック」で使う（new／changed／same・日程）。
+      // data-memo-*＝外して取り込んだら覚えるための鍵（案件IDと差分の指紋・2026-10-21）。
+      var memo = r.skipMemo || {};
       return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '"'
-        + ' data-kind="' + pjEsc((r.diff && r.diff.kind) || '') + '" data-date="' + pjEsc(r.date || '') + '">'
+        + ' data-kind="' + pjEsc((r.diff && r.diff.kind) || '') + '" data-date="' + pjEsc(r.date || '') + '"'
+        + ' data-memo-target="' + pjEsc(memo.target || '') + '" data-memo-fp="' + pjEsc(memo.fp || '') + '">'
         + '<td>' + pjEsc(r.label) + '</td>'
         + '<td style="text-align:center;">'
           + '<input type="checkbox" data-f="skip" onchange="pjToggleSkip(this)"'
@@ -712,7 +726,13 @@
     if (d.kind === 'same') {
       head = '<div class="pj-diff-same" title="取り込んでもECSの中身は変わりません">✅ 変化なし</div>';
     } else if (d.kind === 'changed') {
-      head = '<div class="pj-diff-changed">✏️ 変わります' + pjDiffList(d) + '</div>';
+      var m = r.skipMemo || {};
+      var memoNote = m.remembered
+        ? '<div class="pj-dup-note" title="前回この案件を「取り込まない」にしました。アサイン表はそのときから変わっていません。取り込みたいときはチェックを入れてください。">🔕 前回も外した（そのときから変わっていません）</div>'
+        : (m.changedSince
+          ? '<div class="pj-dup-note"><b>🔔 前回外したあと、アサイン表が変わりました</b></div>'
+          : '');
+      head = memoNote + '<div class="pj-diff-changed">✏️ 変わります' + pjDiffList(d) + '</div>';
     } else {
       head = '<div class="pj-diff-new">🆕 新しい案件</div>';
     }
@@ -867,6 +887,14 @@
       var sk = tr.querySelector('[data-f="skip"]');
       // チェックが外れている＝取り込まない。
       if (sk) { if (sk.checked) { delete cur.skip; } else { cur.skip = true; } }
+      // 「変わります」の案件を外したら、そのときの差分を覚えてもらう（次も同じなら最初から外す・2026-10-21）。
+      if (cur.skip && tr.dataset.memoTarget && tr.dataset.memoFp) {
+        cur.keepTarget = tr.dataset.memoTarget;
+        cur.keepFp = tr.dataset.memoFp;
+      } else {
+        delete cur.keepTarget;
+        delete cur.keepFp;
+      }
       // 似た案件のとき「別の案件として登録する」を選んだか。
       var an = tr.querySelector('[data-f="asNew"]');
       if (an) { if (an.value === '1') { cur.asNew = true; } else { delete cur.asNew; } }
