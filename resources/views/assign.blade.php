@@ -624,6 +624,14 @@
     /* ⚠ 名前を .line-btn にしないこと。他の画面（マイページ・共通設定）では
        .line-btn は「枠線のふつうのボタン」という別の意味で使っている。 */
     .linegrp-btn.done { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok-ink); }
+    /* その日のキャンセル案件（カードの下・見るだけ）。グレーで沈めて、ふつうの案件と見分ける（2026-10-21）。
+       ⚠ 文字は var(--muted)＝黒ベースでも読める濃さ（#98a0aaより暗くしない決まり）。 */
+    .day-cancelled { margin-top: 8px; padding: 6px 12px; border: 1px dashed var(--line); border-radius: 8px;
+      background: var(--panel); color: var(--muted); font-size: 12px; }
+    .day-cancelled .dc-head { font-weight: 700; margin-bottom: 2px; }
+    .day-cancelled .dc-row { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 3px 0; border-top: 1px solid var(--line); }
+    .day-cancelled .dc-name { color: var(--muted); font-weight: 700; text-decoration: line-through; }
+    .day-cancelled .dc-client::before { content: '／'; }
   </style>
 @endverbatim
 @endpush
@@ -737,6 +745,8 @@
 <script>window.ECS_BOARD_MONTH = @json($boardMonth ?? []);</script>
 <!-- 表示の基準日（先頭の日）。日付計算の起点・日付ピッカーの初期値に使う。 -->
 <script>window.ECS_BOARD_ANCHOR = @json($anchor ?? null);</script>
+<!-- キャンセルになった案件と入っていた人（2026-10-21）。その日の欄の下にグレーで見るだけ出す。 -->
+<script>window.ECS_BOARD_CANCELLED = @json($boardCancelled ?? []);</script>
 <!-- ポジション編集：選択肢（役割コードの正本）＋保存先＋CSRF。メンバーのポジションをDB(assignments)に保存する。 -->
 <script>
   window.ECS_ROLE_OPTIONS = @json($roleOptions ?? []);
@@ -2242,11 +2252,15 @@
       return (c.stat || c.state) === sf;
     });
 
-    // 開催日（off）ごとにまとめる
-    const offs = [...new Set(list.map(c => c.off))].sort((a,b) => a - b);
+    // キャンセルになった案件（2026-10-21）。絞り込みをしていないときだけ、その日の欄の下に出す。
+    // ⚠ 絞り込み中に出すと「確定のみ」なのに中止の案件が並んでしまうため。
+    const cancelled = (!sf && !mine) ? (window.ECS_BOARD_CANCELLED || []) : [];
+
+    // 開催日（off）ごとにまとめる。キャンセル案件しかない日も欄を作る（その日に何があったか分かるように）。
+    const offs = [...new Set(list.map(c => c.off).concat(cancelled.map(c => c.off)))].sort((a,b) => a - b);
 
     body.innerHTML = '';
-    empty.style.display = list.length === 0 ? '' : 'none';
+    empty.style.display = offs.length === 0 ? '' : 'none';
 
     offs.forEach(off => {
       const dayCases = list.filter(c => c.off === off);
@@ -2318,8 +2332,30 @@
           row.appendChild(brokenCard(c, e));
         }
       });
+
+      // その日のキャンセル案件（見るだけ・グレー）。⚠ ここで止まってもカードは描き終わっているので囲んでおく。
+      try {
+        const dayCancelled = cancelled.filter(c => c.off === off);
+        if (dayCancelled.length) block.appendChild(cancelledStrip(dayCancelled));
+      } catch (e) {
+        console.error('キャンセル案件の欄を作れませんでした', off, e);
+      }
     });
     renderBulkBar();
+  }
+
+  // キャンセルになった案件の欄（2026-10-21 baba「同じ日に出して」）。
+  // 入っていた人は記録に残してある＝別の案件へお願いするときの参考に見るだけ。ボタンは出さない。
+  function cancelledStrip(items){
+    const el = document.createElement('div');
+    el.className = 'day-cancelled';
+    el.innerHTML = '<div class="dc-head">🚫 この日のキャンセル案件（見るだけ・人数には数えません）</div>'
+      + items.map(c => '<div class="dc-row">'
+        + `<a class="dc-name" href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細を開きます">${escHtml(c.name)}</a>`
+        + (c.client ? `<span class="dc-client">${escHtml(c.client)}</span>` : '')
+        + `<span class="dc-mem">入っていた人：${c.members && c.members.length ? c.members.map(escHtml).join('、') : 'なし'}</span>`
+        + '</div>').join('');
+    return el;
   }
 
   // ===== 🗑 まとめて削除（2026-10-05 baba要望・一時的）=====

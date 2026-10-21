@@ -96,6 +96,8 @@ class AssignBoardController extends Controller
             // 「名簿から追加…」に出す人（社員＋スタッフ）。DBが元＝架空の名前を出さない。
             'roster' => $this->rosterPeople($office),
             'boardCases' => $this->boardCases($anchor, $office),
+            // キャンセルになった案件（2026-10-21 baba OK）。その日の欄の下にグレーで見るだけ。
+            'boardCancelled' => $this->boardCancelled($anchor, $office),
             'boardAvail' => $this->boardAvail($anchor, $office), // off → その日に稼働可/希望のスタッフ一覧
             // 拠点がちがうので出していない人数（off → 人数）。
             // ⚠ 黙って消すと「終日〇を出したのに希望者に出てこない」になるので、理由を画面に出す。
@@ -430,6 +432,61 @@ class AssignBoardController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * ボードの期間にあるキャンセル案件と、入っていた人（2026-10-21 baba OK）。
+     *
+     * 入っていた人は消さずに残してある（8cbafa5）＝別の案件へお引越ししてもらうときの参考に見せる。
+     * ⚠ 見るだけ。カードにはしない＝人を足したり確定にしたりできないようにする。
+     * ⚠ 出す場所は**その日の欄の中**（2026-10-21 baba「一番下だとわからないから同じ日に出して」）。画面のJSの render が off で振り分ける。
+     * ⚠ 拠点・巻き取り・アサイン不要の絞り方は boardCases と同じにそろえる（キャンセルかどうかだけ逆）。
+     *
+     * @return list<array{id: mixed, date: string, name: string, client: string, members: list<string>}>
+     */
+    private function boardCancelled(Carbon $anchor, ?string $office = null): array
+    {
+        $projects = OfficeScope::hideTakenOver(
+            OfficeScope::applyToProjects(Project::query(), $office),
+            $office,
+            true
+        )
+            ->where('is_cancelled', true)->needsAssign()
+            ->whereNotNull('start_date')
+            ->whereDate('start_date', '>=', $anchor->format('Y-m-d'))
+            ->whereDate('start_date', '<=', $anchor->copy()->addDays(self::BOARD_DAYS)->format('Y-m-d'))
+            ->orderBy('start_date')
+            ->get()
+            ->filter(fn (Project $p) => $p->status !== '下書き')
+            ->values();
+
+        if ($projects->isEmpty()) {
+            return [];
+        }
+
+        $assignments = Assignment::whereIn('project_id', $projects->pluck('id'))
+            ->where('status', '!=', 'キャンセル')
+            ->get(['project_id', 'staff_id', 'role']);
+        $names = Person::whereIn('id', $assignments->pluck('staff_id')->unique())->pluck('name', 'id');
+        $byProject = $assignments->groupBy('project_id');
+        $week = ['日', '月', '火', '水', '木', '金', '土'];
+
+        return $projects->map(function (Project $p) use ($byProject, $names, $week, $anchor) {
+            $members = ($byProject->get($p->id) ?? collect())
+                ->unique('staff_id')
+                ->map(fn ($a) => ($names[$a->staff_id] ?? $a->staff_id)
+                    .'（'.(self::POS_LABELS[$a->role] ?? ($a->role ?: '—')).'）')
+                ->values()->all();
+
+            return [
+                'id' => $p->id,
+                'off' => $this->offDays($p->start_date, $anchor),   // どの日の欄に出すか（カードと同じ数え方）
+                'date' => $p->start_date->format('n/j').'（'.$week[$p->start_date->dayOfWeek].'）',
+                'name' => (string) $p->project_name,
+                'client' => (string) ($p->client ?? ''),
+                'members' => $members,
+            ];
+        })->all();
     }
 
     /**

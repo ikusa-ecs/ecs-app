@@ -8,6 +8,7 @@ use App\Support\EventCount;
 use Database\Factories\PersonFactory;
 use Database\Factories\ProjectFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,28 @@ class CancelledProjectCountTest extends TestCase
         $this->assertSame(2, Assignment::count(), 'キャンセルにしても人の記録は消さない');
         $this->assertSame([$live->id], Assignment::onLiveProject()->pluck('project_id')->all());
         $this->assertSame(1, ActiveBonus::forStaff($staff->id, '2026-11')['count'], 'ボーナスの回数にキャンセル案件が入っている');
+    }
+
+    /** 日別ボード：キャンセル案件はカードにせず、その日の欄に「見るだけ」で入っていた人と出す。 */
+    public function test_日別ボードのその日にキャンセル案件を見るだけで出す(): void
+    {
+        $emp = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京']);
+        $staff = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京', 'name' => '引越し候補']);
+        $day = Carbon::today()->addDays(3)->format('Y-m-d');
+        $gone = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day, 'status' => '未着手',
+            'project_name' => '中止になった運動会', 'is_cancelled' => true]);
+        Assignment::create(['project_id' => $gone->id, 'staff_id' => $staff->id, 'role' => 'FC', 'status' => '確定', 'date' => $day]);
+
+        $res = $this->actingAsPerson($emp)->get('/assign')->assertOk();
+
+        $data = $res->original->getData();
+        $this->assertNull(collect($data['boardCases'])->firstWhere('id', $gone->id), 'カードには出さない');
+        $row = collect($data['boardCancelled'])->firstWhere('id', $gone->id);
+        $this->assertNotNull($row, 'キャンセル案件の欄に出す');
+        $this->assertSame(3, $row['off'], 'その日の欄に出すための日（基準日から何日後か）');
+        $this->assertSame(['引越し候補（FC）'], $row['members']);
+        // 画面のJSがその日の欄へ振り分ける（渡し忘れ・描き忘れの見張り）。
+        $res->assertSee('window.ECS_BOARD_CANCELLED', false)->assertSee('cancelledStrip(dayCancelled)', false);
     }
 
     public function test_手で数えるにしてもキャンセルなら数えない(): void
