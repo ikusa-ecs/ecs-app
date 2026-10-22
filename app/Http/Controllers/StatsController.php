@@ -36,6 +36,9 @@ class StatsController extends Controller
     /** 拠点（事務所）の表示順。実データが無くても常にこの順で全拠点を出す。 */
     private const OFFICE_ORDER = ['東京', '名古屋', '大阪', '福岡', '札幌', '東北'];
 
+    /** 集計に出さない確認用アカウント（2026-10-22 baba「Claude確認用は集計ダッシュボードに出さなくていい」）。 */
+    private const HIDDEN_EMAILS = ['onuma+claude@ikusa.co.jp'];
+
     /**
      * 並び順の一覧（URLの sort=… → 画面・CSVに出す名前）。
      * 'hire' 以外は「その列の数が多い順」（2026-09-29 baba要望＝ディレクター数など全部の列で並べたい）。
@@ -354,20 +357,6 @@ class StatsController extends Controller
             ->groupBy('staff_id')
             ->map(fn (Collection $g) => $g->filter(fn ($a) => isset($bigProjectIds[$a->project_id]))->count());
 
-        // エントリー数の規模別＝この期間の案件に「エントリーする」を出した数（同じ案件は1回・規模は ProjectScale の正本）。
-        // ⚠ 数えるのは画面の案件と同じ（イベント数に数えない案件・他拠点の案件は含めない）。
-        $scaleOfProject = $inPeriod->mapWithKeys(fn (Project $p) => [$p->id => ProjectScale::of($p->scale)]);
-        $entryByStaff = [];   // staff_id => ['小型' => n, '中型' => n, '大型' => n]
-        if (! $projectIds->isEmpty()) {
-            foreach (Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']) as $app) {
-                $scale = $scaleOfProject[$app->project_id] ?? null;
-                if ($scale === null) {
-                    continue;
-                }
-                $entryByStaff[$app->staff_id][$scale] = ($entryByStaff[$app->staff_id][$scale] ?? 0) + 1;
-            }
-        }
-
         // ディレクター内訳＝役割D/SDの案件数（同案件は1回）＋実施形態・規模別。
         // 「社員・ディレクター集計」(/projects-agg)と同じ定義：リアル=formatに「リアル」／オンライン=「オンライン」／大型=scale「大型」。
         //  D計・SD計／リアルD（Dのうちリアル）／大型D（リアル&大型のD）／大型SD（リアル&大型のSD）／オンラインD（Dのうちオンライン）。
@@ -415,16 +404,15 @@ class StatsController extends Controller
         $workedIds = $countByStaff->keys()->merge(array_keys($dirStats))->map(fn ($v) => (string) $v)->unique()->values()->all();
         $neededIds = Person::where('role', 'employee')->inService($workedIds)->pluck('id')
             ->merge($countByStaff->keys())->unique()->values();
-        $people = Person::whereIn('id', $neededIds->all())
+        $people = $this->withoutHidden(Person::whereIn('id', $neededIds->all()))
             ->get(['id', 'name', 'role', 'department', 'office', 'hire_date'])
             ->keyBy('id');
 
         // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。
         // 並び順は下の sortMembers（社歴順が既定）。
         $members = $people
-            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats, $entryByStaff) {
+            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats) {
                 $id = $person->id;
-                $ent = $entryByStaff[$id] ?? [];
                 $ds = $dirStats[$id] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
                 $hire = $person->hire_date?->format('Y-m-d') ?? '';
                 // 社歴順で並べたとき「なぜこの順なのか」が名前の横で分かるようにする。
@@ -444,8 +432,6 @@ class StatsController extends Controller
                     'kind'     => $person->role === 'employee' ? '社員' : 'スタッフ',
                     'count'    => (int) ($countByStaff[$id] ?? 0),
                     'big'      => (int) ($bigCountByStaff[$id] ?? 0),
-                    // エントリーの規模別（小型・中型・大型）。
-                    'entry'    => ['小型' => (int) ($ent['小型'] ?? 0), '中型' => (int) ($ent['中型'] ?? 0), '大型' => (int) ($ent['大型'] ?? 0)],
                     'd'        => $ds['d'],
                     'sd'       => $ds['sd'],
                     'dTotal'   => $ds['d'] + $ds['sd'],   // D＋SD合計
@@ -500,7 +486,7 @@ class StatsController extends Controller
         // 所属で絞っているときは、その所属のカードだけ出す（他は0名0件になり、絞ったのか0なのか分からないため）。
         $deptDefs = $scopeDept !== '' ? [$scopeDept] : Departments::GROUPS;
         // ⚠ 退職した社員は分母に数えない（この期間に出勤した人は数える・2026-10-16）。
-        $headByDept = Person::where('role', 'employee')
+        $headByDept = $this->withoutHidden(Person::where('role', 'employee'))
             ->inService($workedIds)
             ->get(['id', 'department'])
             // ⚠ 「経営管理」など、まとめ先が「その他」になる所属の人も数に入れる（Departments::group が正本）。
@@ -592,6 +578,75 @@ class StatsController extends Controller
             'attendanceDispatch' => $attendanceDispatch,
             'byDept'          => $byDept,
             'members'         => $members,
+            'entryScale'      => $this->entryScale($periodAll, $inPeriod, $scopeOffice),
+        ];
+    }
+
+    /**
+     * 確認用アカウント（HIDDEN_EMAILS）を除く。⚠ メールが空の人は残す（whereNotIn だけだと NULL の人まで消える）。
+     */
+    private function withoutHidden($query)
+    {
+        return $query->where(fn ($q) => $q->whereNull('email')->orWhereNotIn('email', self::HIDDEN_EMAILS));
+    }
+
+    /**
+     * 規模別エントリー数（2026-10-22 baba要望・大型がどれだけ避けられているかを見る）。
+     * ⚠ 拠点で絞ったとき：案件数＝その拠点の案件／エントリー＝**本人の所属**がその拠点の人（他拠点の案件へのエントリーも数える）。
+     *   baba決定（公開した集計ページと同じ見方）。同じ人×同じ案件は1回。規模は ProjectScale の正本（空は小型）。
+     *
+     * @return array{projects: array<string,int>, entries: array<string,int>, unset: int, rows: array<int, array<string,mixed>>, zero: int}
+     */
+    private function entryScale(Collection $periodAll, Collection $inPeriod, string $scopeOffice): array
+    {
+        $scales = ProjectScale::all();
+        $projects = array_fill_keys($scales, 0);
+        foreach ($inPeriod as $p) {
+            $projects[ProjectScale::of($p->scale)]++;
+        }
+        $unset = $inPeriod->filter(fn (Project $p) => ProjectScale::isUnset($p->scale))->count();
+
+        $scaleOf = $periodAll->mapWithKeys(fn (Project $p) => [$p->id => ProjectScale::of($p->scale)]);
+        $apps = $periodAll->isEmpty() ? collect()
+            : Application::whereIn('project_id', $periodAll->pluck('id')->all())->get(['project_id', 'staff_id']);
+        $people = $this->withoutHidden(Person::whereIn('id', $apps->pluck('staff_id')->unique()->all()))
+            ->get(['id', 'name', 'office'])->keyBy('id');
+
+        $entries = array_fill_keys($scales, 0);
+        $staff = [];
+        $seen = [];
+        foreach ($apps as $a) {
+            $person = $people->get($a->staff_id);
+            $scale = $scaleOf[$a->project_id] ?? null;
+            $key = $a->project_id . '|' . $a->staff_id;
+            if (! $person || $scale === null || isset($seen[$key])) {
+                continue;
+            }
+            if ($scopeOffice !== '' && (string) $person->office !== $scopeOffice) {
+                continue;
+            }
+            $seen[$key] = true;
+            $entries[$scale]++;
+            $staff[$a->staff_id] ??= ['name' => $person->name ?? $a->staff_id, 'office' => (string) ($person->office ?? '')]
+                + array_fill_keys($scales, 0);
+            $staff[$a->staff_id][$scale]++;
+        }
+
+        $rows = collect($staff)->map(function (array $s) {
+            $s['total'] = $s['小型'] + $s['中型'] + $s['大型'];
+            $s['ratio'] = $s['total'] > 0 ? $s['大型'] / $s['total'] : 0;
+            return $s;
+        })
+            // 大型の割合が低い順（同じなら合計が多い順→氏名順）。
+            ->sort(fn (array $x, array $y) => [$x['ratio'], $y['total'], $x['name']] <=> [$y['ratio'], $x['total'], $y['name']])
+            ->values()->all();
+
+        return [
+            'projects' => $projects,
+            'entries'  => $entries,
+            'unset'    => $unset,
+            'rows'     => $rows,
+            'zero'     => count(array_filter($rows, fn ($s) => $s['大型'] === 0)),
         ];
     }
 

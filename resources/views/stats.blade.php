@@ -130,6 +130,20 @@
   .st-members { max-height: 460px; overflow: auto; padding-right: 4px; }
   .st-note { font-size: 11.5px; color: #a08a73; margin-top: 6px; }
 
+  /* 規模別エントリー数（2026-10-22） */
+  .es-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 8px 0; }
+  .es-card { border: 1px solid var(--line, #e6dccf); border-radius: 10px; padding: 8px 12px; }
+  .es-card .es-num { font-size: 22px; font-weight: 800; color: var(--ink); }
+  .es-card.big .es-num { color: #b5673a; }
+  .es-label { font-size: 11px; color: #a89680; }
+  .es-wrap { max-height: 460px; overflow: auto; }
+  .es-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .es-table th, .es-table td { padding: 5px 8px; border-bottom: 1px solid var(--line, #e6dccf); text-align: right; white-space: nowrap; }
+  .es-table th:nth-child(-n+2), .es-table td:nth-child(-n+2) { text-align: left; }
+  .es-table th { position: sticky; top: 0; background: var(--panel); color: #a08a73; font-weight: 600; }
+  .es-table tr.zero td { background: rgba(220, 38, 38, .08); }
+  @media (max-width: 600px) { .es-cards { grid-template-columns: 1fr; } }
+
   @media (max-width: 900px) {
     .st-kpis { grid-template-columns: repeat(2, 1fr); }
     .st-grid { grid-template-columns: 1fr; }
@@ -490,6 +504,45 @@
      ⚠ 所属で絞っているときは出さない。スタッフ（アルバイト）に所属は無いので、
         絞ると全員消えて「この期間は誰も出勤していない」と読めてしまうため。 --}}
 @if ($scopeDept === '')
+{{-- 規模別エントリー数（2026-10-22 baba要望）。拠点で絞ったとき：案件数＝その拠点の案件／人＝本人の所属がその拠点。 --}}
+@php $es = $entryScale; @endphp
+<div class="st-panel" style="margin-top:16px;">
+  <h3>規模別エントリー数（{{ count($es['rows']) }}名）</h3>
+  <div class="es-cards">
+    @foreach (['小型', '中型', '大型'] as $sc)
+      <div class="es-card{{ $sc === '大型' ? ' big' : '' }}">
+        <div class="es-label">{{ $sc }}・1案件あたり</div>
+        <div class="es-num">{{ $es['projects'][$sc] > 0 ? number_format($es['entries'][$sc] / $es['projects'][$sc], 1) : '—' }} 人</div>
+        <div class="es-label">エントリー {{ $es['entries'][$sc] }} ÷ 案件 {{ $es['projects'][$sc] }}</div>
+      </div>
+    @endforeach
+  </div>
+  <p class="st-note">うち規模未入力 {{ $es['unset'] }}件（小型に数えています）。
+    @if (count($es['rows']) > 0)
+      エントリーした <b>{{ count($es['rows']) }}人</b> のうち、大型に1件もエントリーしていない人 <b>{{ $es['zero'] }}人（{{ round($es['zero'] / count($es['rows']) * 100) }}%）</b>
+    @endif
+  </p>
+  @if (count($es['rows']) > 0)
+    <div class="es-wrap">
+      <table class="es-table">
+        <thead><tr><th>名前</th><th>拠点</th><th>小型</th><th>中型</th><th>大型</th><th>合計</th><th>大型の割合</th></tr></thead>
+        <tbody>
+          @foreach ($es['rows'] as $r)
+            <tr class="{{ $r['大型'] === 0 ? 'zero' : '' }}">
+              <td>{{ $r['name'] }}</td><td>{{ $r['office'] }}</td>
+              <td>{{ $r['小型'] }}</td><td>{{ $r['中型'] }}</td><td>{{ $r['大型'] }}</td><td>{{ $r['total'] }}</td>
+              <td>{{ round($r['ratio'] * 100) }}%</td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  @else
+    <div class="empty">この期間にエントリーした人がいません。</div>
+  @endif
+  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。色がついている行＝大型に1件もエントリーしていない人。並びは大型の割合が低い順。</p>
+</div>
+
 @php $stf = $members->where('kind', 'スタッフ')->values(); @endphp
 <div class="st-panel" style="margin-top:16px;">
   <h3>スタッフ別 イベント出勤数（{{ $stf->count() }}名）</h3>
@@ -497,16 +550,12 @@
     @forelse ($stf as $m)
       <div class="st-row">
         <span class="r-name">{{ $m['name'] }}</span>
-        <span class="r-num">{{ $m['count'] }}回<small>（うち大型{{ $m['big'] }}件）</small></span>
-        <span class="r-num"><small>エントリー 小{{ $m['entry']['小型'] }}／中{{ $m['entry']['中型'] }}／大{{ $m['entry']['大型'] }}</small></span>
-      </div>
+        <span class="r-num">{{ $m['count'] }}回<small>（うち大型{{ $m['big'] }}件）</small></span>      </div>
     @empty
       <div class="empty">この期間に出勤したスタッフがいません。</div>
     @endforelse
   </div>
-  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。並びは「{{ $sort === 'hire' ? '社歴順（IKUSAで働き始めた年月が古い人が上・未入力は下）' : '出勤数が多い順' }}」。</p>
-  <p class="st-note">エントリー＝この期間の案件に「エントリーする」を出した数（同じ案件は1回・規模別）。出勤していない人はここには出ません。</p>
-</div>
+  <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。並びは「{{ $sort === 'hire' ? '社歴順（IKUSAで働き始めた年月が古い人が上・未入力は下）' : '出勤数が多い順' }}」。</p></div>
 @endif
 
 @endsection
