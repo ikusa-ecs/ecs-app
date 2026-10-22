@@ -498,12 +498,14 @@
       <div class="st-row">
         <span class="r-name">{{ $m['name'] }}</span>
         <span class="r-num">{{ $m['count'] }}回<small>（うち大型{{ $m['big'] }}件）</small></span>
+        <span class="r-num"><small>エントリー 小{{ $m['entry']['小型'] }}／中{{ $m['entry']['中型'] }}／大{{ $m['entry']['大型'] }}</small></span>
       </div>
     @empty
       <div class="empty">この期間に出勤したスタッフがいません。</div>
     @endforelse
   </div>
   <p class="st-note">出勤＝キャンセル以外のアサイン。同じイベントで複数日ある場合は、その日数ぶん数えます。並びは「{{ $sort === 'hire' ? '社歴順（IKUSAで働き始めた年月が古い人が上・未入力は下）' : '出勤数が多い順' }}」。</p>
+  <p class="st-note">エントリー＝この期間の案件に「エントリーする」を出した数（同じ案件は1回・規模別）。出勤していない人はここには出ません。</p>
 </div>
 @endif
 

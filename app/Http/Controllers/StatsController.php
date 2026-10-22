@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Support\Departments;
@@ -353,6 +354,20 @@ class StatsController extends Controller
             ->groupBy('staff_id')
             ->map(fn (Collection $g) => $g->filter(fn ($a) => isset($bigProjectIds[$a->project_id]))->count());
 
+        // エントリー数の規模別＝この期間の案件に「エントリーする」を出した数（同じ案件は1回・規模は ProjectScale の正本）。
+        // ⚠ 数えるのは画面の案件と同じ（イベント数に数えない案件・他拠点の案件は含めない）。
+        $scaleOfProject = $inPeriod->mapWithKeys(fn (Project $p) => [$p->id => ProjectScale::of($p->scale)]);
+        $entryByStaff = [];   // staff_id => ['小型' => n, '中型' => n, '大型' => n]
+        if (! $projectIds->isEmpty()) {
+            foreach (Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id']) as $app) {
+                $scale = $scaleOfProject[$app->project_id] ?? null;
+                if ($scale === null) {
+                    continue;
+                }
+                $entryByStaff[$app->staff_id][$scale] = ($entryByStaff[$app->staff_id][$scale] ?? 0) + 1;
+            }
+        }
+
         // ディレクター内訳＝役割D/SDの案件数（同案件は1回）＋実施形態・規模別。
         // 「社員・ディレクター集計」(/projects-agg)と同じ定義：リアル=formatに「リアル」／オンライン=「オンライン」／大型=scale「大型」。
         //  D計・SD計／リアルD（Dのうちリアル）／大型D（リアル&大型のD）／大型SD（リアル&大型のSD）／オンラインD（Dのうちオンライン）。
@@ -407,8 +422,9 @@ class StatsController extends Controller
         // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。
         // 並び順は下の sortMembers（社歴順が既定）。
         $members = $people
-            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats) {
+            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats, $entryByStaff) {
                 $id = $person->id;
+                $ent = $entryByStaff[$id] ?? [];
                 $ds = $dirStats[$id] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
                 $hire = $person->hire_date?->format('Y-m-d') ?? '';
                 // 社歴順で並べたとき「なぜこの順なのか」が名前の横で分かるようにする。
@@ -428,6 +444,8 @@ class StatsController extends Controller
                     'kind'     => $person->role === 'employee' ? '社員' : 'スタッフ',
                     'count'    => (int) ($countByStaff[$id] ?? 0),
                     'big'      => (int) ($bigCountByStaff[$id] ?? 0),
+                    // エントリーの規模別（小型・中型・大型）。
+                    'entry'    => ['小型' => (int) ($ent['小型'] ?? 0), '中型' => (int) ($ent['中型'] ?? 0), '大型' => (int) ($ent['大型'] ?? 0)],
                     'd'        => $ds['d'],
                     'sd'       => $ds['sd'],
                     'dTotal'   => $ds['d'] + $ds['sd'],   // D＋SD合計
