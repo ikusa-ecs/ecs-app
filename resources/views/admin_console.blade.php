@@ -112,7 +112,112 @@
         @endif
       </div>
 
-      {{-- ② Administrator専用の作業への集約リンク --}}
+      {{-- ② お知らせメールの一斉送信（2026-10-22 baba要望）。正本＝App\Support\BroadcastMail。
+           ⚠ 件名・本文はどこにも保存しない（共通パスワードなどを書くため）。 --}}
+      <h2 style="margin:26px 0 4px;">📧 お知らせメールの一斉送信</h2>
+      <p class="muted" style="font-size:12.5px; margin:0 0 12px;">
+        ログインできる人（在籍中・メールあり・パスワード設定済み）に、<b>1人1通ずつ</b>送ります（ほかの人のアドレスは見えません）。臨時スタッフ・体験用は送りません。<br>
+        宛名（○○ 様）は自動で付きます。件名・本文は<b>保存されません</b>。
+      </p>
+      <div class="panel" id="bcPanel" style="max-width:720px; padding:14px; display:grid; gap:10px; font-size:13px;">
+        <label>送り先
+          <select id="bcTarget" style="padding:6px 8px; border:1px solid #d8c8b6; border-radius:7px; font-size:13px;">
+            <option value="all">社員とスタッフ全員</option>
+            <option value="employee">社員だけ</option>
+            <option value="staff">スタッフだけ</option>
+          </select>
+        </label>
+        <label>件名<br>
+          <input id="bcSubject" type="text" maxlength="200" style="width:100%; padding:6px 8px; border:1px solid #d8c8b6; border-radius:7px; font-size:13px;"
+                 value="【重要】ECSの入り方が一時的に変わります（共通パスワードのお知らせ）">
+        </label>
+        <label>本文<br>
+          <textarea id="bcBody" rows="16" style="width:100%; padding:8px; border:1px solid #d8c8b6; border-radius:7px; font-size:13px; font-family:inherit;">お疲れ様です。株式会社IKUSAです。
+
+ECSを動かしている仕組みに安全上の問題が見つかったため、修正が終わるまでの間、ECSを開くときに「共通のID・パスワード」を入れていただく形に変わりました。
+
+■ ECSを開くと、最初にIDとパスワードを聞かれます
+以下を入力してください（スマホ・パソコンに覚えさせておけば、次からは入力不要です）。
+
+　ID　　　：
+　パスワード：
+
+■ そのあとは、いつもどおり
+ご自分のメールアドレスとパスワードでログインしてください。
+
+ECS：{{ url('/') }}
+
+※この共通パスワードは、社外の方には教えないでください。
+※修正が終わったら、元の入り方に戻します（あらためてお知らせします）。
+
+ご不便をおかけしますが、よろしくお願いいたします。</textarea>
+        </label>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <button class="btn" type="button" id="bcCheck">送り先を確認</button>
+          <button class="btn" type="button" id="bcSend" style="display:none;">送信する</button>
+          <span id="bcStatus" class="muted"></span>
+        </div>
+        <div id="bcResult" style="white-space:pre-wrap; font-size:12.5px;"></div>
+      </div>
+      <script>
+      (function () {
+        // 画面のJSが死んでも他の欄に影響しないよう、全体を try で包む。
+        try {
+          var csrf = '{{ csrf_token() }}';
+          var $ = function (id) { return document.getElementById(id); };
+          var ids = [], batch = 20, target = 'all';
+          function post(url, payload) {
+            return fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+              body: JSON.stringify(payload)
+            }).then(function (r) {
+              return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || ('エラー ' + r.status)); return j; });
+            });
+          }
+          // 送り先や文面を変えたら、もう一度「確認」からやり直す（確認した人数と違う相手に送らないため）。
+          ['bcTarget', 'bcSubject', 'bcBody'].forEach(function (id) {
+            $(id).addEventListener('input', function () { $('bcSend').style.display = 'none'; $('bcStatus').textContent = ''; });
+          });
+          $('bcCheck').addEventListener('click', function () {
+            target = $('bcTarget').value;
+            $('bcResult').textContent = '';
+            post('/admin-console/broadcast/preview', { target: target }).then(function (j) {
+              ids = j.ids; batch = j.batch;
+              $('bcStatus').textContent = j.count + '人に送ります。本文を確認してから「送信する」を押してください。';
+              $('bcSend').style.display = j.count ? '' : 'none';
+            }).catch(function (e) { $('bcStatus').textContent = '確認できませんでした：' + e.message; });
+          });
+          $('bcSend').addEventListener('click', function () {
+            var subject = $('bcSubject').value.trim(), body = $('bcBody').value.trim();
+            if (!subject || !body) { alert('件名と本文を入れてください。'); return; }
+            if (!confirm(ids.length + '人にメールを送ります。よろしいですか？\n（送ったメールは取り消せません）')) return;
+            $('bcSend').style.display = 'none'; $('bcCheck').disabled = true;
+            var sent = 0, skipped = [], i = 0;
+            function next() {
+              if (i >= ids.length) {
+                $('bcStatus').textContent = '';
+                $('bcResult').textContent = '✅ ' + sent + '人に送りました。' + (skipped.length ? '\n送れなかった人：\n' + skipped.join('\n') : '');
+                $('bcCheck').disabled = false;
+                return;
+              }
+              var chunk = ids.slice(i, i + batch);
+              $('bcStatus').textContent = '送信中… ' + i + ' / ' + ids.length;
+              post('/admin-console/broadcast/send', { target: target, ids: chunk, subject: subject, body: body }).then(function (j) {
+                sent += j.sent; skipped = skipped.concat(j.skipped); i += batch; next();
+              }).catch(function (e) {
+                // 途中で止まったら、どこまで送れたかをはっきり出す（二重送信を防ぐため、続きは自動で送らない）。
+                $('bcResult').textContent = '⚠ 途中で止まりました：' + e.message + '\n送れたのは ' + sent + '人（' + i + '人目まで処理）。続きを送る前に担当に相談してください。';
+                $('bcStatus').textContent = ''; $('bcCheck').disabled = false;
+              });
+            }
+            next();
+          });
+        } catch (e) { console.error(e); }
+      })();
+      </script>
+
+      {{-- ③ Administrator専用の作業への集約リンク --}}
       <h2 style="margin:26px 0 4px;">その他のAdministrator向け作業</h2>
       <p class="muted" style="font-size:12.5px; margin:0 0 12px;">
         マスタの削除やシステム設定などは、下の画面で行います。

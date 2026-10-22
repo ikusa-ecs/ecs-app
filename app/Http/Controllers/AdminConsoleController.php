@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\BroadcastMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -30,6 +31,38 @@ class AdminConsoleController extends Controller
             'permLabels'     => ['employee' => '社員', 'manager' => '管理者', 'admin' => 'Administrator'],
             'permBadgeColor' => ['employee' => '#6e5b49', 'manager' => '#2c6ca0', 'admin' => '#b5673a'],
         ]);
+    }
+
+    /**
+     * お知らせメールの送り先を数える（送る前の確認用）。2026-10-22 baba要望。
+     * 返すのは id と名前だけ（画面のJSがこの id を BATCH 人ずつ送信に回す）。
+     */
+    public function broadcastPreview(Request $request)
+    {
+        $data = $request->validate(['target' => ['required', Rule::in(array_keys(BroadcastMail::TARGETS))]]);
+        $people = BroadcastMail::recipients($data['target']);
+
+        return response()->json([
+            'count' => $people->count(),
+            'ids'   => $people->map(fn (Person $p) => (string) $p->getKey())->all(),
+            'batch' => BroadcastMail::BATCH,
+        ]);
+    }
+
+    /** お知らせメールを送る（1回で BATCH 人まで）。⚠ 件名・本文は保存しない。 */
+    public function broadcastSend(Request $request)
+    {
+        $data = $request->validate([
+            'target'  => ['required', Rule::in(array_keys(BroadcastMail::TARGETS))],
+            'ids'     => ['required', 'array', 'max:'.BroadcastMail::BATCH],
+            'ids.*'   => ['string'],
+            'subject' => ['required', 'string', 'max:200'],
+            'body'    => ['required', 'string', 'max:10000'],
+        ], [], ['subject' => '件名', 'body' => '本文']);
+
+        return response()->json(
+            BroadcastMail::sendTo($data['ids'], $data['target'], $data['subject'], $data['body'])
+        );
     }
 
     /** 1人の権限を変更する。 */

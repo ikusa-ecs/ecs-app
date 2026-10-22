@@ -232,6 +232,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // Administrator専用コンソール（権限変更などを集約）。全権のみ＝tier:admin。
     Route::get('/admin-console', [AdminConsoleController::class, 'index'])->middleware('tier:admin');
     Route::post('/admin-console/permission', [AdminConsoleController::class, 'updatePermission'])->middleware('tier:admin');
+    // お知らせメールの一斉送信（2026-10-22・Basic認証の共通パスワードを配るため）。送り先の確認→小分けに送信。
+    Route::post('/admin-console/broadcast/preview', [AdminConsoleController::class, 'broadcastPreview'])->middleware('tier:admin');
+    Route::post('/admin-console/broadcast/send', [AdminConsoleController::class, 'broadcastSend'])->middleware('tier:admin');
     // 人の「退職にする／在籍に戻す」と「削除」。どちらも Administrator のみ（権限4段階の決まり）。
     // ⚠ 辞めた人は「退職にする」（在籍を外す）。削除は間違い登録・テストで作った人の片づけ用で、
     //   アサイン等の記録が残っている人はサーバー側で拒否する（過去の案件が追えなくなるため）。
