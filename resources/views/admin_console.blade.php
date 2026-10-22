@@ -36,6 +36,13 @@
         「Administratorだけができること」＝<b>権限の変更</b>と、マスタの削除・システム設定などをここにまとめています。
       </div>
 
+      {{-- このサーバーのPHPの版（2026-10-22 baba要望）。PHPに穴が見つかったとき、エンジニアに聞かずに
+           「直った版になっているか」を確かめるため。⚠ 外からは見えない（Administratorだけ）＝攻撃の手がかりにしない。 --}}
+      <p class="muted" id="phpVersion" style="font-size:12.5px; margin:-4px 0 16px;">
+        このサーバーのPHP：<b>{{ PHP_VERSION }}</b>
+        <span class="ac-sub">（PHPの安全のお知らせが出たら、ここが直った版以上になっているか見てください）</span>
+      </p>
+
       @if (session('admin_status'))
         <div style="background:#e7f6ec; color:#166534; border:1px solid #b7e0c2; border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px; max-width:720px;">
           {{ session('admin_status') }}

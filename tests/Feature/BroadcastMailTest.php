@@ -97,4 +97,11 @@ class BroadcastMailTest extends TestCase
         $this->actingAsPerson($this->admin())->get('/admin-console')
             ->assertOk()->assertSee('お知らせメールの一斉送信')->assertSee('bcSend', false);
     }
+
+    /** PHPの版を Administrator 画面に出す（2026-10-22・穴の修正が入ったか確かめる用）。 */
+    public function test_admin_console_shows_php_version(): void
+    {
+        $this->actingAsPerson($this->admin())->get('/admin-console')
+            ->assertOk()->assertSee('このサーバーのPHP')->assertSee(PHP_VERSION);
+    }
 }
