@@ -1449,12 +1449,14 @@ class PastProjectImportController extends Controller
      *
      * なぜ要るか＝月ごとのアサイン表は「5名」「10チーム」のように単位つきで書かれている
      * （list形式は数字だけ）。どちらでも読めるようにする（2026-08-25）。
+     * ⚠ 数字を全部つなげない＝最初の数だけ（2026-10-22・お客様人数が「150…」→「1503」になっていた）。
+     *   読み方の正本＝Headcount::firstNumber。
      */
     private function digits(string $value): string
     {
-        $v = preg_replace('/[^0-9]/u', '', trim($value));
+        $n = \App\Support\Headcount::firstNumber($value);
 
-        return $v === null ? '' : $v;
+        return $n === null ? '' : (string) $n;
     }
 
     /** 「済」「○」などが入っていれば「やった」と見なす。 */

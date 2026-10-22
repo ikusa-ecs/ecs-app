@@ -19,8 +19,11 @@ namespace App\Support;
  */
 final class Headcount
 {
-    /** 範囲の区切りとして認める文字（全角チルダ・波ダッシュ・ハイフン各種）。 */
-    private const SEPARATORS = ['〜', '～', '~', '-', '－', 'ー', '–', '—', 'から'];
+    /**
+     * 範囲の区切りとして認める文字（全角チルダ・波ダッシュ・ハイフン各種）。
+     * 「8or9」「1or2」も範囲（2026-10-22）。アサイン表にこう書かれていて「89」「12」と読んでいた。
+     */
+    private const SEPARATORS = ['〜', '～', '~', '-', '－', 'ー', '–', '—', 'から', 'or', 'OR', 'Or', 'ｏｒ', 'または'];
 
     /**
      * 「6」「6〜8」「6〜8名」「6名～8名」などを読む。
@@ -106,11 +109,24 @@ final class Headcount
         return $min !== null && $max !== null && $min !== $max;
     }
 
-    /** 文字列から数字だけ取り出す。数字が無ければ null。 */
+    /**
+     * 文字列の**最初の数のかたまり**を取り出す。数字が無ければ null。
+     *
+     * ⚠ 数字を全部つなげない（2026-10-22）。「36人※内IKUSAスタッフ14人」が「3614」、
+     *   「150名×3回」が「1503」になっていた。あとに続く数字は添え書きとして読まない。
+     *   ただし「1,500」の桁区切りはつなげる。
+     */
+    public static function firstNumber(?string $value): ?int
+    {
+        $v = strtr(trim((string) $value), ['０' => '0', '１' => '1', '２' => '2', '３' => '3', '４' => '4',
+            '５' => '5', '６' => '6', '７' => '7', '８' => '8', '９' => '9', '，' => ',']);
+        $v = (string) preg_replace('/(?<=\d),(?=\d{3}(?!\d))/u', '', $v);
+
+        return preg_match('/\d+/', $v, $m) ? (int) $m[0] : null;
+    }
+
     private static function digits(string $value): ?int
     {
-        $d = preg_replace('/[^0-9]/u', '', trim($value));
-
-        return ($d === null || $d === '') ? null : (int) $d;
+        return self::firstNumber($value);
     }
 }

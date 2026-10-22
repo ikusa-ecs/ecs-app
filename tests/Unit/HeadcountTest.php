@@ -76,4 +76,23 @@ class HeadcountTest extends TestCase
         $this->assertSame(['min' => null, 'max' => 17], Headcount::parse('17名（IKUSA10名）'));
         $this->assertSame(['min' => 6, 'max' => 8], Headcount::parse('6〜8(うちIKUSA3)'));
     }
+
+    /** 「8or9」は範囲・あとに続く数字はつなげない（2026-10-22 アサイン表で89・12・3614と読んでいた）。 */
+    public function test_or_and_trailing_numbers(): void
+    {
+        $this->assertSame(['min' => 8, 'max' => 9], Headcount::parse('8or9'));
+        $this->assertSame(['min' => 1, 'max' => 2], Headcount::parse('1 or 2名'));
+        $this->assertSame(['min' => null, 'max' => 36], Headcount::parse('36人※内IKUSAスタッフ14人）'));
+        $this->assertSame(['min' => null, 'max' => 2], Headcount::parse('2名+派遣さん'));
+        $this->assertSame(['min' => null, 'max' => 12], Headcount::parse('１２名'));
+    }
+
+    public function test_first_number(): void
+    {
+        $this->assertSame(150, Headcount::firstNumber('150名×3回'));
+        $this->assertSame(1500, Headcount::firstNumber('1,500名'));
+        $this->assertSame(10, Headcount::firstNumber('10チーム'));
+        $this->assertNull(Headcount::firstNumber('未定'));
+        $this->assertNull(Headcount::firstNumber(''));
+    }
 }
