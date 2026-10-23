@@ -405,7 +405,7 @@ class StatsController extends Controller
         $neededIds = Person::where('role', 'employee')->inService($workedIds)->pluck('id')
             ->merge($countByStaff->keys())->unique()->values();
         $people = $this->withoutHidden(Person::whereIn('id', $neededIds->all()))
-            ->get(['id', 'name', 'role', 'department', 'office', 'hire_date'])
+            ->get(['id', 'name', 'role', 'department', 'office', 'hire_date', 'active'])
             ->keyBy('id');
 
         // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。
@@ -440,6 +440,7 @@ class StatsController extends Controller
                     'bigSD'    => $ds['bigSD'],
                     'onlineD'  => $ds['onlineD'],
                     'director' => $ds['d'],               // 部署別の平均で使う（D数）
+                    'retired'  => $person->active === false,   // 表からは外す（合計には数える）
                 ];
             })
             ->filter(function (array $m) use ($scopeOffice, $scopeDept) {
@@ -460,11 +461,15 @@ class StatsController extends Controller
                 return $m['count'] > 0;   // スタッフは出勤がある人だけ
             })
             ->values();
-        $members = $this->sortMembers($members, $sort);
+
+        // 表（画面・CSV）には退職した社員を出さない（baba 2026-10-23）。
+        // ただし合計・平均の数字は変えない＝退職者の出勤も、これまでどおり $allMembers で数える。
+        $allMembers = $members;
+        $members = $this->sortMembers($allMembers->reject(fn (array $m) => $m['retired'])->values(), $sort);
 
         // のべ出勤数。所属で絞っているときは、その所属の人ぶんだけを足す
         //（絞ったのに数字が全社のままだと、どこの数字か分からなくなるため）。
-        $totalAttendance = $scopeDept !== '' ? $members->sum('count') : $countByStaff->sum();
+        $totalAttendance = $scopeDept !== '' ? $allMembers->sum('count') : $countByStaff->sum();
 
         // のべ人数の内訳＝スタッフ／社員／派遣（2026-10-08 baba「全員に渡すお水の量を事前に知りたい」）。
         // ⚠ 派遣は名簿に入らない＝assignmentsに出てこないので、project_dispatches から人数ぶん足す（正本＝DispatchRows）。
@@ -496,8 +501,8 @@ class StatsController extends Controller
             ->map(fn (Collection $g) => $g->count());
 
         // 部署別＝合計出勤・合計ディレクター＋1人あたり平均（分母＝部署の社員数）。
-        $byDept = collect($deptDefs)->map(function ($dept) use ($members, $headByDept) {
-            $m = $members->where('deptGroup', $dept);
+        $byDept = collect($deptDefs)->map(function ($dept) use ($allMembers, $headByDept) {
+            $m = $allMembers->where('deptGroup', $dept);
             $head = (int) ($headByDept[$dept] ?? 0);
             $sumEvents = $m->sum('count');
             $sumDirector = $m->sum('director');
