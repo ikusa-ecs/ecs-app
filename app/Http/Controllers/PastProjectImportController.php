@@ -838,7 +838,10 @@ class PastProjectImportController extends Controller
                     //   非公開に戻す。過去あつかいは公開済みで入るので、そのままだと
                     //   **これからの案件のクライアント名・会場がスタッフ全員に見えたまま**になる。
                     //   見分け方＝過去で入った案件は「募集しない」かつ「確定」になっている。
-                    $wasPastImport = ! (bool) $existing->is_recruiting && (string) $existing->status === '確定';
+                    // ⚠ 公開ボードで一度「公開」にした案件は、過去あつかいで入ったものではない（2026-10-26 0483：
+                    //   日別ボードで「募集しない」にした確定案件を、取り込みが過去扱いして非公開に戻していた）。
+                    $wasPastImport = ! (bool) $existing->is_recruiting && (string) $existing->status === '確定'
+                        && empty($existing->published_offices);
                     if (! ($isFuture && $wasPastImport)) {
                         unset($attrs['staff_published']);
                     }

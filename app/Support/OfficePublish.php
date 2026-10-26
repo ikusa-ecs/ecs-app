@@ -38,7 +38,9 @@ final class OfficePublish
     {
         $list = self::currentList($p);
         $has = in_array($office, $list, true);
-        if ($has === $on && is_array($p->published_offices)) {
+        // ⚠ 「拠点の一覧」と「公開のスイッチ」がずれているとき（取り込みでスイッチだけ切れた等）は、
+        //   一覧が合っていても「もう公開済み」と返さない（2026-10-26 0483：押しても何も起きず、日別ボードは非公開のまま）。
+        if ($has === $on && is_array($p->published_offices) && (bool) $p->staff_published === $on) {
             return false;
         }
         if ($on && ! $has) {
