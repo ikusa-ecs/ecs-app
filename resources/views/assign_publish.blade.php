@@ -186,6 +186,11 @@
     .ymk.a { background: var(--brand-soft); color: var(--brand-dark); }
     .ymk.b { background: var(--warn-soft); color: #b45309; }
     .ymk.c { background: #ece3d4; color: #7a6a58; }
+    /* 案件一覧と同じ札（大型・オンライン・前泊）。 */
+    .big-mark { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--brand-fill); color: #fff; }
+    .fbadge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; }
+    .fbadge.fmt-online { background: #e3edf7; color: #2c6ca0; }
+    .tag-mini.stay { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; background: #4338ca; color: #fff; }
     tr.extra-row td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 
     /* 日付を押してその日へ飛ぶ並び（2026-09-08 baba要望）。
@@ -885,7 +890,7 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a>${yomiHtmlP(c)} ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a>${yomiHtmlP(c)}${sizeHtmlP(c)} ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
@@ -1021,6 +1026,14 @@
     const y = yomiMarkP[c.yomi];
     if (!y) return '';
     return `<span class="ymk ${y.c}" title="確度：${escapeHtml(c.yomi)}（まだ確定していない案件です）">${y.t}</span>`;
+  }
+  // 大型・オンライン・前泊の札（案件一覧と同じ見た目）。
+  function sizeHtmlP(c){
+    let h = '';
+    if (c.big)    h += '<span class="big-mark">大型</span>';
+    if (c.online) h += '<span class="fbadge fmt-online">オンライン</span>';
+    if (c.stay)   h += `<span class="tag-mini stay">${escapeHtml(c.lodging || '前泊')}</span>`;
+    return h;
   }
 
   // 備考の開閉

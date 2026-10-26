@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Support\Headcount;
+use App\Support\Lodging;
+use App\Support\ProjectScale;
 use App\Models\ProjectShare;
 use App\Support\OfficeCounts;
 use App\Support\OfficePublish;
@@ -113,6 +115,11 @@ class AssignPublishController extends Controller
                 'recruit'   => (bool) $p->is_recruiting,
                 // 確度（Aヨミ/Bヨミ/Cヨミ）。日別ボードと同じ印をスタッフ公開ボードにも出す（2026-10-26 baba要望）。
                 'yomi'      => (string) ($p->yomi ?? ''),
+                // 札（2026-10-26 baba要望）：大型・オンライン・前泊有。日別ボードと同じ決まり（正本＝ProjectScale／ProjectFormats／Lodging）。
+                'big'       => ProjectScale::of($p->scale) === '大型',
+                'online'    => str_contains((string) ($p->format ?? ''), 'オンライン'),
+                'stay'      => Lodging::hasPreStay($p->lodging),
+                'lodging'   => (string) ($p->lodging ?? ''),   // 前泊有などの文字（案件一覧と同じ札に出す）
                 // 登録拠点と、その案件への関わりの札（2026-09-18）。
                 // ⚠ 文言は App\Support\ShareTags が正本（日別ボードと同じ言い方にそろえる）。
                 'office'    => (string) ($p->office ?? ''),
