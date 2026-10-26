@@ -125,6 +125,28 @@ final class Headcount
         return preg_match('/\d+/', $v, $m) ? (int) $m[0] : null;
     }
 
+    /**
+     * お客様人数の読み方（2026-10-26）。
+     * 「1部最大200名」は「1部」の1ではなく「最大200名」の200（お客様人数を1と読んでいた）。
+     * ・「1部」「2回」などの回数・部の数字は外して読む。
+     * ・「最大」「上限」の後ろの数字があれば、それを使う。
+     * ・なければ最初の数字（今までどおり）。
+     */
+    public static function guestCount(?string $value): ?int
+    {
+        $v = strtr(trim((string) $value), ['０' => '0', '１' => '1', '２' => '2', '３' => '3', '４' => '4',
+            '５' => '5', '６' => '6', '７' => '7', '８' => '8', '９' => '9', '，' => ',']);
+        $v = (string) preg_replace('/(?<=\d),(?=\d{3}(?!\d))/u', '', $v);
+
+        if (preg_match('/(最大|上限|MAX|max)\D*(\d+)/u', $v, $m)) {
+            return (int) $m[2];
+        }
+
+        $v = (string) preg_replace('/\d+\s*(部|回|日目|グループ)/u', '', $v);
+
+        return preg_match('/\d+/', $v, $n) ? (int) $n[0] : null;
+    }
+
     private static function digits(string $value): ?int
     {
         return self::firstNumber($value);

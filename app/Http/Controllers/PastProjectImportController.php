@@ -1145,7 +1145,7 @@ class PastProjectImportController extends Controller
             return ['max' => $max, 'min' => Headcount::parse($count)['min'], 'tentative' => false, 'reason' => ''];
         }
 
-        $guests = $this->digits($get('お客様人数'));
+        $guests = ($g = Headcount::guestCount($get('お客様人数'))) === null ? '' : (string) $g;
         $est = RequiredCountEstimate::for(
             $this->resolveContentIds($name),
             $get('案件規模') ?: null,
@@ -1165,7 +1165,7 @@ class PastProjectImportController extends Controller
         string $count, ?string $client, ?string $meetTime, string $office,
         string $mode = self::MODE_PAST, bool $hasPeople = false, ?array $estimate = null): array
     {
-        $guests = $this->digits($get('お客様人数'));
+        $guests = ($g = Headcount::guestCount($get('お客様人数'))) === null ? '' : (string) $g;
         $teams = $this->digits($get('チーム数'));
         $future = $mode === self::MODE_FUTURE;
 
