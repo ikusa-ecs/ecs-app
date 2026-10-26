@@ -235,6 +235,7 @@
     .tag-mini { font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 700; }
     /* 強調（注目してほしい）：追加・宿泊 */
     .tag-mini.add  { background: #b91c1c;            color: #fff; }
+    .tag-mini.repeat { background: #e7f0e9; color: #3f7d52; }
     .tag-mini.stay { background: #e8833a;            color: #fff; }
     /* 中間：予備日・リハ */
     .tag-mini.yobi { background: var(--warn-soft);   color: #b45309; }
@@ -1391,6 +1392,8 @@
         series:c.series || null, seriesRoot:c.seriesRoot || '', groupDays:c.groupDays || null,
         // 日付が変わった印（旧→新・7日間）。⚠ 詰め替え忘れると、サーバーが送っていても画面に出ない。
         dateChange:c.dateChange || null,
+        // リピートの前回（前回の開催日・自分も前回入ったか）。名前は出さない。
+        repeatPrev:c.repeatPrev || null,
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
         // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
@@ -1736,7 +1739,9 @@
         // タグ（追加・予備日/リハ・実施形態・大型・リピート・宿泊）
         let tags = '';
         // 日付が変わった印（7日間・2026-10-26）。旧→新を出す。全員に見える。
-        if (j.dateChange)           tags += '<span class="tag-mini dchg">📅 日付が変わりました（' + j.dateChange.from + '→' + j.dateChange.to + '）</span>';
+        // リピートの前回（2026-10-26）。前回アサインされた案件だと分かるように出す。
+        if (j.repeatPrev)           tags += '<span class="tag-mini repeat">🔁 前回アサインされた案件（' + j.repeatPrev.date + '）' + (j.repeatPrev.mine ? '・あなたも前回入りました' : '') + '</span>';
+        if (j.dateChange)           tags +='<span class="tag-mini dchg">📅 日付が変わりました（' + j.dateChange.from + '→' + j.dateChange.to + '）</span>';
         if (j.extra)                tags += '<span class="tag-mini add">追加</span>';
         if (j.dayType === '予備日')  tags += '<span class="tag-mini yobi">予備日</span>';
         else if (j.dayType === 'リハ' || j.dayType === 'リハ日') tags += '<span class="tag-mini reha">リハ</span>';

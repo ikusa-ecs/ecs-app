@@ -12,6 +12,7 @@ use App\Models\ProjectShare;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\DateChange;
+use App\Support\RepeatHistory;
 use App\Support\RecentWindow;
 use App\Support\AssignmentStamp;
 use App\Support\DispatchRows;
@@ -530,6 +531,8 @@ class AssignBoardController extends Controller
 
         // 日付が変わった案件の印（7日間・2026-10-26）。正本＝App\Support\DateChange。
         $dateChanges = DateChange::forProjects($projectIds->all());
+        // リピート案件の「前回」（誰がアサインされたか）。正本＝App\Support\RepeatHistory。
+        $repeatPrev = RepeatHistory::forProjects($projects->map(fn (array $pair) => $pair[0]));
 
         // この案件群の割当（キャンセル以外）。
         // ⚠ date も引く。アサインは「案件×人×日」で1行なので、2日以上の案件では
@@ -711,6 +714,7 @@ class AssignBoardController extends Controller
                 //   別のことなので別々に持つ（2026-08-28 baba指摘）。
                 'stat' => $this->boardStatus($p),
                 'dateChange' => $dateChanges[(string) $p->id] ?? null,   // 日付が変わった印（旧→新・7日間）
+                'repeatPrev' => $repeatPrev[(string) $p->id] ?? null,    // リピートの前回（日付・案件名・人）
                 'pubOn' => OfficePublish::isPublishedFor($p, $office),   // ⚠ 公開は拠点ごと（2026-09-30）＝この拠点のスタッフに公開しているか（正本＝OfficePublish）
                 // スタッフ募集を続けているか。⚠ 「公開しているか」とは別。
                 //   確定にすると締まる（正本＝RecruitStatus::closeOnConfirmed）。

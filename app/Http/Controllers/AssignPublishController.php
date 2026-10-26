@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Support\Headcount;
 use App\Support\Lodging;
 use App\Support\ProjectScale;
+use App\Support\RepeatHistory;
 use App\Models\ProjectShare;
 use App\Support\OfficeCounts;
 use App\Support\OfficePublish;
@@ -75,8 +76,10 @@ class AssignPublishController extends Controller
         // 同じイベントの全部の日（本番＋リハ日・前日設営・予備日）＝「公開 ◯/◯日」の数え方（スタッフ画面と同じ）。
         // ⚠ 本番だけで数えると、リハ日を公開し忘れても「全日公開」に見える。
         $groupDays = ProjectSeries::daysFor($cases);
+        // リピートの前回（日付だけ見せる。名前は社員・管理者の日別ボードで見る）。正本＝App\Support\RepeatHistory。
+        $repeatPrev = RepeatHistory::forProjects($cases, false);
 
-        $cases = $cases->map(function (Project $p) use ($today, $office, $sharesByProject, $seriesGroups, $groupDays) {
+        $cases = $cases->map(function (Project $p) use ($today, $office, $sharesByProject, $seriesGroups, $groupDays, $repeatPrev) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->timestamp, 86400)
@@ -120,6 +123,9 @@ class AssignPublishController extends Controller
                 'online'    => str_contains((string) ($p->format ?? ''), 'オンライン'),
                 'stay'      => Lodging::hasPreStay($p->lodging),
                 'lodging'   => (string) ($p->lodging ?? ''),   // 前泊有などの文字（案件一覧と同じ札に出す）
+                // リピート（2026-10-26 baba要望）。前回の開催日があれば、その日付を札に出す。
+                'repeat'    => (bool) $p->is_repeat,
+                'repeatPrev' => $repeatPrev[(string) $p->id]['date'] ?? null,
                 // 登録拠点と、その案件への関わりの札（2026-09-18）。
                 // ⚠ 文言は App\Support\ShareTags が正本（日別ボードと同じ言い方にそろえる）。
                 'office'    => (string) ($p->office ?? ''),

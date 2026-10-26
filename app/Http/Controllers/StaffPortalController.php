@@ -23,6 +23,7 @@ use App\Support\RecruitStatus;
 use App\Support\StaffDayEventCount;
 use App\Support\StaffExtra;
 use App\Support\DateChange;
+use App\Support\RepeatHistory;
 use App\Support\StaffLinks;
 use App\Support\TestAccounts;
 use Illuminate\Http\Request;
@@ -816,6 +817,8 @@ class StaffPortalController extends Controller
         // 同じイベントの全部の日（本番＋リハ日・前日設営・予備日）。1枚のカードから日を選んでエントリーするため（2026-10-16）。
         // 日付が変わった案件の印（7日間・全員に見える・2026-10-26）。正本＝App\Support\DateChange。
         $dateChanges = DateChange::forProjects($projects->pluck('id')->all());
+        // リピートの前回（2026-10-26 baba要望）。スタッフの画面には名前は出さず、「前回の案件」かと「自分も前回入ったか」だけ出す。
+        $repeatPrev = RepeatHistory::forProjects($projects, false);
         $groupDays = ProjectSeries::daysFor($projects);
         // ⚠ リハ日・前日設営・予備日は、**この人に公開している日だけ**並べる（2026-10-16 baba決定）。
         //   社員だけで出る日（スタッフに募集しない日）が「募集前」と出続けると紛らわしいため。
@@ -828,7 +831,7 @@ class StaffPortalController extends Controller
             ));
         }
 
-        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups, $groupDays, $dateChanges) {
+        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups, $groupDays, $dateChanges, $repeatPrev, $me) {
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
@@ -870,6 +873,11 @@ class StaffPortalController extends Controller
                 // 同じイベントの全部の日（2日以上あるときだけ）。⚠ 募集していない日も入る＝画面で「募集前」と出す。
                 'groupDays' => count($groupDays[ProjectSeries::rootId($p)] ?? []) > 1 ? $groupDays[ProjectSeries::rootId($p)] : null,
                 'dateChange' => $dateChanges[(string) $p->id] ?? null,   // 日付が変わった印（旧→新・7日間）
+                // リピートの前回：前回の開催日と、この人が前回も入ったか（名前は出さない）。
+                'repeatPrev' => isset($repeatPrev[(string) $p->id]) ? [
+                    'date' => $repeatPrev[(string) $p->id]['date'],
+                    'mine' => in_array((string) $me->id, $repeatPrev[(string) $p->id]['staffIds'], true),
+                ] : null,
                 'off' => $off,
                 // 募集人数は本来セールスが案件登録で入れる項目。まだ未定（空欄・0）のときは
                 // 画面が「満員」に見えてエントリーできなくなるので、既定 5名 として見せる（2026-08-20 baba）。

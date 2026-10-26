@@ -190,6 +190,7 @@
     .big-mark { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--brand-fill); color: #fff; }
     .fbadge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; }
     .fbadge.fmt-online { background: #e3edf7; color: #2c6ca0; }
+    .tag-mini.repeat { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; background: #e7f0e9; color: #3f7d52; }
     .tag-mini.stay { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; background: #4338ca; color: #fff; }
     tr.extra-row td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 
@@ -539,6 +540,9 @@
       office: c.office || '', otherOffice: !!c.otherOffice, shareTags: (c.shareTags || []).slice(),
       // 連日イベント（2026-10-16）。⚠ 書き写さないと札が出ない（この画面はカードを作り直すつくり）。
       series: c.series || null, seriesRoot: c.seriesRoot || '', groupDays: c.groupDays || null,
+      // 確度・札（大型・オンライン・前泊・リピート）。⚠ 書き写さないと印が出ない（この画面はカードを作り直すつくり）。
+      yomi: c.yomi, big: c.big, online: c.online, stay: c.stay, lodging: c.lodging,
+      repeat: c.repeat, repeatPrev: c.repeatPrev,
       staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
       // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
       meetDetail: c.meetDetail || '', belongings: c.belongings || '',
@@ -1033,6 +1037,7 @@
     if (c.big)    h += '<span class="big-mark">大型</span>';
     if (c.online) h += '<span class="fbadge fmt-online">オンライン</span>';
     if (c.stay)   h += `<span class="tag-mini stay">${escapeHtml(c.lodging || '前泊')}</span>`;
+    if (c.repeat) h += `<span class="tag-mini repeat" title="リピート案件です">🔁 リピート${c.repeatPrev ? '（前回 ' + escapeHtml(c.repeatPrev) + '）' : ''}</span>`;
     return h;
   }
 
