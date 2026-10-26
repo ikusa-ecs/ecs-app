@@ -1389,6 +1389,8 @@
         // 連日イベント（◯日目／全◯日）。1日だけの案件は null。
         // ⚠ ここで詰め替え忘れると、サーバーが送っていても画面に出ない。
         series:c.series || null, seriesRoot:c.seriesRoot || '', groupDays:c.groupDays || null,
+        // 日付が変わった印（旧→新・7日間）。⚠ 詰め替え忘れると、サーバーが送っていても画面に出ない。
+        dateChange:c.dateChange || null,
         // 締切はサーバー計算（通常=一斉締切日／追加=公開日+3日・土日は月曜）。
         // 万一サーバーから来なかったときだけ「開催日の4日前」で出す（空欄にしないための保険）。
         deadline:(c.deadline || ((_dl.getMonth()+1) + '/' + _dl.getDate())),
@@ -1733,6 +1735,8 @@
 
         // タグ（追加・予備日/リハ・実施形態・大型・リピート・宿泊）
         let tags = '';
+        // 日付が変わった印（7日間・2026-10-26）。旧→新を出す。全員に見える。
+        if (j.dateChange)           tags += '<span class="tag-mini dchg">📅 日付が変わりました（' + j.dateChange.from + '→' + j.dateChange.to + '）</span>';
         if (j.extra)                tags += '<span class="tag-mini add">追加</span>';
         if (j.dayType === '予備日')  tags += '<span class="tag-mini yobi">予備日</span>';
         else if (j.dayType === 'リハ' || j.dayType === 'リハ日') tags += '<span class="tag-mini reha">リハ</span>';

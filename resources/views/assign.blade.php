@@ -307,6 +307,7 @@
     .grp-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px;
                  background: #1d4e89; color: #fff; white-space: nowrap; vertical-align: middle; }
     html[data-theme="dark"] .grp-badge { background: var(--info-soft); color: var(--info-ink); }
+    .dchg { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--warn-soft); color: var(--warn-ink); white-space: nowrap; }
     .ymk { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
     .ymk.a { background: var(--brand-soft); color: var(--brand-dark); }
     .ymk.b { background: var(--warn-soft);  color: #b45309; }
@@ -808,6 +809,7 @@
       //   （保存はできていた。bRecruit() が「無ければ募集中」とみなすため）。
       recruit:c.recruit,
       yomi:c.yomi,   // 確度（Aヨミ/Bヨミ/Cヨミ）。詰め替え忘れるとカードに出ない。
+      dateChange:c.dateChange,   // 日付が変わった印（旧→新・7日間）。詰め替え忘れると札が出ない。
       // 同じイベントの全部の日（連日イベント・リハ日つき・2026-10-16）。⚠ 詰め替え忘れると札が出ない。
       groupDays:c.groupDays || null,
       needStaff:c.needStaff,   // スタッフ画面で使っている必要人数（未入力なら既定）。締切の判定に使う。
@@ -1915,6 +1917,12 @@
     if (!y) return '';
     return `<span class="ymk ${y.c}" title="確度：${c.yomi}（まだ確定していない案件です）">${y.t}</span>`;
   }
+  // 日付が変わった案件の印（7日間）。旧→新を出す。画面の判定は正本（AppSupportDateChange）の答えをそのまま使う。
+  function dateChangeHtml(c){
+    const d = c.dateChange;
+    if (!d) return '';
+    return `<span class="dchg" title="日付が変わりました（${d.from} → ${d.to}）。変わってから7日間の表示です">📅 ${d.from}→${d.to}</span>`;
+  }
 
   // 実施形態のバッジ（2026-09-01 baba要望）。現地かオンラインかで声を掛ける人が変わるため、
   // アサインを詰めるこの画面にも出す。
@@ -2005,7 +2013,7 @@
     const inner = USING_DB
       ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く">${badge}${name}</a>`
       : `${badge}${name}`;
-    return `<div class="cc-name" title="${name}"><span class="nm">${inner}</span>${yomiHtml(c)}${extraHtml || ''}</div>`;
+    return `<div class="cc-name" title="${name}"><span class="nm">${inner}</span>${yomiHtml(c)}${dateChangeHtml(c)}${extraHtml || ''}</div>`;
   }
 
   // メンバーのポジション欄。手動編集中でスタッフIDがあればプルダウン（選ぶとDB保存）、それ以外は表示のみ。
