@@ -27,7 +27,7 @@ class ProjectFormRequiredTest extends TestCase
 
     /**
      * 確定で保存：案件名・開催日・人数が空なら止める。
-     * ⚠ 人数は2つとも必須（2026-09-18 baba「マストで」）＝全体人数とIKUSA。
+     * ⚠ 人数は全体人数だけ必須（2026-10-26 baba：IKUSAは任意）。
      */
     public function test_publish_requires_name_date_and_count(): void
     {
@@ -35,7 +35,7 @@ class ProjectFormRequiredTest extends TestCase
 
         $this->actingAsPerson($this->emp())
             ->post('/project-form', ['intent' => 'publish'])
-            ->assertSessionHasErrors(['content_names', 'start_date', 'required_count', 'ikusa_count']);
+            ->assertSessionHasErrors(['content_names', 'start_date', 'required_count']);
 
         $this->assertSame($before, Project::count(), '不備があれば登録しない');
     }

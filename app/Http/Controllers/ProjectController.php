@@ -619,12 +619,7 @@ class ProjectController extends Controller
             if ($count < 1 && ! $request->boolean('count_tentative') && ! $noAssign) {
                 $errors['required_count'] = '運営人数（全体人数）を入力するか、「人数は仮（未定）」にチェックを入れてください。';
             }
-            // 運営人数（IKUSA）も必須（2026-09-18 baba「マストで」）。
-            // ⚠ 逃げ道は全体人数と同じ「人数は仮（未定）」ひとつ（チェック1つで両方を仮にする）。
-            $ikusa = Headcount::parse($request->input('ikusa_count'))['max'] ?? 0;
-            if ($ikusa < 1 && ! $request->boolean('count_tentative') && ! $noAssign) {
-                $errors['ikusa_count'] = '運営人数（IKUSA）を入力するか、「人数は仮（未定）」にチェックを入れてください。';
-            }
+            // 運営人数（IKUSA）は必須から外した（2026-10-26 baba）。空でも保存できる。
             if ($errors) {
                 return back()->withInput()->withErrors($errors);
             }

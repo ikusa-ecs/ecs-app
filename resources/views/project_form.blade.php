@@ -903,7 +903,7 @@
                 <!-- 運営人数（IKUSA）＝そのうち自社で出す人数（2026-09-18 baba要望）。
                      ⚠ 覚えておくための数字。募集・残り◯名・自動アサイン・スタッフ画面の締切は
                         今までどおり上の「全体人数」で動く。 -->
-                <label style="margin-top:10px;">運営人数（IKUSA）<span class="req-mark yellow">必須</span></label>
+                <label style="margin-top:10px;">運営人数（IKUSA）</label>
                 <input type="text" id="ikusaCount" name="ikusa_count" data-need="later"
                        inputmode="numeric" placeholder="例）8 ／ 4〜6">
                 <div class="check-row tbd-row" style="margin-top:8px;">
@@ -1807,9 +1807,6 @@
     const noAssign = document.getElementById('noAssign').checked;
     if (count < 1 && !document.getElementById('countTentative').checked && !noAssign) {
       add('運営人数（全体人数）を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('requiredCount'));
-    }
-    if (ikusa < 1 && !document.getElementById('countTentative').checked && !noAssign) {
-      add('運営人数（IKUSA）を入力するか、「人数は仮（未定）」にチェックを入れてください。', document.getElementById('ikusaCount'));
     }
 
     if (missing.length === 0) return true;
