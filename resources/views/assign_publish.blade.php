@@ -181,6 +181,11 @@
 
     /* 追加案件（MTG後に入った案件）を目立たせる */
     .badge.extra { background: #fde8e8; color: #b91c1c; border: 1px solid var(--danger); font-weight: 700; }
+    /* 確度の印（A/B/Cヨミ）。日別ボードと同じ色・文字にそろえる。 */
+    .ymk { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
+    .ymk.a { background: var(--brand-soft); color: var(--brand-dark); }
+    .ymk.b { background: var(--warn-soft); color: #b45309; }
+    .ymk.c { background: #ece3d4; color: #7a6a58; }
     tr.extra-row td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 
     /* 日付を押してその日へ飛ぶ並び（2026-09-08 baba要望）。
@@ -880,7 +885,7 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a> ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a>${yomiHtmlP(c)} ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
@@ -1009,6 +1014,14 @@
   }
 
   function escapeHtml(s){ return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // 確度（Aヨミ/Bヨミ/Cヨミ）の印。日別ボードと同じ（「確定」は印を出さない）。
+  const yomiMarkP = { 'Aヨミ':{ t:'A', c:'a' }, 'Bヨミ':{ t:'B', c:'b' }, 'Cヨミ':{ t:'C', c:'c' } };
+  function yomiHtmlP(c){
+    const y = yomiMarkP[c.yomi];
+    if (!y) return '';
+    return `<span class="ymk ${y.c}" title="確度：${escapeHtml(c.yomi)}（まだ確定していない案件です）">${y.t}</span>`;
+  }
 
   // 備考の開閉
   function toggleNote(id){

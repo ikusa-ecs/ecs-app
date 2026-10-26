@@ -111,6 +111,8 @@ class AssignPublishController extends Controller
                 //   兼ねているので、消すと入っている人が自分の担当を見られなくなる。
                 //   代わりに「募集なし」の札を出し、絞り込みで隠せるようにした。
                 'recruit'   => (bool) $p->is_recruiting,
+                // 確度（Aヨミ/Bヨミ/Cヨミ）。日別ボードと同じ印をスタッフ公開ボードにも出す（2026-10-26 baba要望）。
+                'yomi'      => (string) ($p->yomi ?? ''),
                 // 登録拠点と、その案件への関わりの札（2026-09-18）。
                 // ⚠ 文言は App\Support\ShareTags が正本（日別ボードと同じ言い方にそろえる）。
                 'office'    => (string) ($p->office ?? ''),
