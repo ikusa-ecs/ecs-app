@@ -500,7 +500,7 @@
       </div>
 
       <p class="muted" style="font-size:11.5px; margin:14px 0 0;">
-        ※ 表示している<b>会場（住所）・集合場所・集合〜解散</b>は、スタッフ画面に出る情報と同じものです。<b>案件名をクリック</b>すると案件一覧の該当月へ移動します。<br>
+        ※ 表示している<b>会場（住所）・集合場所・集合〜解散</b>は、スタッフ画面に出る情報と同じものです。<b>案件名をクリック</b>すると、その案件の編集画面が開きます。<br>
         ※「集合〜解散（スタッフ）」は、スタッフに見せる集合・解散時間です。社員と違うときは入力して直せます（直すと「別」マークが付き、スタッフ画面にも反映されます）。<br>
         ※「詳細 →」で案件詳細（アサイン画面）に飛びます。時間・場所など細かい変更はそちらでもできます。<br>
         ※ 公開状態はDB（projects の staff_published）に保存され、案件詳細（アサイン画面）とも同じ列で連動します。<br>
@@ -894,7 +894,7 @@
     tr.innerHTML = `
       <td class="chk"><input type="checkbox" ${checkedIds.has(c.id) ? 'checked' : ''} onchange="onCheck('${c.id}', this.checked)"></td>
       <td class="date-cell">${dateCell(c)}</td>
-      <td class="proj-cell"><a class="proj-link" href="/projects?focus=${c.gkey}" title="案件一覧のこの月へ移動します"><strong>${c.name}</strong></a>${yomiHtmlP(c)}${sizeHtmlP(c)} ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
+      <td class="proj-cell"><a class="proj-link" href="/project-form?project=${encodeURIComponent(c.id)}" title="この案件の編集画面を開きます"><strong>${c.name}</strong></a>${yomiHtmlP(c)}${sizeHtmlP(c)} ${extra ? '<span class="badge extra">追加</span> ' : ''}${c.recruit === false ? '<span class="badge norec" title="案件登録で「募集しない」にしています。スタッフの募集一覧には出ません">募集なし</span> ' : ''}${otherOfficeHtml(c)}${seriesHtml(c)}<div class="client">${c.client}</div><div class="added">登録 <b>${fmtAdded(c.addedDate)}</b></div></td>
       <td class="place-cell">${c.place}<div class="mp">集合場所：${c.meetPlace}</div></td>
       <td class="meet-cell">
         <div class="staff-row" style="flex-wrap:wrap;"><span class="lab">スタッフ</span>
