@@ -33,7 +33,6 @@ class StaffDayEventCountTest extends TestCase
         ProjectFactory::new()->create(['is_cancelled' => true] + $base);        // キャンセル＝数えない
         ProjectFactory::new()->draft()->create($base);                          // 下書き＝数えない
         ProjectFactory::new()->create(['office' => '大阪'] + $base);            // 他拠点＝数えない
-        ProjectFactory::new()->create(['date_type' => '前日設営'] + $base);      // 前日設営＝数えない（2026-10-28）
         ProjectFactory::new()->create(['start_date' => $d20] + $base);
         ProjectFactory::new()->create(['start_date' => $month->copy()->addMonth()->toDateString()] + $base); // 別の月
 

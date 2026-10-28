@@ -17,8 +17,7 @@ use Illuminate\Support\Carbon;
  *  ・出すのは**件数だけ**。案件名・会社名・運営人数は出さない（未公開の中身・社内の数字だから）。
  *  ・自分の拠点の分だけ（ヘルプで来ている案件も含む＝募集タブと同じ OfficeScope::applyToProjects）。
  *
- * ⚠ リハ日は1件と数える（その日に人が要るのは同じため）。
- * ⚠ 前日設営は数えない（2026-10-28 小沼さん指示）。
+ * ⚠ 前日設営・リハ日も1件と数える（その日に人が要るのは同じため）。
  */
 class StaffDayEventCount
 {
@@ -38,9 +37,7 @@ class StaffDayEventCount
             // ⚠ status が空の案件も残す（「!= 下書き」だけだと SQL では空が落ちる）。
             ->where(fn ($w) => $w->whereNull('status')->orWhere('status', '!=', '下書き'))
             ->whereBetween('start_date', [$first->toDateString(), $last->toDateString()])
-            ->where(fn ($w) => $w->whereNull('yomi')->orWhere('yomi', '')->orWhere('yomi', '確定'))
-            // 前日設営は数えない（2026-10-28 小沼さん指示＝前日設営に入る人を1件と数えない）。
-            ->where(fn ($w) => $w->whereNull('date_type')->orWhere('date_type', '!=', '前日設営'));
+            ->where(fn ($w) => $w->whereNull('yomi')->orWhere('yomi', '')->orWhere('yomi', '確定'));
         OfficeScope::applyToProjects($q, $office);
         // 他の拠点に巻き取られた案件は、その拠点のスタッフが入る＝こちらでは数えない。
         OfficeScope::hideTakenOver($q, $office);
