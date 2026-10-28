@@ -113,6 +113,11 @@
         スプレッドシートを「カンマ区切り形式」で落としたCSVを読み込んでください（差分の出方は同じです）。
       </p>
     @else
+      {{-- 取り込み済みの月は既定で隠す（2026-10-28 baba）。記録は消さない＝チェックを外せば出る。 --}}
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0 0 8px;">
+        <input type="checkbox" id="sxHideDone" checked> 取り込み済みの月を隠す
+        <span class="sx-when" id="sxHideCount"></span>
+      </label>
       <table class="sx-table">
         <thead>
           <tr>
@@ -126,7 +131,8 @@
         </thead>
         <tbody>
           @foreach ($rows as $row)
-            <tr>
+            {{-- 取り込み済み＝一度反映して、そのあとシートが変わっていないもの（data-done="1" は隠す対象）。 --}}
+            <tr data-done="{{ $row->applied_at !== null && ! $row->needsAttention() ? '1' : '0' }}">
               <td><b>{{ $row->period }}</b>
                 @if ($row->tab)<br><span class="sx-when">タブ {{ $row->tab }}</span>@endif
               </td>
@@ -170,6 +176,24 @@
         ⚠ 「✅ 反映済み」でも、<b>ECS側で誰かが直していれば差分は出ます</b>。
         この印は「<b>届いた中身を反映したあと、シートが変わっていない</b>」という意味です。
       </p>
+      <script>
+        // 取り込み済みの月を隠す／出す（2026-10-28）。記録は消していないので、チェックを外せば出ます。
+        (function () {
+          var box = document.getElementById('sxHideDone');
+          var count = document.getElementById('sxHideCount');
+          function apply() {
+            var on = box.checked, hidden = 0;
+            document.querySelectorAll('tr[data-done]').forEach(function (tr) {
+              var h = on && tr.getAttribute('data-done') === '1';
+              tr.style.display = h ? 'none' : '';
+              if (h) hidden++;
+            });
+            count.textContent = on && hidden ? '（' + hidden + ' 月を隠しています）' : '';
+          }
+          box.addEventListener('change', apply);
+          apply();
+        })();
+      </script>
     @endif
   </div>
 
