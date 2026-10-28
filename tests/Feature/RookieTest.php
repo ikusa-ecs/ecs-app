@@ -329,6 +329,26 @@ class RookieTest extends TestCase
     }
 
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
+    /** 新人ページから、新人のチャットワークIDを入れられる（2026-10-28 baba）。数字だけ・空なら消す。 */
+    public function test_新人ページからチャットワークIDを入れる(): void
+    {
+        $me = PersonFactory::new()->create(['name' => '社員M', 'role' => 'employee', 'office' => '東京']);
+        $rookie = PersonFactory::new()->create(['name' => '新人C', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+
+        $this->actingAsPerson($me)->post('/rookies/chatwork', ['id' => $rookie->id, 'chatwork_id' => 'abc'])->assertSessionHasErrors('chatwork_id');
+        $this->assertNull($rookie->fresh()->chatwork_id);
+
+        $this->actingAsPerson($me)->post('/rookies/chatwork', ['id' => $rookie->id, 'chatwork_id' => ' 4455 '])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('4455', $rookie->fresh()->chatwork_id);
+
+        $html = $this->actingAsPerson($me)->get('/rookies')->assertOk()->getContent();
+        $this->assertStringContainsString('name="chatwork_id"', $html);
+
+        $this->actingAsPerson($me)->post('/rookies/chatwork', ['id' => $rookie->id, 'chatwork_id' => ''])->assertRedirect();
+        $this->assertNull($rookie->fresh()->chatwork_id);
+    }
+
     /** 文に集合・解散・本番終了・会場・前泊を出す。関東の会場に関東の外から来る人は⚠【遠方】（2026-10-28 baba）。 */
     public function test_コピー文に時間と会場と遠方の印(): void
     {

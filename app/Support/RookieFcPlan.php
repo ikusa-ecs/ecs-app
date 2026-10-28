@@ -135,6 +135,8 @@ final class RookieFcPlan
                 'note' => (string) ($p->rookie_note ?? ''),
                 // 住まいの都道府県（遠方の印に使う・2026-10-28）。
                 'pref' => (string) ($p->prefecture ?? ''),
+                // チャットワークID（新人ページから入れる欄に出す・2026-10-28）。
+                'cw' => (string) ($p->chatwork_id ?? ''),
                 // 参加したいイベント（2026-10-17 baba）＝コンテンツIDの並び。
                 'wishes' => array_values(array_map('strval', (array) ($p->rookie_wishes ?? []))),
                 'monthNo' => $no,

@@ -114,6 +114,26 @@ class RookieController extends Controller
     }
 
     /**
+     * 新人のチャットワークID（2026-10-28 baba「入れられるようにしてほしい」）。
+     * ⚠ 名簿の登録と同じ決まり（数字だけ・32文字まで）。空にすると消す。
+     * ⚠ 社員名簿・スタッフ名簿の画面にはこの欄が無いので、新人ページから入れられるようにしている。
+     */
+    public function setChatwork(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'exists:people,id'],
+            'chatwork_id' => ['nullable', 'string', 'max:32', 'regex:/^[0-9]+$/'],
+        ], [
+            'chatwork_id.regex' => 'チャットワークIDは数字だけで入れてください。',
+        ]);
+        $p = Person::findOrFail($data['id']);
+        $p->chatwork_id = trim((string) ($data['chatwork_id'] ?? '')) ?: null;
+        $p->save();
+
+        return back()->with('ok', $p->name.'さんのチャットワークIDを保存しました。');
+    }
+
+    /**
      * 参加したいイベント（2026-10-17 baba「希望を優先にアサインできるか候補を」）。
      * 受け取り：id＋wishes[]＝コンテンツ台帳のID（空＝希望なし）。台帳に無いIDは捨てる。
      */

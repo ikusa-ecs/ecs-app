@@ -141,7 +141,16 @@
     <tr><th>名前</th><th>OJT担当・チームリーダー・メモ</th><th>何ヶ月目</th><th>この月（目標）</th><th>必修</th><th>推奨</th><th>入社日</th><th></th></tr>
     @forelse ($rookies as $r)
       <tr data-rookie="{{ $r['id'] }}">
-        <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div></td>
+        <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div>
+          {{-- チャットワークIDはここで入れる（2026-10-28 baba）。空だとメンションが付かないので「未登録」を赤で出す。 --}}
+          @if ($canEdit)
+            <form method="POST" action="/rookies/chatwork" class="rk-small" style="margin-top:4px;">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
+              チャットワークID <input class="rk-in" type="text" name="chatwork_id" value="{{ $r['cw'] }}" inputmode="numeric" maxlength="32" placeholder="数字のみ" style="width:110px;">
+              <button class="rk-btn" type="submit">保存</button>
+              @if ($r['cw'] === '')<span style="color:var(--danger);">未登録</span>@endif
+            </form>
+          @endif
+        </td>
         <td>
           @if ($canEdit)
             <form method="POST" action="/rookies/ojt">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
