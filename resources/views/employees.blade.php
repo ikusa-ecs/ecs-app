@@ -130,6 +130,8 @@
             <option value="">新人：すべて</option>
             <option value="fresh">新人（入社半年以内）のみ</option>
           </select>
+          <!-- 退職した人は既定で隠す（2026-10-28 baba）。チェックすると、退職者も「退職」の印つきで出す。 -->
+          <label style="display:flex; align-items:center; gap:4px; font-size:13px;"><input type="checkbox" id="fRetired" onchange="applyFilter()"> 退職者も表示</label>
           <!-- スキルで絞る（例＝英語ができる人を見たい）。2026-09-08 baba要望。 -->
           <!-- 選択肢はサーバーから受け取る（ここに項目名を書かない。正本＝App\Support\SkillFilter）。 -->
           <select id="fSkill" onchange="applyFilter()"></select>
@@ -906,6 +908,7 @@
     const kw     = document.getElementById('kw').value.trim();
     const fDept  = document.getElementById('fDept').value;
     const fFresh = document.getElementById('fFresh').value;
+    const fRetired = document.getElementById('fRetired') ? document.getElementById('fRetired').checked : false;
     const fSkillEl = document.getElementById('fSkill');
     const fSkill = fSkillEl ? fSkillEl.value : '';
     const fOfficeEl = document.getElementById('fOffice');
@@ -924,7 +927,9 @@
       const okOffice = !fOffice || officeOf(p) === fOffice;
       // スキル＝サーバーが付けた印（p.skills）に、選んだ印が入っているか。判定はここでしない。
       const okSkill = !fSkill || (p.skills || []).indexOf(fSkill) >= 0;
-      const visible = okKw && okDept && okFresh && okSkill && okOffice;
+      // 退職者は「退職者も表示」にチェックしたときだけ出す（active が false＝退職）。
+      const okRetired = fRetired || p.active !== false;
+      const visible = okKw && okDept && okFresh && okSkill && okOffice && okRetired;
       mr.style.display = visible ? '' : 'none';
       if (!visible && dr) { dr.style.display = 'none';
         const t = mr.querySelector('.row-toggle'); if (t) t.innerHTML = '詳細 ▾'; }
