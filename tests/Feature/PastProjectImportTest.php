@@ -953,6 +953,23 @@ class PastProjectImportTest extends TestCase
         $this->assertSame(1, Assignment::count(), 'staff を選んでいないのでアサインは消えないこと');
     }
 
+    /** 「項目だけ入れる」は差分の表の日本語名（「お客様人数」）でも指定できる。 */
+    public function test_only_accepts_japanese_labels(): void
+    {
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '20'])]),
+        ])->assertRedirect('/past-import');
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '30', 22 => '8'])]),
+            'edits' => json_encode([0 => ['only' => ['お客様人数']]]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::firstOrFail();
+        $this->assertSame(30, $p->guest_count, '日本語名で選んだ項目が入ること');
+        $this->assertSame(5, $p->required_count, '選んでいない運営人数は変わらないこと');
+    }
+
     /** 「項目だけ入れる」でスタッフを選んだときだけ、アサインを入れ替える。 */
     public function test_only_staff_updates_assignments_and_keeps_fields(): void
     {

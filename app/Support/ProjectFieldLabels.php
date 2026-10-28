@@ -194,6 +194,14 @@ class ProjectFieldLabels
         return isset(self::LABELS[$field]);
     }
 
+    /** 日本語名から列名を引く（差分の表の「お客様人数」→ guest_count）。無ければ null。 */
+    public static function keyForLabel(string $label): ?string
+    {
+        $key = array_search($label, self::LABELS, true);
+
+        return $key === false ? null : (string) $key;
+    }
+
     /** 列の日本語名。決めていない列はそのまま列名を返す。 */
     public static function label(string $field): string
     {

@@ -16,6 +16,7 @@ use App\Support\Headcount;
 use App\Support\MonthlySheetReader;
 use App\Support\OfficeScope;
 use App\Support\PersonLookup;
+use App\Support\ProjectFieldLabels;
 use App\Support\ProjectImportColumns;
 use App\Support\RequiredCountEstimate;
 use App\Support\ScheduleMark;
@@ -1397,7 +1398,16 @@ class PastProjectImportController extends Controller
             if (isset($edit['only']) && is_array($edit['only'])) {
                 $only = [];
                 foreach (array_slice($edit['only'], 0, 60) as $field) {
-                    if (is_string($field) && preg_match('/^[a-z_]{1,40}$/', $field)) {
+                    if (! is_string($field)) {
+                        continue;
+                    }
+                    // 差分の表の日本語名（「お客様人数」「スタッフ」）も受け付ける。列名に直して使う。
+                    if ($field === 'スタッフ') {
+                        $field = 'staff';
+                    } elseif (! preg_match('/^[a-z_]{1,40}$/', $field)) {
+                        $field = (string) ProjectFieldLabels::keyForLabel($field);
+                    }
+                    if (preg_match('/^[a-z_]{1,40}$/', $field)) {
                         $only[] = $field;
                     }
                 }
