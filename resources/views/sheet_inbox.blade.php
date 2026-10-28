@@ -77,6 +77,15 @@
           if (ng) parts.push('<span class="sx-need">⚠ エラー ' + ng + '</span>');
           td.innerHTML = (parts.length ? parts.join('<br>') : '<span class="sx-done">差分なし</span>')
             + '<br><span class="sx-when">✅ 変化なし ' + same + '</span>';
+          // 差分が1つも無い月は、取り込むものが無い＝「差分を見て取り込む」を「差分なし」に変えて、取り込み済みと同じく隠す（2026-10-28 baba）。
+          var row = td.closest('tr');
+          if (row && !chg && !nw && !ng) {
+            row.setAttribute('data-done', '1');
+            var btn = row.querySelector('a.btn');
+            if (btn) { btn.textContent = '差分なし'; btn.removeAttribute('href'); btn.className = 'btn'; btn.style.opacity = '0.5'; }
+            var box = document.getElementById('sxHideDone');
+            if (box) box.dispatchEvent(new Event('change'));
+          }
         })
         .catch(function () { td.innerHTML = '<span class="sx-when">数えられませんでした</span>'; })
         .then(next);
