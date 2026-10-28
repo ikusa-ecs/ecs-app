@@ -730,6 +730,8 @@
 
       <!-- 表示の切替（表で見るか、カレンダーで見るか）。絞り込みはどちらにも効きます。 -->
 @endverbatim
+      <!-- サイドバーの年月フォルダに渡す月の一覧（押すと、その月の一覧を開く）。画面には出さない -->
+      <div id="ymSource" hidden data-tree="{{ json_encode($ymTree, JSON_UNESCAPED_UNICODE) }}" data-current="{{ $monthNav['ym'] }}"></div>
       <!-- 月の切替（1か月ずつ見る・2026-10-28）。重いので、開くのは1か月ぶんだけ -->
       <div class="month-nav" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap;">
         <a class="view-tab" href="{{ url('/projects?ym='.$monthNav['prev']) }}">‹ 前月</a>
@@ -1895,6 +1897,36 @@
   function buildYmTree() {
     const tree = document.getElementById('ymTree');
     if (!tree) return;
+
+    // 2026-10-28：一覧は1か月ずつなので、月を押したら「その月の一覧」を開く（サーバーが渡した月の一覧を使う）。
+    const src = document.getElementById('ymSource');
+    if (src) {
+      let months = [];
+      try { months = JSON.parse(src.dataset.tree || '[]'); } catch (e) { months = []; }
+      const current = src.dataset.current || '';
+      const todayYear = new Date().getFullYear();
+      const yearsSeen = {};
+      const yearList = [];
+      months.forEach(m => { if (!yearsSeen[m.year]) { yearsSeen[m.year] = []; yearList.push(m.year); } yearsSeen[m.year].push(m); });
+      let treeHtml = '';
+      yearList.forEach(y => {
+        const open = (y === todayYear);
+        const total = yearsSeen[y].reduce((s, m) => s + m.count, 0);
+        treeHtml += '<div class="ym-year">'
+          + '<button class="ym-year-btn" onclick="toggleYear(' + y + ')">'
+          +   '<span class="ym-caret" id="ymcaret-' + y + '">' + (open ? '▾' : '▸') + '</span>'
+          +   y + '年<span class="ym-ycount">' + total + '</span></button>'
+          + '<div class="ym-months' + (open ? '' : ' collapsed') + '" id="ymmonths-' + y + '">';
+        yearsSeen[y].forEach(m => {
+          const on = m.key === current ? ' style="font-weight:700;"' : '';
+          treeHtml += '<button class="ym-month-btn"' + on + ' onclick="location.href=\'/projects?ym=' + m.key + '\'">'
+            + m.month + '月<span class="ym-mcount">' + m.count + '</span></button>';
+        });
+        treeHtml += '</div></div>';
+      });
+      tree.innerHTML = treeHtml;
+      return;
+    }
 
     const byYear = {};
     const yearOrder = [];

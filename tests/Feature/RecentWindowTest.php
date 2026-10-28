@@ -46,7 +46,7 @@ class RecentWindowTest extends TestCase
         $tbd = $this->project(null, ['client' => 'ミテイ社']);
         $me = $this->admin();
 
-        $page = $this->actingAsPerson($me)->get('/projects')->assertOk()->assertSee(Carbon::today()->format('Y年n月'))->assertDontSee("monthNav");
+        $page = $this->actingAsPerson($me)->get('/projects')->assertOk()->assertSee(Carbon::today()->format('Y年n月'))->assertSee('id="ymSource"', false)->assertDontSee("monthNav");
         $ids = collect($page->viewData('cases'))->pluck('id');
         $this->assertFalse($ids->contains($old->id), '案件一覧に先月の案件が出ています（今月だけのはず）');
         $this->assertTrue($ids->contains($now->id), '今月の案件は出す');

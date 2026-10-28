@@ -267,6 +267,25 @@ class ProjectController extends Controller
             ->values();
 
         // 月の切替（前月・翌月・表示中の月）。画面の上の「‹ 前月 ／ 年月 ／ 翌月 ›」に使う。
+        // サイドバーの年月フォルダ用（2026-10-28）。案件のある月を、3か月前から先まで出す（それより前は「過去案件」）。
+        // 押すとその月の一覧を開く。件数はこの画面と同じ拠点の絞り込みで数える。
+        $ymTree = OfficeScope::applyToProjects(
+            Project::query()->whereNotNull('start_date')
+                ->whereDate('start_date', '>=', RecentWindow::from()->format('Y-m-d')),
+            $officeScope
+        )
+            ->get(['start_date'])
+            ->groupBy(fn (Project $p) => $p->start_date->format('Y-m'))
+            ->map(fn ($group, string $ym) => [
+                'key' => $ym,
+                'year' => (int) substr($ym, 0, 4),
+                'month' => (int) substr($ym, 5, 2),
+                'count' => $group->count(),
+            ])
+            ->sortKeys()
+            ->values()
+            ->all();
+
         $monthNav = [
             'ym' => $month->format('Y-m'),
             'label' => $month->format('Y年n月'),
@@ -277,6 +296,7 @@ class ProjectController extends Controller
 
         return view('projects', [
             'monthNav' => $monthNav,
+            'ymTree' => $ymTree,
             'cases' => $cases,
             'repeatClients' => $repeatClients,
             'employees' => $employees,
