@@ -172,11 +172,11 @@ class HeadcountRangeTest extends TestCase
     public function test_edit_form_shows_the_range_again(): void
     {
         ProjectFactory::new()->create([
-            'office' => '東京', 'project_name' => '謎解き',
+            'office' => '東京', 'project_name' => '謎解き', 'start_date' => '2026-09-01',
             'required_count' => 8, 'required_count_min' => 6,
         ]);
 
-        $html = $this->actingAsPerson($this->manager())->get('/projects')->assertOk()->getContent();
+        $html = $this->actingAsPerson($this->manager())->get('/projects?ym=2026-09')->assertOk()->getContent();
 
         // 画面へは @json で渡るので、日本語（〜）はエスケープされた形で入る。
         $this->assertStringContainsString(

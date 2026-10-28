@@ -66,7 +66,7 @@ class EventTimeTbdTest extends TestCase
             'event_time_tbd' => true,
         ]);
 
-        $this->actingAsPerson($employee)->get('/projects')
+        $this->actingAsPerson($employee)->get('/projects?ym=2026-09')
             ->assertOk()
             ->assertSee('"evTbd":true', false);
     }

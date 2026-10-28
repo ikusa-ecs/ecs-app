@@ -55,6 +55,6 @@ class NoAssignTest extends TestCase
         $this->assertNotContains($bbq->id, $ids);
 
         $this->assertSame([$normal->id], Project::query()->needsAssign()->pluck('id')->all());
-        $this->assertStringContainsString($bbq->id, $this->actingAsPerson($me)->get('/projects')->assertOk()->getContent());
+        $this->assertStringContainsString($bbq->id, $this->actingAsPerson($me)->get('/projects?ym='.Carbon::parse($date)->format('Y-m'))->assertOk()->getContent());
     }
 }

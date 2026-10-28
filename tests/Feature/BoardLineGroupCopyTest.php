@@ -114,7 +114,7 @@ class BoardLineGroupCopyTest extends TestCase
 
         // 案件一覧にも出る（同じ列を読んでいる）。
         $row = collect(
-            $this->actingAsPerson($me)->get('/projects')->assertOk()->original->getData()['cases']
+            $this->actingAsPerson($me)->get('/projects?ym='.Carbon::today()->addDays(5)->format('Y-m'))->assertOk()->original->getData()['cases']
         )->firstWhere('id', $p->id);
         $this->assertNotNull($row, '案件一覧にこの案件が出ていません');
         $this->assertTrue($row['lineMade'], '案件一覧に反映されていません＝保存先が分かれています');

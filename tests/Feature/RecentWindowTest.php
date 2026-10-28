@@ -40,18 +40,28 @@ class RecentWindowTest extends TestCase
 
     public function test_古い案件はふだんの画面で読まない(): void
     {
-        $old = $this->project(RecentWindow::from()->subDay()->format('Y-m-d'), ['client' => 'フルイ社']);
-        $edge = $this->project(RecentWindow::from()->format('Y-m-d'), ['client' => 'ギリギリ社']);
+        // 案件一覧は1か月ずつ（2026-10-28）。今月を開くと、先月の案件は出ない。
+        $old = $this->project(Carbon::today()->subMonthNoOverflow()->startOfMonth()->addDays(14)->format('Y-m-d'), ['client' => 'フルイ社']);
+        $now = $this->project(Carbon::today()->format('Y-m-d'), ['client' => 'イマ社']);
         $tbd = $this->project(null, ['client' => 'ミテイ社']);
         $me = $this->admin();
 
         $ids = collect($this->actingAsPerson($me)->get('/projects')->assertOk()->viewData('cases'))->pluck('id');
-        $this->assertFalse($ids->contains($old->id), '案件一覧に3か月より前の案件が出ています');
-        $this->assertTrue($ids->contains($edge->id), 'ちょうど3か月前の案件は出す');
-        $this->assertTrue($ids->contains($tbd->id), '日付未定の案件は出す');
+        $this->assertFalse($ids->contains($old->id), '案件一覧に先月の案件が出ています（今月だけのはず）');
+        $this->assertTrue($ids->contains($now->id), '今月の案件は出す');
+        $this->assertTrue($ids->contains($tbd->id), '日付未定の案件は今月を開いたときに出す');
 
+        // 先月を開くと、先月の案件が出て、今月の案件は出ない。
+        $ym = $old->start_date->format('Y-m');
+        $prev = collect($this->actingAsPerson($me)->get('/projects?ym='.$ym)->assertOk()->viewData('cases'))->pluck('id');
+        $this->assertTrue($prev->contains($old->id), '選んだ月（先月）の案件が出ること');
+        $this->assertFalse($prev->contains($now->id), '選んでいない月の案件は出ないこと');
+        $this->assertFalse($prev->contains($tbd->id), '日付未定は今月だけ出ること（どの月にも並ばない）');
+
+        // ダッシュボードは従来どおり3か月の範囲（一覧の変更の対象外）。
+        $ancient = $this->project(RecentWindow::from()->subDay()->format('Y-m-d'), ['client' => 'ムカシ社']);
         $ids = collect($this->actingAsPerson($me)->get('/dashboard')->assertOk()->viewData('cases'))->pluck('id');
-        $this->assertFalse($ids->contains($old->id), 'ダッシュボードに3か月より前の案件が出ています');
+        $this->assertFalse($ids->contains($ancient->id), 'ダッシュボードに3か月より前の案件が出ています');
 
         // ④ 過去案件の画面には出る。
         $ym = Carbon::parse($old->start_date)->format('Y-m');

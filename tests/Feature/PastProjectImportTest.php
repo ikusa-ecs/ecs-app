@@ -27,7 +27,8 @@ class PastProjectImportTest extends TestCase
 
     private function manager(): Person
     {
-        return PersonFactory::new()->create([
+        // 同じテストで2回呼んでも作り直さない（E-001 の重複を防ぐ）。
+        return Person::find('E-001') ?? PersonFactory::new()->create([
             'id' => 'E-001', 'name' => '取込担当', 'permission' => 'manager',
             'office' => '東京', 'must_onboard' => false,
         ]);
@@ -930,6 +931,58 @@ class PastProjectImportTest extends TestCase
 
         $this->assertSame(0, Project::count());
         $this->assertSame(0, Assignment::count());
+    }
+
+    /** 「項目だけ入れる」で選んだ項目（お客様人数）だけが変わり、運営人数とアサインは触らない。 */
+    public function test_only_selected_field_is_updated_and_others_are_kept(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '20', 50 => '鈴木 彩'])]),
+        ])->assertRedirect('/past-import');
+        $this->assertSame(1, Assignment::count());
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '30', 22 => '8', 50 => ''])]),
+            'edits' => json_encode([0 => ['only' => ['guest_count']]]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::firstOrFail();
+        $this->assertSame(30, $p->guest_count, '選んだお客様人数は入ること');
+        $this->assertSame(5, $p->required_count, '選んでいない運営人数は変わらないこと');
+        $this->assertSame(1, Assignment::count(), 'staff を選んでいないのでアサインは消えないこと');
+    }
+
+    /** 「項目だけ入れる」でスタッフを選んだときだけ、アサインを入れ替える。 */
+    public function test_only_staff_updates_assignments_and_keeps_fields(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '20'])]),
+        ])->assertRedirect('/past-import');
+        $this->assertSame(0, Assignment::count());
+
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '30', 22 => '8', 50 => '鈴木 彩'])]),
+            'edits' => json_encode([0 => ['only' => ['staff']]]),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::firstOrFail();
+        $this->assertSame(1, Assignment::count(), 'スタッフを選んだので入ること');
+        $this->assertSame(20, $p->guest_count, '選んでいない項目（前回の取込の値）は変わらないこと');
+        $this->assertSame(5, $p->required_count);
+    }
+
+    /** 「項目だけ入れる」は新しい案件を作らない（上書きする案件が無ければ止める）。 */
+    public function test_only_never_creates_a_new_project(): void
+    {
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'csv' => $this->csv([$this->row([20 => '30'])]),
+            'edits' => json_encode([0 => ['only' => ['guest_count']]]),
+        ])->assertRedirect('/past-import');
+
+        $this->assertSame(0, Project::count());
+        $this->assertStringContainsString('新しくは作りません', (string) session('status'));
     }
 
     /** 下見も直した内容で判定し直す（エラーが消えたことを画面で確かめられる）。 */

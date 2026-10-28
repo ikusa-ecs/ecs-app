@@ -729,6 +729,19 @@
       </div>
 
       <!-- 表示の切替（表で見るか、カレンダーで見るか）。絞り込みはどちらにも効きます。 -->
+      <!-- 月の切替（1か月ずつ見る・2026-10-28）。重いので、開くのは1か月ぶんだけ -->
+      <div class="month-nav" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap;">
+        <a class="view-tab" href="{{ url('/projects?ym='.$monthNav['prev']) }}">‹ 前月</a>
+        <strong style="font-size:16px;min-width:110px;text-align:center;">{{ $monthNav['label'] }}</strong>
+        <a class="view-tab" href="{{ url('/projects?ym='.$monthNav['next']) }}">翌月 ›</a>
+        @unless($monthNav['isThisMonth'])
+          <a class="view-tab" href="{{ url('/projects') }}">今月へ</a>
+        @endunless
+        <form method="GET" action="{{ url('/projects') }}" style="margin:0;">
+          <input type="month" name="ym" value="{{ $monthNav['ym'] }}" onchange="this.form.submit()" style="padding:5px 8px;border:1px solid var(--line, #ccc);border-radius:6px;">
+        </form>
+      </div>
+
       <div class="view-tabs">
         <button type="button" class="view-tab active" id="vtab-list" onclick="switchView('list')">📋 一覧</button>
         <button type="button" class="view-tab" id="vtab-cal" onclick="switchView('cal')">📅 カレンダー</button>

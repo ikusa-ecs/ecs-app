@@ -46,6 +46,17 @@ class ProjectController extends Controller
     /** 案件編集画面の下に出す編集履歴の件数（続きは /project-history で見る）。 */
     private const FORM_HISTORY_LIMIT = 20;
 
+    /** 一覧で開く月（?ym=2026-10）。空・おかしい値なら今月。 */
+    private function monthOf(Request $request): Carbon
+    {
+        $ym = (string) $request->query('ym', '');
+        if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $ym)) {
+            return Carbon::createFromFormat('Y-m-d', $ym.'-01')->startOfDay();
+        }
+
+        return Carbon::today()->startOfMonth();
+    }
+
     public function index(Request $request)
     {
         $today = Carbon::today();
@@ -65,10 +76,20 @@ class ProjectController extends Controller
         // 拠点で絞るときは「登録拠点がその拠点」＋「その拠点に共有された案件」も含める（アサイン表と同じ）。
         // ⚠ 2026-10-09：**3か月より前の案件は読まない**（過去のアサイン表の取込で何千件にもなるため）。
         //   それより前は「🗂 過去案件」（/past-projects）で月ごとに見る。範囲の正本＝RecentWindow。
-        $projects = RecentWindow::apply(OfficeScope::applyToProjects(
+        // 2026-10-28：一覧は「1か月ずつ」見る（重いため）。?ym=2026-10 で月を選ぶ。無ければ今月。
+        // 日付が空の案件は、今月を開いたときだけ出す（どの月にも出すと同じ案件が何度も並ぶため）。
+        $month = $this->monthOf($request);
+        $isThisMonth = $month->isSameMonth($today);
+        $projects = OfficeScope::applyToProjects(
             Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name']),
             $officeScope
-        ))
+        )
+            ->where(function ($q) use ($month, $isThisMonth) {
+                $q->whereBetween('start_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()->endOfDay()]);
+                if ($isThisMonth) {
+                    $q->orWhereNull('start_date');
+                }
+            })
             ->orderBy('start_date')
             ->get();
 
@@ -245,7 +266,17 @@ class ProjectController extends Controller
             ->map(fn (Person $e) => ['id' => $e->id, 'name' => $e->name])
             ->values();
 
+        // 月の切替（前月・翌月・表示中の月）。画面の上の「‹ 前月 ／ 年月 ／ 翌月 ›」に使う。
+        $monthNav = [
+            'ym' => $month->format('Y-m'),
+            'label' => $month->format('Y年n月'),
+            'prev' => $month->copy()->subMonth()->format('Y-m'),
+            'next' => $month->copy()->addMonth()->format('Y-m'),
+            'isThisMonth' => $isThisMonth,
+        ];
+
         return view('projects', [
+            'monthNav' => $monthNav,
             'cases' => $cases,
             'repeatClients' => $repeatClients,
             'employees' => $employees,

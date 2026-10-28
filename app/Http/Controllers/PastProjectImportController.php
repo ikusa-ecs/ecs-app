@@ -75,6 +75,13 @@ class PastProjectImportController extends Controller
 
     public const MODE_FUTURE = 'これから';
 
+    /** 「項目だけ入れる」で、一緒に入れないと中身がずれる項目（2026-10-28）。 */
+    private const ONLY_ALSO = [
+        'required_count' => ['required_count_min', 'count_tentative'],
+        'ikusa_count' => ['ikusa_count_min'],
+        'team_count' => ['team_tentative'],
+    ];
+
     /** 取込画面。?sync=番号 が付いていれば、受信箱に届いた中身を読んで開く。 */
     public function show(Request $request)
     {
@@ -807,6 +814,29 @@ class PastProjectImportController extends Controller
             $existing = SheetDiff::target($found, $edit);
             // 上書きのときに書き換えないもの（顧客名の書き方・台帳に無い名前のコンテンツ）を外す。
             $attrs = $this->keepOnUpdate($existing, $attrs, $name, $get);
+            // 項目だけ入れる（2026-10-28）。チェックを付けた項目だけを、上書きする案件に入れる。
+            // ⚠ 新しく作らない（一部の項目だけで案件を新規にすると、中身が欠けたまま残る）。
+            // ⚠ 'staff' に印が無ければ、アサインには触らない（人はそのまま）。
+            if (isset($edit['only'])) {
+                $keep = $this->onlyFields($edit['only']);
+                if ($existing === null) {
+                    $errors[] = $entry['label']."（{$name}）：項目だけ入れるには、上書きする案件が必要です（新しくは作りません）";
+
+                    continue;
+                }
+                if ($keep === []) {
+                    $errors[] = $entry['label']."（{$name}）：入れる項目が1つも選ばれていません";
+
+                    continue;
+                }
+                $attrs = array_intersect_key($attrs, array_flip($keep));
+                if (! in_array('start_date', $keep, true)) {
+                    $date = optional($existing->start_date)->format('Y-m-d') ?? $date;
+                }
+                if (! in_array('staff', $keep, true)) {
+                    $assignments = [];
+                }
+            }
             // 取り込んだ＝もう「外している」案件ではない（2026-10-21・正本＝SheetSkipMemory）。
             if ($existing !== null) {
                 SheetSkipMemory::forget((string) $existing->id);
@@ -1362,6 +1392,17 @@ class PastProjectImportController extends Controller
             if (! empty($edit['forceNew'])) {
                 $clean['forceNew'] = true;
             }
+            // 項目だけ入れる（2026-10-28）。チェックを付けた変更の項目名（案件の項目名・'staff'＝スタッフの変更）。
+            // ⚠ 印が無い＝これまでどおり行まるごと。
+            if (isset($edit['only']) && is_array($edit['only'])) {
+                $only = [];
+                foreach (array_slice($edit['only'], 0, 60) as $field) {
+                    if (is_string($field) && preg_match('/^[a-z_]{1,40}$/', $field)) {
+                        $only[] = $field;
+                    }
+                }
+                $clean['only'] = array_values(array_unique($only));
+            }
             // 手でつなぐECSの案件ID（2026-09-29）。
             // ⚠ 形がおかしくても捨てない＝linkIdFor で「見つかりません」と止める（黙って新しい案件にしない）。
             if (isset($edit['linkId']) && is_scalar($edit['linkId'])) {
@@ -1445,6 +1486,22 @@ class PastProjectImportController extends Controller
         }
 
         return array_values($byId);
+    }
+
+    /**
+     * 「項目だけ入れる」で選ばれた項目名に、一緒に入れるべき項目を足す（2026-10-28）。
+     */
+    private function onlyFields(array $only): array
+    {
+        $fields = [];
+        foreach ($only as $field) {
+            $fields[] = $field;
+            foreach (self::ONLY_ALSO[$field] ?? [] as $more) {
+                $fields[] = $more;
+            }
+        }
+
+        return array_values(array_unique($fields));
     }
 
     /**
