@@ -729,6 +729,7 @@
       </div>
 
       <!-- 表示の切替（表で見るか、カレンダーで見るか）。絞り込みはどちらにも効きます。 -->
+@endverbatim
       <!-- 月の切替（1か月ずつ見る・2026-10-28）。重いので、開くのは1か月ぶんだけ -->
       <div class="month-nav" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap;">
         <a class="view-tab" href="{{ url('/projects?ym='.$monthNav['prev']) }}">‹ 前月</a>
@@ -741,6 +742,7 @@
           <input type="month" name="ym" value="{{ $monthNav['ym'] }}" onchange="this.form.submit()" style="padding:5px 8px;border:1px solid var(--line, #ccc);border-radius:6px;">
         </form>
       </div>
+@verbatim
 
       <div class="view-tabs">
         <button type="button" class="view-tab active" id="vtab-list" onclick="switchView('list')">📋 一覧</button>
