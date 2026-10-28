@@ -392,6 +392,7 @@
       ／ 取り込まない <b id="pjSkip">0</b> 件 ／ アサインに入る人：<b id="pjPeople">0</b> 名
       <br>ECSとの違い：🆕 新しい案件 <b id="pjDiffNew">0</b> 件 ／ ✏️ 変わる案件 <b id="pjDiffChanged">0</b> 件
       ／ ✅ 変化なし <b id="pjDiffSame">0</b> 件
+      ／ <label style="cursor:pointer;"><input type="checkbox" id="pjHideSame" checked onchange="pjApplyHideSame()"> 変化なしを隠す</label>
     </div>
     <div id="pjWarn"></div>
     <p class="pj-lead" style="margin:0 2px 8px;">
@@ -491,6 +492,15 @@
     document.getElementById('pjWarn').innerHTML = '<div class="pj-flash err">' + pjEsc(message) + '</div>';
     pjClear();
     document.getElementById('pjBtn').disabled = true;
+  }
+
+  // 変化なしの行を隠す（2026-10-28）。隠すだけで、取込のチェックや中身は変えない。
+  function pjApplyHideSame() {
+    var hide = document.getElementById('pjHideSame');
+    var on = !!(hide && hide.checked);
+    document.querySelectorAll('#pjBody tr[data-kind="same"]').forEach(function (tr) {
+      tr.style.display = on ? 'none' : '';
+    });
   }
 
   function pjRender(data) {
@@ -636,6 +646,7 @@
 
     pjMarkEdited();
     pjBulkSetup(rows);
+    pjApplyHideSame();
 
     var result = document.getElementById('pjResult');
     result.style.display = '';
