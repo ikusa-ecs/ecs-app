@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Support\ClockTime;
 use App\Support\Headcount;
 use App\Support\Lodging;
 use App\Support\ProjectScale;
@@ -225,10 +226,10 @@ class AssignPublishController extends Controller
             return $deny;
         }
         if ($request->has('staff_meet')) {
-            $project->staff_meet_time = trim((string) $request->input('staff_meet')) ?: null;
+            $project->staff_meet_time = ClockTime::normalize((string) $request->input('staff_meet'));
         }
         if ($request->has('staff_leave')) {
-            $project->staff_leave_time = trim((string) $request->input('staff_leave')) ?: null;
+            $project->staff_leave_time = ClockTime::normalize((string) $request->input('staff_leave'));
         }
         $project->save();
 

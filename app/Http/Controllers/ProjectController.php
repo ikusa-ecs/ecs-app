@@ -11,6 +11,7 @@ use App\Models\ProjectHistory;
 use App\Models\ProjectShare;
 use App\Support\AssignMtg;
 use App\Support\BoardBulkDelete;
+use App\Support\ClockTime;
 use App\Support\ClientName;
 use App\Support\CsvText;
 use App\Support\DirectorSync;
@@ -797,8 +798,8 @@ class ProjectController extends Controller
             'end_time' => $request->input('end_time'),
             // スタッフに見せる集合・解散。空＝社員と同じ（スタッフ画面が start_time / end_time に落ちる）。
             // 空文字ではなく null で持つ＝「未入力」と「たまたま同じ時刻を入れた」を混ぜない。
-            'staff_meet_time' => $request->input('staff_meet_time') ?: null,
-            'staff_leave_time' => $request->input('staff_leave_time') ?: null,
+            'staff_meet_time' => ClockTime::normalize((string) $request->input('staff_meet_time')),
+            'staff_leave_time' => ClockTime::normalize((string) $request->input('staff_leave_time')),
             'event_enter_time' => $request->input('event_enter_time'),
             'event_start_time' => $request->input('event_start_time'),
             'event_end_time' => $request->input('event_end_time'),

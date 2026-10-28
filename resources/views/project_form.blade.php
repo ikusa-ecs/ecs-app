@@ -1951,8 +1951,9 @@
     setVal('venue', E.location);
     setVal('startTime', E.start_time);
     setVal('endTime', E.end_time);
-    setVal('staffMeetTime', E.staff_meet_time);
-    setVal('staffLeaveTime', E.staff_leave_time);
+    // 0なしの「7:00」は時刻の欄に出せないので、「07:00」にそろえてから入れる（2026-10-28）。
+    setVal('staffMeetTime', (E.staff_meet_time || '').replace(/^(\d):/, '0$1:'));
+    setVal('staffLeaveTime', (E.staff_leave_time || '').replace(/^(\d):/, '0$1:'));
     setVal('requiredCount', E.required_count);
     setVal('ikusaCount', E.ikusa_count);   // 運営人数（IKUSA）。⚠ ここを忘れると編集で空に見える
     setVal('guestNum', E.guest_count);
