@@ -80,18 +80,32 @@ class ProjectController extends Controller
         // 日付が空の案件は、今月を開いたときだけ出す（どの月にも出すと同じ案件が何度も並ぶため）。
         $month = $this->monthOf($request);
         $isThisMonth = $month->isSameMonth($today);
-        $projects = OfficeScope::applyToProjects(
-            Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name']),
-            $officeScope
-        )
-            ->where(function ($q) use ($month, $isThisMonth) {
-                $q->whereBetween('start_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()->endOfDay()]);
-                if ($isThisMonth) {
-                    $q->orWhereNull('start_date');
-                }
-            })
-            ->orderBy('start_date')
-            ->get();
+        // キーワード検索（2026-10-28）：?q= があれば、月に関係なく全期間から探す（案件名・クライアント名）。
+        // 一致した案件だけを返す（新しい順に上限まで）。⚠ 検索語の % _ \ はそのまま探す。
+        $searchQ = trim((string) $request->query('q', ''));
+        $searchLimit = 200;
+        $searchTruncated = false;
+        $withRelations = Project::with(['director:id,name', 'subDirector:id,name', 'goodsOwner:id,name']);
+        if ($searchQ !== '') {
+            $like = '%'.addcslashes($searchQ, '%_\\').'%';
+            $found = OfficeScope::applyToProjects($withRelations, $officeScope)
+                ->where(fn ($w) => $w->where('project_name', 'like', $like)->orWhere('client', 'like', $like))
+                ->orderByDesc('start_date')
+                ->limit($searchLimit + 1)
+                ->get();
+            $searchTruncated = $found->count() > $searchLimit;
+            $projects = $found->take($searchLimit)->reverse()->values();
+        } else {
+            $projects = OfficeScope::applyToProjects($withRelations, $officeScope)
+                ->where(function ($q) use ($month, $isThisMonth) {
+                    $q->whereBetween('start_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()->endOfDay()]);
+                    if ($isThisMonth) {
+                        $q->orWhereNull('start_date');
+                    }
+                })
+                ->orderBy('start_date')
+                ->get();
+        }
 
         // この一覧に出る案件の「拠点間共有」（ヘルプ/巻き取り）をまとめて引く。
         $sharesByProject = $projects->isEmpty()
@@ -296,6 +310,9 @@ class ProjectController extends Controller
 
         return view('projects', [
             'monthNav' => $monthNav,
+            'searchQ' => $searchQ,
+            'searchTruncated' => $searchTruncated,
+            'searchLimit' => $searchLimit,
             'ymTree' => $ymTree,
             'cases' => $cases,
             'repeatClients' => $repeatClients,

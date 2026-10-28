@@ -743,7 +743,18 @@
         <form method="GET" action="{{ url('/projects') }}" style="margin:0;">
           <input type="month" name="ym" value="{{ $monthNav['ym'] }}" onchange="this.form.submit()" style="padding:5px 8px;border:1px solid var(--line, #ccc);border-radius:6px;">
         </form>
+        <form method="GET" action="{{ url('/projects') }}" style="margin:0;display:flex;gap:6px;align-items:center;">
+          <input type="search" name="q" value="{{ $searchQ }}" placeholder="全期間から探す（案件名・会社名）" style="padding:5px 8px;border:1px solid var(--line, #ccc);border-radius:6px;min-width:220px;">
+          <button type="submit" class="view-tab">🔍 探す</button>
+        </form>
       </div>
+      @if($searchQ !== '')
+        <div style="margin:0 0 10px;font-size:14px;">
+          「{{ $searchQ }}」の検索結果（全期間）：{{ $cases->count() }}件
+          @if($searchTruncated)<span style="color:#b45309;">（新しい順に{{ $searchLimit }}件まで。もっと絞ってください）</span>@endif
+          <a href="{{ url('/projects?ym='.$monthNav['ym']) }}" style="margin-left:8px;">月の一覧に戻る</a>
+        </div>
+      @endif
 @verbatim
 
       <div class="view-tabs">
