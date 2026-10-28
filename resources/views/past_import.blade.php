@@ -53,7 +53,7 @@
   .pj-summary { font-size: 13px; margin: 10px 2px; }
   .pj-summary .ok { color: #2e9e6b; font-weight: 700; }
   .pj-summary .ng { color: #d9534f; font-weight: 700; }
-  .pj-scroll { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .pj-scroll { max-height: 72vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
   table.pj-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.pj-table th, table.pj-table td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; white-space: nowrap; }
   table.pj-table th { background: #f6f1ea; position: sticky; top: 0; }
@@ -489,6 +489,7 @@
     document.getElementById('pjResult').style.display = '';
     document.getElementById('pjResult').style.minHeight = '';
     pjKeepY = null;
+    pjKeepTop = null;
     document.getElementById('pjWarn').innerHTML = '<div class="pj-flash err">' + pjEsc(message) + '</div>';
     pjClear();
     document.getElementById('pjBtn').disabled = true;
@@ -654,6 +655,10 @@
     // 「② 確かめ直す」のときは、押した場所のまま（2026-10-09 baba「差分のところも上にもどらないようにしてほしい」）。
     // はじめて読んだときだけ、結果の表の頭まで動かす。
     result.style.minHeight = '';
+    // 表の中のスクロールも、描き直す前の位置へ戻す（2026-10-28）。描き直すと表の中は先頭に戻ってしまうため。
+    var scrollBox = document.querySelector('#pjResult .pj-scroll');
+    if (scrollBox && pjKeepTop !== null) { scrollBox.scrollTop = pjKeepTop; }
+    pjKeepTop = null;
     if (pjKeepY !== null) {
       window.scrollTo(0, pjKeepY);
       pjKeepY = null;
@@ -1014,10 +1019,14 @@
   // ⚠ 判定はサーバーにやらせる＝画面にもう1つ同じ判定を書かないため。
   // 確かめ直す前の画面の位置（表を描き直したあと、ここへ戻す）。null＝戻さない（はじめて読んだとき）。
   var pjKeepY = null;
+  // 表の中（.pj-scroll）の位置。描き直す前に覚えて、描き直したあと戻す（2026-10-28）。
+  var pjKeepTop = null;
 
   function pjRecheck() {
     if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }
     pjKeepY = window.scrollY;
+    var table = document.querySelector('#pjResult .pj-scroll');
+    pjKeepTop = table ? table.scrollTop : null;
     // 描き直すあいだ表が空になって高さが縮み、位置がずれないように、いまの高さを押さえておく。
     var box = document.getElementById('pjResult');
     if (box) { box.style.minHeight = box.offsetHeight + 'px'; }
