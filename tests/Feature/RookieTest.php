@@ -329,6 +329,20 @@ class RookieTest extends TestCase
     }
 
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
+    /** イベプラ・セールスのどちらでもない人は、新人の一覧に出ない（手の印が残っていても）（2026-10-28 baba）。 */
+    public function test_イベプラ_セールス以外は新人に出ない(): void
+    {
+        $other = PersonFactory::new()->create(['name' => '社長', 'role' => 'employee', 'department' => '経営',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'rookie_state' => 'in']);
+        $sales = PersonFactory::new()->create(['name' => '新人S', 'role' => 'employee', 'department' => 'セールス',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+
+        $ids = Rookies::list('東京')->pluck('id')->all();
+        $this->assertNotContains($other->id, $ids);
+        $this->assertContains($sales->id, $ids);
+        $this->assertNotNull($other->fresh()->rookie_state, '印は消さずに隠すだけ');
+    }
+
     /** 新人ページから、新人のチャットワークIDを入れられる（2026-10-28 baba）。数字だけ・空なら消す。 */
     public function test_新人ページからチャットワークIDを入れる(): void
     {

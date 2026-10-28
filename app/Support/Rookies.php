@@ -82,6 +82,11 @@ final class Rookies
         return OfficeScope::applyToPeople(Person::employees()->where('active', true), $office)
             ->orderBy('hire_date')->orderBy('id')->get()
             ->filter(function (Person $p) use ($limit) {
+                // イベプラ・セールスのどちらでもない人は、新人の一覧に出さない（2026-10-28 baba「新人タグを外して」）。
+                // ⚠ 手で「新人に入れた」印（rookie_state=in）が残っていても出さない＝印は消さずに隠すだけ。
+                if (array_intersect($p->departmentList(), self::DEPARTMENTS) === []) {
+                    return false;
+                }
                 if ($p->rookie_state === self::OUT) {
                     return false;
                 }
@@ -89,8 +94,7 @@ final class Rookies
                     return true;
                 }
 
-                return $p->hire_date && $p->hire_date->gte($limit)
-                    && array_intersect($p->departmentList(), self::DEPARTMENTS) !== [];
+                return $p->hire_date && $p->hire_date->gte($limit);
             })->values();
     }
 
