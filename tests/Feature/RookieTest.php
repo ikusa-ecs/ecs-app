@@ -329,6 +329,34 @@ class RookieTest extends TestCase
     }
 
     /** ARENA場所貸しには新人を入れない（2026-10-09 baba）。 */
+    /** 文に集合・解散・本番終了・会場・前泊を出す。関東の会場に関東の外から来る人は⚠【遠方】（2026-10-28 baba）。 */
+    public function test_コピー文に時間と会場と遠方の印(): void
+    {
+        $d1 = Carbon::today()->addDays(1);
+        if (! $d1->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        $far = PersonFactory::new()->create(['name' => '遠方さん', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'prefecture' => '大阪府']);
+        $near = PersonFactory::new()->create(['name' => '近所さん', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京', 'prefecture' => '千葉県']);
+        $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $d1->format('Y-m-d'), 'required_count' => 1,
+            'status' => '調整中', 'project_name' => '謎パ', 'content_names' => ['謎パ'], 'client' => 'A社',
+            'location' => '東京都千代田区1-1', 'start_time' => '09:00', 'end_time' => '18:00', 'event_end_time' => '17:00',
+            'lodging' => '前泊有', 'stay_pre_meet_time' => '20:00']);
+        foreach ([$far, $near] as $rookie) {
+            Assignment::create(['project_id' => $project->id, 'staff_id' => $rookie->id, 'role' => 'FC', 'status' => '仮', 'date' => $d1->format('Y-m-d')]);
+        }
+
+        $rows = collect(RookieFcPlan::build(Carbon::today()->startOfMonth(), '東京')['rookies']);
+
+        $text = $rows->firstWhere('id', $far->id)['copyText'];
+        $this->assertStringContainsString('⚠【遠方】', $text);
+        $this->assertStringContainsString('　集合 09:00・解散 18:00・本番終了 17:00／東京都千代田区', $text);
+        $this->assertStringContainsString('　前泊あり（前日の集合 20:00）', $text);
+        $this->assertStringNotContainsString('⚠【遠方】', $rows->firstWhere('id', $near->id)['copyText']);
+    }
+
     public function test_ARENA場所貸しは外す(): void
     {
         $this->assertTrue(RookieFcPlan::isArenaRental(ProjectFactory::new()->make(['format' => 'ARENA場所貸し'])));

@@ -86,10 +86,25 @@ final class Prefectures
         '沖縄県' => [],   // ⚠ 陸でも橋でもつながらないので隣は無し
     ];
 
+    /** 関東の1都6県（2026-10-28 新人のチャットワーク文で「関東圏外から遠い」を出すため）。 */
+    public const KANTO = ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'];
+
     /** 都道府県として正しい名前か。 */
     public static function isValid(mixed $name): bool
     {
         return in_array(trim((string) $name), self::ALL, true);
+    }
+
+    /**
+     * 会場が関東で、住まいが関東の外＝遠いか（2026-10-28 baba「東京の会場に関東圏外から来る人は目立たせて」）。
+     * ⚠ どちらかの県が分からないときは遠いとは言わない（推測で目立たせない）。
+     */
+    public static function isFarFromKanto(mixed $home, mixed $venue): bool
+    {
+        $home = trim((string) $home);
+        $venue = trim((string) $venue);
+
+        return in_array($venue, self::KANTO, true) && self::isValid($home) && ! in_array($home, self::KANTO, true);
     }
 
     /**

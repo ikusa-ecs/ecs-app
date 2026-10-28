@@ -67,6 +67,7 @@ final class RookieFcPlan
                         'dayType' => $pr ? (string) ($pr->date_type ?? '本番') : '',
                         'role' => (string) ($a->role ?: '—'),
                         'status' => (string) $a->status,
+                        'info' => self::info($pr),
                     ];
                     $monthEvents++;
                     if ($a->role === 'D') {
@@ -132,6 +133,8 @@ final class RookieFcPlan
                 // チームリーダー（2026-10-13 baba）。
                 'leader' => (string) ($p->rookie_leader_id ?? ''),
                 'note' => (string) ($p->rookie_note ?? ''),
+                // 住まいの都道府県（遠方の印に使う・2026-10-28）。
+                'pref' => (string) ($p->prefecture ?? ''),
                 // 参加したいイベント（2026-10-17 baba）＝コンテンツIDの並び。
                 'wishes' => array_values(array_map('strval', (array) ($p->rookie_wishes ?? []))),
                 'monthNo' => $no,
@@ -270,12 +273,36 @@ final class RookieFcPlan
         return implode('', $out);
     }
 
+    /**
+     * 文に出す案件の時間と会場（2026-10-28 baba）。
+     * 集合＝start_time／解散＝end_time／本番終了＝event_end_time。会場は都道府県＋市区町村（無ければ住所の全部）。
+     * ⚠ 未入力は空のまま返す（文の方で「未入力」と出す＝推測で埋めない）。
+     */
+    private static function info(?Project $pr): array
+    {
+        if (! $pr) {
+            return [];
+        }
+
+        return [
+            'meet' => trim((string) $pr->start_time),
+            'leave' => trim((string) $pr->end_time),
+            'end' => trim((string) $pr->event_end_time),
+            'where' => trim((string) $pr->prefecture.(string) $pr->city) ?: trim((string) $pr->location),
+            'pref' => (string) ($pr->prefecture ?? ''),
+            'preStay' => Lodging::hasPreStay($pr->lodging),
+            'preMeet' => trim((string) $pr->stay_pre_meet_time),
+        ];
+    }
+
     private static function copyText(array $r, string $ojt, Carbon $month, string $leader = '', string $ojtSales = ''): string
     {
-        $line = function (array $c, string $tail) {
+        // 関東の外から来る人は、関東の会場のとき行頭に⚠【遠方】を付ける（2026-10-28）。
+        $line = function (array $c, string $tail) use ($r) {
             $d = Carbon::parse($c['date']);
+            $far = Prefectures::isFarFromKanto($r['pref'] ?? '', $c['info']['pref'] ?? '') ? '⚠【遠方】' : '';
 
-            return $d->format('n/j').'('.self::WEEK[$d->dayOfWeek].') '.$c['name']
+            return $far.$d->format('n/j').'('.self::WEEK[$d->dayOfWeek].') '.$c['name']
                 .($c['client'] !== '' ? '／'.$c['client'] : '')
                 .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')
                 .$tail;
@@ -294,9 +321,25 @@ final class RookieFcPlan
                 .'／いま：D '.$r['monthD'].'件・FC '.$r['monthFc'].'件';
         }
 
+        // 案件の下に出す、集合・解散・本番終了・会場・前泊（2026-10-28 baba）。
+        $detail = function (array $c) {
+            $i = $c['info'] ?? [];
+            if (! $i) {
+                return [];
+            }
+            $t = fn (string $v) => $v !== '' ? $v : '未入力';
+            $out = ['　集合 '.$t($i['meet']).'・解散 '.$t($i['leave']).'・本番終了 '.$t($i['end']).'／'.$t($i['where'])];
+            if ($i['preStay']) {
+                $out[] = '　前泊あり（前日の集合 '.$t($i['preMeet']).'）';
+            }
+
+            return $out;
+        };
+
         $lines[] = '■ D（ディレクター）';
         foreach ($r['dCases'] as $c) {
             $lines[] = $line($c, '（'.$c['status'].'）');
+            array_push($lines, ...$detail($c));
         }
         if (! $r['dCases']) {
             $lines[] = '（なし）';
@@ -306,6 +349,7 @@ final class RookieFcPlan
         $lines[] = '■ FC・そのほか';
         foreach ($others as $c) {
             $lines[] = $line($c, '　'.$c['role'].'（'.$c['status'].'）');
+            array_push($lines, ...$detail($c));
         }
         if (! $others) {
             $lines[] = '（なし）';
@@ -316,6 +360,7 @@ final class RookieFcPlan
             foreach ($r['myPicks'] as $p) {
                 $tags = array_filter([$p['mark'], $p['first'] ? '初めて' : '', $p['preStay'] ? '前泊' : '']);
                 $lines[] = $line($p, $tags ? '［'.implode('・', $tags).'］' : '');
+                array_push($lines, ...$detail($p));
             }
         }
         $lines[] = 'この内容で問題ないか確認をお願いします。';
@@ -456,6 +501,7 @@ final class RookieFcPlan
                 'mark' => $mark,          // 必修／推奨／空
                 'first' => (bool) $first,   // この新人がFCで初めてのコンテンツか
                 'preStay' => self::preStayDay($c) !== null,
+                'info' => self::info($c),
                 'difficulty' => RookieDifficulty::ofProject($c, $map),
                 'room' => $room[$c->id],
                 'rookie' => $state[$id]['person']->name,
