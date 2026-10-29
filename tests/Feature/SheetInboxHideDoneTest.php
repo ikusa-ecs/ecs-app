@@ -38,8 +38,8 @@ class SheetInboxHideDoneTest extends TestCase
 
         $html = $this->actingAsPerson($manager)->get('/sheet-inbox?office=東京')->assertOk()->getContent();
 
-        $this->assertSame(1, substr_count($html, 'data-done="1"'));
-        $this->assertSame(2, substr_count($html, 'data-done="0"'));
+        $this->assertSame(1, substr_count($html, 'data-applied="1"'));
+        $this->assertSame(2, substr_count($html, 'data-applied="0"'));
         $this->assertStringContainsString('id="sxHideDone"', $html);
     }
 }

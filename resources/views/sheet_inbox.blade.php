@@ -80,7 +80,7 @@
           // 差分が1つも無い月は、取り込むものが無い＝「差分を見て取り込む」を「差分なし」に変えて、取り込み済みと同じく隠す（2026-10-28 baba）。
           var row = td.closest('tr');
           if (row && !chg && !nw && !ng) {
-            row.setAttribute('data-done', '1');
+            row.setAttribute('data-nodiff', '1');
             var btn = row.querySelector('a.btn');
             if (btn) { btn.textContent = '差分なし'; btn.removeAttribute('href'); btn.className = 'btn'; btn.style.opacity = '0.5'; }
             var box = document.getElementById('sxHideDone');
@@ -124,9 +124,14 @@
     @else
       {{-- 取り込み済みの月は既定で隠す（2026-10-28 baba）。記録は消さない＝チェックを外せば出る。 --}}
       <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0 0 8px;">
-        <input type="checkbox" id="sxHideDone" checked> 取り込み済み・差分なしの月を隠す
+        <input type="checkbox" id="sxHideDone" checked> 差分なしの月を隠す
         <span class="sx-when" id="sxHideCount"></span>
       </label>
+      <style>
+        .sx-yearhead th { text-align: left; background: var(--panel-2, #f5f5f5); }
+        .sx-yeartoggle { background: none; border: 0; padding: 4px 0; font: inherit; font-weight: 700; cursor: pointer; color: inherit; }
+        tbody.sx-collapsed tr[data-applied] { display: none; }
+      </style>
       <table class="sx-table">
         <thead>
           <tr>
@@ -140,11 +145,14 @@
         </thead>
         {{-- 年ごとに分ける（2026-10-29 小沼さん）。年のまとまりは tbody で分け、全部隠れたら年ごと隠す。 --}}
         @foreach ($rows->groupBy(fn ($r) => substr($r->period, 0, 4)) as $year => $yearRows)
-        <tbody data-year="{{ $year }}">
-          <tr><th colspan="6" style="text-align:left; background:var(--panel-2, #f5f5f5);">{{ $year }}年</th></tr>
+        @php($open = (string) $year === now()->format('Y'))
+        <tbody data-year="{{ $year }}" class="{{ $open ? '' : 'sx-collapsed' }}">
+          <tr class="sx-yearhead"><th colspan="6">
+            <button type="button" class="sx-yeartoggle" aria-expanded="{{ $open ? 'true' : 'false' }}">{{ $open ? '▼' : '▶' }} {{ $year }}年</button>
+          </th></tr>
           @foreach ($yearRows as $row)
-            {{-- 取り込み済み＝一度反映して、そのあとシートが変わっていないもの（data-done="1" は隠す対象）。 --}}
-            <tr data-done="{{ $row->applied_at !== null && ! $row->needsAttention() ? '1' : '0' }}">
+            {{-- 取り込み済み＝一度反映して、そのあとシートが変わっていないもの（data-applied="1"）。隠すのは差分なしの月だけ（下の script で data-nodiff）。 --}}
+            <tr data-applied="{{ $row->applied_at !== null && ! $row->needsAttention() ? '1' : '0' }}">
               <td><b>{{ $row->period }}</b>
                 @if ($row->tab)<br><span class="sx-when">タブ {{ $row->tab }}</span>@endif
               </td>
@@ -196,20 +204,29 @@
           var count = document.getElementById('sxHideCount');
           function apply() {
             var on = box.checked, hidden = 0;
-            document.querySelectorAll('tr[data-done]').forEach(function (tr) {
-              var h = on && tr.getAttribute('data-done') === '1';
+            document.querySelectorAll('tr[data-applied]').forEach(function (tr) {
+              var h = on && tr.getAttribute('data-nodiff') === '1';
               tr.style.display = h ? 'none' : '';
               if (h) hidden++;
             });
             // 年の中の月が全部隠れたら、年の見出しも隠す
             document.querySelectorAll('tbody[data-year]').forEach(function (tb) {
-              var months = tb.querySelectorAll('tr[data-done]');
+              var months = tb.querySelectorAll('tr[data-applied]');
               var shown = Array.prototype.some.call(months, function (tr) { return tr.style.display !== 'none'; });
               tb.style.display = shown ? '' : 'none';
             });
             count.textContent = on && hidden ? '（' + hidden + ' 月を隠しています）' : '';
           }
           box.addEventListener('change', apply);
+          // 年の見出しを押すと、その年の月を開いたり閉じたりする（2026-10-29 小沼さん）。
+          document.querySelectorAll('tbody[data-year]').forEach(function (tb) {
+            var btn = tb.querySelector('.sx-yeartoggle');
+            btn.addEventListener('click', function () {
+              var closed = tb.classList.toggle('sx-collapsed');
+              btn.textContent = (closed ? '▶ ' : '▼ ') + tb.getAttribute('data-year') + '年';
+              btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+            });
+          });
           apply();
         })();
       </script>
