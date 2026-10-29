@@ -124,7 +124,7 @@
     @else
       {{-- 取り込み済みの月は既定で隠す（2026-10-28 baba）。記録は消さない＝チェックを外せば出る。 --}}
       <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0 0 8px;">
-        <input type="checkbox" id="sxHideDone" checked> 取り込み済みの月を隠す
+        <input type="checkbox" id="sxHideDone" checked> 取り込み済み・差分なしの月を隠す
         <span class="sx-when" id="sxHideCount"></span>
       </label>
       <table class="sx-table">
@@ -138,8 +138,11 @@
             <th style="width:130px;"></th>
           </tr>
         </thead>
-        <tbody>
-          @foreach ($rows as $row)
+        {{-- 年ごとに分ける（2026-10-29 小沼さん）。年のまとまりは tbody で分け、全部隠れたら年ごと隠す。 --}}
+        @foreach ($rows->groupBy(fn ($r) => substr($r->period, 0, 4)) as $year => $yearRows)
+        <tbody data-year="{{ $year }}">
+          <tr><th colspan="6" style="text-align:left; background:var(--panel-2, #f5f5f5);">{{ $year }}年</th></tr>
+          @foreach ($yearRows as $row)
             {{-- 取り込み済み＝一度反映して、そのあとシートが変わっていないもの（data-done="1" は隠す対象）。 --}}
             <tr data-done="{{ $row->applied_at !== null && ! $row->needsAttention() ? '1' : '0' }}">
               <td><b>{{ $row->period }}</b>
@@ -179,6 +182,7 @@
             </tr>
           @endforeach
         </tbody>
+        @endforeach
       </table>
 
       <p class="sx-lead" style="margin:12px 2px 0;">
@@ -196,6 +200,12 @@
               var h = on && tr.getAttribute('data-done') === '1';
               tr.style.display = h ? 'none' : '';
               if (h) hidden++;
+            });
+            // 年の中の月が全部隠れたら、年の見出しも隠す
+            document.querySelectorAll('tbody[data-year]').forEach(function (tb) {
+              var months = tb.querySelectorAll('tr[data-done]');
+              var shown = Array.prototype.some.call(months, function (tr) { return tr.style.display !== 'none'; });
+              tb.style.display = shown ? '' : 'none';
             });
             count.textContent = on && hidden ? '（' + hidden + ' 月を隠しています）' : '';
           }
