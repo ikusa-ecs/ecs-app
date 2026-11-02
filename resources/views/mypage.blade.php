@@ -810,7 +810,16 @@
             <button class="cal-modal-close" onclick="closeBulkCal()" aria-label="閉じる">×</button>
           </div>
           <div class="cal-modal-body">
-            <p class="cal-modal-note">各案件の「登録」を押すと、Googleカレンダーの予定追加画面が入力済みで開きます。内容を確認して「保存」を押してください（カレンダーの時間は移動ぶん前後1時間を含みます）。</p>
+            <!-- 全部まとめて登録（2026-11-02 小沼さん）。1件ずつ押さなくてよいように、予定のファイル（.ics）を作る。
+                 中身＝案件ごとに「移動（集合の1時間前〜集合）」「【役割】_コンテンツ_顧客（集合〜解散）」「移動（解散〜1時間後）」の3つ＋前泊・後泊。 -->
+            <div class="cal-bulk-all">
+              <button class="btn primary" onclick="downloadAllIcs()">📥 全部まとめて登録する（<span id="bulkAllCount">0</span>件）</button>
+              <p class="cal-modal-note" style="margin-top:8px;">
+                予定のファイル（.ics）がダウンロードされます。Googleカレンダーの<b>⚙ 設定 → インポート/エクスポート → インポート</b>でそのファイルを選ぶと、全部の案件が一度に入ります。<br>
+                案件ごとに「<b>移動</b>（集合の1時間前〜集合）」「<b>【役割】_コンテンツ_顧客</b>（集合〜解散）」「<b>移動</b>（解散〜1時間後）」の3つ、前泊・後泊がある案件はその日も入ります。集合・解散の時間が決まっていない案件は終日で入ります（移動は入りません）。
+              </p>
+            </div>
+            <p class="cal-modal-note">1件ずつ入れたいときは、各案件の「登録」を押してください。Googleカレンダーの予定追加画面が入力済みで開きます（時間は集合〜解散。移動は入りません）。</p>
             <div id="bulkList"></div>
           </div>
         </div>
@@ -999,8 +1008,10 @@
     if (hasTime) {
       const [mh, mm] = c.meet.split(':').map(Number);
       const [lh, lm] = c.leave.split(':').map(Number);
-      const s = new Date(d); s.setHours(mh - 1, mm, 0, 0);   // 集合 −1時間（移動枠）
-      const e = new Date(d); e.setHours(lh + 1, lm, 0, 0);   // 解散 ＋1時間（移動枠）
+      // 集合〜解散（拘束時間）だけ。移動の前後1時間は「全部まとめて登録」で別の予定にする（2026-11-02 小沼さん）。
+      const s = new Date(d); s.setHours(mh, mm, 0, 0);
+      const e = new Date(d); e.setHours(lh, lm, 0, 0);
+      if (e <= s) e.setDate(e.getDate() + 1);                // 日をまたぐ解散
       dates = calStamp(s) + '/' + calStamp(e);
     } else {
       const e = new Date(d); e.setDate(e.getDate() + 1);
@@ -1013,7 +1024,7 @@
       'ディレクター：' + (c.dir || '—'),
       '自分の役割：' + roleLabel(c.myPos),
       '集合〜解散：' + (c.meet || '—') + '〜' + (c.leave || '—') +
-        (hasTime ? '（カレンダーの時間は前後1時間の移動枠を含みます）' : '（時間未定のため終日で登録）')
+        (hasTime ? '' : '（時間未定のため終日で登録）')
     ];
     if (c.note) lines.push('メモ：' + c.note);
 
@@ -1073,7 +1084,8 @@
 
   // 「今後をまとめて登録」→ 一覧の小窓を出し、1件ずつリンク
   function openBulkCal() {
-    const list = assignedCases().filter(c => !c.archived).sort((a, b) => a.off - b.off);
+    const list = upcomingCases();
+    document.getElementById('bulkAllCount').textContent = list.length;
     document.getElementById('bulkList').innerHTML = list.length
       ? list.map(c =>
           '<div class="bulk-row">' +
@@ -1088,6 +1100,101 @@
     document.getElementById('bulkBg').classList.add('show');
   }
   function closeBulkCal() { document.getElementById('bulkBg').classList.remove('show'); }
+
+  // ===== 全部まとめて登録（予定のファイル .ics を作る・2026-11-02 小沼さん「一つずつ登録するの面倒」）=====
+  // 形は小沼さんがアサイン表のGASで使っているものに合わせた：
+  //   移動（集合の1時間前〜集合）／【役割】_コンテンツ_顧客（集合〜解散）／移動（解散〜解散の1時間後）
+  // ＋前泊（前の日・集合時間があればその時間〜23:59）・後泊（次の日・終日）。
+  // ⚠ 予定ごとに決まったID（UID）を付ける＝同じファイルをもう一度取り込んでも、同じ予定として扱われるように。
+  function icsEsc(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+  function icsUtc(d) {
+    return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate())
+      + 'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + '00Z';
+  }
+  function hm(t) { const m = String(t || '').match(/(\d{1,2})\s*[:：時]\s*(\d{1,2})?/); return m && Number(m[1]) < 24 ? [Number(m[1]), Number(m[2] || 0)] : null; }
+  function icsEvents(c) {
+    const out = [];
+    const d = dateOf(c.off);
+    const pos = roleLabel(c.myPos).replace(/（.*）$/, '');
+    const title = '【' + pos + '】_' + c.content + '_' + c.client;
+    const loc = (c.place && c.place !== '（未定）') ? c.place : (c.placeShort || '');
+    const desc = '顧客：' + c.client + '\nコンテンツ：' + c.content + '\nポジション：' + roleLabel(c.myPos)
+      + '\n営業担当：' + (c.sales || '—') + '\nディレクター：' + (c.dir || '—') + (loc ? '\n会場：' + loc : '') + (c.note ? '\nメモ：' + c.note : '');
+    const uid = String(c.id) + '-' + String(c.myPos || '');
+    const mt = hm(c.meet), lt = hm(c.leave);
+    if (mt && lt) {
+      const s = new Date(d); s.setHours(mt[0], mt[1], 0, 0);
+      const e = new Date(d); e.setHours(lt[0], lt[1], 0, 0);
+      if (e <= s) e.setDate(e.getDate() + 1);   // 日をまたぐ解散
+      const H = 60 * 60 * 1000;
+      out.push({ uid: uid + '-move-before', start: new Date(s.getTime() - H), end: s, title: '移動', desc: title + ' への移動' });
+      out.push({ uid: uid + '-main', start: s, end: e, title: title, desc: desc, loc: loc });
+      out.push({ uid: uid + '-move-after', start: e, end: new Date(e.getTime() + H), title: '移動', desc: title + ' からの移動' });
+    } else {
+      out.push({ uid: uid + '-main', day: d, title: title, desc: desc + '\n（集合・解散の時間が未定のため終日で登録）', loc: loc });
+    }
+    stayKinds(c).forEach(function (k) {
+      const sd = new Date(d); sd.setDate(sd.getDate() + (k === '前泊' ? -1 : 1));
+      const sdesc = (k === '前泊' ? '次の日' : '前の日') + 'が本番：' + title
+        + (String(c.lodging || '').includes('一部') ? '\n※一部前泊＝自分が泊まるかは担当に確認してください' : '');
+      const pt = k === '前泊' ? hm(c.stayPreMeet) : null;
+      if (pt) {
+        const ss = new Date(sd); ss.setHours(pt[0], pt[1], 0, 0);
+        const se = new Date(sd); se.setHours(23, 59, 0, 0);
+        out.push({ uid: uid + '-stay-' + (k === '前泊' ? 'pre' : 'post'), start: ss, end: se, title: '🛏 ' + k + '｜' + c.content + '（' + c.client + '）', desc: sdesc + '\n前泊の集合時間：' + c.stayPreMeet, loc: loc });
+      } else {
+        out.push({ uid: uid + '-stay-' + (k === '前泊' ? 'pre' : 'post'), day: sd, title: '🛏 ' + k + '｜' + c.content + '（' + c.client + '）', desc: sdesc, loc: loc });
+      }
+    });
+    return out;
+  }
+  function buildIcs(list) {
+    const stamp = icsUtc(new Date());
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//IKUSA//ECS//JA', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+    list.forEach(function (c) {
+      try {
+        icsEvents(c).forEach(function (ev) {
+          lines.push('BEGIN:VEVENT', 'UID:' + ev.uid + '@ecs.ikusa.co.jp', 'DTSTAMP:' + stamp);
+          if (ev.day) {
+            const n = new Date(ev.day); n.setDate(n.getDate() + 1);
+            lines.push('DTSTART;VALUE=DATE:' + calYmd(ev.day), 'DTEND;VALUE=DATE:' + calYmd(n));
+          } else {
+            lines.push('DTSTART:' + icsUtc(ev.start), 'DTEND:' + icsUtc(ev.end));
+          }
+          lines.push('SUMMARY:' + icsEsc(ev.title), 'DESCRIPTION:' + icsEsc(ev.desc));
+          if (ev.loc) lines.push('LOCATION:' + icsEsc(ev.loc));
+          lines.push('END:VEVENT');
+        });
+      } catch (e) { console.error('カレンダーのファイル', c && c.id, e); }   // 1件こわれても残りは作る
+    });
+    lines.push('END:VCALENDAR');
+    return lines.map(icsFold).join('\r\n') + '\r\n';
+  }
+  // 長い行は75バイトごとに折り返す（.ics の決まり。折り返した行の頭は空白1つ）。日本語・絵文字を途中で切らない。
+  function icsFold(line) {
+    const enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    const parts = []; let cur = ''; let bytes = 0; let limit = 75;
+    Array.from(line).forEach(function (ch) {
+      const b = enc.encode(ch).length;
+      if (bytes + b > limit) { parts.push(cur); cur = ''; bytes = 0; limit = 74; }
+      cur += ch; bytes += b;
+    });
+    parts.push(cur);
+    return parts.join('\r\n ');
+  }
+  function upcomingCases() { return assignedCases().filter(c => !c.archived).sort((a, b) => a.off - b.off); }
+  function downloadAllIcs() {
+    const list = upcomingCases();
+    if (!list.length) { alert('今後のアサイン案件はありません。'); return; }
+    const blob = new Blob([buildIcs(list)], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    const t = new Date();
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ECS_アサイン_' + calYmd(t) + '.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
 
   // ===== カレンダー表示（アサイン案件をマス目に置く。出勤可能日画面の作りを踏襲）=====
   // 現在のリスト／カレンダーの表示状態。既定はリスト。
