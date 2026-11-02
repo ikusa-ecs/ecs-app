@@ -134,6 +134,37 @@ class SheetImportMatchTest extends TestCase
         $this->assertSame('P-2026-0042', Project::first()->id);
     }
 
+    /**
+     * 日付しか合わないIDは、下見で🔴を出す（はじめは取り込まない＝画面側の _skip）。2026-11-02 P-2026-0269。
+     * シートでファミリーフェスのブロックがBBQで上書きされ、100行目のIDだけ残った → 取り込むとファミリーフェスがBBQになった。
+     * ⚠ IDのつながりは外さない（手でつないだ行は名前が違うことがある）。コンテンツか顧客が合えば出さない。
+     */
+    public function test_日付しか合わないIDは下見で知らせる(): void
+    {
+        $me = $this->manager();
+        $this->ecsProject(['id' => 'P-2026-0269', 'project_name' => 'ファミリーフェス', 'content_names' => ['ファミリーフェス'], 'client' => '福井銀行']);
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('BBQ', 'ワヨー株式会社様', 'P-2026-0269')])->assertOk();
+        $row = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => SheetSync::firstOrFail()->id])
+            ->assertOk()->json('rows.0');
+        $this->assertSame('sheet', $row['link']['by'], 'IDのつながりは外さない');
+        $this->assertStringContainsString('日付しか合いません', $row['idWeak']);
+
+        // 「別の案件＝新しく登録する」を選んだら、もう出さない（人が決めた）。
+        $row = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => SheetSync::firstOrFail()->id,
+            'edits' => json_encode([0 => ['forceNew' => true]])])->assertOk()->json('rows.0');
+        $this->assertSame('', $row['idWeak']);
+
+        // 顧客が合えば（コンテンツ名が変わっただけ）出さない。
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('ファミリーフェス＋BBQ', '福井銀行様', 'P-2026-0269')])->assertOk();
+        $row = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => SheetSync::firstOrFail()->id])
+            ->assertOk()->json('rows.0');
+        $this->assertSame('', $row['idWeak']);
+    }
+
     /** IDがあれば日付が違っても同じ案件（baba「IDで管理してるなら同じものって紐づけたい」）。日程とアサインも新しい日に移る。⚠ 日付もコンテンツも違うIDは使わない（test_ずれたIDは使わない）。 */
     public function test_IDがあれば日付が違っても同じ案件(): void
     {

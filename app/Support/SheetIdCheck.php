@@ -77,6 +77,19 @@ final class SheetIdCheck
         return false;
     }
 
+    /**
+     * 日付しか合わない（コンテンツも顧客も違う）か（2026-11-02 P-2026-0269）。
+     * 【なぜ要るか】シートでファミリーフェスのブロックがBBQで上書きされ、100行目のIDだけ残った。
+     *   同じ日なので fits() は通り、ファミリーフェスのブロックがシートに無いので claimedByOther() も効かず、
+     *   取り込むとファミリーフェスの案件がBBQで上書きされた。→ 取込の下見で🔴を出し、はじめは取り込まない。
+     * ⚠ IDは信じたまま（外さない）。手でつないだ行は名前が違うことがある（2026-09-29 baba決定）ので、人が決める。
+     */
+    public static function onlyDateMatches(Project $p, ?string $date, string $content, string $client, ?ImportContents $contents = null): bool
+    {
+        return $date !== null && $date !== '' && optional($p->start_date)->format('Y-m-d') === $date
+            && ! self::strong($p, $date, $content, $client, $contents ?? new ImportContents);
+    }
+
     /** 同じ日で、コンテンツが重なるか顧客が同じ（＝そのブロックの案件だと言いきれる）。 */
     private static function strong(Project $p, ?string $date, string $content, string $client, ImportContents $contents): bool
     {

@@ -522,7 +522,8 @@
     rows.forEach(function (r) {
       var same = r.diff && r.diff.kind === 'same';
       var remembered = !!(r.skipMemo && r.skipMemo.remembered);
-      r._skip = !!r.skip || ((same || remembered) && !pjSkipDecided[r.index]);
+      // 日付しか合わないIDでつながっている案件も、はじめは外す（2026-11-02 P-2026-0269 がBBQで上書きされた）。
+      r._skip = !!r.skip || ((same || remembered || !!r.idWeak) && !pjSkipDecided[r.index]);
     });
     var memoCount = rows.filter(function (r) { return r.skipMemo && r.skipMemo.remembered; }).length;
     var memoChanged = rows.filter(function (r) { return r.skipMemo && r.skipMemo.changedSince; }).length;
@@ -623,6 +624,8 @@
       if (r.cancelled) { notes.unshift('キャンセルの印が付いているので取り込みません'); }
       // 100行目のIDが別の案件を指していた（ブロックの並べ替えなどでずれた）。正しい案件は右の「IDでつなぐ」で選べる。
       if (r.idMismatch) { notes.unshift(r.idMismatch); }
+      // 日付しか合わないIDでつながっている（2026-11-02 P-2026-0269）。はじめは取り込まない（下の _skip）。
+      if (r.idWeak) { notes.unshift(r.idWeak); }
       var cls = (r._skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
       // data-kind / data-date＝上の「まとめてチェック」で使う（new／changed／same・日程）。
       // data-memo-*＝外して取り込んだら覚えるための鍵（案件IDと差分の指紋・2026-10-21）。

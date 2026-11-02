@@ -279,6 +279,21 @@ class PastProjectImportController extends Controller
                         $ecsId = null;
                     }
                 }
+                // 日付しか合わないIDは🔴で知らせて、はじめは取り込まない（2026-11-02 P-2026-0269 がBBQで上書きされた）。
+                // ⚠ 取込で手でつなぎ直した列（id_changes の行き先がこのID）は、名前が違ってもそのまま信じる。
+                $idWeak = '';
+                if ($ecsId !== null && ($byId ?? null) && SheetIdCheck::onlyDateMatches($byId, $blockDate, $blockContent,
+                    (string) ($case['fields']['顧客名(代理店名)'] ?? ''), $this->importContents)) {
+                    $chg = $sync !== null && isset($case['col'])
+                        ? (($sync->id_changes ?? [])[(string) $case['col']] ?? (($sync->id_changes ?? [])[(int) $case['col']] ?? null))
+                        : null;
+                    if (! (is_array($chg) && (string) ($chg['to'] ?? '') === $ecsId)) {
+                        $idWeak = '🔴 シートの100行目のID「'.$ecsId.'」の案件（'.optional($byId->start_date)->format('n/j')
+                            .'『'.$byId->project_name.'』'.($byId->client ? '／'.$byId->client : '').'）とは、日付しか合いません（コンテンツも顧客も違います）。'
+                            .'別の案件のIDが残っているかもしれないので、はじめは取り込みません。同じ案件ならチェックを入れてください。'
+                            .'違う案件なら「別の案件＝ECSに無いので新しく登録する」を選んでください';
+                    }
+                }
                 if ($ecsId === null && $idMismatch === '' && $sync !== null && isset($case['col'])) {
                     $mapped = (string) (($sync->project_ids ?? [])[(string) $case['col']] ?? (($sync->project_ids ?? [])[(int) $case['col']] ?? ''));
                     // ⚠ そのIDがシートの別のブロックにもう書いてあれば使わない（同じIDを2つのブロックに付けない）。
@@ -307,6 +322,8 @@ class PastProjectImportController extends Controller
                     'ecsId' => $ecsId,
                     // 100行目のIDが別の案件を指していて使わなかったとき、その知らせ（下見に出す）。
                     'idMismatch' => $idMismatch,
+                    // 日付しか合わないIDでつながっている（🔴・はじめは取り込まない）。2026-11-02。
+                    'idWeak' => $idWeak,
                     'sheetId' => $sheetId,
                 ];
             }
@@ -665,6 +682,8 @@ class PastProjectImportController extends Controller
                 'people' => count($assignments),
                 'missing' => array_keys($miss),
                 'idMismatch' => (string) ($entry['idMismatch'] ?? ''),
+                // 手でIDを入れた・別の案件にしたときは出さない（人がもう決めた）。
+                'idWeak' => ($edit['linkId'] ?? '') === '' && empty($edit['forceNew']) ? (string) ($entry['idWeak'] ?? '') : '',
                 'ambiguous' => array_keys($dup),
                 'errors' => $info['errors'],
             ];
