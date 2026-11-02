@@ -338,6 +338,8 @@
     html[data-theme="dark"] .mp-ev.ev-real { background: var(--ok-soft); border-color: var(--ok-line); border-left-color: #9ccbaa; }
     /* 黒地では「暗くする」ホバーだと変化が見えないので、明るくする向きにそろえる。 */
     html[data-theme="dark"] .mp-ev:hover { filter: brightness(1.3); }
+    /* 前泊・後泊（本番の前の日・次の日）。スタッフ画面の jc-stay と同じく点線（2026-11-02）。 */
+    .mp-ev.ev-stay { display: block; text-decoration: none; color: inherit; border-style: dashed; border-left-width: 1px; }
 
     /* アカウント欄・通知トグル */
     html[data-theme="dark"] .line-btn { background: var(--surface-3); }
@@ -1064,15 +1066,15 @@
       dates = calStamp(st) + '/' + calStamp(en);
     }
     const q = new URLSearchParams({
-      action: 'TEMPLATE', text: '🛏 ' + kind + '｜' + c.content + '（' + c.client + '）',
+      action: 'TEMPLATE', text: kind + '｜' + c.content + '（' + c.client + '）',
       dates: dates, details: lines.join('\n'), location: loc, ctz: 'Asia/Tokyo'
     });
     return 'https://calendar.google.com/calendar/render?' + q.toString();
   }
-  // 「🛏 前泊」「🛏 後泊」の登録リンク（無い案件は空）。
+  // 「前泊」「後泊」の登録リンク（無い案件は空）。
   function stayCalLinks(c) {
     return stayKinds(c).map(k =>
-      '<a class="cal-btn" href="' + stayGcalUrl(c, k).replace(/&/g, '&amp;') + '" target="_blank" rel="noopener" title="' + k + 'の日をGoogleカレンダーに登録">🛏 ' + k + '</a>'
+      '<a class="cal-btn" href="' + stayGcalUrl(c, k).replace(/&/g, '&amp;') + '" target="_blank" rel="noopener" title="' + k + 'の日をGoogleカレンダーに登録">' + k + '</a>'
     ).join('');
   }
 
@@ -1178,12 +1180,27 @@
     });
     return map;
   }
+  // 前泊・後泊の日（本番の前の日・次の日）を「日 → [{kind, c}]」に（スタッフ画面と同じ・2026-11-02）。月をまたいでも拾う。
+  function asgStayByDay(y, m) {
+    const map = {};
+    assignedCases().forEach(c => {
+      stayKinds(c).forEach(kind => {
+        const d = dateOf(c.off);
+        d.setDate(d.getDate() + (kind === '前泊' ? -1 : 1));
+        if (d.getFullYear() === y && d.getMonth() + 1 === m) {
+          (map[d.getDate()] = map[d.getDate()] || []).push({ kind: kind, c: c });
+        }
+      });
+    });
+    return map;
+  }
 
   function renderAsgCalendar() {
     const { y, m } = asgCalMonth();
     const grid = document.getElementById('asgCalGrid');
     const dayMap = asgByDay(y, m);
-    const hasAny = Object.keys(dayMap).length > 0;
+    const stayMap = asgStayByDay(y, m);
+    const hasAny = Object.keys(dayMap).length > 0 || Object.keys(stayMap).length > 0;
     document.getElementById('asgCalEmpty').style.display = hasAny ? 'none' : 'block';
 
     let html = '';
@@ -1200,14 +1217,24 @@
     for (let d = 1; d <= days; d++) {
       const dow = new Date(y, m - 1, d).getDay();
       const evs = dayMap[d] || [];
+      const stays = stayMap[d] || [];
       const dowCls = (dow === 6 ? ' sat' : (dow === 0 ? ' sun' : ''));
-      html += '<div class="mp-cell' + (evs.length ? ' has' : '') + dowCls + '">' +
+      html += '<div class="mp-cell' + (evs.length || stays.length ? ' has' : '') + dowCls + '">' +
         '<div class="dnum">' + d + '</div>' +
         evs.map(c =>
           '<button class="mp-ev' + evClass(c) + '" onclick="addCal(\'' + c.id + '\')" title="クリックでGoogleカレンダー登録">' +
             '<span class="ev-name">' + (c.content || c.name) + '</span>' +
             '<span class="ev-pos">' + roleLabel(c.myPos) + (c.placeShort ? ' / ' + c.placeShort : '') + '</span>' +
           '</button>'
+        ).join('') +
+        // 前泊・後泊。押すとその日をGoogleカレンダーに登録（前泊は集合時間から・リストの前泊・後泊ボタンと同じ）。
+        stays.map(s =>
+          '<a class="mp-ev ev-stay' + evClass(s.c) + '" href="' + stayGcalUrl(s.c, s.kind).replace(/&/g, '&amp;') + '" target="_blank" rel="noopener"'
+            + ' title="' + s.kind + '（' + (s.kind === '前泊' ? '次の日' : '前の日') + 'が本番）＝クリックでGoogleカレンダー登録">' +
+            '<span class="ev-name">' + s.kind + '</span>' +
+            '<span class="ev-pos">' + (s.c.content || s.c.name) +
+              (s.kind === '前泊' && s.c.stayPreMeet ? ' / 集合 ' + s.c.stayPreMeet : '') + '</span>' +
+          '</a>'
         ).join('') +
       '</div>';
     }

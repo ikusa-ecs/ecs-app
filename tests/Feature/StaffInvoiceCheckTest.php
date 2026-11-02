@@ -31,10 +31,10 @@ class StaffInvoiceCheckTest extends TestCase
         Assignment::create(['project_id' => $b->id, 'staff_id' => $s->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-13']);
 
         $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10&tab=check')->assertOk()
-            ->assertSee('🛏 前後泊あり')
+            ->assertSee('<span class="si-fmt">前後泊あり</span>', false)
             ->assertSee("　FC（巡回ファシリ）\n　リアル／前後泊あり", false)
             ->assertSee("泊まらない案件")
-            ->assertDontSee('🛏 無');
+            ->assertDontSee('<span class="si-fmt">無</span>', false);
     }
 
     public function test_staff_with_assignments_are_listed_with_details(): void

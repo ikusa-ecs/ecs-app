@@ -83,7 +83,7 @@ final class MyCalendarEvents
         }
 
         $partial = str_contains((string) $p->lodging, '一部') ? "\n※一部前泊＝自分が泊まるかは担当に確認してください" : '';
-        $stayTitle = fn ($k) => '🛏 '.$k.'｜'.$content.'（'.$client.'）';
+        $stayTitle = fn ($k) => $k.'｜'.$content.'（'.$client.'）';
         if (Lodging::hasPreStay($p->lodging)) {
             $day = $date->copy()->subDay();
             $pt = self::hm($p->stay_pre_meet_time);

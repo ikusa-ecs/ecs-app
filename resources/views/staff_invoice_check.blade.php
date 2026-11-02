@@ -188,7 +188,7 @@
                 @if ($c['format'] !== '' || $stay !== '' || $c['meet'] !== '' || $c['leave'] !== '' || $c['place'] !== '')
                   <div class="si-sub">
                     @if ($c['format'] !== '')<span class="si-fmt">{{ $c['format'] }}</span>@endif
-                    @if ($stay !== '')<span class="si-fmt">🛏 {{ $stay }}</span>@endif
+                    @if ($stay !== '')<span class="si-fmt">{{ $stay }}</span>@endif
                     @if ($c['meet'] !== '' || $c['leave'] !== '')<span>{{ $c['meet'] !== '' ? '集合 '.$c['meet'] : '' }}{{ $c['meet'] !== '' && $c['leave'] !== '' ? '・' : '' }}{{ $c['leave'] !== '' ? '解散 '.$c['leave'] : '' }}</span>@endif
                     @if ($c['place'] !== '')<span>📍 {{ $c['place'] }}</span>@endif
                   </div>

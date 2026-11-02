@@ -2081,7 +2081,7 @@
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'jc-job confirmed jc-stay';
-          b.innerHTML = '<span class="jc-nm">🛏 ' + s.kind + '</span>'
+          b.innerHTML = '<span class="jc-nm">' + s.kind + '</span>'
             + '<span class="jc-sub">' + escAttr(s.c.content) + '</span>'
             + (s.kind === '前泊' && s.c.stayPreMeet ? '<span class="jc-sub">🕘 集合 ' + escAttr(s.c.stayPreMeet) + '</span>' : '');
           b.title = s.kind + '：' + s.c.content + '／' + s.c.client
@@ -2595,7 +2595,7 @@
         const m = document.createElement('span');
         m.className = 'stay-mark';
         m.style.cssText = 'display:block; font-size:10px; font-weight:700; line-height:1.2;';
-        m.textContent = '🛏' + kinds.join('・');
+        m.textContent = kinds.join('・');
         cell.appendChild(m);
         cell.title = (cell.title ? cell.title + '\n' : '') + stayDays[d].join('\n');
       }

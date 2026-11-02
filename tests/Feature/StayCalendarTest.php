@@ -11,8 +11,8 @@ use Tests\TestCase;
 
 /**
  * 前泊・後泊をカレンダーに出す（2026-11-02・FBフォーム 馬場さん）。
- *   ・スタッフ画面のカレンダー＝確定アサインの前の日・次の日に「🛏 前泊／後泊」の帯（画面のJSで描く）。
- *   ・社員のマイページ＝「📅 登録」「今後をまとめて登録」の横に「🛏 前泊／後泊」のGoogleカレンダー登録。
+ *   ・スタッフ画面のカレンダー＝確定アサインの前の日・次の日に「前泊／後泊」の帯（画面のJSで描く）。
+ *   ・社員のマイページ＝「📅 登録」「今後をまとめて登録」の横に「前泊／後泊」のGoogleカレンダー登録。
  * どちらも前泊と数える言葉は App\Support\Lodging から受け取る（画面に言葉を直書きしない）。
  */
 class StayCalendarTest extends TestCase
@@ -44,7 +44,8 @@ class StayCalendarTest extends TestCase
 
         $res = $this->actingAsPerson($me)->get('/mypage')->assertOk()
             ->assertSee('window.ECS_PRE_STAY_WORDS = '.json_encode(\App\Support\Lodging::PRE_STAY_WORDS), false)
-            ->assertSee('function stayCalLinks', false);
+            ->assertSee('function stayCalLinks', false)
+            ->assertSee('function asgStayByDay', false);   // カレンダー表示にも前泊・後泊（2026-11-02）
         $row = collect($res->original->getData()['cases'])->firstWhere('id', $p->id);
         $this->assertNotNull($row);
         $this->assertSame('19:30', $row['stayPreMeet']);
