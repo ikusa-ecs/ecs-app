@@ -630,8 +630,13 @@ class AssignBoardController extends Controller
                 ->all();
 
             // 応募者（applications → 希望者カラム用 {name, lv, pos}）。cal は画面側で当日の稼働可と突合。
+            // 見ている拠点の応募者だけ（2026-11-02 小沼さん「ヘルプで複数拠点に募集しても、自拠点の箇所には自拠点だけ」）。
+            // ⚠ すでにこの案件に入っている人は他拠点でも残す（エントリー一覧と同じ決まり・正本 OfficeScope::personIn）。
+            $memberIds = ($assignedByProject->get($p->id) ?? collect())->pluck('staff_id')->all();
             $applicants = ($appsByProject->get($p->id) ?? collect())
-                ->unique('staff_id')->values()
+                ->unique('staff_id')
+                ->filter(fn ($a) => in_array($a->staff_id, $memberIds, true) || OfficeScope::personIn($people->get($a->staff_id), $office))
+                ->values()
                 ->map(function ($a) use ($people) {
                     $sid = $a->staff_id;
                     $person = $people->get($sid);
@@ -1245,8 +1250,10 @@ class AssignBoardController extends Controller
     {
         $today = Carbon::today();
 
-        // 拠点で絞るのは「案件」だけ。候補者＝応募者∪現メンバー＝その案件に紐づく人なので、
-        // 他拠点の人でもそのまま出す（メンバーが消えると保存＝上書きで担当が外れてしまう）。
+        // 拠点で絞るのは「案件」と「応募者」。⚠ 現メンバーは他拠点の人でもそのまま出す
+        //   （メンバーが消えると保存＝上書きで担当が外れてしまう）。
+        // 応募者は見ている拠点の人だけ（2026-11-02 小沼さん「ヘルプで複数拠点に募集しても、自拠点の箇所には自拠点だけ」）。
+        //   エントリー一覧（entriesCases）と同じ決まり＝正本 OfficeScope::personIn。
         // ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
         $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::with('director:id,name'), $office))
             ->notCancelled()->needsAssign()   // キャンセルになった案件は並べない（2026-08-26）
@@ -1319,9 +1326,11 @@ class AssignBoardController extends Controller
         //   読み方と見せ方の正本＝App\Support\DispatchRows。
         $dispatchesByProject = DispatchRows::forProjects($projectIds);
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $entryNoteByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames, $dispatchesByProject) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $entryNoteByProject, $assignedByProject, $assignInfoByProject, $availSet, $people, $contentNames, $dispatchesByProject, $office) {
             $assignedIds = $assignedByProject->get($p->id, []);
-            $applicantIds = $appsByProject->get($p->id, []);
+            // 応募者は見ている拠点の人だけ（すでにこの案件に入っている人は他拠点でも残す）。
+            $applicantIds = array_values(array_filter($appsByProject->get($p->id, []),
+                fn ($sid) => in_array($sid, $assignedIds, true) || OfficeScope::personIn($people->get($sid), $office)));
             $entryNotes = $entryNoteByProject->get($p->id, []);
             $assignInfo = $assignInfoByProject->get($p->id, []);
             $off = $this->offDays($p->start_date ?? $today, $today);

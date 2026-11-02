@@ -203,6 +203,41 @@ class OfficeScopeBoardTest extends TestCase
     }
 
     /** 日別ボードの「希望者（その日稼働可）」は自拠点のスタッフだけ。 */
+    /**
+     * 日別ボードの「希望者」とピックアップの候補も、見ている拠点の応募者だけ（2026-11-02 小沼さん）。
+     * ヘルプで複数拠点に募集をかけると、他拠点のスタッフの応募がこちらの案件の欄にも出ていた。
+     * ⚠ すでにこの案件に入っている人は他拠点でも出す（ピックアップは保存が上書きなので、消えると外れてしまう）。
+     */
+    public function test_board_and_pickup_hide_applicants_from_other_offices_unless_assigned(): void
+    {
+        $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
+        $tokyoStaff = PersonFactory::new()->staff()->create(['office' => '東京']);
+        $osakaStaff = PersonFactory::new()->staff()->create(['office' => '大阪']);
+        $osakaMember = PersonFactory::new()->staff()->create(['office' => '大阪']);
+        $project = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $this->soon()]);
+        foreach ([$tokyoStaff, $osakaStaff, $osakaMember] as $s) {
+            Application::create(['project_id' => $project->id, 'staff_id' => $s->id, 'intent' => '希望', 'applied_at' => now()]);
+        }
+        Assignment::create(['project_id' => $project->id, 'staff_id' => $osakaMember->id, 'date' => $this->soon(), 'role' => 'FC', 'status' => '仮']);
+
+        $board = collect($this->actingAsPerson($tokyoEmp)->get('/assign')->assertOk()->original->getData()['boardCases']);
+        $applicants = collect($board->firstWhere('id', $project->id)['applicants'])->pluck('id')->all();
+        $this->assertContains($tokyoStaff->id, $applicants);
+        $this->assertNotContains($osakaStaff->id, $applicants, '他拠点のスタッフの応募は出さない');
+        $this->assertContains($osakaMember->id, $applicants, 'すでに入っている人は他拠点でも出す');
+
+        $pickup = collect($this->actingAsPerson($tokyoEmp)->get('/pickup')->assertOk()->original->getData()['pickupCases']);
+        $entrants = collect($pickup->firstWhere('id', $project->id)['entrants'])->pluck('id')->all();
+        $this->assertContains($tokyoStaff->id, $entrants);
+        $this->assertNotContains($osakaStaff->id, $entrants, '他拠点のスタッフの応募は出さない');
+        $this->assertContains($osakaMember->id, $entrants, 'すでに入っている人は他拠点でも出す');
+
+        // 全拠点で見ているときは全員。
+        $all = collect($this->actingAsPerson(PersonFactory::new()->create(['office' => '東京', 'permission' => 'manager']))
+            ->get('/assign?office=all')->assertOk()->original->getData()['boardCases']);
+        $this->assertContains($osakaStaff->id, collect($all->firstWhere('id', $project->id)['applicants'])->pluck('id')->all());
+    }
+
     public function test_board_available_pool_is_limited_to_my_office(): void
     {
         $tokyoEmp = PersonFactory::new()->create(['office' => '東京']);
