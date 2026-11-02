@@ -51,6 +51,7 @@ class SizeListController extends Controller
             ->byKana()
             ->get(['id', 'name', 'name_kana', 'role', 'office', 'department', 'shoe_size', 'shirt_size', 'height', 'is_fulltime', 'can_view_sizes']);
         $row = fn (Person $p) => [
+            'id' => (string) $p->id,
             'name' => (string) $p->name,
             'kana' => (string) ($p->name_kana ?? ''),
             'office' => (string) ($p->office ?? ''),
@@ -64,6 +65,10 @@ class SizeListController extends Controller
         // スタッフは、サイズ（靴・服・身長のどれか）を登録している人だけ（2026-11-02 小沼さん）。社員は全員。
         $staff = $people->where('role', 'staff')->map($row)
             ->filter(fn ($r) => $r['shoe'] !== '' || $r['wear'] !== '' || $r['height'] !== '')->values();
+        // 表に出ない（サイズ未登録の）スタッフの名前だけ。名前で探して出てこないとき「未登録」と分かるように（2026-11-02 小沼さん）。
+        $unregistered = $people->where('role', 'staff')->map($row)
+            ->filter(fn ($r) => $r['shoe'] === '' && $r['wear'] === '' && $r['height'] === '')
+            ->map(fn ($r) => ['name' => $r['name'], 'kana' => $r['kana']])->values();
         $byGroup = $people->where('role', 'employee')->groupBy(fn (Person $p) => Departments::group($p->department) ?: Departments::OTHER);   // 部署が空の人も「その他」に（消さない）
         $employees = [];
         foreach (Departments::GROUPS as $g) {
@@ -79,7 +84,7 @@ class SizeListController extends Controller
                 ->values()
             : null;
 
-        return view('sizes', ['staff' => $staff, 'employees' => $employees, 'fulltime' => $fulltime]);
+        return view('sizes', ['staff' => $staff, 'employees' => $employees, 'fulltime' => $fulltime, 'unregistered' => $unregistered]);
     }
 
     /** 常勤のスタッフに、サイズ一覧を見せる／見せないを付け外しする（社員以上・押した瞬間に保存）。 */

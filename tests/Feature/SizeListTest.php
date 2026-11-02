@@ -30,13 +30,18 @@ class SizeListTest extends TestCase
         $this->actingAsPerson($notShown)->get('/sizes')->assertForbidden();   // 常勤でも、見せていなければ開けない
         $this->actingAsPerson($notFull)->get('/sizes')->assertForbidden();    // 常勤でなければ、見せる印が残っていても開けない
 
-        $this->actingAsPerson($viewer)->get('/sizes')->assertOk()
+        $data = $this->actingAsPerson($viewer)->get('/sizes')->assertOk()
             ->assertSee('見る花子')->assertSee('23.5')->assertSee('158')
             ->assertSee('社員一郎')->assertSee('27')
             ->assertDontSee('辞めた三郎')
-            ->assertDontSee('見ない四郎')                       // サイズを登録していないスタッフは出さない
             ->assertDontSee('この一覧を見せる常勤スタッフ')       // 付け外しは社員だけ
-            ->assertDontSee('/staff-invoice-check', false);   // スタッフに社員のメニューを出さない
+            ->assertDontSee('/staff-invoice-check', false)    // スタッフに社員のメニューを出さない
+            ->original->getData();
+        // サイズを登録していないスタッフは表に出さない。名前だけ「未登録」として持つ（探したときに分かるように）。
+        $this->assertNotContains('見ない四郎', collect($data['staff'])->pluck('name')->all());
+        $this->assertContains('見ない四郎', collect($data['unregistered'])->pluck('name')->all());
+        $this->assertNotContains('見る花子', collect($data['unregistered'])->pluck('name')->all());
+        $this->assertNotContains('辞めた三郎', collect($data['unregistered'])->pluck('name')->all());
 
         $this->actingAsPerson($emp)->get('/sizes')->assertOk()
             ->assertSee('見る花子')
