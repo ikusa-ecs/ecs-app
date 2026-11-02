@@ -375,11 +375,15 @@ class PersonController extends Controller
     public function staff()
     {
         // ポジション可否・NGペアも一緒に読む（毎回引かないようにする）。
-        $people = Person::staff()
-            ->with(['roleEligibilities', 'ngRelations'])
-            ->orderByDesc('experience_count')
-            ->get()
-            ->map(function (Person $p) {
+        // 経験回数は保存された people.experience_count（参考値・本番はほぼ空）ではなく、
+        // アサインから数え直した数（正本＝ExperienceCount・詳細の「通算 ○件」と同じ）を使う。
+        // ⚠ 参考値で並べていたので全員0になり、「経験回数の多い順」が番号順と同じになっていた（2026-11-02 小沼さん）。
+        $rows = Person::staff()->with(['roleEligibilities', 'ngRelations'])->get();
+        $experience = ExperienceCount::forMany($rows->pluck('id')->all());
+        $people = $rows
+            ->sortByDesc(fn (Person $p) => (int) ($experience[$p->id]['projects'] ?? 0))
+            ->values()
+            ->map(function (Person $p) use ($experience) {
                 // できるポジション → people.js と同じ {D:true, OP:false, ...} の形に戻す
                 $can = $p->roleEligibilities->pluck('position')->all();
                 $pos = [];
@@ -406,7 +410,7 @@ class PersonController extends Controller
                     // joinDate ＝ 区分（新人/中堅/ベテラン）計算の元。people.js と同じく文字列で渡す。
                     'joinDate' => $p->hire_date?->format('Y-m-d'),
                     'exclusive' => (bool) $p->is_exclusive,
-                    'total' => $p->experience_count ?? 0,
+                    'total' => (int) ($experience[$p->id]['projects'] ?? 0),
                     'pos' => $pos,
                     // OPの区別（B案）：オンライン可／リアル可。null=未設定は false 扱いで渡す。
                     'opOnline' => (bool) $p->op_online,
@@ -465,7 +469,7 @@ class PersonController extends Controller
             // 経験回数（自動集計・2026-08-27 baba要望）。正本＝App\Support\ExperienceCount。
             // ⚠ 表に保存せず毎回数える（写しは必ず腐る）。一覧ぶんを1回のクエリでまとめて数える
             //   ＝1人ずつ引くと人数ぶんSQLが走る。
-            'experience' => ExperienceCount::forMany($people->pluck('id')->all()),
+            'experience' => $experience,
             // 拠点で絞って見るための選択肢（2026-08-25 baba要望）。
             // 既定は自分の拠点。「すべての拠点」も選べる＝他拠点の人を探せなくならないように
             // （他拠点へヘルプに行く／来てもらう運用があるため）。

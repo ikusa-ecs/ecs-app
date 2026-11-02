@@ -7,6 +7,7 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
+use App\Support\ExperienceCount;
 use Illuminate\Support\Carbon;
 
 /**
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  *  ・最大連勤＝全アサイン日のうち連続日数の最長。
  *  ・ご無沙汰＝基準日以前で最後にアサインされてからの経過日数（無ければ「—」）。
  *  ・選ばれた率＝応募(applications)のうち実アサインされた割合。
- *  ・通算＝people.experience_count。区分（新人/中堅/ベテラン）は通算から画面側で判定。
+ *  ・通算＝アサインから数え直した数（ExperienceCount・2026-11-02 から。以前は people.experience_count）。区分（新人/中堅/ベテラン）は通算から画面側で判定。
  *  ・活性度＝対象月の希望日数 ÷ 対象月の本番開催日数（50%↑=アクティブ/30%↑=準/未満=非）。
  *
  * 対象月は「今日の当月」（例：7月に開けば2026-07。運用ではアサインMTGの対象月）。
@@ -65,8 +66,13 @@ class StaffStatusController extends Controller
             ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d').' 23:59:59'])
             ->distinct()->pluck('staff_id')->all();
 
-        $status = Person::staff()->inService($workingThisMonth)->orderByDesc('experience_count')->get()
-            ->map(function (Person $p) use ($today, $monthStart, $monthEnd, $projectType, $eventDays, $assignsByStaff, $prefByStaff, $appsByStaff) {
+        // 通算＝アサインから数え直した数（正本＝ExperienceCount・名簿の詳細「通算 ○件」と同じ）。
+        // ⚠ 保存された people.experience_count（参考値・本番はほぼ空）は使わない＝全員0で新人扱いになっていた（2026-11-02）。
+        $people = Person::staff()->inService($workingThisMonth)->get();
+        $experience = ExperienceCount::forMany($people->pluck('id')->all());
+        $status = $people
+            ->sortByDesc(fn (Person $p) => (int) ($experience[$p->id]['projects'] ?? 0))
+            ->map(function (Person $p) use ($today, $monthStart, $monthEnd, $projectType, $eventDays, $assignsByStaff, $prefByStaff, $appsByStaff, $experience) {
                 $myAssigns = $assignsByStaff->get($p->id, collect());
 
                 // 今月アサイン数（対象月・本番のみ）
@@ -110,7 +116,7 @@ class StaffStatusController extends Controller
                     'cap' => 20,
                     'rate' => $rate,            // 稼働率＝月÷希望日数（希望0件は null）
                     'renkin' => $renkin,
-                    'total' => (int) ($p->experience_count ?? 0),
+                    'total' => (int) ($experience[$p->id]['projects'] ?? 0),
                     'zeroPref' => $want === 0,
                     'applied' => $applied,
                     'picked' => $picked,

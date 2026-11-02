@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
+use App\Support\ExperienceCount;
 use App\Support\OfficeScope;
 use App\Support\RecentWindow;
 use Illuminate\Http\Request;
@@ -133,7 +134,11 @@ class AssignDashboardController extends Controller
         $rates = [];
         $zeroPrefCount = 0;
         $alerts = [];
-        foreach (OfficeScope::applyToPeople(Person::staff(), $office)->get() as $p) {
+        $staffList = OfficeScope::applyToPeople(Person::staff(), $office)->get();
+        // 区分（新人/中堅/ベテラン）の元の通算＝アサインから数え直した数（正本＝ExperienceCount・2026-11-02）。
+        // ⚠ people.experience_count（参考値・本番はほぼ空）は使わない＝全員「新人」になっていた。
+        $experience = ExperienceCount::forMany($staffList->pluck('id')->all());
+        foreach ($staffList as $p) {
             $want = $prefByStaff->get($p->id, collect())->count();
             if ($want === 0) {
                 $zeroPrefCount++;
@@ -152,7 +157,7 @@ class AssignDashboardController extends Controller
 
             // 要注意＝希望はあるのに充足率30%未満（30%担保の目安に未達）。0%＝赤、1〜29%＝オレンジ。
             if ($rate < 30) {
-                $total = (int) ($p->experience_count ?? 0);
+                $total = (int) ($experience[$p->id]['projects'] ?? 0);
                 $alerts[] = [
                     'name'  => $p->name,
                     'lv'    => $total <= 10 ? '新人' : ($total < 30 ? '中堅' : 'ベテラン'),
