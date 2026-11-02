@@ -25,9 +25,31 @@
 
 @section('content')
   <p class="sz-intro">
-    在籍中のスタッフと社員の<b>靴（足袋）・服・身長</b>だけを並べた一覧です（衣装の準備用）。サイズは本人がプロフィールで入れたものです。空の人は「—」になります。
+    在籍中のスタッフと社員の<b>靴（足袋）・服・身長</b>だけを並べた一覧です（衣装の準備用）。サイズは本人がプロフィールで入れたものです。
+    スタッフはサイズを登録している人だけ出ます。空の欄は「—」になります。
   </p>
   @include('partials.office_switch')
+
+  {{-- 常勤のスタッフに見せる／見せない（社員だけに出る・押した瞬間に保存・2026-11-02 小沼さん「つど権限を付与する」）。 --}}
+  @if ($fulltime !== null)
+    <div class="sz-grant">
+      <div class="sz-sec" style="margin-top:4px;">👀 この一覧を見せる常勤スタッフ</div>
+      <p class="sz-intro" style="margin-bottom:6px;">チェックした人だけ、スタッフ画面からこの一覧を開けます。使い終わったらチェックを外してください。常勤の印はスタッフ名簿の「詳細」→「区分」で付けます。</p>
+      @if (count($fulltime) === 0)
+        <p class="sz-intro">常勤のスタッフがいません。</p>
+      @else
+        <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
+          @foreach ($fulltime as $f)
+            <label style="font-size:13.5px; cursor:pointer;">
+              <input type="checkbox" class="sz-grant-cb" data-id="{{ $f['id'] }}" @checked($f['on']) onchange="szGrant(this)">
+              {{ $f['name'] }}@if ($f['office'] !== '')<span class="sz-small">{{ $f['office'] }}</span>@endif
+              <span class="sz-small sz-grant-msg"></span>
+            </label>
+          @endforeach
+        </div>
+      @endif
+    </div>
+  @endif
   <div class="sz-bar">
     <input type="text" id="szSearch" placeholder="名前・ふりがなで探す" oninput="szFilter()">
     <select id="szKind" onchange="szFilter()">
@@ -57,6 +79,22 @@
 @endsection
 
 @push('scripts')
+<script>
+  // 常勤のスタッフに見せる／見せない。押した瞬間に保存。失敗したらチェックを戻して赤字（請求書チェックと同じ作り）。
+  function szGrant(cb) {
+    const msg = cb.parentElement.querySelector('.sz-grant-msg');
+    const on = cb.checked;
+    msg.textContent = '保存中…'; msg.style.color = '';
+    fetch('/sizes/grant', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: cb.dataset.id, on: on })
+    })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(() => { msg.textContent = on ? '見せています' : ''; })
+    .catch(err => { cb.checked = !on; msg.textContent = '保存できませんでした（' + err + '）'; msg.style.color = '#b91c1c'; });
+  }
+</script>
 <script>
   // 名前・ふりがなで探す／スタッフ・社員で絞る。画面の中だけで絞る（保存はしない）。
   function szFilter() {

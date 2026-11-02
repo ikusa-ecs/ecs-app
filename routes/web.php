@@ -117,6 +117,8 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     // サイズ一覧（靴・服・身長だけ・2026-11-02）。社員以上＋チェックされたスタッフ。
     // ⚠ tier を付けない＝スタッフも通す。門は SizeListController::canView の1か所。
     Route::get('/sizes', [\App\Http\Controllers\SizeListController::class, 'index']);
+    // 常勤のスタッフにサイズ一覧を見せる／見せない（社員以上・つど付け外し・2026-11-02）。門は grant() の中。
+    Route::post('/sizes/grant', [\App\Http\Controllers\SizeListController::class, 'grant']);
     // 使い方ガイド（社内向け・全役割）。サイドバー（社員以上）から開く。
     // ⚠ 社員以上だけ（2026-09-07）。中身が「社員側の全画面の使い方」なので、スタッフには出さない。
     //   スタッフ向けは下の /guide-staff（こちらは誰でも開ける）。

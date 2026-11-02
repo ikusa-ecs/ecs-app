@@ -573,7 +573,7 @@
             <h4 style="margin-top:16px;">区分</h4>
             <div class="trait">
               <label><input type="checkbox" class="edit-exclusive" ${p.exclusive?'checked':''}> 専属スタッフ</label>
-              <label title="常勤のスタッフは、スタッフ画面から「サイズ一覧」（全員の靴・服・身長）を開けます"><input type="checkbox" class="edit-size-viewer" ${p.sizeViewer?'checked':''}> 常勤</label>
+              <label title="常勤のスタッフは、サイズ一覧の画面で「見せる」を付けると、その間だけサイズ一覧（全員の靴・服・身長）を開けます"><input type="checkbox" class="edit-fulltime" ${p.fulltime?'checked':''}> 常勤</label>
             </div>
 
             ${nameEditor(p)}
@@ -883,9 +883,9 @@
     const mcScaleEl = dr.querySelector('.edit-mc-scale');
     if (mcScaleEl) body.append('mc_max_scale', mcScaleEl.value);
     if (exclusive) body.append('exclusive', '1');
-    // 常勤（＝サイズ一覧を見られる・2026-11-02）。欄が無いときは送らない＝勝手に外さない。
-    const sizeViewerEl = dr.querySelector('.edit-size-viewer');
-    if (sizeViewerEl) body.append('size_viewer', sizeViewerEl.checked ? '1' : '0');
+    // 常勤（2026-11-02）。欄が無いときは送らない＝勝手に外さない。
+    const fulltimeEl = dr.querySelector('.edit-fulltime');
+    if (fulltimeEl) body.append('fulltime', fulltimeEl.checked ? '1' : '0');
     if (follow)    body.append('follow', '1');
     if (starter)   body.append('starter', '1');
     if (atmosT)    body.append('atmos', '1');
@@ -910,7 +910,7 @@
       ['OP','MC','SP'].forEach(k => { p.pos[k] = posSel.includes(k); });
       p.opOnline = opOnline; p.opReal = opReal;
       p.exclusive = exclusive;
-      if (sizeViewerEl) p.sizeViewer = sizeViewerEl.checked;
+      if (fulltimeEl) p.fulltime = fulltimeEl.checked;
       p.traits = { follow: follow, starter: starter, atmos: atmosT };
       p.ng = ngText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
       p.dnote = memo;

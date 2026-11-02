@@ -410,7 +410,7 @@ class PersonController extends Controller
                     // joinDate ＝ 区分（新人/中堅/ベテラン）計算の元。people.js と同じく文字列で渡す。
                     'joinDate' => $p->hire_date?->format('Y-m-d'),
                     'exclusive' => (bool) $p->is_exclusive,
-                    'sizeViewer' => (bool) $p->can_view_sizes,   // 常勤＝サイズ一覧を見られる（2026-11-02）
+                    'fulltime' => (bool) $p->is_fulltime,   // 常勤（2026-11-02）
                     'total' => (int) ($experience[$p->id]['projects'] ?? 0),
                     'pos' => $pos,
                     // OPの区別（B案）：オンライン可／リアル可。null=未設定は false 扱いで渡す。
@@ -606,9 +606,10 @@ class PersonController extends Controller
 
             // 3) 専属・人柄・メモ（people の実在カラム）。
             $person->is_exclusive = $request->boolean('exclusive');
-            // 常勤＝サイズ一覧を見られる（2026-11-02）。送られてきたときだけ更新＝古い画面から保存しても勝手に外さない。
-            if ($request->has('size_viewer')) {
-                $person->can_view_sizes = $request->boolean('size_viewer');
+            // 常勤（2026-11-02）。送られてきたときだけ更新＝古い画面から保存しても勝手に外さない。
+            // ⚠ サイズ一覧を見せるかは別（サイズ一覧の画面でつど付け外し・SizeListController::grant）。
+            if ($request->has('fulltime')) {
+                $person->is_fulltime = $request->boolean('fulltime');
             }
             $person->can_follow_newbie = $request->boolean('follow');
             $person->self_starter = $request->boolean('starter');
