@@ -20,6 +20,23 @@ class StaffInvoiceCheckTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** 明細に前泊の有無（2026-11-02）。前泊・前後泊は札とコピー文に出す。無し・未定は出さない。 */
+    public function test_detail_shows_pre_stay(): void
+    {
+        $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京']);
+        $s = PersonFactory::new()->create(['role' => 'staff', 'office' => '東京', 'name' => '前泊太郎']);
+        $a = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-12', 'project_name' => '泊まる案件', 'format' => 'リアル', 'lodging' => '前後泊あり']);
+        $b = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-13', 'project_name' => '泊まらない案件', 'format' => 'リアル', 'lodging' => '無']);
+        Assignment::create(['project_id' => $a->id, 'staff_id' => $s->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-12']);
+        Assignment::create(['project_id' => $b->id, 'staff_id' => $s->id, 'role' => 'FC', 'status' => '確定', 'date' => '2026-10-13']);
+
+        $this->actingAsPerson($me)->get('/staff-invoice-check?ym=2026-10&tab=check')->assertOk()
+            ->assertSee('🛏 前後泊あり')
+            ->assertSee("　FC（巡回ファシリ）\n　リアル／前後泊あり", false)
+            ->assertSee("泊まらない案件")
+            ->assertDontSee('🛏 無');
+    }
+
     public function test_staff_with_assignments_are_listed_with_details(): void
     {
         $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => '担当花子']);

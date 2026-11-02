@@ -6,6 +6,7 @@ use App\Models\Person;
 use App\Models\Setting;
 use App\Models\StaffAllowance;
 use App\Models\StaffInvoiceCheck;
+use App\Support\Lodging;
 use App\Support\OfficeScope;
 use App\Support\PersonMonthCases;
 use App\Support\ProjectContentName;
@@ -218,11 +219,11 @@ class StaffInvoiceCheckController extends Controller
         return implode("\n", $lines);
     }
 
-    /** 2行目＝「　リアルロング／集合 7:00・解散 18:00／会場住所」（無い項目は書かない）。 */
+    /** 2行目＝「　リアルロング／前泊有／集合 7:00・解散 18:00／会場住所」（無い項目は書かない）。 */
     public static function detailLine(array $c): string
     {
         $time = trim(($c['meet'] !== '' ? '集合 '.$c['meet'] : '').($c['meet'] !== '' && $c['leave'] !== '' ? '・' : '').($c['leave'] !== '' ? '解散 '.$c['leave'] : ''));
-        $bits = array_filter([$c['format'], $time, $c['place']], fn ($v) => $v !== '');
+        $bits = array_filter([$c['format'], Lodging::stayLabel($c['lodging'] ?? ''), $time, $c['place']], fn ($v) => $v !== '');
 
         return $bits ? "\n　".implode('／', $bits) : '';
     }

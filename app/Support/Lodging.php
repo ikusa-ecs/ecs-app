@@ -37,6 +37,15 @@ final class Lodging
         return false;
     }
 
+    /**
+     * 明細に出す宿泊の札（「前泊有」「一部前泊有」「後泊あり」「前後泊あり」）。泊まりが無い・未定は空。
+     * 請求書チェックの明細で前泊手当を見比べる用（2026-11-02）。
+     */
+    public static function stayLabel(?string $lodging): string
+    {
+        return self::hasPreStay($lodging) || self::hasPostStay($lodging) ? trim((string) $lodging) : '';
+    }
+
     /** 「後泊がある」と数える言葉。「後泊あり」「前後泊あり」（2026-10-14・FBシート No.23）。 */
     public const POST_STAY_WORDS = ['後泊'];
 

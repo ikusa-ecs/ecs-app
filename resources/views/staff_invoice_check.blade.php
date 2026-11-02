@@ -183,10 +183,12 @@
               <li>{{ $c['date'] }}　<a href="/project-assign?project={{ urlencode($c['projectId']) }}">{{ $c['name'] }}</a>{{ $c['client'] !== '' ? '／'.$c['client'] : '' }}{{ $c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '' }}　{{ $c['role'] }}
                 @if ($c['status'] !== '確定')<span class="st">（{{ $c['status'] }}）</span>@endif
                 @if ($c['cancelled'])<span class="cx">案件中止</span>@endif
-                {{-- 実施形態・集合／解散・会場住所（2026-10-13） --}}
-                @if ($c['format'] !== '' || $c['meet'] !== '' || $c['leave'] !== '' || $c['place'] !== '')
+                {{-- 実施形態・宿泊（前泊など・2026-11-02）・集合／解散・会場住所（2026-10-13） --}}
+                @php $stay = \App\Support\Lodging::stayLabel($c['lodging']); @endphp
+                @if ($c['format'] !== '' || $stay !== '' || $c['meet'] !== '' || $c['leave'] !== '' || $c['place'] !== '')
                   <div class="si-sub">
                     @if ($c['format'] !== '')<span class="si-fmt">{{ $c['format'] }}</span>@endif
+                    @if ($stay !== '')<span class="si-fmt">🛏 {{ $stay }}</span>@endif
                     @if ($c['meet'] !== '' || $c['leave'] !== '')<span>{{ $c['meet'] !== '' ? '集合 '.$c['meet'] : '' }}{{ $c['meet'] !== '' && $c['leave'] !== '' ? '・' : '' }}{{ $c['leave'] !== '' ? '解散 '.$c['leave'] : '' }}</span>@endif
                     @if ($c['place'] !== '')<span>📍 {{ $c['place'] }}</span>@endif
                   </div>
