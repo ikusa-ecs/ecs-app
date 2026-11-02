@@ -573,7 +573,7 @@
             <h4 style="margin-top:16px;">区分</h4>
             <div class="trait">
               <label><input type="checkbox" class="edit-exclusive" ${p.exclusive?'checked':''}> 専属スタッフ</label>
-              <label title="チェックすると、この人もスタッフ画面から「サイズ一覧」（全員の靴・服・身長）を開けます"><input type="checkbox" class="edit-size-viewer" ${p.sizeViewer?'checked':''}> 👕 サイズ一覧を見られる</label>
+              <label title="常勤のスタッフは、スタッフ画面から「サイズ一覧」（全員の靴・服・身長）を開けます"><input type="checkbox" class="edit-size-viewer" ${p.sizeViewer?'checked':''}> 常勤</label>
             </div>
 
             ${nameEditor(p)}
@@ -883,7 +883,7 @@
     const mcScaleEl = dr.querySelector('.edit-mc-scale');
     if (mcScaleEl) body.append('mc_max_scale', mcScaleEl.value);
     if (exclusive) body.append('exclusive', '1');
-    // サイズ一覧を見られる（2026-11-02）。欄が無いときは送らない＝勝手に外さない。
+    // 常勤（＝サイズ一覧を見られる・2026-11-02）。欄が無いときは送らない＝勝手に外さない。
     const sizeViewerEl = dr.querySelector('.edit-size-viewer');
     if (sizeViewerEl) body.append('size_viewer', sizeViewerEl.checked ? '1' : '0');
     if (follow)    body.append('follow', '1');

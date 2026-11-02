@@ -1241,7 +1241,7 @@
             <button class="line-btn" onclick="location.href='/profile'">マイプロフィールを編集する</button>
             <button class="line-btn" onclick="location.href='/password'">パスワードを変更する</button>
             <button class="line-btn" onclick="window.open('/guide-staff','_blank','noopener')">📋 使い方ガイドを見る</button>
-            {{-- サイズ一覧（2026-11-02）。スタッフ名簿で「サイズ一覧を見られる」にチェックされた人と社員以上だけ。 --}}
+            {{-- サイズ一覧（2026-11-02）。スタッフ名簿で「常勤」にチェックされた人と社員以上だけ。 --}}
             @if (\App\Http\Controllers\SizeListController::canView(Auth::user()))
             <button class="line-btn" onclick="location.href='/sizes'">👕 サイズ一覧（みんなの靴・服・身長）を見る</button>
             @endif
