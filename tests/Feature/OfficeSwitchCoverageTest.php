@@ -38,6 +38,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/past-projects',       // 過去案件（2026-10-09 に追加）
         '/staff-invoice-check', // スタッフ別アサイン（請求書チェック）（2026-10-13 に追加）
         '/employee-assignments', // 社員別アサイン一覧（2026-10-13 に追加）
+        '/sizes',               // サイズ一覧（2026-11-02 に追加）
     ];
 
     private function admin(): Person

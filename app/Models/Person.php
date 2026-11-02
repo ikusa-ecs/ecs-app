@@ -69,6 +69,7 @@ class Person extends Model implements AuthenticatableContract
             'invited_at' => 'datetime',      // ログイン案内メールを最後に送った日時
             'password_set_at' => 'datetime', // 本人が自分でパスワードを決めた日時
             'is_exclusive' => 'boolean',
+            'can_view_sizes' => 'boolean',   // サイズ一覧（/sizes）を見られるスタッフ（2026-11-02）
             'op_online' => 'boolean',   // OPオンライン可（B案）
             'op_real' => 'boolean',     // OPリアル(現地)可（B案）
             'notify_settings' => 'array',   // マイページの通知オン/オフ

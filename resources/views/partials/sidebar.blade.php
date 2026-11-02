@@ -86,6 +86,8 @@
         <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
         {{-- 社員別アサイン一覧（2026-10-13）。 --}}
         <a class="{{ ($active ?? '') === 'employee_assignments' ? 'active' : '' }}" href="/employee-assignments"><span class="nav-icon">👥</span> 社員別アサイン一覧</a>
+        {{-- サイズ一覧（靴・服・身長だけ・2026-11-02）。 --}}
+        <a class="{{ ($active ?? '') === 'sizes' ? 'active' : '' }}" href="/sizes"><span class="nav-icon">👕</span> サイズ一覧</a>
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
         <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>
         {{-- CSV取込は増やさず1項目に集約。ハブ画面から名簿・コンテンツ・案件の各取込へ。 --}}
@@ -102,6 +104,9 @@
     @else
     {{-- スタッフはこちら（/profile・/password を開いたとき）。自分の画面へ戻る道だけ出す。 --}}
     <a href="/staff-portal"><span class="nav-icon">🏠</span> スタッフ画面へ戻る</a>
+    @if (\App\Http\Controllers\SizeListController::canView(Auth::user()))
+    <a class="{{ ($active ?? '') === 'sizes' ? 'active' : '' }}" href="/sizes"><span class="nav-icon">👕</span> サイズ一覧</a>
+    @endif
     <a href="/guide-staff" target="_blank" rel="noopener"><span class="nav-icon">📋</span> 使い方ガイド</a>
     @endif
   </nav>

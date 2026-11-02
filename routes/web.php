@@ -114,6 +114,9 @@ Route::middleware(['auth', 'twofa', 'onboarded'])->group(function () {
     Route::post('/staff-portal/entry', [StaffPortalController::class, 'saveEntry']);
     // 連日イベントの全日程にまとめてエントリー（2026-10-16）。
     Route::post('/staff-portal/entry-series', [StaffPortalController::class, 'saveSeriesEntry']);
+    // サイズ一覧（靴・服・身長だけ・2026-11-02）。社員以上＋チェックされたスタッフ。
+    // ⚠ tier を付けない＝スタッフも通す。門は SizeListController::canView の1か所。
+    Route::get('/sizes', [\App\Http\Controllers\SizeListController::class, 'index']);
     // 使い方ガイド（社内向け・全役割）。サイドバー（社員以上）から開く。
     // ⚠ 社員以上だけ（2026-09-07）。中身が「社員側の全画面の使い方」なので、スタッフには出さない。
     //   スタッフ向けは下の /guide-staff（こちらは誰でも開ける）。
