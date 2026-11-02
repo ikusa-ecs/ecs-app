@@ -224,7 +224,8 @@
           if (!cb) return '';
           const tr = cb.closest('tr');
           return '<label class="sz-chip" style="cursor:pointer;"><input type="checkbox" ' + (cb.checked ? 'checked ' : '')
-            + 'onchange="szPickToggle(\'' + szEsc(pid) + '\', this.checked)"> ' + szEsc(tr.dataset.name || '') + '</label>';
+            + 'onchange="szPickToggle(\'' + szEsc(pid) + '\', this.checked)"> ' + szEsc(tr.dataset.name || '')
+            + '<span class="sz-small">👟' + szEsc(tr.dataset.shoe || '—') + ' 👕' + szEsc(tr.dataset.wear || '—') + '</span></label>';
         }).join('') + '</div>';
       box.innerHTML = html;
       if (scroll) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
