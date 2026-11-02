@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GoogleCalendarLink;
+use App\Support\GoogleCalendarSync;
 use App\Support\PersonalCases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -41,6 +43,13 @@ class MyPageController extends Controller
             'cases' => PersonalCases::cases($today, $me),
             'myAssign' => PersonalCases::myAssign($me),
             'notify' => $notify,
+            // Googleカレンダーとの連携（2026-11-02）。configured＝管理者が鍵を入れたか／linked＝本人が連携したか。
+            'googleCal' => [
+                'configured' => GoogleCalendarSync::configured(),
+                'linked' => $me ? GoogleCalendarLink::whereKey($me->id)->exists() : false,
+                'email' => $me ? (string) (GoogleCalendarLink::find($me->id)->google_email ?? '') : '',
+                'syncedAt' => $me ? optional(GoogleCalendarLink::find($me->id)?->synced_at)->format('n/j H:i') : null,
+            ],
         ]);
     }
 

@@ -424,6 +424,13 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/mypage', [MyPageController::class, 'index']);
     // マイページの通知設定（新人フォロー所感/アサイン確定/締切）を people へ本物保存。
     Route::post('/mypage/notify', [MyPageController::class, 'saveNotify']);
+    // Googleカレンダーに直接登録（2026-11-02 baba決定）。正本＝App\Support\GoogleCalendarSync。
+    Route::get('/google-calendar/connect', [\App\Http\Controllers\GoogleCalendarController::class, 'connect']);
+    Route::get('/google-calendar/callback', [\App\Http\Controllers\GoogleCalendarController::class, 'callback']);
+    Route::post('/google-calendar/sync', [\App\Http\Controllers\GoogleCalendarController::class, 'sync']);
+    Route::post('/google-calendar/disconnect', [\App\Http\Controllers\GoogleCalendarController::class, 'disconnect']);
+    // 予定のファイル（.ics）＝Googleとつながない人の予備の道（中身はGoogleへの登録と同じ＝MyCalendarEvents）。
+    Route::get('/mypage/calendar.ics', [\App\Http\Controllers\GoogleCalendarController::class, 'ics']);
     // 収支入力。案件一覧を DB から出す（D または営業担当の案件が対象）。
     Route::get('/mypage-finance', [MyPageFinanceController::class, 'index']);
     // 収支（売上・経費明細・メモ）を project_finances へ本物保存（イベプラ要望）。

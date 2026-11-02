@@ -35,6 +35,14 @@ return [
         ],
     ],
 
+    // Googleカレンダーに直接登録する（2026-11-02 baba決定）。鍵はコードに書かず .env に置く。
+    // Google Cloud で「内部（ikusa.co.jp だけ）」のOAuthクライアントを作り、その番号と鍵を入れる。
+    // リダイレクトURI＝ https://（ECSのドメイン）/google-calendar/callback 。空のあいだは連携ボタンを出さない。
+    'google_calendar' => [
+        'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
+    ],
+
     // チャットワーク。token は「鍵」なのでコードに書かず .env の CHATWORK_TOKEN に置く。
     //
     // ⚠ 部屋の既定値は**持たない**（2026-09-15 に消した）。

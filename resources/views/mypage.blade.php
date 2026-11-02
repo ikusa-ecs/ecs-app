@@ -810,15 +810,13 @@
             <button class="cal-modal-close" onclick="closeBulkCal()" aria-label="閉じる">×</button>
           </div>
           <div class="cal-modal-body">
-            <!-- 全部まとめて登録（2026-11-02 小沼さん）。1件ずつ押さなくてよいように、予定のファイル（.ics）を作る。
-                 中身＝案件ごとに「移動（集合の1時間前〜集合）」「【役割】_コンテンツ_顧客（集合〜解散）」「移動（解散〜1時間後）」の3つ＋前泊・後泊。 -->
-            <div class="cal-bulk-all">
-              <button class="btn primary" onclick="downloadAllIcs()">📥 全部まとめて登録する（<span id="bulkAllCount">0</span>件）</button>
-              <p class="cal-modal-note" style="margin-top:8px;">
-                予定のファイル（.ics）がダウンロードされます。Googleカレンダーの<b>⚙ 設定 → インポート/エクスポート → インポート</b>でそのファイルを選ぶと、全部の案件が一度に入ります。<br>
-                案件ごとに「<b>移動</b>（集合の1時間前〜集合）」「<b>【役割】_コンテンツ_顧客</b>（集合〜解散）」「<b>移動</b>（解散〜1時間後）」の3つ、前泊・後泊がある案件はその日も入ります。集合・解散の時間が決まっていない案件は終日で入ります（移動は入りません）。
-              </p>
-            </div>
+            <!-- 全部まとめて登録（2026-11-02）。Googleカレンダーに直接書く（baba決定）。中身は renderGcalBox() が状態で切り替える。
+                 予定の組み立ての正本＝App\Support\MyCalendarEvents（サーバー）。 -->
+            <div class="cal-bulk-all" id="gcalBox"></div>
+            <p class="cal-modal-note" style="margin-top:8px;">
+              案件ごとに「<b>移動</b>（集合の1時間前〜集合）」「<b>【役割】_コンテンツ_顧客</b>（集合〜解散）」「<b>移動</b>（解散〜1時間後）」の3つ、前泊・後泊がある案件はその日も入ります。集合・解散の時間が決まっていない案件は終日で入ります（移動は入りません）。
+              何回押しても同じ予定は重なりません（上書きします）。アサインが外れた案件の予定は消します（自分で入れた予定には触りません）。
+            </p>
             <p class="cal-modal-note">1件ずつ入れたいときは、各案件の「登録」を押してください。Googleカレンダーの予定追加画面が入力済みで開きます（時間は集合〜解散。移動は入りません）。</p>
             <div id="bulkList"></div>
           </div>
@@ -844,6 +842,8 @@
   // 役割コード（D/SD/MC…）→ 表示ラベル（「D（ディレクター）」等）の正本。暗号表示を避けるため。
   window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
   // 前泊・後泊と数える言葉（正本＝App\Support\Lodging）。Googleカレンダーに前泊・後泊も登録する用（2026-11-02）。
+  // Googleカレンダーとの連携の状態（2026-11-02）。{configured, linked, email, syncedAt}
+  window.ECS_GCAL = @json($googleCal ?? ['configured' => false, 'linked' => false, 'email' => '', 'syncedAt' => null]);
   window.ECS_PRE_STAY_WORDS = @json(\App\Support\Lodging::PRE_STAY_WORDS);
   window.ECS_POST_STAY_WORDS = @json(\App\Support\Lodging::POST_STAY_WORDS);
   // 案件は必ずDBの内容にする。0件なら0件のまま（見本 cases.js の架空案件に戻さない）。
@@ -1085,7 +1085,7 @@
   // 「今後をまとめて登録」→ 一覧の小窓を出し、1件ずつリンク
   function openBulkCal() {
     const list = upcomingCases();
-    document.getElementById('bulkAllCount').textContent = list.length;
+    renderGcalBox();
     document.getElementById('bulkList').innerHTML = list.length
       ? list.map(c =>
           '<div class="bulk-row">' +
@@ -1101,99 +1101,54 @@
   }
   function closeBulkCal() { document.getElementById('bulkBg').classList.remove('show'); }
 
-  // ===== 全部まとめて登録（予定のファイル .ics を作る・2026-11-02 小沼さん「一つずつ登録するの面倒」）=====
-  // 形は小沼さんがアサイン表のGASで使っているものに合わせた：
-  //   移動（集合の1時間前〜集合）／【役割】_コンテンツ_顧客（集合〜解散）／移動（解散〜解散の1時間後）
-  // ＋前泊（前の日・集合時間があればその時間〜23:59）・後泊（次の日・終日）。
-  // ⚠ 予定ごとに決まったID（UID）を付ける＝同じファイルをもう一度取り込んでも、同じ予定として扱われるように。
-  function icsEsc(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
-  function icsUtc(d) {
-    return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate())
-      + 'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + '00Z';
-  }
-  function hm(t) { const m = String(t || '').match(/(\d{1,2})\s*[:：時]\s*(\d{1,2})?/); return m && Number(m[1]) < 24 ? [Number(m[1]), Number(m[2] || 0)] : null; }
-  function icsEvents(c) {
-    const out = [];
-    const d = dateOf(c.off);
-    const pos = roleLabel(c.myPos).replace(/（.*）$/, '');
-    const title = '【' + pos + '】_' + c.content + '_' + c.client;
-    const loc = (c.place && c.place !== '（未定）') ? c.place : (c.placeShort || '');
-    const desc = '顧客：' + c.client + '\nコンテンツ：' + c.content + '\nポジション：' + roleLabel(c.myPos)
-      + '\n営業担当：' + (c.sales || '—') + '\nディレクター：' + (c.dir || '—') + (loc ? '\n会場：' + loc : '') + (c.note ? '\nメモ：' + c.note : '');
-    const uid = String(c.id) + '-' + String(c.myPos || '');
-    const mt = hm(c.meet), lt = hm(c.leave);
-    if (mt && lt) {
-      const s = new Date(d); s.setHours(mt[0], mt[1], 0, 0);
-      const e = new Date(d); e.setHours(lt[0], lt[1], 0, 0);
-      if (e <= s) e.setDate(e.getDate() + 1);   // 日をまたぐ解散
-      const H = 60 * 60 * 1000;
-      out.push({ uid: uid + '-move-before', start: new Date(s.getTime() - H), end: s, title: '移動', desc: title + ' への移動' });
-      out.push({ uid: uid + '-main', start: s, end: e, title: title, desc: desc, loc: loc });
-      out.push({ uid: uid + '-move-after', start: e, end: new Date(e.getTime() + H), title: '移動', desc: title + ' からの移動' });
-    } else {
-      out.push({ uid: uid + '-main', day: d, title: title, desc: desc + '\n（集合・解散の時間が未定のため終日で登録）', loc: loc });
-    }
-    stayKinds(c).forEach(function (k) {
-      const sd = new Date(d); sd.setDate(sd.getDate() + (k === '前泊' ? -1 : 1));
-      const sdesc = (k === '前泊' ? '次の日' : '前の日') + 'が本番：' + title
-        + (String(c.lodging || '').includes('一部') ? '\n※一部前泊＝自分が泊まるかは担当に確認してください' : '');
-      const pt = k === '前泊' ? hm(c.stayPreMeet) : null;
-      if (pt) {
-        const ss = new Date(sd); ss.setHours(pt[0], pt[1], 0, 0);
-        const se = new Date(sd); se.setHours(23, 59, 0, 0);
-        out.push({ uid: uid + '-stay-' + (k === '前泊' ? 'pre' : 'post'), start: ss, end: se, title: '🛏 ' + k + '｜' + c.content + '（' + c.client + '）', desc: sdesc + '\n前泊の集合時間：' + c.stayPreMeet, loc: loc });
-      } else {
-        out.push({ uid: uid + '-stay-' + (k === '前泊' ? 'pre' : 'post'), day: sd, title: '🛏 ' + k + '｜' + c.content + '（' + c.client + '）', desc: sdesc, loc: loc });
-      }
-    });
-    return out;
-  }
-  function buildIcs(list) {
-    const stamp = icsUtc(new Date());
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//IKUSA//ECS//JA', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
-    list.forEach(function (c) {
-      try {
-        icsEvents(c).forEach(function (ev) {
-          lines.push('BEGIN:VEVENT', 'UID:' + ev.uid + '@ecs.ikusa.co.jp', 'DTSTAMP:' + stamp);
-          if (ev.day) {
-            const n = new Date(ev.day); n.setDate(n.getDate() + 1);
-            lines.push('DTSTART;VALUE=DATE:' + calYmd(ev.day), 'DTEND;VALUE=DATE:' + calYmd(n));
-          } else {
-            lines.push('DTSTART:' + icsUtc(ev.start), 'DTEND:' + icsUtc(ev.end));
-          }
-          lines.push('SUMMARY:' + icsEsc(ev.title), 'DESCRIPTION:' + icsEsc(ev.desc));
-          if (ev.loc) lines.push('LOCATION:' + icsEsc(ev.loc));
-          lines.push('END:VEVENT');
-        });
-      } catch (e) { console.error('カレンダーのファイル', c && c.id, e); }   // 1件こわれても残りは作る
-    });
-    lines.push('END:VCALENDAR');
-    return lines.map(icsFold).join('\r\n') + '\r\n';
-  }
-  // 長い行は75バイトごとに折り返す（.ics の決まり。折り返した行の頭は空白1つ）。日本語・絵文字を途中で切らない。
-  function icsFold(line) {
-    const enc = new TextEncoder();
-    if (enc.encode(line).length <= 75) return line;
-    const parts = []; let cur = ''; let bytes = 0; let limit = 75;
-    Array.from(line).forEach(function (ch) {
-      const b = enc.encode(ch).length;
-      if (bytes + b > limit) { parts.push(cur); cur = ''; bytes = 0; limit = 74; }
-      cur += ch; bytes += b;
-    });
-    parts.push(cur);
-    return parts.join('\r\n ');
-  }
+  // ===== 全部まとめてGoogleカレンダーに登録（2026-11-02 baba決定「ボタン1つでGoogleカレンダーに書き込む方式」）=====
+  // ⚠ 予定の組み立てはサーバー（App\Support\MyCalendarEvents）。ここでは押す・結果を出すだけ。
+  //   以前はここで .ics を組み立てていたが、Googleへの登録と2か所になるのでサーバーへ移した。
   function upcomingCases() { return assignedCases().filter(c => !c.archived).sort((a, b) => a.off - b.off); }
-  function downloadAllIcs() {
-    const list = upcomingCases();
-    if (!list.length) { alert('今後のアサイン案件はありません。'); return; }
-    const blob = new Blob([buildIcs(list)], { type: 'text/calendar;charset=utf-8' });
-    const a = document.createElement('a');
-    const t = new Date();
-    a.href = URL.createObjectURL(blob);
-    a.download = 'ECS_アサイン_' + calYmd(t) + '.ics';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  function renderGcalBox() {
+    const g = window.ECS_GCAL || {};
+    const box = document.getElementById('gcalBox');
+    if (!box) return;
+    const n = upcomingCases().length;
+    const ics = '<a href="/mypage/calendar.ics" style="font-size:12px;">予定のファイル（.ics）で落とす</a>';
+    if (!g.configured) {
+      box.innerHTML = '<p class="cal-modal-note">Googleカレンダーへの一括登録は<b>準備中</b>です（管理者の設定待ち）。それまでは各案件の「登録」を使うか、' + ics + 'してGoogleカレンダーの「⚙ 設定 → インポート」で入れてください。</p>';
+      return;
+    }
+    if (!g.linked) {
+      box.innerHTML = '<a class="btn primary" href="/google-calendar/connect">🔗 Googleカレンダーと連携する</a>'
+        + '<p class="cal-modal-note" style="margin-top:8px;">最初に1回だけ、Googleで「許可」を押してください。そのあとはボタン1つで、今後の案件（' + n + '件）が自分のメインのカレンダーに入ります。</p>';
+      return;
+    }
+    box.innerHTML = '<button type="button" class="btn primary" id="gcalSyncBtn" onclick="gcalSync()">📅 Googleカレンダーに登録する（' + n + '件）</button>'
+      + ' <span id="gcalMsg" style="font-size:12.5px; margin-left:6px;"></span>'
+      + '<p class="cal-modal-note" style="margin-top:8px;">連携中：' + escHtmlG(g.email || 'Googleアカウント')
+      + (g.syncedAt ? '／前回の登録 ' + escHtmlG(g.syncedAt) : '')
+      + '　<button type="button" class="btn sm" onclick="gcalDisconnect()" style="font-size:11px;">連携をやめる</button></p>';
+  }
+  function escHtmlG(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function gcalSync() {
+    const btn = document.getElementById('gcalSyncBtn');
+    const msg = document.getElementById('gcalMsg');
+    btn.disabled = true; msg.style.color = ''; msg.textContent = '登録中…（件数が多いと少しかかります）';
+    fetch('/google-calendar/sync', { method: 'POST', headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' } })
+      .then(r => r.json().then(j => ({ ok: r.ok, j: j })))
+      .then(({ ok, j }) => {
+        if (!ok || !j.ok) throw new Error(j.message || '登録できませんでした');
+        msg.style.color = 'var(--ok-ink, #166534)';
+        msg.textContent = '✅ 登録しました（' + j.cases + '案件／新しく ' + j.created + '・上書き ' + j.updated + '・消した ' + j.deleted + '）'
+          + (j.failed ? '　⚠ ' + j.failed + '件は入りませんでした。もう一度押してください' : '');
+        if (window.ECS_GCAL) { const t = new Date(); window.ECS_GCAL.syncedAt = (t.getMonth() + 1) + '/' + t.getDate() + ' ' + pad2(t.getHours()) + ':' + pad2(t.getMinutes()); }
+      })
+      .catch(err => { msg.style.color = '#b91c1c'; msg.textContent = '⚠ ' + err.message; })
+      .finally(() => { btn.disabled = false; });
+  }
+  function gcalDisconnect() {
+    if (!confirm('Googleカレンダーとの連携をやめますか？（登録した予定はカレンダーに残ります）')) return;
+    const f = document.createElement('form');
+    f.method = 'POST'; f.action = '/google-calendar/disconnect';
+    f.innerHTML = '<input type="hidden" name="_token" value="' + escHtmlG(window.ECS_CSRF || '') + '">';
+    document.body.appendChild(f); f.submit();
   }
 
   // ===== カレンダー表示（アサイン案件をマス目に置く。出勤可能日画面の作りを踏襲）=====
