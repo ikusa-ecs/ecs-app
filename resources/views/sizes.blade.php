@@ -20,6 +20,11 @@
   .sz-name { font-weight: 700; }
   .sz-small { font-size: 11px; color: var(--muted); margin-left: 6px; }
   .sz-none { color: var(--muted); }
+  .sz-table .sz-ck { width: 28px; padding-right: 0; }
+  .sz-bar button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: inherit; background: var(--panel); color: var(--ink); cursor: pointer; }
+  .sz-sum { display: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.9; }
+  .sz-sum b { margin-right: 4px; }
+  .sz-sum .sz-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0 10px; margin: 2px 4px 2px 0; }
 </style>
 @endpush
 
@@ -58,7 +63,11 @@
       <option value="emp">社員だけ</option>
     </select>
     <span class="cnt" id="szCount">{{ count($staff) + collect($employees)->sum(fn ($r) => count($r)) }}人</span>
+    <button type="button" onclick="szSum()">🧮 チェックした人を集計（<span id="szPickN">0</span>人）</button>
+    <button type="button" onclick="szPickClear()">チェックを全部外す</button>
   </div>
+  {{-- 集計の結果（2026-11-02 スタッフ要望「どのサイズが何個要るか」）。画面の中だけで数える＝保存しない。 --}}
+  <div class="sz-sum" id="szSum"></div>
 
   {{-- スタッフ --}}
   <div class="sz-part" data-kind="staff">
@@ -119,6 +128,56 @@
       });
       document.getElementById('szCount').textContent = n + '人';
     } catch (e) { console.error('サイズ一覧の絞り込み', e); }
+  }
+</script>
+<script>
+  // チェックした人の靴・服を、サイズごとに何個要るかまとめる（未登録は「未登録」で数える）。
+  function szPickCount() {
+    document.getElementById('szPickN').textContent = document.querySelectorAll('.sz-pick:checked').length;
+  }
+  function szPickClear() {
+    document.querySelectorAll('.sz-pick:checked').forEach(function (cb) { cb.checked = false; });
+    szPickCount();
+    document.getElementById('szSum').style.display = 'none';
+  }
+  // 並び順：服は SS→S→M→L→LL→3L…、靴は数の小さい順。どちらでもないものは後ろに文字順。
+  const SZ_WEAR_ORDER = ['XXS', 'SS', 'XS', 'S', 'M', 'L', 'LL', 'XL', '2L', '3L', 'XXL', '2XL', '4L', '3XL', '5L', '4XL', '6L'];
+  function szRank(v) {
+    const u = v.toUpperCase().replace(/サイズ/g, '').trim();
+    const i = SZ_WEAR_ORDER.indexOf(u);
+    if (i >= 0) return [0, i, ''];
+    const n = parseFloat(u.replace(/[^\d.]/g, ''));
+    if (!isNaN(n)) return [1, n, u];
+    return [2, 0, u];
+  }
+  function szTally(rows, key) {
+    const m = {};
+    let none = 0;
+    rows.forEach(function (tr) {
+      const v = (tr.dataset[key] || '').trim();
+      if (v === '') { none++; return; }
+      m[v] = (m[v] || 0) + 1;
+    });
+    const keys = Object.keys(m).sort(function (a, b) {
+      const x = szRank(a), y = szRank(b);
+      return x[0] - y[0] || x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0);
+    });
+    const esc = function (s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    let html = keys.map(function (k) { return '<span class="sz-chip">' + esc(k) + '：<b>' + m[k] + '</b>個</span>'; }).join('');
+    if (none) html += '<span class="sz-chip sz-none">未登録：' + none + '人</span>';
+    return html || '<span class="sz-none">なし</span>';
+  }
+  function szSum() {
+    try {
+      const rows = Array.prototype.map.call(document.querySelectorAll('.sz-pick:checked'), function (cb) { return cb.closest('tr'); });
+      const box = document.getElementById('szSum');
+      box.style.display = 'block';
+      if (!rows.length) { box.innerHTML = '<span class="sz-none">集計したい人の左のチェックを入れてから押してください。</span>'; return; }
+      box.innerHTML = '<div><b>集計（' + rows.length + '人）</b></div>'
+        + '<div><b>👟 靴（足袋）</b>' + szTally(rows, 'shoe') + '</div>'
+        + '<div><b>👕 服</b>' + szTally(rows, 'wear') + '</div>';
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) { console.error('サイズ一覧の集計', e); }
   }
 </script>
 @endpush
