@@ -403,6 +403,8 @@
     /* 確定アサイン（2026-09-07）。カレンダーで「その日はもう入っている」が分かるようにする。
        ⚠ 募集の3色（募集中＝薄橙／エントリー中＝薄緑／締切＝灰）と混ざらないよう青にする。 */
     .jc-job.confirmed { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; font-weight: 700; }
+    /* 前泊・後泊の帯（2026-11-02）。確定の色のまま点線にして「本番の日ではない」と分かるように。 */
+    .jc-job.jc-stay { border-style: dashed; border-width: 1px; font-weight: 600; }
     .jc-hint { font-size: 11.5px; color: var(--muted); margin: 8px 2px 0; }
     /* PCでは列の見出しに曜日が出ているので、マスの中の曜日は隠す。 */
     .jc-dow { display: none; }
@@ -1342,6 +1344,8 @@
   </script>
   <!-- DBから渡された、本人が「確定」の案件（2026-10-05から非公開でも出す）。確定アサイン表示の元データ。 -->
   <script>window.ECS_PUBLISHED = @json($published);</script>
+  {{-- 前泊・後泊と数える言葉（正本＝App\Support\Lodging）。カレンダーの前泊・後泊の帯で使う（2026-11-02）。 --}}
+  <script>const ECS_PRE_STAY_WORDS = @json(\App\Support\Lodging::PRE_STAY_WORDS); const ECS_POST_STAY_WORDS = @json(\App\Support\Lodging::POST_STAY_WORDS);</script>
   {{-- 終わった案件（新しい順・約13か月ぶん）。請求書を作るときに見返すためのもの。 --}}
   <script>window.ECS_PAST_JOBS = @json($pastJobs ?? []);</script>
   <!-- 募集中タブの案件リスト（DB）。 -->
@@ -1979,6 +1983,22 @@
         confirmedCount++;
       });
 
+      // 確定アサインの前泊・後泊を、前の日・次の日のマスに出す（2026-11-02・FBフォーム 馬場さん）。
+      // ⚠ 前泊かどうかの言葉の正本＝App\Support\Lodging（「前後泊あり」も前泊・後泊の両方）。
+      const stayByDay = {};
+      (window.ECS_PUBLISHED || []).forEach(c => {
+        try {
+          const lg = String(c.lodging || '');
+          const put = (off, kind) => {
+            const sd = addDays(today, off);
+            if (sd.getFullYear() !== y || sd.getMonth() !== m) return;
+            (stayByDay[sd.getDate()] = stayByDay[sd.getDate()] || []).push({ kind: kind, c: c });
+          };
+          if (ECS_PRE_STAY_WORDS.some(w => lg.includes(w)))  put(c.off - 1, '前泊');
+          if (ECS_POST_STAY_WORDS.some(w => lg.includes(w))) put(c.off + 1, '後泊');
+        } catch (e) { console.error('前泊・後泊の印', c && c.id, e); }
+      });
+
       const first = new Date(y, m, 1);
       const days = new Date(y, m + 1, 0).getDate();
       // 1日までの空きマス。週のはじまりは**本人の設定**（2026-09-15）。
@@ -2048,6 +2068,21 @@
             + '<span class="jc-sub">確定</span>';
           b.title = '確定アサイン：' + c.content + '／' + c.client
             + '（押すと「確定アサイン」タブが開いて、持ち物や集合場所が見られます）';
+          b.onclick = function (ev) { ev.stopPropagation(); goToAssignTab(); };
+          cell.appendChild(b);
+        });
+
+        // その日の前泊・後泊（確定アサインの前の日・次の日）。押すと「確定アサイン」タブへ。
+        (stayByDay[d] || []).forEach(s => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'jc-job confirmed jc-stay';
+          b.innerHTML = '<span class="jc-nm">🛏 ' + s.kind + '</span>'
+            + '<span class="jc-sub">' + escAttr(s.c.content) + '</span>'
+            + (s.kind === '前泊' && s.c.stayPreMeet ? '<span class="jc-sub">🕘 集合 ' + escAttr(s.c.stayPreMeet) + '</span>' : '');
+          b.title = s.kind + '：' + s.c.content + '／' + s.c.client
+            + (s.kind === '前泊' ? '（次の日が本番です）' : '（前の日が本番です）')
+            + (String(s.c.lodging || '').includes('一部') ? '※一部前泊＝泊まるかは担当に確認してください' : '');
           b.onclick = function (ev) { ev.stopPropagation(); goToAssignTab(); };
           cell.appendChild(b);
         });

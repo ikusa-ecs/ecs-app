@@ -138,6 +138,8 @@ class PersonalCases
             // リストのバッジ用（大型・前泊・予備日・リハ）
             'scale' => $p->scale ?? '',
             'lodging' => $p->lodging ?? '',
+            // 前泊の集合時間（2026-11-02）。Googleカレンダーの前泊の予定のメモに入れる。
+            'stayPreMeet' => (string) ($p->stay_pre_meet_time ?? ''),
             'dateType' => $p->date_type ?? '本番',
             'archived' => $off < 0,
             'draft' => $p->status === '下書き',

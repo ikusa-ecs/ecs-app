@@ -834,6 +834,9 @@
   window.ECS_CSRF = '{{ csrf_token() }}';
   // 役割コード（D/SD/MC…）→ 表示ラベル（「D（ディレクター）」等）の正本。暗号表示を避けるため。
   window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
+  // 前泊・後泊と数える言葉（正本＝App\Support\Lodging）。Googleカレンダーに前泊・後泊も登録する用（2026-11-02）。
+  window.ECS_PRE_STAY_WORDS = @json(\App\Support\Lodging::PRE_STAY_WORDS);
+  window.ECS_POST_STAY_WORDS = @json(\App\Support\Lodging::POST_STAY_WORDS);
   // 案件は必ずDBの内容にする。0件なら0件のまま（見本 cases.js の架空案件に戻さない）。
   window.ECS_CASES = window.ECS_CASES_DB || [];
 </script>
@@ -947,7 +950,7 @@
     // 操作列：これからの案件は「📅登録」、終了案件（アーカイブ）は「💰収支入力」
     const actBtn = isArch
       ? '<button class="fin-btn" onclick="goFinance(\'' + c.id + '\')">💰 収支入力</button>'
-      : '<button class="cal-btn" onclick="addCal(\'' + c.id + '\')">📅 登録</button>';
+      : '<button class="cal-btn" onclick="addCal(\'' + c.id + '\')">📅 登録</button>' + stayCalLinks(c);
     return '<tr class="' + rowClass(c).trim() + '">' +
       '<td>' + fmtDate(c.off) + '</td>' +
       '<td><strong>' + c.name + '</strong>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
@@ -1021,6 +1024,47 @@
     return 'https://calendar.google.com/calendar/render?' + q.toString();
   }
 
+  // 前泊・後泊の予定（2026-11-02・FBフォーム 馬場さん）。前泊＝本番の前の日、後泊＝次の日の終日予定。
+  // ⚠ 前泊かどうかの言葉は App\Support\Lodging から受け取る（「前後泊あり」は両方）。
+  function stayKinds(c) {
+    const lg = String(c.lodging || '');
+    const out = [];
+    if ((window.ECS_PRE_STAY_WORDS || []).some(w => lg.includes(w)))  out.push('前泊');
+    if ((window.ECS_POST_STAY_WORDS || []).some(w => lg.includes(w))) out.push('後泊');
+    return out;
+  }
+  function stayGcalUrl(c, kind) {
+    const d = dateOf(c.off);
+    const s = new Date(d); s.setDate(s.getDate() + (kind === '前泊' ? -1 : 1));
+    const e = new Date(s); e.setDate(e.getDate() + 1);
+    const loc = (c.place && c.place !== '（未定）') ? c.place : (c.placeShort || '');
+    const lines = [
+      (kind === '前泊' ? '次の日' : '前の日') + 'が本番：' + c.content + '（' + c.client + '）' + fmtDate(c.off),
+      '自分の役割：' + roleLabel(c.myPos)
+    ];
+    if (kind === '前泊' && c.stayPreMeet) lines.push('前泊の集合時間：' + c.stayPreMeet);
+    if (String(c.lodging || '').includes('一部')) lines.push('※一部前泊＝自分が泊まるかは担当に確認してください');
+    // 前泊の集合時間が入っていれば、その時間から前の日の終わり（23:59）まで。無ければ終日（2026-11-02 小沼さん）。
+    let dates = calYmd(s) + '/' + calYmd(e);
+    const tm = kind === '前泊' ? String(c.stayPreMeet || '').match(/(\d{1,2})\s*[:：時]\s*(\d{1,2})?/) : null;
+    if (tm && Number(tm[1]) < 24) {
+      const st = new Date(s); st.setHours(Number(tm[1]), Number(tm[2] || 0), 0, 0);
+      const en = new Date(s); en.setHours(23, 59, 0, 0);
+      dates = calStamp(st) + '/' + calStamp(en);
+    }
+    const q = new URLSearchParams({
+      action: 'TEMPLATE', text: '🛏 ' + kind + '｜' + c.content + '（' + c.client + '）',
+      dates: dates, details: lines.join('\n'), location: loc, ctz: 'Asia/Tokyo'
+    });
+    return 'https://calendar.google.com/calendar/render?' + q.toString();
+  }
+  // 「🛏 前泊」「🛏 後泊」の登録リンク（無い案件は空）。
+  function stayCalLinks(c) {
+    return stayKinds(c).map(k =>
+      '<a class="cal-btn" href="' + stayGcalUrl(c, k).replace(/&/g, '&amp;') + '" target="_blank" rel="noopener" title="' + k + 'の日をGoogleカレンダーに登録">🛏 ' + k + '</a>'
+    ).join('');
+  }
+
   // 案件ごとの「📅 登録」
   function addCal(id) {
     const c = myCaseById(id);
@@ -1037,6 +1081,7 @@
             '<span class="bulk-name"><strong>' + c.content + '</strong>（' + c.client + '）' +
               '<br><span class="sub-loc">' + roleLabel(c.myPos) + ' / ' + (c.placeShort || '—') + '</span></span>' +
             '<a class="cal-btn" href="' + gcalUrl(c).replace(/&/g, '&amp;') + '" target="_blank" rel="noopener">📅 登録</a>' +
+            stayCalLinks(c) +
           '</div>'
         ).join('')
       : '<p class="empty-note">今後のアサイン案件はありません。</p>';
