@@ -35,6 +35,12 @@
     return (Date.now() - d.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
   };
   window.ECS_lvOf = function (person) {
+    // 働き始めた年月が空の人は、経験回数（通算＝アサインから数えた数）で決める（2026-11-02 小沼さん
+    // 「280回通算してるのに新人になってる」）。決まりは稼働状況タブと同じ＝10回以下 新人／30回未満 中堅／それ以上 ベテラン。
+    if (!(person && person.joinDate)) {
+      var t = Number(person && person.total) || 0;
+      return t <= 10 ? 'new' : (t < 30 ? 'mid' : 'vet');
+    }
     var y = window.ECS_yearsSince(person && person.joinDate);
     return y < 1 ? 'new' : (y < 3 ? 'mid' : 'vet');
   };

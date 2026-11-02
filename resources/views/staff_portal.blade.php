@@ -2568,11 +2568,37 @@
       pad.className = 'cell empty';
       grid.appendChild(pad);
     }
+    // 確定アサインの前泊・後泊の日（2026-11-02 小沼さん「前泊アリの案件なのにカレンダーにはイベントとしか出ない」）。
+    // ⚠ その日の〇×は今までどおり付けられる（前泊の日でも昼は動けることがある）＝印を足すだけ。
+    // ⚠ 前泊と数える言葉の正本＝App\Support\Lodging（ECS_PRE_STAY_WORDS／ECS_POST_STAY_WORDS）。
+    const stayDays = {};
+    (window.ECS_PUBLISHED || []).forEach(j => {
+      try {
+        const lg = String(j.lodging || '');
+        const put = (off, kind) => {
+          const d = addDays(today, off);
+          if (inPrefMonth(d)) (stayDays[d.getDate()] = stayDays[d.getDate()] || []).push(kind + '：' + j.content + ' ' + j.client
+            + (kind === '前泊' && j.stayPreMeet ? '（集合 ' + j.stayPreMeet + '）' : ''));
+        };
+        if (ECS_PRE_STAY_WORDS.some(w => lg.includes(w)))  put(j.off - 1, '前泊');
+        if (ECS_POST_STAY_WORDS.some(w => lg.includes(w))) put(j.off + 1, '後泊');
+      } catch (e) { console.error('前泊・後泊の印', j && j.id, e); }
+    });
     for (let d = 1; d <= PREF_DAYS; d++) {
       const cell = document.createElement('div');
       if (eventDays[d]) paintEvent(cell, d, eventDays[d]);
       else if (entryDays[d]) paintEntry(cell, d, entryDays[d]);
       else paintEditable(cell, d);
+      // ⚠ 最初の div（日の数字）は触らない＝dayCellByNum がそこで日を探している。印は後ろに足す。
+      if (stayDays[d]) {
+        const kinds = Array.from(new Set(stayDays[d].map(s => s.slice(0, 2))));
+        const m = document.createElement('span');
+        m.className = 'stay-mark';
+        m.style.cssText = 'display:block; font-size:10px; font-weight:700; line-height:1.2;';
+        m.textContent = '🛏' + kinds.join('・');
+        cell.appendChild(m);
+        cell.title = (cell.title ? cell.title + '\n' : '') + stayDays[d].join('\n');
+      }
       grid.appendChild(cell);
     }
     // 保存済みのコメントを反映

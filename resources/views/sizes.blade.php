@@ -11,13 +11,15 @@
   .sz-bar input, .sz-bar select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; font-family: inherit; background: var(--panel); color: var(--ink); }
   .sz-bar input { min-width: 200px; }
   .sz-bar .cnt { font-size: 12.5px; color: var(--muted); }
+  .sz-sec { margin: 18px 0 8px; font-size: 15px; font-weight: 800; color: var(--ink); }
+  .sz-dept { margin: 12px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
   .sz-table { width: 100%; border-collapse: collapse; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .sz-table th, .sz-table td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; font-size: 13.5px; }
   .sz-table th { font-size: 12px; color: var(--muted); }
+  .sz-table td.sz-n { width: 34%; }
   .sz-name { font-weight: 700; }
   .sz-small { font-size: 11px; color: var(--muted); margin-left: 6px; }
   .sz-none { color: var(--muted); }
-  @media (max-width: 720px) { .sz-table th.hide-sp, .sz-table td.hide-sp { display: none; } }
 </style>
 @endpush
 
@@ -30,24 +32,28 @@
     <input type="text" id="szSearch" placeholder="名前・ふりがなで探す" oninput="szFilter()">
     <select id="szKind" onchange="szFilter()">
       <option value="">スタッフと社員</option>
-      <option value="スタッフ">スタッフだけ</option>
-      <option value="社員">社員だけ</option>
+      <option value="staff">スタッフだけ</option>
+      <option value="emp">社員だけ</option>
     </select>
-    <span class="cnt" id="szCount">{{ count($rows) }}人</span>
+    <span class="cnt" id="szCount">{{ count($staff) + collect($employees)->sum(fn ($r) => count($r)) }}人</span>
   </div>
 
-  <table class="sz-table">
-    <tr><th>名前</th><th class="hide-sp">種類</th><th>靴（足袋）</th><th>服</th><th>身長</th></tr>
-    @foreach ($rows as $r)
-      <tr class="sz-row" data-name="{{ $r['name'] }}" data-kana="{{ $r['kana'] }}" data-kind="{{ $r['kind'] }}">
-        <td><span class="sz-name">{{ $r['name'] }}</span>@if ($r['office'] !== '')<span class="sz-small">{{ $r['office'] }}</span>@endif</td>
-        <td class="hide-sp">{{ $r['kind'] }}</td>
-        <td>@if ($r['shoe'] !== ''){{ $r['shoe'] }}@else<span class="sz-none">—</span>@endif</td>
-        <td>@if ($r['wear'] !== ''){{ $r['wear'] }}@else<span class="sz-none">—</span>@endif</td>
-        <td>@if ($r['height'] !== ''){{ $r['height'] }}@else<span class="sz-none">—</span>@endif</td>
-      </tr>
+  {{-- スタッフ --}}
+  <div class="sz-part" data-kind="staff">
+    <div class="sz-sec">スタッフ（{{ count($staff) }}人）</div>
+    @include('partials.sizes_table', ['rows' => $staff])
+  </div>
+
+  {{-- 社員（部署ごと・イベプラが先頭） --}}
+  <div class="sz-part" data-kind="emp">
+    <div class="sz-sec">社員（{{ collect($employees)->sum(fn ($r) => count($r)) }}人）</div>
+    @foreach ($employees as $dept => $rows)
+      <div class="sz-group">
+        <div class="sz-dept">{{ $dept }}（{{ count($rows) }}人）</div>
+        @include('partials.sizes_table', ['rows' => $rows])
+      </div>
     @endforeach
-  </table>
+  </div>
 @endsection
 
 @push('scripts')
@@ -58,11 +64,20 @@
       const q = (document.getElementById('szSearch').value || '').trim().replace(/\s+/g, '');
       const kind = document.getElementById('szKind').value;
       let n = 0;
-      document.querySelectorAll('.sz-row').forEach(function (tr) {
-        const hay = ((tr.dataset.name || '') + (tr.dataset.kana || '')).replace(/\s+/g, '');
-        const show = (!q || hay.includes(q)) && (!kind || tr.dataset.kind === kind);
-        tr.style.display = show ? '' : 'none';
-        if (show) n++;
+      document.querySelectorAll('.sz-part').forEach(function (part) {
+        const partOn = !kind || part.dataset.kind === kind;
+        part.style.display = partOn ? '' : 'none';
+        part.querySelectorAll('.sz-row').forEach(function (tr) {
+          const hay = ((tr.dataset.name || '') + (tr.dataset.kana || '')).replace(/\s+/g, '');
+          const show = partOn && (!q || hay.includes(q));
+          tr.style.display = show ? '' : 'none';
+          if (show) n++;
+        });
+      });
+      // 名前で探したとき、1人も当たらない部署の見出しは隠す。
+      document.querySelectorAll('.sz-group').forEach(function (g) {
+        const any = Array.prototype.some.call(g.querySelectorAll('.sz-row'), function (tr) { return tr.style.display !== 'none'; });
+        g.style.display = any ? '' : 'none';
       });
       document.getElementById('szCount').textContent = n + '人';
     } catch (e) { console.error('サイズ一覧の絞り込み', e); }

@@ -34,6 +34,21 @@ class SizeListTest extends TestCase
         $this->actingAsPerson($emp)->get('/sizes')->assertOk()->assertSee('見る花子');
     }
 
+    /** スタッフと社員は分けて、社員は部署ごと（イベプラが先頭）。部署が空の社員も「その他」に出す（2026-11-02 小沼さん）。 */
+    public function test_staff_and_employees_are_split_and_employees_grouped_by_department(): void
+    {
+        $me = PersonFactory::new()->create(['role' => 'employee', 'permission' => 'employee', 'office' => '東京', 'name' => 'セールス太郎', 'department' => 'セールス']);
+        PersonFactory::new()->create(['role' => 'employee', 'permission' => 'employee', 'office' => '東京', 'name' => 'イベプラ花子', 'department' => 'イベプラ']);
+        PersonFactory::new()->create(['role' => 'employee', 'permission' => 'employee', 'office' => '東京', 'name' => '部署なし次郎', 'department' => null]);
+        PersonFactory::new()->staff()->create(['office' => '東京', 'name' => 'スタッフ一子']);
+
+        $data = $this->actingAsPerson($me)->get('/sizes')->assertOk()
+            ->assertSeeInOrder(['スタッフ（', 'スタッフ一子', '社員（', 'イベプラ（', 'イベプラ花子', 'セールス（', 'セールス太郎', 'その他（', '部署なし次郎'])
+            ->original->getData();
+        $this->assertSame(['イベプラ', 'セールス', 'その他'], array_keys($data['employees']));
+        $this->assertSame(['スタッフ一子'], collect($data['staff'])->pluck('name')->all());
+    }
+
     public function test_flag_is_saved_from_roster(): void
     {
         $emp = PersonFactory::new()->create(['role' => 'employee', 'permission' => 'employee', 'office' => '東京']);

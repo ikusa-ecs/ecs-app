@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\Departments;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,20 +34,30 @@ class SizeListController extends Controller
         abort_unless(self::canView(Auth::user()), 403);
 
         $office = OfficeScope::filter($request);
-        $rows = OfficeScope::applyToPeople(Person::query()->whereIn('role', ['staff', 'employee']), $office)
+        $people = OfficeScope::applyToPeople(Person::query()->whereIn('role', ['staff', 'employee']), $office)
             ->where(fn ($q) => $q->where('active', true)->orWhereNull('active'))
             ->byKana()
-            ->get(['id', 'name', 'name_kana', 'role', 'office', 'shoe_size', 'shirt_size', 'height'])
-            ->map(fn (Person $p) => [
-                'name' => (string) $p->name,
-                'kana' => (string) ($p->name_kana ?? ''),
-                'kind' => $p->role === 'staff' ? 'スタッフ' : '社員',
-                'office' => (string) ($p->office ?? ''),
-                'shoe' => trim((string) ($p->shoe_size ?? '')),
-                'wear' => trim((string) ($p->shirt_size ?? '')),
-                'height' => trim((string) ($p->height ?? '')),
-            ]);
+            ->get(['id', 'name', 'name_kana', 'role', 'office', 'department', 'shoe_size', 'shirt_size', 'height']);
+        $row = fn (Person $p) => [
+            'name' => (string) $p->name,
+            'kana' => (string) ($p->name_kana ?? ''),
+            'office' => (string) ($p->office ?? ''),
+            'shoe' => trim((string) ($p->shoe_size ?? '')),
+            'wear' => trim((string) ($p->shirt_size ?? '')),
+            'height' => trim((string) ($p->height ?? '')),
+        ];
 
-        return view('sizes', ['rows' => $rows]);
+        // スタッフと社員は分けて出す。社員は部署ごと＝イベプラを先頭に（2026-11-02 小沼さん）。
+        // 部署のまとめ方と並びの正本＝App\Support\Departments::GROUPS（イベプラ／セールス／クリエイティブ／その他）。
+        $staff = $people->where('role', 'staff')->map($row)->values();
+        $byGroup = $people->where('role', 'employee')->groupBy(fn (Person $p) => Departments::group($p->department) ?: Departments::OTHER);   // 部署が空の人も「その他」に（消さない）
+        $employees = [];
+        foreach (Departments::GROUPS as $g) {
+            if ($byGroup->has($g)) {
+                $employees[$g] = $byGroup->get($g)->map($row)->values();
+            }
+        }
+
+        return view('sizes', ['staff' => $staff, 'employees' => $employees]);
     }
 }
