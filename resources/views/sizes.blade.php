@@ -25,6 +25,17 @@
   .sz-sum { display: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.9; }
   .sz-sum b { margin-right: 4px; }
   .sz-sum .sz-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0 10px; margin: 2px 4px 2px 0; }
+  /* 日付から選ぶ（2026-11-04） */
+  .sz-dayblk { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; }
+  .sz-crumb { font-size: 13.5px; margin: 4px 0 8px; color: var(--muted); }
+  .sz-crumb a { color: var(--ink); font-weight: 700; cursor: pointer; text-decoration: underline; }
+  .sz-crumb .sep { margin: 0 6px; }
+  .sz-crumb .cur { color: var(--ink); font-weight: 800; }
+  .sz-pj { display: inline-block; text-align: left; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 0 6px 6px 0; background: var(--panel); color: var(--ink); font-family: inherit; font-size: 13px; cursor: pointer; }
+  .sz-pj.on { outline: 2px solid var(--ink); }
+  .sz-pj .sz-small { margin-left: 0; display: block; }
+  .sz-dayblk .sz-sum { display: block; border: none; padding: 6px 0 0; margin: 0; }
+  .sz-kari { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
 </style>
 @endpush
 
@@ -55,6 +66,22 @@
       @endif
     </div>
   @endif
+  {{-- 日付から選ぶ（2026-11-04 小沼さん要望）。日付 › 案件 と選ぶと、その案件に入っている人がポジションつきで出る。
+       チェックの付け外しで、靴・服をサイズごとに数え直す（画面の中だけ・保存しない）。下の全員一覧のチェックとは別。 --}}
+  <div class="sz-dayblk">
+    <div class="sz-sec" style="margin-top:4px;">📅 日付から選ぶ（その日の案件に入っている人）</div>
+    <div class="sz-bar" style="margin-bottom:6px;">
+      <button type="button" onclick="szDayMove(-1)" aria-label="前の日">◀</button>
+      <input type="date" id="szDate" onchange="szDayLoad()" style="min-width:0;">
+      <button type="button" onclick="szDayMove(1)" aria-label="次の日">▶</button>
+      <button type="button" onclick="szDayToday()">今日</button>
+    </div>
+    <div class="sz-crumb" id="szCrumb"></div>
+    <div id="szDayProjects"></div>
+    <div id="szDayBody"></div>
+  </div>
+
+  <div class="sz-sec">👥 全員の一覧</div>
   <div class="sz-bar">
     <input type="text" id="szSearch" placeholder="名前・ふりがなで探す" oninput="szFilter()">
     <select id="szKind" onchange="szFilter()">
@@ -231,5 +258,88 @@
       if (scroll) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (e) { console.error('サイズ一覧の集計', e); }
   }
+</script>
+<script>
+  // 日付から選ぶ（2026-11-04）。日付 › 案件 › 入っている人。数えるのは szTally（下の全員一覧と同じ数え方）。
+  let SZ_DAY = { date: '', projects: [], pid: '' };
+  const SZ_WEEK = ['日', '月', '火', '水', '木', '金', '土'];
+  function szYmd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function szDayLabel(ymd) {
+    const p = ymd.split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, p[2]);
+    return (p[1]) + '/' + p[2] + '（' + SZ_WEEK[d.getDay()] + '）';
+  }
+  function szDayToday() { document.getElementById('szDate').value = szYmd(new Date()); szDayLoad(); }
+  function szDayMove(n) {
+    const v = document.getElementById('szDate').value;
+    if (!v) { szDayToday(); return; }
+    const p = v.split('-').map(Number);
+    document.getElementById('szDate').value = szYmd(new Date(p[0], p[1] - 1, p[2] + n));
+    szDayLoad();
+  }
+  function szDayLoad() {
+    const date = document.getElementById('szDate').value;
+    SZ_DAY = { date: date, projects: [], pid: '' };
+    document.getElementById('szDayBody').innerHTML = '';
+    if (!date) { szDayRender(); return; }
+    document.getElementById('szDayProjects').innerHTML = '<span class="sz-none">読み込み中…</span>';
+    const office = new URLSearchParams(location.search).get('office');
+    fetch('/sizes/day?date=' + encodeURIComponent(date) + (office ? '&office=' + encodeURIComponent(office) : ''), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (j) {
+        if (document.getElementById('szDate').value !== date) return;   // 連打で古い答えが後から来たら捨てる
+        SZ_DAY.projects = j.projects || [];
+        if (SZ_DAY.projects.length === 1) SZ_DAY.pid = SZ_DAY.projects[0].id;   // 1件だけならそのまま開く
+        szDayRender();
+      })
+      .catch(function (err) {
+        document.getElementById('szDayProjects').innerHTML = '<span style="color:#b91c1c;">読み込めませんでした（' + szEsc(err) + '）</span>';
+      });
+  }
+  function szDayPick(pid) { SZ_DAY.pid = pid; szDayRender(); }
+  function szDayRender() {
+    try {
+      const crumb = document.getElementById('szCrumb');
+      const list = document.getElementById('szDayProjects');
+      const body = document.getElementById('szDayBody');
+      if (!SZ_DAY.date) { crumb.innerHTML = ''; list.innerHTML = '<span class="sz-none">日付を選んでください。</span>'; body.innerHTML = ''; return; }
+      const pj = SZ_DAY.projects.find(function (p) { return p.id === SZ_DAY.pid; });
+      // パンくず：日付 › 案件
+      crumb.innerHTML = (pj ? '<a onclick="szDayPick(\'\')">' + szDayLabel(SZ_DAY.date) + '</a>' : '<span class="cur">' + szDayLabel(SZ_DAY.date) + '</span>')
+        + (pj ? '<span class="sep">›</span><span class="cur">' + szEsc(pj.name) + (pj.client ? '（' + szEsc(pj.client) + '）' : '') + '</span>' : '');
+      if (!SZ_DAY.projects.length) { list.innerHTML = '<span class="sz-none">この日の案件はありません。</span>'; body.innerHTML = ''; return; }
+      list.innerHTML = SZ_DAY.projects.map(function (p) {
+        return '<button type="button" class="sz-pj' + (p.id === SZ_DAY.pid ? ' on' : '') + '" onclick="szDayPick(\'' + szEsc(p.id) + '\')">'
+          + '<b>' + szEsc(p.name) + '</b>' + (p.client ? '（' + szEsc(p.client) + '）' : '')
+          + '<span class="sz-small">' + (p.meet ? '集合 ' + szEsc(p.meet) + '・' : '') + p.members.length + '人</span></button>';
+      }).join('');
+      if (!pj) { body.innerHTML = '<span class="sz-none">案件を選ぶと、入っている人が出ます。</span>'; return; }
+      if (!pj.members.length) { body.innerHTML = '<span class="sz-none">この案件にはまだ誰も入っていません。</span>'; return; }
+      const cell = function (v) { return v ? szEsc(v) : '<span class="sz-none">—</span>'; };
+      body.innerHTML = '<div class="sz-bar" style="margin:4px 0 6px;"><button type="button" onclick="szDayAll(true)">全部つける</button>'
+        + '<button type="button" onclick="szDayAll(false)">全部外す</button></div>'
+        + '<table class="sz-table"><tr><th class="sz-ck"></th><th>名前</th><th>ポジション</th><th>靴（足袋）</th><th>服</th><th>身長</th></tr>'
+        + pj.members.map(function (m) {
+          return '<tr class="sz-drow" data-shoe="' + szEsc(m.shoe) + '" data-wear="' + szEsc(m.wear) + '">'
+            + '<td class="sz-ck"><input type="checkbox" class="sz-dpick" checked onchange="szDaySum()" aria-label="集計に入れる"></td>'
+            + '<td class="sz-n"><span class="sz-name">' + szEsc(m.name) + '</span>' + (m.emp ? '<span class="sz-small">社員</span>' : '') + '</td>'
+            + '<td>' + szEsc(m.pos) + (m.kari ? '<span class="sz-kari">仮</span>' : '') + '</td>'
+            + '<td>' + cell(m.shoe) + '</td><td>' + cell(m.wear) + '</td><td>' + cell(m.height) + '</td></tr>';
+        }).join('') + '</table><div class="sz-sum" id="szDaySum"></div>';
+      szDaySum();
+    } catch (e) { console.error('サイズ一覧 日付から選ぶ', e); }
+  }
+  function szDayAll(on) { document.querySelectorAll('.sz-dpick').forEach(function (cb) { cb.checked = on; }); szDaySum(); }
+  function szDaySum() {
+    try {
+      const rows = Array.prototype.map.call(document.querySelectorAll('.sz-dpick:checked'), function (cb) { return cb.closest('tr'); });
+      const box = document.getElementById('szDaySum');
+      if (!box) return;
+      box.innerHTML = '<div><b>集計（' + rows.length + '人）</b></div>'
+        + (rows.length ? '<div><b>👟 靴（足袋）</b>' + szTally(rows, 'shoe') + '</div><div><b>👕 服</b>' + szTally(rows, 'wear') + '</div>'
+          : '<span class="sz-none">チェックした人がいません。</span>');
+    } catch (e) { console.error('サイズ一覧 日付の集計', e); }
+  }
+  szDayToday();
 </script>
 @endpush

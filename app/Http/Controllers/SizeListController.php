@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assignment;
 use App\Models\Person;
+use App\Models\Project;
+use App\Support\AssignmentRole;
 use App\Support\Departments;
+use App\Support\ProjectContentName;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -85,6 +89,72 @@ class SizeListController extends Controller
             : null;
 
         return view('sizes', ['staff' => $staff, 'employees' => $employees, 'fulltime' => $fulltime, 'unregistered' => $unregistered]);
+    }
+
+    /**
+     * 日付から選ぶ（2026-11-04 小沼さん要望）。その日の案件と、各案件に入っている人（ポジション・靴・服・身長）を返す。
+     *
+     * 【なぜ】衣装の準備は「この日のこの案件に入る人」の分だけ要る。一覧から1人ずつ探してチェックするのは手間。
+     * 【出すもの】その日が開催日の案件（キャンセル・アサイン不要・下書きは除く）×外していないアサイン（キャンセル以外・仮も確定も）。
+     *   サイズ未登録の人も出す（集計では「未登録」で数える）。名前・ポジション・靴・服・身長だけ。
+     * 【拠点】一覧と同じ OfficeScope。門も一覧と同じ canView()。
+     */
+    public function day(Request $request)
+    {
+        abort_unless(self::canView(Auth::user()), 403);
+        $date = (string) $request->query('date', '');
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return response()->json(['ok' => false, 'message' => '日付を選んでください'], 422);
+        }
+
+        $office = OfficeScope::filter($request);
+        $projects = OfficeScope::applyToProjects(Project::query()->notCancelled()->needsAssign(), $office)
+            ->whereDate('start_date', $date)
+            ->orderBy('start_time')->orderBy('id')
+            ->get()
+            ->filter(fn (Project $p) => $p->status !== '下書き')
+            ->values();
+
+        $asg = $projects->isEmpty() ? collect() : Assignment::whereIn('project_id', $projects->pluck('id'))
+            ->where('status', '!=', 'キャンセル')
+            ->get(['project_id', 'staff_id', 'role', 'status']);
+        $people = Person::whereIn('id', $asg->pluck('staff_id')->unique())
+            ->get(['id', 'name', 'name_kana', 'role', 'shoe_size', 'shirt_size', 'height'])->keyBy('id');
+        // ポジションの並び＝アサイン表と同じ（D→SD→OP→MC→FC→CK→SP→RP・知らない役割は最後）。
+        $order = array_flip(array_keys(AssignmentRole::assignLabels()));
+
+        $out = $projects->map(function (Project $p) use ($asg, $people, $order) {
+            $members = $asg->where('project_id', $p->id)->unique('staff_id')
+                ->filter(fn ($a) => $people->has($a->staff_id))
+                ->map(function ($a) use ($people) {
+                    $h = $people->get($a->staff_id);
+
+                    return [
+                        'id' => (string) $h->id,
+                        'name' => (string) $h->name,
+                        'kana' => (string) ($h->name_kana ?? ''),
+                        'emp' => $h->role === 'employee',
+                        'role' => (string) ($a->role ?? ''),
+                        'pos' => $a->role ? AssignmentRole::label($a->role) : '—',
+                        'kari' => $a->status === '仮',
+                        'shoe' => trim((string) ($h->shoe_size ?? '')),
+                        'wear' => trim((string) ($h->shirt_size ?? '')),
+                        'height' => trim((string) ($h->height ?? '')),
+                    ];
+                })
+                ->sort(fn ($x, $y) => [($order[$x['role']] ?? 99), $x['kana'] ?: $x['name']] <=> [($order[$y['role']] ?? 99), $y['kana'] ?: $y['name']])
+                ->values()->all();
+
+            return [
+                'id' => (string) $p->id,
+                'name' => ProjectContentName::of($p),
+                'client' => (string) ($p->client ?? ''),
+                'meet' => (string) ($p->start_time ?? ''),
+                'members' => $members,
+            ];
+        })->values();
+
+        return response()->json(['ok' => true, 'date' => $date, 'projects' => $out]);
     }
 
     /** 常勤のスタッフに、サイズ一覧を見せる／見せないを付け外しする（社員以上・押した瞬間に保存）。 */

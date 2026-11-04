@@ -953,6 +953,11 @@
   // メンバーの並び順＝上から D → (SD) → MC → OP → FC → CK → 軍師/サポ → 受付 → その他。
   const ECS_ROLE_RANK = { D:0, SD:1, MC:2, OP:3, FC:4, CK:5, SP:6, GUN:6, RP:7, UKE:7 };
   function roleRank(code){ return (code && (code in ECS_ROLE_RANK)) ? ECS_ROLE_RANK[code] : 99; }
+  // 集合時間を分にする（"9:00"・"09：30"・"9時" など）。未定・読めないときは最後に回す。
+  function boardMeetMin(c){
+    const m = String(c.meet || '').match(/(\d{1,2})\s*[:：時]\s*(\d{1,2})?/);
+    return m ? Number(m[1]) * 60 + Number(m[2] || 0) : 99999;
+  }
   // 表示用にソートしたコピーを返す（c.assigned 自体は触らない＝削除は id で行う）。
   function buildMembers(c){
     return c.assigned.slice().sort((a, b) => {
@@ -2288,7 +2293,9 @@
     empty.style.display = offs.length === 0 ? '' : 'none';
 
     offs.forEach(off => {
-      const dayCases = list.filter(c => c.off === off);
+      // 同じ日の中は集合時間の早い順（未定は最後・同じなら案件ID順）（2026-11-02 小沼さん）。
+      const dayCases = list.filter(c => c.off === off)
+        .sort((a, b) => (boardMeetMin(a) - boardMeetMin(b)) || String(a.id).localeCompare(String(b.id)));
       const date = addDays(off);
       const dy   = date.getDay();
       const dowC = dy === 0 ? 'sun' : (dy === 6 ? 'sat' : '');
