@@ -1732,6 +1732,16 @@
     const q = PICK.q.trim();
     const list = roster.filter(pp => pp.role === PICK.kind && !taken.has(pp.name)
       && (!q || String(pp.name).indexOf(q) !== -1));
+    // 社員は「イベプラが上・その中は歴順（入社日の古い順・未入力は最後）」、ほかの部署はこれまでどおり五十音順（2026-11-04 小沼さん）。
+    // ⚠ 名簿はもとから五十音順＝sort は同じ順位なら元の並びを保つので、イベプラ以外は五十音のまま。
+    if (PICK.kind === 'employee') {
+      list.sort((a, b) => {
+        if (!!a.planner !== !!b.planner) return a.planner ? -1 : 1;
+        if (!a.planner) return 0;
+        const ha = a.hire || '9999', hb = b.hire || '9999';
+        return ha < hb ? -1 : ha > hb ? 1 : 0;
+      });
+    }
 
     // ⚠ その日、別の案件にもう入っている人は**下へ回す**（2026-09-03 baba要望）。
     //   これまでは名簿の五十音順に混ざっていて、押して確認が出てはじめて気づいていた。

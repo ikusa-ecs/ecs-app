@@ -12,6 +12,7 @@ use App\Models\ProjectShare;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
 use App\Support\DateChange;
+use App\Support\Departments;
 use App\Support\RepeatHistory;
 use App\Support\RecentWindow;
 use App\Support\AssignmentStamp;
@@ -430,6 +431,10 @@ class AssignBoardController extends Controller
                     'pos' => $pos,
                     // Dの経験があるコンテンツ（社員のとき D か FC かの既定を決めるのに使う）
                     'dexp' => $p->director_contents ?? [],
+                    // 社員の追加で「イベプラを上・その中は歴順（入社日の古い順）」に並べる（2026-11-04 小沼さん）。
+                    // イベプラかどうかは兼務も含める（D決めと同じ hasDepartment）。入社日が空＝未入力（イベプラの中で最後）。
+                    'planner' => $p->role === 'employee' && $p->hasDepartment(Departments::PLANNER),
+                    'hire' => $p->role === 'employee' ? (optional($p->hire_date)->format('Y-m-d') ?? '') : '',
                 ];
             })
             ->values()

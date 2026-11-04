@@ -126,4 +126,20 @@ class BoardRosterRealDataTest extends TestCase
         $this->assertStringContainsString("f.action = '/logout'", $html);
         $this->assertStringNotContainsString("location.href = '/';", $html);
     }
+
+    /** 社員の追加の並び用に、イベプラかどうかと入社日を渡す（2026-11-04 小沼さん「イベプラが上・歴順」）。スタッフには付けない。 */
+    public function test_roster_carries_planner_and_hire_date_for_employees(): void
+    {
+        $me = $this->emp(['id' => 'E-001', 'department' => 'セールス', 'hire_date' => '2020-04-01']);
+        PersonFactory::new()->create(['id' => 'E-PLN', 'role' => 'employee', 'office' => '東京', 'active' => true, 'department' => 'イベプラ', 'hire_date' => '2018-10-01']);
+        PersonFactory::new()->create(['id' => 'S-001', 'role' => 'staff', 'permission' => 'staff', 'office' => '東京', 'active' => true, 'hire_date' => '2017-01-01']);
+
+        $roster = collect($this->actingAsPerson($me)->get('/assign?office=東京')->assertOk()->viewData('roster'))->keyBy('id');
+
+        $this->assertTrue($roster['E-PLN']['planner']);
+        $this->assertSame('2018-10-01', $roster['E-PLN']['hire']);
+        $this->assertFalse($roster['E-001']['planner']);
+        $this->assertFalse($roster['S-001']['planner']);
+        $this->assertSame('', $roster['S-001']['hire']);
+    }
 }
