@@ -402,8 +402,12 @@
     .pick-box .pk-item .busy-tag { color: #b91c1c; font-size: 11px; font-weight: 700; white-space: nowrap; }
     .pick-box .pk-sep { padding: 4px 8px; font-size: 11px; font-weight: 700; color: #b91c1c; background: #fdecec; border-top: 1px solid #f3b7b7; }
     .pick-box .pk-none { padding: 10px 8px; font-size: 12px; color: var(--muted, #8a7a6b); }
-    .pick-box .pk-foot { display: flex; align-items: center; gap: 6px; }
-    .pick-box .pk-foot .sp { flex: 1; }
+    /* ⚠ 枠が細いと「1人を選んでいます」が1文字幅に押しつぶされて縦書きに見えた（2026-11-04 小沼さん）。
+       文字は折り返さない＋入りきらなければボタンを次の行へ回す。 */
+    .pick-box .pk-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .pick-box .pk-foot .sp { flex: 1 0 auto; white-space: nowrap; font-size: 12px; }
+    .pick-box .pk-foot .mini { white-space: nowrap; }
+    .pick-box .pk-already { padding: 4px 8px; font-size: 11.5px; color: var(--muted, #8a7a6b); }
     .pick-box .pk-spot { margin-top: 6px; padding: 8px; background: #fbf6ef; border: 1px dashed var(--brand); border-radius: 8px; font-size: 12px; }
 
     /* 希望者の色の凡例 */
@@ -1764,10 +1768,14 @@
     const box = document.getElementById('pkList');
     if (!box) return;
     const list = pickCandidates();
+    const already = pickAlreadyIn();
     if (!list.length) {
-      box.innerHTML = '<div class="pk-none">この名前の'
-        + (PICK.kind === 'employee' ? '社員' : 'スタッフ')
-        + 'は名簿にいません（すでにこの案件に入っている人は出ません）。</div>';
+      // 探した名前の人がもうこの案件に入っているときは「名簿にいません」ではなく「アサイン済み」と出す（2026-11-04 小沼さん）。
+      box.innerHTML = already.length
+        ? '<div class="pk-none">' + already.map(escHtml).join('、') + ' さんは、すでにアサイン済みです。</div>'
+        : (PICK.q.trim()
+          ? '<div class="pk-none">この名前の' + (PICK.kind === 'employee' ? '社員' : 'スタッフ') + 'は名簿にいません。</div>'
+          : '<div class="pk-none">追加できる人がいません。</div>');
     } else {
       // ⚠ 別案件に入っている人は下にまとまる（pickCandidates で並べ替え済み）。
       //   その境目に見出しを1本入れて、どこから先が「その日もう埋まっている人」か分かるようにする。
@@ -1790,9 +1798,24 @@
           + (pp.otherOffice ? '<span class="lv">' + escHtml(pp.office || '') + '</span>' : '')
           + (where ? '<span class="busy-tag">⛔</span>' : '')
           + '</label>';
-      }).join('');
+      }).join('')
+        // 名前でしぼったとき、同じ名前でもうこの案件に入っている人も一言出す（一覧には出さない＝二重に入れない）。
+        + (already.length ? '<div class="pk-already">すでにアサイン済み：' + already.map(escHtml).join('、') + '</div>' : '');
     }
     renderPickFoot();
+  }
+
+  // 名前でしぼったとき、その名前でもうこの案件に入っている人（名前だけ）。何も入れていないときは出さない。
+  function pickAlreadyIn(){
+    const q = PICK.q.trim();
+    if (!q) return [];
+    const c = cases.find(x => x.id === PICK.caseId);
+    const roster = window.ECS_ROSTER || [];
+    const kindOf = new Map(roster.map(pp => [pp.name, pp.role]));
+    return (c ? c.assigned : [])
+      .map(m => m.name)
+      .filter(n => n && String(n).indexOf(q) !== -1 && (!kindOf.has(n) || kindOf.get(n) === PICK.kind))
+      .filter((n, i, a) => a.indexOf(n) === i);
   }
 
   function renderPickFoot(){
@@ -1808,7 +1831,7 @@
     const spot = document.getElementById('pkSpot');
     if (!spot) return;
     const q = PICK.q.trim();
-    const none = pickCandidates().length === 0;
+    const none = pickCandidates().length === 0 && pickAlreadyIn().length === 0;   // アサイン済みの人なら臨時スタッフの道は出さない
     spot.innerHTML = (PICK.kind === 'staff' && q && none)
       ? '<div class="pk-spot">「<b>' + escHtml(q) + '</b>」は名簿にいません。<br>'
         + '<button class="mini" style="margin-top:6px;" onclick="addSpotFromPicker()">'
