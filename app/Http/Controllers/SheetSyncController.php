@@ -9,6 +9,7 @@ use App\Support\MonthlySheetReader;
 use App\Support\SheetIdCheck;
 use App\Support\OfficeScope;
 use App\Support\SheetSyncNotice;
+use App\Support\SheetWishColumn;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -196,6 +197,13 @@ class SheetSyncController extends Controller
             //   合わないIDが書かれている列には '' を返す＝GASがその欄を空にする（次の取込で正しいIDが入る）。
             'projectIds' => (object) $ids,
             'idRow' => self::ID_ROW,
+            // 名簿の「希望」の列（2026-11-04 小沼さん要望）。GASは row 行目・col 列目（どちらも1はじまり）から下へ values を書く。
+            // ⚠ スタッフだけ。社員・見つからない名前は ''。見出しが「希望」でなければ values は空＝何も書かない。
+            'wishes' => [
+                'row' => SheetWishColumn::FIRST_ROW,
+                'col' => SheetWishColumn::WISH_COL + 1,
+                'values' => SheetWishColumn::valuesFor($rows, $ym),
+            ],
             'message' => $changed
                 ? '受け取りました（前回と中身が変わっています）。'
                 : '受け取りました（前回と同じ中身です）。',
@@ -206,6 +214,8 @@ class SheetSyncController extends Controller
     private function fingerprintOf(array $rows): string
     {
         unset($rows[self::ID_ROW - 1]);
+        // ⚠ K列（希望）・L列（割合）の名簿はECSが毎朝書く数なので、「変わった」に数えない（2026-11-04）。
+        $rows = SheetWishColumn::blankOut($rows);
 
         return hash('sha256', json_encode(array_values($rows), JSON_UNESCAPED_UNICODE));
     }
