@@ -39,6 +39,8 @@ final class HistorySource
         'imports' => 'CSV一括取込',
         'project-import' => 'CSV一括取込（案件）',
         'past-import' => 'アサイン表の取込',
+        'entry-check' => 'エントリーの点検',
+        'entry-move' => 'エントリーの付け替え',
         'sheet-inbox' => 'アサイン表の受信箱',
         'masters' => 'マスタ管理',
         'masters/content-cleanup' => 'マスタ管理（台帳の片づけ）',
@@ -94,6 +96,7 @@ final class HistorySource
         'masters/contents/*/oneoff' => 'コンテンツを単発に',
         'masters/contents/*/delete' => 'コンテンツの削除',
         'masters/contents/bulk-delete' => 'コンテンツのまとめて削除',
+        'entry-move' => 'エントリーを別の案件へ移す',
     ];
 
     /** いまの操作の「ページ › 部分」。画面からの操作でなければ「システム（自動の処理）」。 */

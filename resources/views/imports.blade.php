@@ -73,6 +73,14 @@
       <a class="btn primary" href="/entry-check">開く</a>
     </div>
 
+    {{-- エントリーの付け替え（2026-11-09 小沼さん）。点検で見つけた人を、押したときの案件へ戻す。 --}}
+    <div class="im-card">
+      <div class="im-icon">↪</div>
+      <h2>エントリーの付け替え</h2>
+      <p>取込で案件の中身が入れ替わったとき、スタッフのエントリーを<b>押したときに選んだ案件</b>へ移します。動くのはエントリーだけで、アサインは動きません。</p>
+      <a class="btn primary" href="/entry-move">開く</a>
+    </div>
+
     {{-- 出勤可能日の取込（2026-08-31 baba要望）。月別シートを待たずにまとめて入れる。 --}}
     <div class="im-card">
       <div class="im-icon">📅</div>

@@ -218,6 +218,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/past-import', [PastProjectImportController::class, 'import'])->middleware('tier:manager');
     // エントリーの点検（2026-10-02 baba）。取込でIDがずれ、エントリーが別の案件を指していないか。見るだけ。
     Route::get('/entry-check', [EntryCheckController::class, 'index'])->middleware('tier:manager');
+    // エントリーを別の案件へ移す（2026-11-09 小沼さん）。取込で案件の中身が入れ替わったときのあと片づけ。
+    Route::get('/entry-move', [\App\Http\Controllers\EntryMoveController::class, 'show'])->middleware('tier:manager');
+    Route::post('/entry-move', [\App\Http\Controllers\EntryMoveController::class, 'move'])->middleware('tier:manager');
     // 社員の出勤可能日のまとめて取込（2026-08-31 baba要望）。月別シートをそのまま流し込む。
     // ⚠ 必ずプレビューを見せてから保存する（誰の何日がどう入るかを見てから確定）。
     Route::get('/availability-import', [AvailabilityImportController::class, 'show'])->middleware('tier:manager');
