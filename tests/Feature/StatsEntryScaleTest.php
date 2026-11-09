@@ -96,6 +96,21 @@ class StatsEntryScaleTest extends TestCase
         $this->assertSame(1, $es['activeCount']);
     }
 
+    /** 外部D＝スタッフでDをしている人の欄（2026-11-09 小沼さん）。 */
+    public function test_staff_directors_are_listed(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'name' => '集計担当', 'permission' => 'admin', 'office' => '東京', 'must_onboard' => false, 'role' => 'employee',
+        ]);
+        $ext = PersonFactory::new()->create(['name' => '外部ディレ太', 'role' => 'staff', 'office' => '東京']);
+        $p = ProjectFactory::new()->create(['start_date' => Carbon::today()->startOfMonth()->toDateString(), 'status' => '確定', 'office' => '東京']);
+        \App\Models\Assignment::create(['project_id' => $p->id, 'staff_id' => $ext->id, 'role' => 'D', 'status' => '確定', 'date' => $p->start_date]);
+
+        $this->actingAsPerson($admin)->get('/stats?office=東京')->assertOk()
+            ->assertSee('外部D（スタッフのD）（1名・D 1件／SD 0件）')
+            ->assertSee('外部ディレ太');
+    }
+
     /** セールスの新人（入社後半年以内）はセールスに数えず「その他」（2026-11-09 小沼さん）。 */
     public function test_sales_rookie_counts_as_other(): void
     {

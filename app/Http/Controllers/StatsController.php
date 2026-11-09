@@ -458,7 +458,7 @@ class StatsController extends Controller
                     return $scopeOffice === '' || $m['office'] === $scopeOffice;
                 }
 
-                return $m['count'] > 0;   // スタッフは出勤がある人だけ
+                return $m['count'] > 0 || $m['dTotal'] > 0;   // スタッフは出勤がある人だけ（Dだけの人も・外部D 2026-11-09）
             })
             ->values();
 

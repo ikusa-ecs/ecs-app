@@ -546,6 +546,23 @@
   <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。並びはエントリー数（合計）が多い順。<b>赤い行＝アクティブスタッフ</b>（この期間のイベント日 {{ $es['eventDays'] }}日の半分以上＝{{ $es['activeLine'] }}日以上にエントリーした人・{{ $es['activeCount'] }}名）。大型の数が赤字＝大型に1件もエントリーしていない人。</p>
 </div>
 
+{{-- 外部D＝スタッフ（アルバイト）でDをしている人（2026-11-09 小沼さん）。数え方は社員のD・SDと同じ（同じ案件は1回）。 --}}
+@php $extD = $members->where('kind', 'スタッフ')->where('dTotal', '>', 0)->sortByDesc('dTotal')->values(); @endphp
+<div class="st-panel" style="margin-top:16px;">
+  <h3>外部D（スタッフのD）（{{ $extD->count() }}名・D {{ $extD->sum('d') }}件／SD {{ $extD->sum('sd') }}件）</h3>
+  <div class="st-members">
+    @forelse ($extD as $m)
+      <div class="st-row">
+        <span class="r-name">{{ $m['name'] }}</span>
+        <span class="r-num">D {{ $m['d'] }}件・SD {{ $m['sd'] }}件<small>（うち大型D {{ $m['bigD'] }}件・オンラインD {{ $m['onlineD'] }}件）</small></span>
+      </div>
+    @empty
+      <div class="empty">この期間にDをしたスタッフはいません。</div>
+    @endforelse
+  </div>
+  <p class="st-note">スタッフ（アルバイト）でD・SDに入った人。数え方は社員のD・SDと同じ（同じ案件は1回）。並びはD＋SDが多い順。</p>
+</div>
+
 @php $stf = $members->where('kind', 'スタッフ')->values(); @endphp
 <div class="st-panel" style="margin-top:16px;">
   <h3>スタッフ別 イベント出勤数（{{ $stf->count() }}名）</h3>
