@@ -263,6 +263,7 @@ class AssignSheetController extends Controller
                 'assembly'    => $this->clean($p->assembly_type),
                 'alcohol'     => $p->alcohol === null ? '' : ($p->alcohol ? '有' : '無'),
                 'goods'       => $p->goodsOwner->name ?? '',
+                'goodsId'     => (string) ($p->goods_owner_id ?? ''),
                 'catering'    => $this->clean($p->catering),
                 'transport'   => $this->clean($p->transport),
                 'note'        => $this->clean($p->note),
@@ -350,7 +351,7 @@ class AssignSheetController extends Controller
     public function updateProject(Request $request)
     {
         $allowed = array_merge(self::TEXT_FIELDS, self::INT_FIELDS, self::BOOL_FIELDS,
-            [self::RANGE_FIELD]);
+            [self::RANGE_FIELD, 'sales_owner', 'goods_owner_id']);
 
         $data = $request->validate([
             'project_id' => ['required', 'string'],
@@ -370,7 +371,18 @@ class AssignSheetController extends Controller
         $field = $data['field'];
         $value = trim((string) ($data['value'] ?? ''));
 
-        if ($field === self::RANGE_FIELD) {
+        if ($field === 'sales_owner') {
+            // 営業担当（2026-11-09 小沼さん要望）。案件登録と同じく名前で持つ（一覧に無い人もそのまま打てる）。
+            // 2人以上は「・」区切りで入れる＝表示（implode('・')）と同じ形に戻す。
+            $names = collect(preg_split('/[・、,，]/u', $value))->map(fn ($n) => trim($n))->filter()->values()->all();
+            $project->sales_owners = $names === [] ? null : $names;
+        } elseif ($field === 'goods_owner_id') {
+            // 物品担当（2026-11-09 小沼さん要望）。案件一覧の詳細パネルと同じく、名簿にいる社員だけ。
+            if ($value !== '' && ! Person::employees()->whereKey($value)->exists()) {
+                return response()->json(['ok' => false, 'message' => '社員の名簿にいない人は物品担当にできません。'], 422);
+            }
+            $project->goods_owner_id = $value === '' ? null : $value;
+        } elseif ($field === self::RANGE_FIELD) {
             // 運営人数だけは「6〜8人」の範囲で入れられる（2026-08-25 baba）。
             // ⚠ 数字だけ抜き出すと「6〜8」が「68」になるので、必ず Headcount を通す。
             $range = Headcount::parse($value);

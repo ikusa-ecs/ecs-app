@@ -480,6 +480,20 @@
 @if (count($cards) === 0)
   <div class="sheet-empty">この月に表示できる案件がありません。上のプルダウンで別の月を選んでください。</div>
 @else
+@php
+  // 営業担当の候補・物品担当の選択肢（2026-11-09）。在籍の社員（他拠点も・いま見ている拠点が先）。
+  $goodsOpts = [];
+  foreach ($employeeGroups as $g) {
+    foreach ($g['people'] as $e) {
+      $goodsOpts[(string) $e['id']] = $e['name'];
+    }
+  }
+@endphp
+<datalist id="ecsSalesList">
+  @foreach (array_unique(array_values($goodsOpts)) as $nm)
+    <option value="{{ $nm }}"></option>
+  @endforeach
+</datalist>
 <div class="sheet-scroll">
   <div class="sheet-row" id="sheetRow">
     @foreach ($cards as $c)
@@ -487,7 +501,7 @@
         $short = $c['need_i'] > 0 && $c['filled'] < $c['need_i'];
 
         // 各項目を積む。編集できる項目は 'edit'=>true＋'inputs'（欄の指定）を持つ＝編集モードで入力欄に切り替わる。
-        // 空でも常に積み、非編集時は .pe-empty で隠す（上に詰まる）。人の割当（営業/物品/D）はここでは読み取り表示。
+        // 空でも常に積み、非編集時は .pe-empty で隠す（上に詰まる）。営業・物品担当もここで直せる（2026-11-09）。Dは読み取りだけ（D決めの画面で）。
         $jisseki = [];
         if ($c['logo'] !== '') $jisseki[] = 'ロゴ:' . $c['logo'];
         if ($c['camera'] !== '') $jisseki[] = 'カメ:' . $c['camera'];
@@ -497,7 +511,9 @@
         $rows = [
           ['edit' => true, 'lbl' => '規模/営業',
             'read' => trim($c['scale'] . '　' . $c['sales']), 'empty' => ($c['scale'] === '' && $c['sales'] === ''),
-            'inputs' => [['f' => 'scale', 'v' => $c['scale'], 'ph' => '規模', 'w' => 'wide']]],
+            'inputs' => [['f' => 'scale', 'v' => $c['scale'], 'ph' => '規模', 'w' => 'wide'],
+                         // 営業担当（2026-11-09）。社員の名前が候補に出る・一覧に無い名前もそのまま打てる。2人以上は「・」区切り。
+                         ['f' => 'sales_owner', 'v' => $c['sales'], 'ph' => '営業担当', 'w' => 'wide', 'list' => 'ecsSalesList']]],
           // ⚠ 顧客は 2026-09-28 に「頭」へ移した（baba要望）。ここには積まない。
           ['edit' => true, 'lbl' => '運営場所',
             'read' => $c['operationPlace'] . ($c['isMulti'] ? '（複数開催）' : ''), 'empty' => ($c['operationPlace'] === ''),
@@ -542,7 +558,10 @@
                          ['f' => 'alcohol', 'v' => $c['alcohol'], 't' => 'select', 'opts' => ['' => '酒—', '有' => '酒有', '無' => '酒無']]]],
           ['edit' => true, 'lbl' => '物品/ケータ',
             'read' => $c['goods'] . ($c['catering'] !== '' ? ' ' . $c['catering'] : ''), 'empty' => ($c['goods'] === '' && $c['catering'] === ''),
-            'inputs' => [['f' => 'catering', 'v' => $c['catering'], 'ph' => 'ケータリング', 'w' => 'wide']]],
+            // 物品担当（2026-11-09）。社員から選ぶ。今の担当が退職などで名簿に無くても、選び直すまでは残す。
+            'inputs' => [['f' => 'goods_owner_id', 'v' => $c['goodsId'], 't' => 'select', 'ph' => '物品担当',
+                          'opts' => ['' => '物品担当—'] + ($c['goodsId'] !== '' ? [$c['goodsId'] => $c['goods'] !== '' ? $c['goods'] : $c['goodsId']] : []) + $goodsOpts],
+                         ['f' => 'catering', 'v' => $c['catering'], 'ph' => 'ケータリング', 'w' => 'wide']]],
           ['edit' => true, 'lbl' => '移動',
             'read' => $c['transport'], 'empty' => ($c['transport'] === ''),
             'inputs' => [['f' => 'transport', 'v' => $c['transport'], 'ph' => '移動', 'w' => 'wide']]],
@@ -663,7 +682,7 @@
                       @endforeach
                     </select>
                   @else
-                    <input class="pe-in {{ $in['w'] ?? '' }}" type="{{ $in['t'] ?? 'text' }}" @if (($in['t'] ?? '') === 'number') min="0" @endif value="{{ $in['v'] }}" placeholder="{{ $in['ph'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（入れると保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)">
+                    <input class="pe-in {{ $in['w'] ?? '' }}" type="{{ $in['t'] ?? 'text' }}" @if (($in['t'] ?? '') === 'number') min="0" @endif @if (! empty($in['list'])) list="{{ $in['list'] }}" autocomplete="off" @endif value="{{ $in['v'] }}" placeholder="{{ $in['ph'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（入れると保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)">
                   @endif
                   @if (! empty($in['suf']))<span class="pe-sep">{{ $in['suf'] }}</span>@endif
                 @endforeach
