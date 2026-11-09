@@ -394,15 +394,18 @@
   @endif
 
   {{-- 規模別イベント数（小型／中型／大型）＋昨対比 --}}
-  <div class="st-panel">
+  {{-- ⚠ 縦に3つ積むと長細く見えた（2026-11-09 小沼さん）＝横に3枚並べる。拠点別が出ないとき（拠点を選んだとき）は横いっぱい。 --}}
+  <div class="st-panel" @if ($scopeOffice !== '') style="grid-column: 1 / -1;" @endif>
     <h3>規模別 イベント数（昨対比つき）</h3>
-    @foreach ($byScale as $s)
-      <div class="st-row {{ $s['count'] === 0 ? 'zero' : '' }}">
-        <span class="r-name">{{ $s['scale'] }}</span>
-        <span class="r-num">{{ $s['count'] }}<small>件</small></span>
-      </div>
-      @include('partials.yoy', ['y' => $s['yoy']])
-    @endforeach
+    <div class="es-cards">
+      @foreach ($byScale as $s)
+        <div class="es-card{{ $s['scale'] === '大型' ? ' big' : '' }}">
+          <div class="es-label">{{ $s['scale'] }}</div>
+          <div class="es-num">{{ $s['count'] }}<small style="font-size:12px; font-weight:600;"> 件</small></div>
+          @include('partials.yoy', ['y' => $s['yoy']])
+        </div>
+      @endforeach
+    </div>
     @if ($scaleUnsetCount > 0)
       <p class="st-note">※ うち <b>{{ $scaleUnsetCount }}件</b>は案件規模が未入力（いまは「{{ $scaleUnsetGoesTo }}」に数えています）。</p>
     @endif
