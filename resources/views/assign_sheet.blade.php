@@ -109,7 +109,8 @@
   .mrow.mblk { padding: 0; font-size: 10.5px; align-items: stretch;
     border-top: 1px solid #f7f3ec; }
   .mblk .c-nm { color: var(--ink); }
-  .mblk .c-nm.nm-hit { background: rgba(250, 204, 21, .45); border-radius: 3px; font-weight: 700; }
+  /* 人の名前で探したときの印。⚠ 黄色は「人数が足りない」の色なので使わない（2026-11-09 小沼さん）。 */
+  .mblk .c-nm .m-nm-read.nm-hit { background: rgba(56, 189, 248, .35); outline: 2px solid #0ea5e9; border-radius: 3px; font-weight: 700; }
   .mblk .c-nm .emp { font-size: 9px; color: #b8875a; margin-left: 2px; }
   /* 社員の名前は部署の色（2026-10-19 baba）。イベプラ＝オレンジ／セールス＝紺／クリエイティブ＝黄緑。
      その他・未設定・スタッフは色なし。部署の見分けの正本＝App\Support\Departments::code。 */
@@ -1032,8 +1033,11 @@
       el.style.display = show ? '' : 'none';
       if (show) shown++;
       // 探した人の名前に色を付ける（どこに入っているか一目で分かるように）。
-      el.querySelectorAll('.mblk .c-nm').forEach(function (nm) {
-        var t = (nm.textContent || '').replace(/[\s　]+/g, '').toLowerCase();
+      // ⚠ 見るのは名前の文字（.nm-dep）だけ。.c-nm の中には入れ替え用の社員プルダウンが隠れていて、
+      //   textContent で見ると社員全員の名前が入る＝関係ない行まで当たっていた（2026-11-09 小沼さん指摘）。
+      el.querySelectorAll('.mblk .c-nm .m-nm-read').forEach(function (nm) {
+        var dep = nm.querySelector('.nm-dep');
+        var t = ((dep ? dep.textContent : '') || '').replace(/[\s　]+/g, '').toLowerCase();
         nm.classList.toggle('nm-hit', !!q && t.indexOf(q) >= 0);
       });
     });
