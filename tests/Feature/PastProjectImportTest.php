@@ -673,6 +673,25 @@ class PastProjectImportTest extends TestCase
     }
 
     /**
+     * 「イベント東→他拠点(巻き取り)」＝こちらの案件を他拠点に巻き取ってもらう（2026-11-09 小沼さん指摘）。
+     * 向きを見ずに「他拠点から巻き取り」と書いていたのを、「他拠点に巻き取り」に直した。
+     */
+    public function test_monthly_sheet_outgoing_takeover_note_direction(): void
+    {
+        $me = $this->manager();
+        $this->staff('S-001', '鈴木 彩');
+
+        $this->actingAsPerson($me)->post('/past-import', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', 'イベント東→他拠点(巻き取り)'),
+        ])->assertRedirect('/past-import');
+
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertStringContainsString('他拠点に巻き取り', (string) $p->note);
+        $this->assertStringNotContainsString('他拠点から', (string) $p->note);
+    }
+
+    /**
      * 「これからの案件」として取り込むと、案件は調整中・未公開・募集する／アサインは仮で入る
      * （2026-08-26 baba要望）。
      *

@@ -568,7 +568,11 @@ final class MonthlySheetReader
         $inner = self::insideParen($piece);
         foreach (self::CROSS_OFFICE as $kind) {
             if (self::norm($inner) === self::norm($kind)) {
-                $found['拠点間の関わり'] ??= $kind;
+                // ⚠ 矢印の向きを見る（2026-11-09 小沼さん指摘）。
+                //   「イベント東→他拠点(巻き取り)」＝こちらの案件を**他拠点に**巻き取ってもらう。
+                //   「イベント他拠点→東(巻き取り)」＝他拠点の案件を**こちらが**巻き取る（これまでどおり）。
+                //   それまでは向きを見ず、どちらも「他拠点から巻き取り」と備考に書いていた。
+                $found['拠点間の関わり'] ??= self::isOutgoing($piece) ? self::OUTGOING_PREFIX.$kind : $kind;
 
                 return;
             }
@@ -627,6 +631,17 @@ final class MonthlySheetReader
     }
 
     /** 「イベント東(リアルロング)」→「リアルロング」。カッコが無ければそのまま。 */
+    /** 「他拠点に巻き取ってもらう」向きの印の頭（取込の備考にそのまま出る＝「他拠点に巻き取り」）。 */
+    public const OUTGOING_PREFIX = '他拠点に';
+
+    /** 「イベント東→他拠点(巻き取り)」のように、矢印の先が「他拠点」か（＝こちらから他拠点へ出す向き）。 */
+    private static function isOutgoing(string $piece): bool
+    {
+        $head = preg_replace('/[（(].*$/u', '', $piece);
+
+        return (bool) preg_match('/[→⇒]\s*他拠点/u', (string) $head);
+    }
+
     private static function insideParen(string $value): string
     {
         return preg_match('/[（(]\s*([^）)]+?)\s*[）)]/u', $value, $m) ? $m[1] : $value;

@@ -1343,7 +1343,9 @@ class PastProjectImportController extends Controller
             $marks[] = 'キャンセル';
         }
         if ($get('拠点間の関わり') !== '') {
-            $marks[] = '他拠点から'.$get('拠点間の関わり');
+            // 「他拠点に巻き取り」（東→他拠点）はそのまま。それ以外は「他拠点から〜」（2026-11-09）。
+            $cross = $get('拠点間の関わり');
+            $marks[] = str_starts_with($cross, MonthlySheetReader::OUTGOING_PREFIX) ? $cross : '他拠点から'.$cross;
         }
         // 「営業案件」＝イベント数に数えないもの。数えない理由が案件を見て分かるように残す
         // （実施形態が空で入るので、備考が無いと「入れ忘れ」に見える）。
