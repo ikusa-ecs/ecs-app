@@ -424,7 +424,7 @@ class StatsController extends Controller
                     'name'     => $person->name ?? $id,
                     'dept'     => $person->department ?? '',
                     // 色分け・絞り込み・集計の単位（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
-                    'deptGroup' => Departments::group($person->department),
+                    'deptGroup' => self::statsGroup($person),
                     // 社歴の並び替えに使う入社年月日（'Y-m-d'／未入力は空）と、画面に出す言い方。
                     'hire'      => $hire,
                     'hireLabel' => $hireLabel,
@@ -493,11 +493,11 @@ class StatsController extends Controller
         // ⚠ 退職した社員は分母に数えない（この期間に出勤した人は数える・2026-10-16）。
         $headByDept = $this->withoutHidden(Person::where('role', 'employee'))
             ->inService($workedIds)
-            ->get(['id', 'department'])
+            ->get(['id', 'department', 'hire_date'])
             // ⚠ 「経営管理」など、まとめ先が「その他」になる所属の人も数に入れる（Departments::group が正本）。
             //   ここで department をそのまま突き合わせていたころは、その人たちの出勤が
             //   どの部署にも入らず、静かに消えていた。
-            ->groupBy(fn (Person $p) => Departments::group($p->department))
+            ->groupBy(fn (Person $p) => self::statsGroup($p))
             ->map(fn (Collection $g) => $g->count());
 
         // 部署別＝合計出勤・合計ディレクター＋1人あたり平均（分母＝部署の社員数）。
@@ -602,6 +602,25 @@ class StatsController extends Controller
      *
      * @return array{projects: array<string,int>, entries: array<string,int>, unset: int, rows: array<int, array<string,mixed>>, zero: int}
      */
+    /** セールスの新人＝入社して半年以内（今日から見て）。この集計では「その他」に数える。 */
+    public const SALES_ROOKIE_MONTHS = 6;
+
+    /**
+     * この集計で使う部署のまとめ（イベプラ／セールス／クリエイティブ／その他）。
+     * ⚠ セールスの新人（入社後半年以内）はセールスに数えず「その他」に入れる（2026-11-09 小沼さん）。
+     *   この画面の集計だけの決まり。名簿の所属・ほかの画面の色分けは Departments::group のまま。
+     */
+    public static function statsGroup(Person $p): string
+    {
+        $group = Departments::group($p->department);
+        if ($group === 'セールス' && $p->hire_date
+            && $p->hire_date->greaterThan(Carbon::today()->subMonths(self::SALES_ROOKIE_MONTHS))) {
+            return Departments::OTHER;
+        }
+
+        return $group;
+    }
+
     private function entryScale(Collection $periodAll, Collection $inPeriod, string $scopeOffice): array
     {
         $scales = ProjectScale::all();
@@ -612,6 +631,13 @@ class StatsController extends Controller
         $unset = $inPeriod->filter(fn (Project $p) => ProjectScale::isUnset($p->scale))->count();
 
         $scaleOf = $periodAll->mapWithKeys(fn (Project $p) => [$p->id => ProjectScale::of($p->scale)]);
+        // アクティブスタッフ（2026-11-09 小沼さん）＝この期間のイベント日の半分以上にエントリーした人。
+        // イベント日＝数える案件（$inPeriod）の開催日の種類。エントリー日数＝エントリーした案件の開催日の種類（同じ日に2件でも1日）。
+        $dayOf = $periodAll->mapWithKeys(fn (Project $p) => [$p->id => $p->start_date ? Carbon::parse($p->start_date)->format('Y-m-d') : '']);
+        $eventDays = $inPeriod->map(fn (Project $p) => $p->start_date ? Carbon::parse($p->start_date)->format('Y-m-d') : '')
+            ->filter()->unique()->count();
+        $activeLine = (int) ceil($eventDays / 2);
+        $daysByStaff = [];
         $apps = $periodAll->isEmpty() ? collect()
             : Application::whereIn('project_id', $periodAll->pluck('id')->all())->get(['project_id', 'staff_id']);
         $people = $this->withoutHidden(Person::whereIn('id', $apps->pluck('staff_id')->unique()->all()))
@@ -635,18 +661,27 @@ class StatsController extends Controller
             $staff[$a->staff_id] ??= ['name' => $person->name ?? $a->staff_id, 'office' => (string) ($person->office ?? '')]
                 + array_fill_keys($scales, 0);
             $staff[$a->staff_id][$scale]++;
+            if (($dayOf[$a->project_id] ?? '') !== '') {
+                $daysByStaff[$a->staff_id][$dayOf[$a->project_id]] = true;
+            }
         }
 
-        $rows = collect($staff)->map(function (array $s) {
+        $rows = collect($staff)->map(function (array $s, $sid) use ($daysByStaff, $eventDays, $activeLine) {
             $s['total'] = $s['小型'] + $s['中型'] + $s['大型'];
             $s['ratio'] = $s['total'] > 0 ? $s['大型'] / $s['total'] : 0;
+            $s['days'] = count($daysByStaff[$sid] ?? []);
+            $s['active'] = $eventDays > 0 && $s['days'] >= $activeLine;
             return $s;
         })
-            // 大型の割合が低い順（同じなら合計が多い順→氏名順）。
-            ->sort(fn (array $x, array $y) => [$x['ratio'], $y['total'], $x['name']] <=> [$y['ratio'], $x['total'], $y['name']])
+            // エントリー数（合計）が多い順（同じなら氏名順）。2026-11-09 小沼さん「単純にエントリー数順に」。
+            // ⚠ それまでは大型の割合が低い順だった。
+            ->sort(fn (array $x, array $y) => [$y['total'], $x['name']] <=> [$x['total'], $y['name']])
             ->values()->all();
 
         return [
+            'eventDays'   => $eventDays,
+            'activeLine'  => $activeLine,
+            'activeCount' => count(array_filter($rows, fn ($s) => $s['active'])),
             'projects' => $projects,
             'entries'  => $entries,
             'unset'    => $unset,
@@ -732,8 +767,8 @@ class StatsController extends Controller
         // 所属で絞っているとき＝その所属の社員のぶんだけ数える（スタッフに所属は無いので入らない）。
         $ids = Person::whereIn('id', $rows->pluck('staff_id')->unique()->all())
             ->where('role', 'employee')
-            ->get(['id', 'department'])
-            ->filter(fn (Person $p) => Departments::group($p->department) === $scopeDept)
+            ->get(['id', 'department', 'hire_date'])
+            ->filter(fn (Person $p) => self::statsGroup($p) === $scopeDept)
             ->pluck('id')
             ->flip();
 

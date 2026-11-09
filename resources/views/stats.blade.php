@@ -141,7 +141,9 @@
   .es-table th, .es-table td { padding: 5px 8px; border-bottom: 1px solid var(--line, #e6dccf); text-align: right; white-space: nowrap; }
   .es-table th:nth-child(-n+2), .es-table td:nth-child(-n+2) { text-align: left; }
   .es-table th { position: sticky; top: 0; background: var(--panel); color: #a08a73; font-weight: 600; }
-  .es-table tr.zero td { background: rgba(220, 38, 38, .08); }
+  /* アクティブスタッフ＝イベント日の半分以上にエントリー（2026-11-09 小沼さん）。大型0件は「大型」のマスだけ赤字。 */
+  .es-table tr.active td { background: rgba(220, 38, 38, .16); }
+  .es-table td.zero { color: #dc2626; font-weight: 700; }
   @media (max-width: 600px) { .es-cards { grid-template-columns: 1fr; } }
 
   @media (max-width: 900px) {
@@ -435,7 +437,7 @@
         </div>
       @endforeach
     </div>
-    <p class="st-note">平均＝部署の社員数で割った1人あたり（出勤＝のべ日数／D＝ディレクター担当案件数）。</p>
+    <p class="st-note">平均＝部署の社員数で割った1人あたり（出勤＝のべ日数／D＝ディレクター担当案件数）。セールスの新人（入社して半年以内）はセールスではなく「その他」に数えています。</p>
   </div>
 </div>
 
@@ -525,12 +527,13 @@
   @if (count($es['rows']) > 0)
     <div class="es-wrap">
       <table class="es-table">
-        <thead><tr><th>名前</th><th>拠点</th><th>小型</th><th>中型</th><th>大型</th><th>合計</th><th>大型の割合</th></tr></thead>
+        <thead><tr><th>名前</th><th>拠点</th><th>小型</th><th>中型</th><th>大型</th><th>合計</th><th>エントリー日数</th><th>大型の割合</th></tr></thead>
         <tbody>
           @foreach ($es['rows'] as $r)
-            <tr class="{{ $r['大型'] === 0 ? 'zero' : '' }}">
+            <tr class="{{ $r['active'] ? 'active' : '' }}">
               <td>{{ $r['name'] }}</td><td>{{ $r['office'] }}</td>
-              <td>{{ $r['小型'] }}</td><td>{{ $r['中型'] }}</td><td>{{ $r['大型'] }}</td><td>{{ $r['total'] }}</td>
+              <td>{{ $r['小型'] }}</td><td>{{ $r['中型'] }}</td><td class="{{ $r['大型'] === 0 ? 'zero' : '' }}">{{ $r['大型'] }}</td><td>{{ $r['total'] }}</td>
+              <td>{{ $r['days'] }}日</td>
               <td>{{ round($r['ratio'] * 100) }}%</td>
             </tr>
           @endforeach
@@ -540,7 +543,7 @@
   @else
     <div class="empty">この期間にエントリーした人がいません。</div>
   @endif
-  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。色がついている行＝大型に1件もエントリーしていない人。並びは大型の割合が低い順。</p>
+  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。並びはエントリー数（合計）が多い順。<b>赤い行＝アクティブスタッフ</b>（この期間のイベント日 {{ $es['eventDays'] }}日の半分以上＝{{ $es['activeLine'] }}日以上にエントリーした人・{{ $es['activeCount'] }}名）。大型の数が赤字＝大型に1件もエントリーしていない人。</p>
 </div>
 
 @php $stf = $members->where('kind', 'スタッフ')->values(); @endphp

@@ -62,4 +62,52 @@ class StatsEntryScaleTest extends TestCase
         $this->assertTrue($members->contains('name', '集計担当'));
         $this->assertFalse($members->contains('name', 'Claude確認用'), '確認用アカウントが集計に出ています。');
     }
+
+    /**
+     * エントリー数（合計）が多い順・イベント日の半分以上にエントリーした人はアクティブ（2026-11-09 小沼さん）。
+     */
+    public function test_sorted_by_total_and_active_staff(): void
+    {
+        $admin = PersonFactory::new()->create([
+            'name' => '集計担当', 'permission' => 'admin', 'office' => '東京', 'must_onboard' => false, 'role' => 'employee',
+        ]);
+        $many = PersonFactory::new()->create(['name' => 'たくさん', 'role' => 'staff', 'office' => '東京']);
+        $few = PersonFactory::new()->create(['name' => 'すこし', 'role' => 'staff', 'office' => '東京']);
+
+        $d = Carbon::today()->startOfMonth();
+        $p = [];
+        foreach ([0, 0, 1, 2] as $i => $add) {   // イベント日は3日（1日目に2件）
+            $p[$i] = ProjectFactory::new()->create(['start_date' => $d->copy()->addDays($add)->toDateString(), 'status' => '未着手', 'office' => '東京', 'scale' => '大型']);
+        }
+        // たくさん＝4件・3日 → アクティブ／すこし＝同じ日の2件だけ＝1日 → 半分（2日）に届かない
+        foreach ($p as $x) {
+            Application::create(['project_id' => $x->id, 'staff_id' => $many->id, 'intent' => '希望']);
+        }
+        Application::create(['project_id' => $p[0]->id, 'staff_id' => $few->id, 'intent' => '希望']);
+        Application::create(['project_id' => $p[1]->id, 'staff_id' => $few->id, 'intent' => '希望']);
+
+        $es = $this->actingAsPerson($admin)->get('/stats?office=東京')->assertOk()->original->getData()['entryScale'];
+
+        $this->assertSame(3, $es['eventDays']);
+        $this->assertSame(2, $es['activeLine']);
+        $this->assertSame(['たくさん', 'すこし'], array_column($es['rows'], 'name'));
+        $this->assertSame([3, 1], array_column($es['rows'], 'days'));
+        $this->assertSame([true, false], array_column($es['rows'], 'active'));
+        $this->assertSame(1, $es['activeCount']);
+    }
+
+    /** セールスの新人（入社後半年以内）はセールスに数えず「その他」（2026-11-09 小沼さん）。 */
+    public function test_sales_rookie_counts_as_other(): void
+    {
+        $rookie = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => Carbon::today()->subMonths(2)]);
+        $senior = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => Carbon::today()->subMonths(7)]);
+        $blank = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => null]);
+        $plan = PersonFactory::new()->make(['department' => 'イベプラ', 'hire_date' => Carbon::today()->subMonths(1)]);
+
+        $c = \App\Http\Controllers\StatsController::class;
+        $this->assertSame('その他', $c::statsGroup($rookie));
+        $this->assertSame('セールス', $c::statsGroup($senior));
+        $this->assertSame('セールス', $c::statsGroup($blank));
+        $this->assertSame('イベプラ', $c::statsGroup($plan), 'イベプラの新人はそのまま');
+    }
 }
