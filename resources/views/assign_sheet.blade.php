@@ -109,6 +109,7 @@
   .mrow.mblk { padding: 0; font-size: 10.5px; align-items: stretch;
     border-top: 1px solid #f7f3ec; }
   .mblk .c-nm { color: var(--ink); }
+  .mblk .c-nm.nm-hit { background: rgba(250, 204, 21, .45); border-radius: 3px; font-weight: 700; }
   .mblk .c-nm .emp { font-size: 9px; color: #b8875a; margin-left: 2px; }
   /* 社員の名前は部署の色（2026-10-19 baba）。イベプラ＝オレンジ／セールス＝紺／クリエイティブ＝黄緑。
      その他・未設定・スタッフは色なし。部署の見分けの正本＝App\Support\Departments::code。 */
@@ -456,7 +457,7 @@
     </select>
   </form>
 
-  <input type="search" id="sheetSearch" placeholder="コンテンツ・顧客で絞り込み" oninput="ecsSheetFilter()" style="min-width:190px;">
+  <input type="search" id="sheetSearch" placeholder="コンテンツ・顧客・人の名前で絞り込み" oninput="ecsSheetFilter()" style="min-width:190px;">
 
   <label class="chk"><input type="checkbox" id="sheetShort" onchange="ecsSheetFilter()"> 人数が足りない案件だけ（{{ $shortCount }}）</label>
 
@@ -589,7 +590,8 @@
       @endphp
       <div class="acard"
            data-project="{{ $c['id'] }}"
-           data-search="{{ mb_strtolower($c['content'] . ' ' . $c['client'] . ' ' . $c['agency']) }}"
+           {{-- 人の名前でも探せる（2026-11-09）＝メンバー・営業・物品も入れる。空白は抜く（「西本 蓮太郎」も「西本蓮太郎」で当たるように）。 --}}
+           data-search="{{ preg_replace('/[\s　]+/u', '', mb_strtolower($c['content'] . '|' . $c['client'] . '|' . $c['agency'] . '|' . $c['sales'] . '|' . $c['goods'] . '|' . implode('|', array_column($c['members'], 'name')))) }}"
            data-short="{{ $short ? '1' : '0' }}">
 
         {{-- 頭＋案件名は sticky でスクロール枠の上端に残す（下のメンバーを見ても案件名が消えない）。 --}}
@@ -1018,7 +1020,8 @@
   // 検索ボックス（コンテンツ・顧客）と「人数が足りない案件だけ」で、カードを出し分ける。
   // サーバーで作ったカードを画面側で見せ隠しするだけ（開き直し不要で軽い）。
   function ecsSheetFilter() {
-    var q = (document.getElementById('sheetSearch').value || '').trim().toLowerCase();
+    // 空白は抜いて比べる（人の名前の「姓 名」の間の空白を気にせず探せるように・2026-11-09）。
+    var q = (document.getElementById('sheetSearch').value || '').replace(/[\s　]+/g, '').toLowerCase();
     var shortOnly = document.getElementById('sheetShort').checked;
     var cards = document.querySelectorAll('#sheetRow .acard');
     var shown = 0;
@@ -1028,6 +1031,11 @@
       var show = okText && okShort;
       el.style.display = show ? '' : 'none';
       if (show) shown++;
+      // 探した人の名前に色を付ける（どこに入っているか一目で分かるように）。
+      el.querySelectorAll('.mblk .c-nm').forEach(function (nm) {
+        var t = (nm.textContent || '').replace(/[\s　]+/g, '').toLowerCase();
+        nm.classList.toggle('nm-hit', !!q && t.indexOf(q) >= 0);
+      });
     });
     var s = document.getElementById('sheetShown');
     if (s) s.textContent = shown;

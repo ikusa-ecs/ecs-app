@@ -68,4 +68,15 @@ class AssignSheetOwnerEditTest extends TestCase
             ->assertSee('ecsSalesList', false)
             ->assertSee("'goods_owner_id'", false);
     }
+
+    /** 人の名前でも絞り込める＝検索用の文字に人の名前が空白ぬきで入る（2026-11-09）。 */
+    public function test_search_text_includes_people_without_spaces(): void
+    {
+        $this->actingAsPerson($this->manager());
+        ProjectFactory::new()->create(['office' => '東京', 'start_date' => now()->toDateString(), 'sales_owners' => ['西本 蓮太郎']]);
+
+        $this->get('/assign-sheet?month=' . now()->format('Y-m'))
+            ->assertOk()
+            ->assertSee('西本蓮太郎', false);
+    }
 }
