@@ -109,6 +109,14 @@
   .mrow.mblk { padding: 0; font-size: 10.5px; align-items: stretch;
     border-top: 1px solid #f7f3ec; }
   .mblk .c-nm { color: var(--ink); }
+  /* 移動・音響のチェック選択（2026-11-09）。その場で下に開く＝横スクロールの枠に切られないように。 */
+  .pick-pop { display: block; width: 100%; }
+  .pick-pop > summary { list-style: none; cursor: pointer; font-size: 12px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pick-pop > summary::-webkit-details-marker { display: none; }
+  .pick-pop[open] > summary { border-color: var(--brand, #8a5a2b); }
+  .pick-pop .pick-list { display: block; margin-top: 4px; max-height: 200px; overflow: auto; padding: 6px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .pick-pop .pick-list label { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; cursor: pointer; white-space: nowrap; }
+  .pick-pop .pick-list input { margin: 0; }
   /* 人の名前で探したときの印。⚠ 黄色は「人数が足りない」の色なので使わない（2026-11-09 小沼さん）。 */
   .mblk .c-nm .m-nm-read.nm-hit { background: rgba(56, 189, 248, .35); outline: 2px solid #0ea5e9; border-radius: 3px; font-weight: 700; }
   .mblk .c-nm .emp { font-size: 9px; color: #b8875a; margin-left: 2px; }
@@ -504,6 +512,19 @@
 
         // 各項目を積む。編集できる項目は 'edit'=>true＋'inputs'（欄の指定）を持つ＝編集モードで入力欄に切り替わる。
         // 空でも常に積み、非編集時は .pe-empty で隠す（上に詰まる）。営業・物品担当もここで直せる（2026-11-09）。Dは読み取りだけ（D決めの画面で）。
+        // 移動・音響の選択肢（2026-11-09 小沼さん要望＝選択式に）。案件一覧と同じく拠点ごとの設定（OfficeOptions）。
+        // 「電車+IKUSAカー」のような組み合わせはばらして1つずつにし、今の値にしか無いものも足す（消えないように）。
+        $pickAtoms = function (string $kind, string $cur) use ($c) {
+          $office = $c['office'] !== '' ? $c['office'] : \App\Support\OfficeScope::DEFAULT_OFFICE;
+          $atoms = [];
+          foreach (array_merge(\App\Support\OfficeOptions::get($office, $kind), [$cur]) as $v) {
+            foreach (explode('+', (string) $v) as $a) {
+              $a = trim($a);
+              if ($a !== '' && $a !== 'ー' && ! in_array($a, $atoms, true)) $atoms[] = $a;
+            }
+          }
+          return $atoms;
+        };
         $jisseki = [];
         if ($c['logo'] !== '') $jisseki[] = 'ロゴ:' . $c['logo'];
         if ($c['camera'] !== '') $jisseki[] = 'カメ:' . $c['camera'];
@@ -550,7 +571,7 @@
             'inputs' => [['f' => 'staff_role', 'v' => $c['staffRole'], 'ph' => '運営方式', 'w' => 'wide']]],
           ['edit' => true, 'lbl' => '音響',
             'read' => $c['audio'], 'empty' => ($c['audio'] === ''),
-            'inputs' => [['f' => 'audio_equipment', 'v' => $c['audio'], 'ph' => '音響', 'w' => 'wide']]],
+            'inputs' => [['f' => 'audio_equipment', 'v' => $c['audio'], 't' => 'pick', 'ph' => '音響', 'opts' => $pickAtoms('audio_equipment', $c['audio'])]]],
           ['edit' => true, 'lbl' => '会場住所',
             'read' => $c['location'], 'empty' => ($c['location'] === ''),
             'inputs' => [['f' => 'location', 'v' => $c['location'], 'ph' => '会場住所', 'w' => 'wide']]],
@@ -566,7 +587,7 @@
                          ['f' => 'catering', 'v' => $c['catering'], 'ph' => 'ケータリング', 'w' => 'wide']]],
           ['edit' => true, 'lbl' => '移動',
             'read' => $c['transport'], 'empty' => ($c['transport'] === ''),
-            'inputs' => [['f' => 'transport', 'v' => $c['transport'], 'ph' => '移動', 'w' => 'wide']]],
+            'inputs' => [['f' => 'transport', 'v' => $c['transport'], 't' => 'pick', 'ph' => '移動', 'opts' => $pickAtoms('transport', $c['transport'])]]],
           ['edit' => true, 'lbl' => '実績公開', 'sep' => ' ',
             'read' => implode(' ', $jisseki), 'empty' => ($c['logo'] === '' && $c['camera'] === '' && $c['article'] === '' && $c['video'] === ''),
             'inputs' => [['f' => 'pub_logo', 'v' => $c['logo'], 'ph' => 'ロゴ'], ['f' => 'pub_camera', 'v' => $c['camera'], 'ph' => 'カメ'], ['f' => 'pub_article', 'v' => $c['article'], 'ph' => '記事'], ['f' => 'pub_video', 'v' => $c['video'], 'ph' => '動画']]],
@@ -678,6 +699,17 @@
                       </span>
                       <textarea class="pe-in {{ $in['w'] ?? '' }}" rows="3" placeholder="{{ $in['ph'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（枠の外を押すと保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)" style="width:100%; box-sizing:border-box; resize:vertical; font-family:inherit;">{{ $in['v'] }}</textarea>
                     </span>
+                  @elseif (($in['t'] ?? 'text') === 'pick')
+                    {{-- いくつでも選べるチェック（移動・音響）。選んだものは「+」でつないで保存（案件一覧と同じ持ち方）。 --}}
+                    @php $picked = array_values(array_filter(array_map('trim', explode('+', (string) $in['v'])), fn ($s) => $s !== '' && $s !== 'ー')); @endphp
+                    <details class="pick-pop" data-none="{{ $in['ph'] }}を選ぶ">
+                      <summary>{{ $picked !== [] ? implode('＋', $picked) : $in['ph'] . 'を選ぶ' }}</summary>
+                      <span class="pick-list">
+                        @foreach ($in['opts'] as $opt)
+                          <label><input type="checkbox" value="{{ $opt }}" {{ in_array($opt, $picked, true) ? 'checked' : '' }} onchange="ecsSheetPick(this,'{{ $in['f'] }}')">{{ $opt }}</label>
+                        @endforeach
+                      </span>
+                    </details>
                   @elseif (($in['t'] ?? 'text') === 'select')
                     <select class="pe-in {{ $in['w'] ?? '' }}" title="{{ $in['ph'] ?? $r['lbl'] }}（選ぶと保存）" onchange="ecsSheetSaveProject(this,'{{ $in['f'] }}',this.value)">
                       @foreach ($in['opts'] as $ov => $ol)
@@ -1007,6 +1039,17 @@
         }
       })
       .catch(function () { alert('通信エラーで保存できませんでした。'); });
+  }
+
+  // 移動・音響のチェックを付け外ししたら、選んでいるものを「+」でつないで保存する（2026-11-09）。
+  function ecsSheetPick(cb, field) {
+    var box = cb.closest('.pick-pop');
+    if (!box) return;
+    var vals = [];
+    box.querySelectorAll('input[type="checkbox"]').forEach(function (c) { if (c.checked) vals.push(c.value); });
+    var sum = box.querySelector('summary');
+    if (sum) sum.textContent = vals.length ? vals.join('＋') : (box.getAttribute('data-none') || '選ぶ');
+    ecsSheetSaveProject(cb, field, vals.join('+'));
   }
 
   // 進行チェック（LINE/引継/台本）のチップを、編集モードのときだけクリックでオン/オフ保存する。

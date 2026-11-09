@@ -69,6 +69,22 @@ class AssignSheetOwnerEditTest extends TestCase
             ->assertSee("'goods_owner_id'", false);
     }
 
+    /** 移動・音響はチェックで選ぶ（2026-11-09）。組み合わせはばらし、今の値にしか無いものも残す。 */
+    public function test_transport_and_audio_are_pick_lists(): void
+    {
+        $this->actingAsPerson($this->manager());
+        ProjectFactory::new()->create(['office' => '東京', 'start_date' => now()->toDateString(),
+            'transport' => '電車+船', 'audio_equipment' => '会場音響']);
+
+        $html = $this->get('/assign-sheet?month=' . now()->format('Y-m'))->assertOk()->getContent();
+
+        $this->assertStringContainsString("ecsSheetPick(this,'transport')", $html);
+        $this->assertStringContainsString("ecsSheetPick(this,'audio_equipment')", $html);
+        $this->assertMatchesRegularExpression('/value="電車" checked/', $html);
+        $this->assertMatchesRegularExpression('/value="船" checked/', $html, '一覧に無い今の値も消えない');
+        $this->assertStringNotContainsString('value="電車+IKUSAカー"', $html, '組み合わせはばらす');
+    }
+
     /** 人の名前でも絞り込める＝検索用の文字に人の名前が空白ぬきで入る（2026-11-09）。 */
     public function test_search_text_includes_people_without_spaces(): void
     {
