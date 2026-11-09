@@ -376,9 +376,10 @@
   </ul>
 @endif
 
+{{-- 規模別イベント数の欄は消した（2026-11-09 小沼さん：一番上の数字カードと同じ中身）。 --}}
+{{-- 拠点（事務所）別イベント数。全拠点モードのみ表示（特定の拠点を選んだら他拠点は隠す・baba 2026-07-27）。 --}}
+@if ($scopeOffice === '')
 <div class="st-grid">
-  {{-- 拠点（事務所）別イベント数。全拠点モードのみ表示（特定の拠点を選んだら他拠点は隠す・baba 2026-07-27）。 --}}
-  @if ($scopeOffice === '')
   <div class="st-panel">
     <h3>拠点別 イベント数</h3>
     @forelse ($byOffice as $b)
@@ -391,26 +392,8 @@
     @endforelse
     <p class="st-note">※ 現在は東京のみ運営のため、ほとんどが東京になります（他拠点は今後対応）。</p>
   </div>
-  @endif
-
-  {{-- 規模別イベント数（小型／中型／大型）＋昨対比 --}}
-  {{-- ⚠ 縦に3つ積むと長細く見えた（2026-11-09 小沼さん）＝横に3枚並べる。拠点別が出ないとき（拠点を選んだとき）は横いっぱい。 --}}
-  <div class="st-panel" @if ($scopeOffice !== '') style="grid-column: 1 / -1;" @endif>
-    <h3>規模別 イベント数（昨対比つき）</h3>
-    <div class="es-cards">
-      @foreach ($byScale as $s)
-        <div class="es-card{{ $s['scale'] === '大型' ? ' big' : '' }}">
-          <div class="es-label">{{ $s['scale'] }}</div>
-          <div class="es-num">{{ $s['count'] }}<small style="font-size:12px; font-weight:600;"> 件</small></div>
-          @include('partials.yoy', ['y' => $s['yoy']])
-        </div>
-      @endforeach
-    </div>
-    @if ($scaleUnsetCount > 0)
-      <p class="st-note">※ うち <b>{{ $scaleUnsetCount }}件</b>は案件規模が未入力（いまは「{{ $scaleUnsetGoesTo }}」に数えています）。</p>
-    @endif
-  </div>
 </div>
+@endif
 
 <div class="st-grid">
   {{-- 他拠点依頼数（東→他拠点／他拠点→東／ヘルプを別々に） --}}
