@@ -91,8 +91,30 @@ class ImportCrossOfficeShareTest extends TestCase
 
         $share = ProjectShare::where('project_id', $p->id)->first();
         $this->assertNotNull($share, '巻き取りの印が付いていない');
-        $this->assertSame('福岡', $share->office);
+        // 向きの書かれていない「巻き取り」＝他拠点→取り込んだ拠点（備考の「他拠点から巻き取り」と同じ向き）。
+        // ⚠ 2026-11-09 までは逆（持ち主＝東京・巻き取る側＝福岡）で記録していた。
+        $this->assertSame('東京', $share->office);
+        $this->assertSame('福岡', $p->fresh()->office);
         $this->assertSame('巻き取り', $share->kind);
+    }
+
+    /** 「東⇒名(巻き取り)」のように拠点名が両方あれば、相手を選ばなくても記録する・備考は「名古屋巻き取り」（2026-11-09）。 */
+    public function test_named_direction_is_recorded_without_choosing(): void
+    {
+        $me = $this->manager();
+        \App\Models\Office::firstOrCreate(['name' => '名古屋'], ['active' => true, 'sort_order' => 2]);
+        $this->assertSame(['東京', '名古屋'], \App\Support\MonthlySheetReader::crossDirection('東⇒名(巻き取り)'));
+        $this->assertSame(['東京', '他拠点'], \App\Support\MonthlySheetReader::crossDirection('イベント東→他拠点(巻き取り)'));
+        $this->assertSame(['他拠点', '東京'], \App\Support\MonthlySheetReader::crossDirection('イベント他拠点東(巻き取り)'));
+
+        $ctl = \App\Http\Controllers\PastProjectImportController::class;
+        $this->assertSame('名古屋巻き取り', $ctl::crossNote('巻き取り', '東京', '名古屋'));
+        $this->assertSame('他拠点に巻き取り', $ctl::crossNote('巻き取り', '東京', '他拠点'));
+        $this->assertSame('他拠点から巻き取り', $ctl::crossNote('巻き取り', '他拠点', '東京'));
+        $this->assertSame(['東京', '名古屋'], $ctl::crossPlan('東京', '名古屋', '東京', ''));
+        $this->assertSame(['東京', '福岡'], $ctl::crossPlan('東京', '他拠点', '東京', '福岡'));
+        $this->assertSame(['福岡', '東京'], $ctl::crossPlan('他拠点', '東京', '東京', '福岡'));
+        $this->assertNull($ctl::crossPlan('他拠点', '東京', '東京', ''));
     }
 
     /** ⚠ 相手の拠点を選ばなければ、これまでどおり印は付けない（勘で拠点を決めない）。 */

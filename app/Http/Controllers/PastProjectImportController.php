@@ -867,6 +867,7 @@ class PastProjectImportController extends Controller
 
             // シートの「巻き取り／ヘルプ」の印（無ければ空文字）。
             $crossKind = $get('拠点間の関わり');
+            $crossPlan = $crossKind !== '' ? self::crossPlan($get('拠点間の元'), $get('拠点間の先'), $office, $shareOffice) : null;
 
             $isFuture = $mode === self::MODE_FUTURE;
 
@@ -876,7 +877,7 @@ class PastProjectImportController extends Controller
             $sheetIdHere = $entry['sheetId'] ?? null;
 
             DB::transaction(function () use ($existing, $attrs, $date, $assignments, $assignStatus, $isFuture,
-                $crossKind, $shareOffice, $office, $seriesCol, $sheetIdHere, &$idChanges, &$created, &$updated, &$assignCount, &$shared,
+                $crossKind, $crossPlan, $shareOffice, $office, $seriesCol, $sheetIdHere, &$idChanges, &$created, &$updated, &$assignCount, &$shared,
                 &$idsByColumn, &$needParent) {
                 if ($existing) {
                     // ⚠ 公開の状態（staff_published）は、読み込み直しでは触らない（2026-08-28 baba報告）。
@@ -936,12 +937,21 @@ class PastProjectImportController extends Controller
                 }
 
                 // 巻き取り・ヘルプを「拠点間の関わり」として記録する（2026-08-28 baba要望）。
-                // ⚠ シートには「どの拠点から」が書かれていないので、画面で選んだ相手の拠点を使う。
+                // ⚠ シートに「他拠点」としか書かれていない側は、画面で選んだ相手の拠点を使う。
                 //   選んでいなければ、これまでどおり備考の文字だけ（勘で拠点を決めない）。
-                if ($crossKind !== '' && $shareOffice !== '' && $shareOffice !== $office) {
+                // 向き＝[持ち主, 巻き取る側]（正本 crossPlan・2026-11-09）。持ち主が取り込んだ拠点と違えば
+                // 案件の登録拠点を持ち主にする（他拠点→東＝名古屋の案件を東京が巻き取る）。
+                if ($crossPlan !== null) {
+                    [$owner, $taker] = $crossPlan;
                     $kind = str_contains($crossKind, '巻き取り') ? '巻き取り' : 'ヘルプ';
+                    if ((string) $project->office !== $owner) {
+                        $project->office = $owner;
+                        $project->save();
+                    }
+                    // 前に逆向きで記録したもの（持ち主の拠点への関わり）は意味が無いので消す。
+                    ProjectShare::where('project_id', $project->id)->where('office', $owner)->delete();
                     ProjectShare::updateOrCreate(
-                        ['project_id' => $project->id, 'office' => $shareOffice],
+                        ['project_id' => $project->id, 'office' => $taker],
                         ['kind' => $kind, 'created_by' => Auth::id()]
                     );
                     $shared++;
@@ -1343,9 +1353,7 @@ class PastProjectImportController extends Controller
             $marks[] = 'キャンセル';
         }
         if ($get('拠点間の関わり') !== '') {
-            // 「他拠点に巻き取り」（東→他拠点）はそのまま。それ以外は「他拠点から〜」（2026-11-09）。
-            $cross = $get('拠点間の関わり');
-            $marks[] = str_starts_with($cross, MonthlySheetReader::OUTGOING_PREFIX) ? $cross : '他拠点から'.$cross;
+            $marks[] = self::crossNote($get('拠点間の関わり'), $get('拠点間の元'), $get('拠点間の先'));
         }
         // 「営業案件」＝イベント数に数えないもの。数えない理由が案件を見て分かるように残す
         // （実施形態が空で入るので、備考が無いと「入れ忘れ」に見える）。
@@ -1488,6 +1496,51 @@ class PastProjectImportController extends Controller
      *   選んでいなければ空を返す＝これまでどおり備考に文字を残すだけにする。
      * ⚠ 取込先の拠点と同じものは受け付けない（自分に頼む印は作らない）。
      */
+    /**
+     * 備考に残す拠点間の印の言い方（2026-11-09 小沼さん）。
+     *   ・先（巻き取る側）が拠点名で分かる＝「名古屋巻き取り」（他拠点からこちらへ来たもの以外）
+     *   ・先が「他拠点」＝「他拠点に巻き取り」（こちらの案件を他拠点に巻き取ってもらう）
+     *   ・それ以外（他拠点→東・向きが読めない）＝「他拠点から巻き取り」（これまでどおり）
+     */
+    public static function crossNote(string $kind, string $from, string $to): string
+    {
+        $other = MonthlySheetReader::OTHER_OFFICE;
+        if ($to === $other) {
+            return $other.'に'.$kind;
+        }
+        if ($to !== '' && $from !== $other && $from !== '') {
+            return $to.$kind;
+        }
+
+        return $other.'から'.$kind;
+    }
+
+    /**
+     * 拠点間の関わりの向き＝[案件の持ち主の拠点, 巻き取る・手伝う拠点]。決められなければ null。
+     *   ・シートに両方の拠点名がある（東⇒名）→ そのまま
+     *   ・片方が「他拠点」→ そこを画面で選んだ相手の拠点に、拠点名が無い側を取り込んだ拠点にする
+     *   ・どちらも読めない（他拠点東 以外の古い書き方）→ 他拠点→取り込んだ拠点 とみなす
+     * ⚠ 2026-11-09 まではいつも「持ち主＝取り込んだ拠点・巻き取る側＝選んだ相手」で記録していたため、
+     *   「他拠点→東」が逆向き（東京の案件を名古屋が巻き取る）になっていた。
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public static function crossPlan(string $from, string $to, string $office, string $shareOffice): ?array
+    {
+        $other = MonthlySheetReader::OTHER_OFFICE;
+        $pick = fn (string $v, string $fallback) => $v === $other ? $shareOffice : ($v !== '' ? $v : $fallback);
+        if ($from === '' && $to === '') {
+            $from = $other;
+        }
+        $owner = $pick($from, $office);
+        $taker = $pick($to, $office);
+        if ($owner === '' || $taker === '' || $owner === $taker) {
+            return null;
+        }
+
+        return [$owner, $taker];
+    }
+
     private function shareOffice(Request $request, string $ownOffice): string
     {
         $sent = trim((string) $request->input('share_office', ''));

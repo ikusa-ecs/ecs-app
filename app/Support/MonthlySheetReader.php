@@ -568,11 +568,17 @@ final class MonthlySheetReader
         $inner = self::insideParen($piece);
         foreach (self::CROSS_OFFICE as $kind) {
             if (self::norm($inner) === self::norm($kind)) {
-                // ⚠ 矢印の向きを見る（2026-11-09 小沼さん指摘）。
-                //   「イベント東→他拠点(巻き取り)」＝こちらの案件を**他拠点に**巻き取ってもらう。
-                //   「イベント他拠点→東(巻き取り)」＝他拠点の案件を**こちらが**巻き取る（これまでどおり）。
+                // ⚠ 矢印の向きも読む（2026-11-09 小沼さん指摘）。
+                //   「イベント東→他拠点(巻き取り)」＝東京の案件を**他拠点が**巻き取る。
+                //   「イベント他拠点→東(巻き取り)」＝他拠点の案件を**東京が**巻き取る。
+                //   「東⇒名(巻き取り)」＝東京の案件を**名古屋が**巻き取る（拠点名が両方分かる）。
                 //   それまでは向きを見ず、どちらも「他拠点から巻き取り」と備考に書いていた。
-                $found['拠点間の関わり'] ??= self::isOutgoing($piece) ? self::OUTGOING_PREFIX.$kind : $kind;
+                if (! isset($found['拠点間の関わり'])) {
+                    $found['拠点間の関わり'] = $kind;
+                    [$from, $to] = self::crossDirection($piece);
+                    $found['拠点間の元'] = $from;
+                    $found['拠点間の先'] = $to;
+                }
 
                 return;
             }
@@ -631,15 +637,54 @@ final class MonthlySheetReader
     }
 
     /** 「イベント東(リアルロング)」→「リアルロング」。カッコが無ければそのまま。 */
-    /** 「他拠点に巻き取ってもらう」向きの印の頭（取込の備考にそのまま出る＝「他拠点に巻き取り」）。 */
-    public const OUTGOING_PREFIX = '他拠点に';
+    /** 拠点間の印の「他拠点」（どこか書かれていない）。 */
+    public const OTHER_OFFICE = '他拠点';
 
-    /** 「イベント東→他拠点(巻き取り)」のように、矢印の先が「他拠点」か（＝こちらから他拠点へ出す向き）。 */
-    private static function isOutgoing(string $piece): bool
+    /** シートでの拠点の略し方（「東⇒名」など）。正式名もそのまま受け付ける。 */
+    private const OFFICE_ABBR = ['東' => '東京', '名' => '名古屋', '大' => '大阪', '福' => '福岡'];
+
+    /**
+     * 拠点間の印の矢印の左右＝[元（案件の持ち主）, 先（巻き取る・手伝う側）]。
+     * 値は 正式な拠点名／「他拠点」／''（読めない）。
+     *   「イベント東→他拠点(巻き取り)」→ [東京, 他拠点]
+     *   「イベント他拠点→東(巻き取り)」「イベント他拠点東(巻き取り)」→ [他拠点, 東京]
+     *   「東⇒名(巻き取り)」→ [東京, 名古屋]
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function crossDirection(string $piece): array
     {
-        $head = preg_replace('/[（(].*$/u', '', $piece);
+        $head = trim((string) preg_replace('/[（(].*$/u', '', $piece));
+        $head = trim((string) preg_replace('/^イベント/u', '', $head));
+        if (preg_match('/^(.*?)\s*[→⇒＞>]\s*(.*)$/u', $head, $m)) {
+            return [self::officeToken($m[1]), self::officeToken($m[2])];
+        }
+        // 矢印なしの「他拠点東」＝他拠点→東（これまでの書き方）。
+        if (str_starts_with($head, self::OTHER_OFFICE)) {
+            return [self::OTHER_OFFICE, self::officeToken(mb_substr($head, mb_strlen(self::OTHER_OFFICE)))];
+        }
 
-        return (bool) preg_match('/[→⇒]\s*他拠点/u', (string) $head);
+        return ['', ''];
+    }
+
+    /** 「東」「名古屋」「他拠点」→ 正式名／「他拠点」。読めなければ ''。 */
+    private static function officeToken(string $t): string
+    {
+        $t = trim($t);
+        if ($t === self::OTHER_OFFICE) {
+            return self::OTHER_OFFICE;
+        }
+        if (isset(self::OFFICE_ABBR[$t])) {
+            return self::OFFICE_ABBR[$t];
+        }
+        if (in_array($t, self::OFFICE_ABBR, true)) {
+            return $t;
+        }
+        try {
+            return in_array($t, OfficeScope::options(), true) ? $t : '';
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     private static function insideParen(string $value): string
