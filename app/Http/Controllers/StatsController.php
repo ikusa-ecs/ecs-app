@@ -404,6 +404,8 @@ class StatsController extends Controller
         $workedIds = $countByStaff->keys()->merge(array_keys($dirStats))->map(fn ($v) => (string) $v)->unique()->values()->all();
         $neededIds = Person::where('role', 'employee')->inService($workedIds)->pluck('id')
             ->merge($countByStaff->keys())->unique()->values();
+        // セールス新人の判定の基準日＝見ている期間のはじまり（statsGroup・2026-11-09 小沼さん）。
+        $groupBase = self::periodStart($selected, $span);
         $people = $this->withoutHidden(Person::whereIn('id', $neededIds->all()))
             ->get(['id', 'name', 'role', 'department', 'office', 'hire_date', 'active'])
             ->keyBy('id');
@@ -411,7 +413,7 @@ class StatsController extends Controller
         // メンバー一覧（社員＝全員／スタッフ＝出勤ありのみ・拠点別のときは社員はその拠点だけ）。
         // 並び順は下の sortMembers（社歴順が既定）。
         $members = $people
-            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats) {
+            ->map(function (Person $person) use ($countByStaff, $bigCountByStaff, $dirStats, $groupBase) {
                 $id = $person->id;
                 $ds = $dirStats[$id] ?? ['d' => 0, 'sd' => 0, 'realD' => 0, 'bigD' => 0, 'bigSD' => 0, 'onlineD' => 0];
                 $hire = $person->hire_date?->format('Y-m-d') ?? '';
@@ -424,7 +426,7 @@ class StatsController extends Controller
                     'name'     => $person->name ?? $id,
                     'dept'     => $person->department ?? '',
                     // 色分け・絞り込み・集計の単位（イベプラ／セールス／クリエイティブ／その他）。正本＝Departments。
-                    'deptGroup' => self::statsGroup($person),
+                    'deptGroup' => self::statsGroup($person, $groupBase),
                     // 社歴の並び替えに使う入社年月日（'Y-m-d'／未入力は空）と、画面に出す言い方。
                     'hire'      => $hire,
                     'hireLabel' => $hireLabel,
@@ -497,7 +499,7 @@ class StatsController extends Controller
             // ⚠ 「経営管理」など、まとめ先が「その他」になる所属の人も数に入れる（Departments::group が正本）。
             //   ここで department をそのまま突き合わせていたころは、その人たちの出勤が
             //   どの部署にも入らず、静かに消えていた。
-            ->groupBy(fn (Person $p) => self::statsGroup($p))
+            ->groupBy(fn (Person $p) => self::statsGroup($p, $groupBase))
             ->map(fn (Collection $g) => $g->count());
 
         // 部署別＝合計出勤・合計ディレクター＋1人あたり平均（分母＝部署の社員数）。
@@ -609,12 +611,14 @@ class StatsController extends Controller
      * この集計で使う部署のまとめ（イベプラ／セールス／クリエイティブ／その他）。
      * ⚠ セールスの新人（入社後半年以内）はセールスに数えず「その他」に入れる（2026-11-09 小沼さん）。
      *   この画面の集計だけの決まり。名簿の所属・ほかの画面の色分けは Departments::group のまま。
+     * ⚠ 「半年以内」は**見ている期間のはじまりの日**で判定する（小沼さん決定）＝過去の集計は、いつ見ても数字が変わらない。
+     *   例：7/1入社→2026年8〜12月の集計は「その他」、2027年1月からは「セールス」。
      */
-    public static function statsGroup(Person $p): string
+    public static function statsGroup(Person $p, Carbon $periodStart): string
     {
         $group = Departments::group($p->department);
         if ($group === 'セールス' && $p->hire_date
-            && $p->hire_date->greaterThan(Carbon::today()->subMonths(self::SALES_ROOKIE_MONTHS))) {
+            && $p->hire_date->greaterThan($periodStart->copy()->subMonths(self::SALES_ROOKIE_MONTHS))) {
             return Departments::OTHER;
         }
 
@@ -742,7 +746,7 @@ class StatsController extends Controller
             'hasData'    => $hasData,
             'total'      => $prev->count(),
             'byScale'    => $this->countByScale($prev),
-            'attendance' => $hasData ? $this->attendanceOf($prev, $scopeDept) : 0,
+            'attendance' => $hasData ? $this->attendanceOf($prev, $scopeDept, self::periodStart($key, $span)) : 0,
         ];
     }
 
@@ -750,7 +754,7 @@ class StatsController extends Controller
      * その案件たちの「のべ出勤数」（キャンセル以外のアサインの行数＝出勤日数）。
      * 所属で絞っているときは、その所属の社員ぶんだけを足す（画面のいまの条件に合わせる）。
      */
-    private function attendanceOf(Collection $projects, string $scopeDept): int
+    private function attendanceOf(Collection $projects, string $scopeDept, Carbon $groupBase): int
     {
         if ($projects->isEmpty()) {
             return 0;
@@ -768,7 +772,7 @@ class StatsController extends Controller
         $ids = Person::whereIn('id', $rows->pluck('staff_id')->unique()->all())
             ->where('role', 'employee')
             ->get(['id', 'department', 'hire_date'])
-            ->filter(fn (Person $p) => self::statsGroup($p) === $scopeDept)
+            ->filter(fn (Person $p) => self::statsGroup($p, $groupBase) === $scopeDept)
             ->pluck('id')
             ->flip();
 
@@ -872,6 +876,20 @@ class StatsController extends Controller
 
     // ⚠ 「リアル／オンライン」のイベント数は 2026-09-09 に画面から外した（上長要望＝規模で見る）。
     //   社員別の「リアルD／オンラインD」は今までどおり残しているので、その判定は projMeta の中にある。
+
+    /** 期間キー → その期間のはじまりの日（セールス新人の判定に使う）。読めなければ今日。 */
+    public static function periodStart(string $key, string $span): Carbon
+    {
+        try {
+            return match ($span) {
+                'quarter' => Carbon::create((int) substr($key, 0, 4), ((int) substr($key, -1) - 1) * 3 + 1, 1)->startOfDay(),
+                'year'    => Carbon::create((int) $key, 1, 1)->startOfDay(),
+                default   => Carbon::createFromFormat('Y-m-d', $key.'-01')->startOfDay(),
+            };
+        } catch (\Throwable $e) {
+            return Carbon::today();
+        }
+    }
 
     /** 日付 → 期間キー（span 別）。month=YYYY-MM／quarter=YYYY-Qn／year=YYYY。 */
     private function periodKey(Carbon $d, string $span): string

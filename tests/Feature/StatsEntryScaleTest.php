@@ -114,15 +114,18 @@ class StatsEntryScaleTest extends TestCase
     /** セールスの新人（入社後半年以内）はセールスに数えず「その他」（2026-11-09 小沼さん）。 */
     public function test_sales_rookie_counts_as_other(): void
     {
-        $rookie = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => Carbon::today()->subMonths(2)]);
-        $senior = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => Carbon::today()->subMonths(7)]);
+        // 判定は「見ている期間のはじまり」で（小沼さん決定）。7/1入社＝2026年8〜12月はその他・2027年1月からセールス。
+        $july = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => Carbon::parse('2026-07-01')]);
         $blank = PersonFactory::new()->make(['department' => 'セールス', 'hire_date' => null]);
-        $plan = PersonFactory::new()->make(['department' => 'イベプラ', 'hire_date' => Carbon::today()->subMonths(1)]);
+        $plan = PersonFactory::new()->make(['department' => 'イベプラ', 'hire_date' => Carbon::parse('2026-07-01')]);
 
         $c = \App\Http\Controllers\StatsController::class;
-        $this->assertSame('その他', $c::statsGroup($rookie));
-        $this->assertSame('セールス', $c::statsGroup($senior));
-        $this->assertSame('セールス', $c::statsGroup($blank));
-        $this->assertSame('イベプラ', $c::statsGroup($plan), 'イベプラの新人はそのまま');
+        $this->assertSame('その他', $c::statsGroup($july, $c::periodStart('2026-08', 'month')));
+        $this->assertSame('その他', $c::statsGroup($july, $c::periodStart('2026-12', 'month')));
+        $this->assertSame('セールス', $c::statsGroup($july, $c::periodStart('2027-01', 'month')));
+        $this->assertSame('セールス', $c::statsGroup($july, $c::periodStart('2027-Q1', 'quarter')));
+        $this->assertSame('その他', $c::statsGroup($july, $c::periodStart('2026', 'year')));
+        $this->assertSame('セールス', $c::statsGroup($blank, $c::periodStart('2026-08', 'month')));
+        $this->assertSame('イベプラ', $c::statsGroup($plan, $c::periodStart('2026-08', 'month')), 'イベプラの新人はそのまま');
     }
 }
