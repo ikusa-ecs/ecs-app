@@ -141,6 +141,9 @@
   .es-table th, .es-table td { padding: 5px 8px; border-bottom: 1px solid var(--line, #e6dccf); text-align: right; white-space: nowrap; }
   .es-table th:nth-child(-n+2), .es-table td:nth-child(-n+2) { text-align: left; }
   .es-table th { position: sticky; top: 0; background: var(--panel); color: #a08a73; font-weight: 600; }
+  .es-table th.es-sort { cursor: pointer; user-select: none; }
+  .es-table th.es-sort:hover { color: var(--ink); }
+  .es-arrow { font-size: 10px; margin-left: 2px; }
   /* アクティブスタッフ＝イベント日の半分以上にエントリー（2026-11-09 小沼さん）。大型0件は「大型」のマスだけ赤字。 */
   .es-table tr.active td { background: rgba(220, 38, 38, .16); }
   .es-table tr.semi td { background: rgba(245, 158, 11, .12); }
@@ -526,8 +529,13 @@
   </div>
   @if (count($es['rows']) > 0)
     <div class="es-wrap">
-      <table class="es-table">
-        <thead><tr><th>名前</th><th>拠点</th><th>小型</th><th>中型</th><th>大型</th><th>合計</th><th>エントリー日数</th><th>イベント参加数</th><th>大型の割合</th></tr></thead>
+      {{-- 見出しを押すとその列で並べ替え（2026-11-09 小沼さん）。数字の列は多い順→もう一度で少ない順。画面の中だけで並べ替える（読み込み直さない）。 --}}
+      <table class="es-table" id="esTable">
+        <thead><tr>
+          @foreach (['名前' => 'str', '拠点' => 'str', '小型' => 'num', '中型' => 'num', '大型' => 'num', '合計' => 'num', 'エントリー日数' => 'num', 'イベント参加数' => 'num', '大型の割合' => 'num'] as $label => $type)
+            <th class="es-sort" data-type="{{ $type }}" @if ($label === '合計') data-dir="desc" @endif onclick="esSort(this)" title="押すとこの列で並べ替え">{{ $label }}<span class="es-arrow">{{ $label === '合計' ? '▼' : '' }}</span></th>
+          @endforeach
+        </tr></thead>
         <tbody>
           @foreach ($es['rows'] as $r)
             <tr class="{{ $r['active'] ? 'active' : ($r['semi'] ? 'semi' : '') }}">
@@ -541,10 +549,36 @@
         </tbody>
       </table>
     </div>
+    <script>
+      // 規模別エントリー数の表の並べ替え。セルの文字から数字だけ取り出して比べる（「3日」「50%」も数字で）。
+      function esSort(th) {
+        var table = document.getElementById('esTable');
+        var body = table.tBodies[0];
+        var idx = Array.prototype.indexOf.call(th.parentNode.children, th);
+        var isNum = th.getAttribute('data-type') === 'num';
+        // 1回目＝数字は多い順・文字は五十音順。同じ列をもう一度押すと逆。
+        var desc = th.getAttribute('data-dir') ? th.getAttribute('data-dir') !== 'desc' : isNum;
+        th.parentNode.querySelectorAll('th').forEach(function (h) { h.removeAttribute('data-dir'); h.querySelector('.es-arrow').textContent = ''; });
+        th.setAttribute('data-dir', desc ? 'desc' : 'asc');
+        th.querySelector('.es-arrow').textContent = desc ? '▼' : '▲';
+        var val = function (tr) {
+          var t = tr.children[idx].textContent.trim();
+          return isNum ? (parseFloat(t.replace(/[^0-9.\-]/g, '')) || 0) : t;
+        };
+        var rows = Array.prototype.slice.call(body.rows);
+        rows.sort(function (a, b) {
+          var x = val(a), y = val(b);
+          var c = isNum ? x - y : String(x).localeCompare(String(y), 'ja');
+          if (c === 0) { c = a.children[0].textContent.localeCompare(b.children[0].textContent, 'ja'); return c; }
+          return desc ? -c : c;
+        });
+        rows.forEach(function (r) { body.appendChild(r); });
+      }
+    </script>
   @else
     <div class="empty">この期間にエントリーした人がいません。</div>
   @endif
-  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。並びはエントリー数（合計）が多い順。<b>赤い行＝アクティブスタッフ</b>（この期間のイベント日 {{ $es['eventDays'] }}日の半分以上＝{{ $es['activeLine'] }}日以上にエントリーした人・{{ $es['activeCount'] }}名）。<b>薄いオレンジの行＝準アクティブスタッフ</b>（1日以上〜半分未満）。イベント参加数＝実際に出勤した数（キャンセル以外のアサイン）。大型の数が赤字＝大型に1件もエントリーしていない人。</p>
+  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。並びははじめはエントリー数（合計）が多い順。<b>見出しを押すと、その列で並べ替え</b>（もう一度押すと逆順）。<b>赤い行＝アクティブスタッフ</b>（この期間のイベント日 {{ $es['eventDays'] }}日の半分以上＝{{ $es['activeLine'] }}日以上にエントリーした人・{{ $es['activeCount'] }}名）。<b>薄いオレンジの行＝準アクティブスタッフ</b>（1日以上〜半分未満）。イベント参加数＝実際に出勤した数（キャンセル以外のアサイン）。大型の数が赤字＝大型に1件もエントリーしていない人。</p>
 </div>
 
 {{-- 外部D＝スタッフ（アルバイト）でDをしている人（2026-11-09 小沼さん）。数え方は社員のD・SDと同じ（同じ案件は1回）。 --}}
