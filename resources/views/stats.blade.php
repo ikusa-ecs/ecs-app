@@ -143,6 +143,7 @@
   .es-table th { position: sticky; top: 0; background: var(--panel); color: #a08a73; font-weight: 600; }
   /* アクティブスタッフ＝イベント日の半分以上にエントリー（2026-11-09 小沼さん）。大型0件は「大型」のマスだけ赤字。 */
   .es-table tr.active td { background: rgba(220, 38, 38, .16); }
+  .es-table tr.semi td { background: rgba(245, 158, 11, .12); }
   .es-table td.zero { color: #dc2626; font-weight: 700; }
   @media (max-width: 600px) { .es-cards { grid-template-columns: 1fr; } }
 
@@ -524,16 +525,30 @@
       エントリーした <b>{{ count($es['rows']) }}人</b> のうち、大型に1件もエントリーしていない人 <b>{{ $es['zero'] }}人（{{ round($es['zero'] / count($es['rows']) * 100) }}%）</b>
     @endif
   </p>
+  {{-- アクティブ／準アクティブの合計（2026-11-09 小沼さん）。イベント参加数＝実際に出勤した数（キャンセル以外）。 --}}
+  <div class="es-cards">
+    <div class="es-card big">
+      <div class="es-label">アクティブスタッフ（{{ $es['activeLine'] }}日以上エントリー）</div>
+      <div class="es-num">{{ $es['activeCount'] }} 人</div>
+      <div class="es-label">イベント参加数 合計 {{ $es['activeAttend'] }} 回</div>
+    </div>
+    <div class="es-card">
+      <div class="es-label">準アクティブスタッフ（1〜{{ max($es['activeLine'] - 1, 1) }}日エントリー）</div>
+      <div class="es-num">{{ $es['semiCount'] }} 人</div>
+      <div class="es-label">イベント参加数 合計 {{ $es['semiAttend'] }} 回</div>
+    </div>
+  </div>
   @if (count($es['rows']) > 0)
     <div class="es-wrap">
       <table class="es-table">
-        <thead><tr><th>名前</th><th>拠点</th><th>小型</th><th>中型</th><th>大型</th><th>合計</th><th>エントリー日数</th><th>大型の割合</th></tr></thead>
+        <thead><tr><th>名前</th><th>拠点</th><th>小型</th><th>中型</th><th>大型</th><th>合計</th><th>エントリー日数</th><th>イベント参加数</th><th>大型の割合</th></tr></thead>
         <tbody>
           @foreach ($es['rows'] as $r)
-            <tr class="{{ $r['active'] ? 'active' : '' }}">
+            <tr class="{{ $r['active'] ? 'active' : ($r['semi'] ? 'semi' : '') }}">
               <td>{{ $r['name'] }}</td><td>{{ $r['office'] }}</td>
               <td>{{ $r['小型'] }}</td><td>{{ $r['中型'] }}</td><td class="{{ $r['大型'] === 0 ? 'zero' : '' }}">{{ $r['大型'] }}</td><td>{{ $r['total'] }}</td>
               <td>{{ $r['days'] }}日</td>
+              <td>{{ $r['attend'] }}回</td>
               <td>{{ round($r['ratio'] * 100) }}%</td>
             </tr>
           @endforeach
@@ -543,7 +558,7 @@
   @else
     <div class="empty">この期間にエントリーした人がいません。</div>
   @endif
-  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。並びはエントリー数（合計）が多い順。<b>赤い行＝アクティブスタッフ</b>（この期間のイベント日 {{ $es['eventDays'] }}日の半分以上＝{{ $es['activeLine'] }}日以上にエントリーした人・{{ $es['activeCount'] }}名）。大型の数が赤字＝大型に1件もエントリーしていない人。</p>
+  <p class="st-note">エントリー＝「エントリーする」を出した数（同じ案件は1回）。拠点で絞ると、案件数はその拠点の案件、人は本人の所属がその拠点の人（他拠点の案件へのエントリーも数えます）。並びはエントリー数（合計）が多い順。<b>赤い行＝アクティブスタッフ</b>（この期間のイベント日 {{ $es['eventDays'] }}日の半分以上＝{{ $es['activeLine'] }}日以上にエントリーした人・{{ $es['activeCount'] }}名）。<b>薄いオレンジの行＝準アクティブスタッフ</b>（1日以上〜半分未満）。イベント参加数＝実際に出勤した数（キャンセル以外のアサイン）。大型の数が赤字＝大型に1件もエントリーしていない人。</p>
 </div>
 
 {{-- 外部D＝スタッフ（アルバイト）でDをしている人（2026-11-09 小沼さん）。数え方は社員のD・SDと同じ（同じ案件は1回）。 --}}

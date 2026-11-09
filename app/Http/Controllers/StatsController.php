@@ -585,7 +585,7 @@ class StatsController extends Controller
             'attendanceDispatch' => $attendanceDispatch,
             'byDept'          => $byDept,
             'members'         => $members,
-            'entryScale'      => $this->entryScale($periodAll, $inPeriod, $scopeOffice),
+            'entryScale'      => $this->entryScale($periodAll, $inPeriod, $scopeOffice, $countByStaff),
         ];
     }
 
@@ -625,7 +625,7 @@ class StatsController extends Controller
         return $group;
     }
 
-    private function entryScale(Collection $periodAll, Collection $inPeriod, string $scopeOffice): array
+    private function entryScale(Collection $periodAll, Collection $inPeriod, string $scopeOffice, Collection $countByStaff): array
     {
         $scales = ProjectScale::all();
         $projects = array_fill_keys($scales, 0);
@@ -670,11 +670,15 @@ class StatsController extends Controller
             }
         }
 
-        $rows = collect($staff)->map(function (array $s, $sid) use ($daysByStaff, $eventDays, $activeLine) {
+        $rows = collect($staff)->map(function (array $s, $sid) use ($daysByStaff, $eventDays, $activeLine, $countByStaff) {
             $s['total'] = $s['小型'] + $s['中型'] + $s['大型'];
             $s['ratio'] = $s['total'] > 0 ? $s['大型'] / $s['total'] : 0;
             $s['days'] = count($daysByStaff[$sid] ?? []);
             $s['active'] = $eventDays > 0 && $s['days'] >= $activeLine;
+            // 準アクティブ＝1日以上エントリーしたが半分に届かない人（2026-11-09 小沼さん）。
+            $s['semi'] = ! $s['active'] && $s['days'] >= 1;
+            // イベント参加数＝実際に出勤した数（キャンセル以外のアサイン・出勤数と同じ数え方）。
+            $s['attend'] = (int) ($countByStaff[$sid] ?? 0);
             return $s;
         })
             // エントリー数（合計）が多い順（同じなら氏名順）。2026-11-09 小沼さん「単純にエントリー数順に」。
@@ -686,6 +690,9 @@ class StatsController extends Controller
             'eventDays'   => $eventDays,
             'activeLine'  => $activeLine,
             'activeCount' => count(array_filter($rows, fn ($s) => $s['active'])),
+            'activeAttend' => array_sum(array_column(array_filter($rows, fn ($s) => $s['active']), 'attend')),
+            'semiCount'   => count(array_filter($rows, fn ($s) => $s['semi'])),
+            'semiAttend'  => array_sum(array_column(array_filter($rows, fn ($s) => $s['semi']), 'attend')),
             'projects' => $projects,
             'entries'  => $entries,
             'unset'    => $unset,

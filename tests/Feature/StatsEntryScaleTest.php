@@ -93,7 +93,18 @@ class StatsEntryScaleTest extends TestCase
         $this->assertSame(['たくさん', 'すこし'], array_column($es['rows'], 'name'));
         $this->assertSame([3, 1], array_column($es['rows'], 'days'));
         $this->assertSame([true, false], array_column($es['rows'], 'active'));
+        $this->assertSame([false, true], array_column($es['rows'], 'semi'));
         $this->assertSame(1, $es['activeCount']);
+        $this->assertSame(1, $es['semiCount']);
+        // イベント参加数＝実際の出勤（キャンセルは数えない）
+        $this->assertSame(0, $es['activeAttend']);
+        \App\Models\Assignment::create(['project_id' => $p[2]->id, 'staff_id' => $many->id, 'role' => 'FC', 'status' => '確定', 'date' => $p[2]->start_date]);
+        \App\Models\Assignment::create(['project_id' => $p[0]->id, 'staff_id' => $few->id, 'role' => 'FC', 'status' => '確定', 'date' => $p[0]->start_date]);
+        \App\Models\Assignment::create(['project_id' => $p[3]->id, 'staff_id' => $few->id, 'role' => 'FC', 'status' => 'キャンセル', 'date' => $p[3]->start_date]);
+        $es = $this->actingAsPerson($admin)->get('/stats?office=東京')->assertOk()
+            ->assertSee('準アクティブスタッフ')->original->getData()['entryScale'];
+        $this->assertSame(1, $es['activeAttend']);
+        $this->assertSame(1, $es['semiAttend']);
     }
 
     /** 外部D＝スタッフでDをしている人の欄（2026-11-09 小沼さん）。 */
