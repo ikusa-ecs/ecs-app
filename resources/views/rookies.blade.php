@@ -573,7 +573,8 @@
         <option value="">台帳のコンテンツを選ぶ</option>
         @foreach ($contents as $c)<option value="{{ $c->id }}">{{ $c->content_name }}</option>@endforeach
       </select>
-      <input class="rk-in" name="category" placeholder="分類（例：謎解き脱出）" style="width:11em;">
+      <input class="rk-in" name="category" placeholder="分類（例：謎解き脱出）" style="width:11em;" list="rkDiffCats" title="今ある分類を選ぶと、その分類のいちばん下に入ります">
+      <datalist id="rkDiffCats">@foreach ($difficultyCategories as $cat)<option value="{{ $cat }}">@endforeach</datalist>
       <select class="rk-in" name="difficulty"><option value="">難易度</option>@for ($i = 1; $i <= 4; $i++)<option>{{ $i }}</option>@endfor</select>
       <select class="rk-in" name="need"><option value="">必修・推奨なし</option><option value="must">必修</option><option value="recommend">推奨</option></select>
       <label class="rk-small"><input type="checkbox" name="one_of" value="1"> 同じ分類から1つでよい（◻︎）</label>

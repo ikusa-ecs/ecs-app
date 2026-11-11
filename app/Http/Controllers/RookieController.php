@@ -62,7 +62,10 @@ class RookieController extends Controller
             'employees' => Person::employees()->where('active', true)->orderBy('id')->get(['id', 'name']),
             // 月ごとの目標の表＝セールス版とイベプラ版（2026-10-13）。
             'targetSets' => [Rookies::SALES => Rookies::targets(Rookies::SALES), Rookies::EVENTPLAN => Rookies::targets(Rookies::EVENTPLAN)],
-            'difficulties' => ContentDifficulty::orderBy('kind', 'desc')->orderBy('id')->get(),
+            // 並び＝種類（リアル→オンライン）→ 分類（シートで最初に出てきた順）→ 足した順。
+            // 画面で足した行は、同じ分類のいちばん下に入る（2026-11-11 小沼さん）。
+            'difficulties' => $diffs = self::orderedDifficulties(),
+            'difficultyCategories' => $diffs->pluck('category')->filter()->unique()->values(),
             'contents' => Content::where('active', true)->orderBy('content_name')->get(['id', 'content_name']),
             'unlinked' => $plan['unlinked'],
             'canEdit' => true,   // 社員以上ならだれでも直せる（この画面に来られるのは社員以上だけ）
@@ -266,6 +269,22 @@ class RookieController extends Controller
         $d->delete();
 
         return back()->with('ok', $d->kind.'の難易度表から「'.$d->sheet_name.'」を消しました。');
+    }
+
+    /** 難易度表の並び（種類→分類の最初の行の順→id）。同じ分類の行がまとまり、足した行はその分類の最後に来る。 */
+    public static function orderedDifficulties()
+    {
+        $all = ContentDifficulty::orderBy('kind', 'desc')->orderBy('id')->get();
+        $first = [];
+        foreach ($all as $d) {
+            $first[$d->kind.'|'.($d->category ?? '')] ??= $d->id;
+        }
+
+        return $all->sortBy([
+            fn ($a, $b) => strcmp($b->kind, $a->kind),
+            fn ($a, $b) => $first[$a->kind.'|'.($a->category ?? '')] <=> $first[$b->kind.'|'.($b->category ?? '')],
+            fn ($a, $b) => $a->id <=> $b->id,
+        ])->values();
     }
 
     /** 難易度の行を台帳のコンテンツにつなぐ（空＝外す）。 */

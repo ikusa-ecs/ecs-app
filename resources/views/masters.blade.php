@@ -28,17 +28,17 @@
          **名前の欄が空に見える**（2026-08-27に略称の列を足したとき実際に起きた）。
          固定幅の合計＋すき間が、パネルの中で使える幅を超えないこと。
          見張りのテスト＝MastersGridWidthTest。 */
-    .m-wrap.m-wide { max-width: 1100px; }
+    .m-wrap.m-wide { max-width: 1140px; }
     /* 画面が狭いときは縦に潰さず横スクロールにする（潰れると気づけないため）。 */
     .m-scroll { overflow-x: auto; }
 
     .m-head {
-      display: grid; grid-template-columns: 46px 66px minmax(150px, 1fr) 120px 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
+      display: grid; grid-template-columns: 46px 66px minmax(150px, 1fr) 100px 170px 40px 52px 44px 118px 60px 160px; gap: 8px;
       font-size: 11.5px; font-weight: 700; color: var(--muted); padding: 2px 4px 6px; align-items: end;
     }
     .m-head.off { grid-template-columns: 56px 1fr 96px 52px 150px; }
     .m-row {
-      display: grid; grid-template-columns: 46px 66px minmax(150px, 1fr) 120px 100px 40px 52px 44px 128px 60px 160px; gap: 8px;
+      display: grid; grid-template-columns: 46px 66px minmax(150px, 1fr) 100px 170px 40px 52px 44px 118px 60px 160px; gap: 8px;
       align-items: center; padding: 6px 4px; border-top: 1px solid var(--line);
     }
     .m-row.off { grid-template-columns: 56px 1fr 96px 52px 150px; }
@@ -46,6 +46,12 @@
     .m-del { display: flex; align-items: center; justify-content: center; }
     .m-used { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.3; }
     .m-row.add { border-top: 2px solid #e3d3b6; margin-top: 4px; }
+    /* 種類・分類ごとの見出し（2026-11-11 小沼さん：スプシのように分類ごとに並べる） */
+    .m-group { margin: 14px 0 0; padding: 6px 8px; font-size: 13px; font-weight: 800; color: var(--brand-dark); background: var(--surface-2, #f7f1e6); border-radius: 8px; }
+    .m-group .cnt { font-weight: 400; font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+    .m-kg { display: flex; gap: 4px; }
+    .m-kg select { padding: 6px 4px; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; font-family: inherit; width: 74px; background: #fff; }
+    html[data-theme="dark"] .m-kg select { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
     /* まとめて保存バー */
     .m-save-bar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 12px 4px 2px; }
     .m-save-bar .m-btn { padding: 9px 20px; font-size: 13px; }
@@ -119,6 +125,7 @@
   <div class="panel m-wrap m-wide" id="contents">
     <div class="panel-head"><h2>コンテンツ</h2></div>
     <p class="m-intro">案件名に使うコンテンツ（水合戦・運動会 など）。ここを直すと案件登録の選択肢に反映されます。<br>
+      <b>種類・分類</b>＝スプシ「リアル／オンラインイベント関連資料」の分類です。この分類ごとにまとめて並びます（▲▼はまとまりの中で動きます）。<br>
       「紙」＝謎解きシートが必要なコンテンツ。オンにすると <a href="/paper-stock">謎解きの紙 在庫</a> で集計されます（枚/組＝1チームあたりの必要枚数・基本1）。<br>
       <b>「略称」</b>＝カレンダーの予定名などで、正式名のかわりに使う短い名前です（例「先が見えない防災訓練」→「防災訓練」）。
       <b>空のままなら正式名を使います</b>ので、略称が無いコンテンツは空でOKです。</p>
@@ -129,9 +136,12 @@
     <form method="POST" action="/masters/contents/bulk">
       @csrf
       <div class="m-head">
-        <span>削除</span><span>ID</span><span>コンテンツ名</span><span>略称</span><span>分類</span><span>紙</span><span>枚/組</span><span>有効</span><span>必要人数</span><span>並び替え</span><span>操作</span>
+        <span>削除</span><span>ID</span><span>コンテンツ名</span><span>略称</span><span>種類・分類</span><span>紙</span><span>枚/組</span><span>有効</span><span>必要人数</span><span>並び替え</span><span>操作</span>
       </div>
-      @foreach ($contents as $c)
+      <datalist id="genreOptions">@foreach ($genreOptions as $g)<option value="{{ $g }}">@endforeach</datalist>
+      @foreach ($contentGroups as $grp)
+        <div class="m-group">{{ $grp['kind'] !== '' ? $grp['kind'].' › '.($grp['genre'] !== '' ? $grp['genre'] : '分類なし') : '未分類（種類・分類を選んで「すべて保存」）' }}<span class="cnt">{{ $grp['items']->count() }}件</span></div>
+      @foreach ($grp['items'] as $c)
         <div class="m-row">
           {{-- まとめて削除のチェック（2026-08-31 baba要望）。案件CSVの取込で台帳に増えた
                いらないコンテンツを一度に片づけるためのもの。
@@ -158,7 +168,12 @@
           {{-- 略称（2026-08-27 baba要望）。カレンダーの予定名などで正式名のかわりに使う。
                空でよい＝空のときは正式名を使う。 --}}
           <input type="text" name="rows[{{ $c->id }}][short_name]" value="{{ $c->short_name }}" placeholder="略称（任意）">
-          <input type="text" name="rows[{{ $c->id }}][category]" value="{{ $c->category }}" placeholder="分類">
+          {{-- 種類・分類（スプシ「リアル／オンラインイベント関連資料」の分類・2026-11-11 小沼さん）。正本＝ContentGenre。
+               ⚠ もとの「分類」（盛り上げ系・真面目系）は画面から外した＝DBには残る（どこでも使っていなかった）。 --}}
+          <div class="m-kg">
+            <select name="rows[{{ $c->id }}][kind]"><option value="">—</option>@foreach (\App\Support\ContentGenre::KINDS as $k)<option @selected($c->kind === $k)>{{ $k }}</option>@endforeach</select>
+            <input type="text" name="rows[{{ $c->id }}][genre]" value="{{ $c->genre }}" placeholder="分類" list="genreOptions">
+          </div>
           <label class="m-chk"><input type="checkbox" name="rows[{{ $c->id }}][needs_paper]" value="1" @checked($c->needs_paper)></label>
           <input type="number" name="rows[{{ $c->id }}][sheets_per_team]" value="{{ $c->sheets_per_team ?? 1 }}" min="1" max="99" title="1チームあたりの必要枚数">
           <label class="m-chk"><input type="checkbox" name="rows[{{ $c->id }}][active]" value="1" @checked($c->active)></label>
@@ -183,6 +198,7 @@
             @endif
           </div>
         </div>
+      @endforeach
       @endforeach
       <div class="m-save-bar">
         <span class="m-note" style="margin:0;">編集した内容をまとめて保存します。</span>
@@ -216,7 +232,10 @@
       <span class="m-id">新規</span>
       <input type="text" name="content_name" placeholder="コンテンツ名" required>
       <input type="text" name="short_name" placeholder="略称（任意）">
-      <input type="text" name="category" placeholder="分類（任意）">
+      <div class="m-kg">
+        <select name="kind"><option value="">—</option>@foreach (\App\Support\ContentGenre::KINDS as $k)<option>{{ $k }}</option>@endforeach</select>
+        <input type="text" name="genre" placeholder="分類" list="genreOptions">
+      </div>
       <label class="m-chk"><input type="checkbox" name="needs_paper" value="1"></label>
       <input type="number" name="sheets_per_team" value="1" min="1" max="99" title="1チームあたりの必要枚数">
       <label class="m-chk"><input type="checkbox" name="active" value="1" checked></label>

@@ -89,6 +89,13 @@ class RookieTest extends TestCase
 
         $this->actingAsPerson($me)->post('/rookies/difficulty/delete', ['id' => $d->id])->assertRedirect();
         $this->assertSame(0, ContentDifficulty::count());
+
+        // 足した行は、同じ分類のいちばん下に入る（ほかの分類の後ろではない・2026-11-11 小沼さん）
+        ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'A', 'category' => '謎解き脱出']);
+        ContentDifficulty::create(['kind' => 'リアル', 'sheet_name' => 'B', 'category' => '合戦系']);
+        $this->actingAsPerson($me)->post('/rookies/difficulty/add', ['kind' => 'リアル', 'content_id' => 'CT-5', 'category' => '謎解き脱出']);
+        $this->assertSame(['A', '謎解き新作', 'B'],
+            \App\Http\Controllers\RookieController::orderedDifficulties()->pluck('sheet_name')->all());
     }
 
     public function test_新人は自動で出て卒業で消える(): void

@@ -44,6 +44,9 @@ class MasterController extends Controller
 
         return view('masters', [
             'contents' => $contents,
+            // 種類（リアル／オンライン）→分類（スプシの分類）ごとにまとめて並べる（2026-11-11 小沼さん）。正本＝ContentGenre
+            'contentGroups' => \App\Support\ContentGenre::group($contents),
+            'genreOptions' => \App\Support\ContentGenre::genreOptions(),
             'offices' => Office::orderBy('sort_order')->orderBy('id')->get(),
             // 役割は正本のコード→ラベル。編集不可（表示のみ）。
             'positions' => AssignmentRole::LABELS,
@@ -204,6 +207,8 @@ class MasterController extends Controller
             // ⚠ 空でよい＝空のときは正式名を使う。
             'short_name' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:100'],
+            'kind' => ['nullable', 'in:,リアル,オンライン'],
+            'genre' => ['nullable', 'string', 'max:100'],
             'sheets_per_team' => ['nullable', 'integer', 'min:1', 'max:99'],
         ]);
 
@@ -217,7 +222,11 @@ class MasterController extends Controller
 
         $content->content_name = $data['content_name'];
         $content->short_name = trim((string) ($data['short_name'] ?? '')) ?: null;
-        $content->category = $data['category'] ?? null;
+        if ($request->has('category')) {
+            $content->category = $data['category'] ?? null;
+        }
+        $content->kind = ($data['kind'] ?? '') !== '' ? $data['kind'] : null;
+        $content->genre = trim((string) ($data['genre'] ?? '')) ?: null;
         $content->is_physical = $request->boolean('is_physical');
         $content->needs_paper = $request->boolean('needs_paper');
         $content->sheets_per_team = max(1, (int) ($data['sheets_per_team'] ?? 1));
@@ -255,7 +264,17 @@ class MasterController extends Controller
             if (array_key_exists('short_name', $vals)) {
                 $content->short_name = trim((string) $vals['short_name']) ?: null;
             }
-            $content->category = $vals['category'] ?? null;
+            // 盛り上げ系・真面目系の「分類」は画面から外した（2026-11-11）＝送られてきたときだけ直す（消さない）。
+            if (array_key_exists('category', $vals)) {
+                $content->category = $vals['category'];
+            }
+            // 種類・分類（スプシの分類・2026-11-11 小沼さん）。
+            if (array_key_exists('kind', $vals)) {
+                $content->kind = in_array($vals['kind'], \App\Support\ContentGenre::KINDS, true) ? $vals['kind'] : null;
+            }
+            if (array_key_exists('genre', $vals)) {
+                $content->genre = trim((string) $vals['genre']) ?: null;
+            }
             $content->needs_paper = ! empty($vals['needs_paper']);
             $content->sheets_per_team = max(1, (int) ($vals['sheets_per_team'] ?? 1));
             $content->active = ! empty($vals['active']);
@@ -271,7 +290,10 @@ class MasterController extends Controller
     {
         $this->saveContentRows($request);   // 編集中の内容を先に保存
 
-        $ordered = Content::orderBy('sort_order')->orderBy('id')->get();
+        // 動かすのは同じ種類・分類のまとまりの中だけ（画面はまとまりごとに並べているため・2026-11-11）。
+        $me = Content::find($id);
+        $ordered = Content::orderBy('sort_order')->orderBy('id')->get()
+            ->filter(fn ($c) => !$me || ($c->kind === $me->kind && ($c->kind === null || $c->genre === $me->genre)))->values();
         $pos = $ordered->search(fn ($c) => $c->id === $id);
         if ($pos !== false) {
             $swapWith = $dir === 'up' ? $pos - 1 : $pos + 1;
