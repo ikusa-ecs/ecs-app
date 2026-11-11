@@ -119,9 +119,9 @@
     {{-- 「この欄を送りました」の印。チェックは選んだものしか送られないので、
          印が無いと全部外した状態を保存できない。決まりの正本＝App\Support\ProfileBasics。 --}}
     <input type="hidden" name="departments_sent" value="1">
-    <div style="display:flex; flex-wrap:wrap; gap:6px 16px;">
+    <div style="display:flex; flex-wrap:wrap; gap:8px 16px;">
       @foreach (\App\Support\Departments::ALL as $opt)
-        <label style="display:inline-flex; align-items:center; gap:6px; font-weight:400; font-size:13.5px;">
+        <label style="display:inline-flex; align-items:center; gap:8px; font-weight:400; font-size:13.5px;">
           <input type="checkbox" name="departments[]" value="{{ $opt }}"
                  style="width:auto;" @checked(in_array($opt, $me->departmentList(), true))>
           {{ $opt }}

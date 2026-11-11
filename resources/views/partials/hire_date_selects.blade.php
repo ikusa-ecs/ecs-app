@@ -30,7 +30,7 @@
 @endphp
 <span class="hire-date-field" style="display:block;">
   {{-- ⚠ この注意書きは薄い文字にしない。実際に2回、生年月日を入れた方が出ている。 --}}
-  <span class="hire-date-warn" style="display:block; margin:0 0 6px; padding:6px 10px; border-radius:8px;
+  <span class="hire-date-warn" style="display:block; margin:0 0 8px; padding:8px 8px; border-radius:8px;
         background:#fdecec; border:1px solid #f3b7b7; color:#a12121; font-size:13px; font-weight:700; line-height:1.6;">
     ⚠ ここは<u>生年月日ではありません</u>。<b>IKUSAで働き始めた日</b>を選んでください。
   </span>
@@ -57,6 +57,6 @@
   {{-- 選んだ内容を「勤続◯年◯か月」に言い換えて出す。
        ⚠ 生年月日を選ぶと「勤続21年」のように出て、ひと目でおかしいと分かる＝いちばん効く歯止め。
        JavaScript が動かなくても、ここが空になるだけで入力そのものは今までどおりできる。 --}}
-  <span class="hire-date-echo" style="display:block; margin-top:5px; font-size:13px; color:var(--muted);"></span>
+  <span class="hire-date-echo" style="display:block; margin-top:4px; font-size:13px; color:var(--muted);"></span>
 </span>
 @include('partials.hire_date_script')

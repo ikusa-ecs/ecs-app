@@ -20,7 +20,7 @@
       /* 備考の帯。見落とすと事故るので、うすい黄色で目立たせる（未記入のときはグレーで控えめ）。 */
       .pnote {
         display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
-        margin: 8px 0; padding: 7px 10px; border-radius: 8px; line-height: 1.6;
+        margin: 8px 0; padding: 8px 8px; border-radius: 8px; line-height: 1.6;
         background: #fdf6e3; border: 1px solid #f0dfae; color: #8a6d1a;
         font-size: 12px; font-weight: 600;
       }
@@ -36,7 +36,7 @@
       .pnote .pn-btn.save { border-color: #cfa04a; background: #cfa04a; color: #fff; }
       .pnote .pn-input {
         flex: 1 1 260px; min-width: 180px; font-family: inherit; font-size: 12px; line-height: 1.6;
-        padding: 5px 7px; border-radius: 6px; border: 1px solid #e0d3b0; color: #4a4238; resize: vertical;
+        padding: 4px 8px; border-radius: 6px; border: 1px solid #e0d3b0; color: #4a4238; resize: vertical;
       }
       .pnote .pn-msg    { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #b45309; }
       .pnote .pn-msg.ok { color: #15803d; }

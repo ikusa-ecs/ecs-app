@@ -326,7 +326,7 @@ html[data-theme="dark"] [style*="color:#333"]:not([style*="background-color:#333
 /* 「これは見本です」の帯 */
 .theme-preview-bar {
   background: var(--brand-fill); color: #fff; font-size: 12.5px; font-weight: 700;
-  padding: 7px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
 }
 .theme-preview-bar a { color: #fff; text-decoration: underline; font-weight: 700; }
 
@@ -354,7 +354,7 @@ a:hover { text-decoration: underline; }
   color: #6e5f4f;
   display: flex;
   flex-direction: column;
-  padding: 10px 0;
+  padding: 8px 0;
   /* 画面の左に貼り付けて追従させる（下までスクロールしてもメニューが消えない）。
      JSは使わずブラウザ標準の sticky なので動作は軽い。 */
   position: sticky;
@@ -367,7 +367,7 @@ a:hover { text-decoration: underline; }
   font-size: 20px;
   font-weight: 700;
   color: #4b3a2c;
-  padding: 4px 22px 10px;
+  padding: 4px 24px 8px;
   letter-spacing: 1px;
 }
 .sidebar .logo small {
@@ -378,22 +378,22 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0;
   margin-top: 2px;
 }
-.sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
 .sidebar nav a {
   color: #6e5b49;
-  padding: 5px 14px;
+  padding: 4px 16px;
   border-radius: 8px;
   font-size: 13px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .sidebar nav a:hover { background: #dccbb1; color: #4f4338; text-decoration: none; }
 .sidebar nav a.active { background: var(--brand-fill); color: #fff; }
 .sidebar nav .group-label {
   font-size: 11px;
   color: #a08a73;
-  padding: 7px 14px 3px;
+  padding: 8px 16px 4px;
   letter-spacing: 1px;
 }
 /* グループ見出し＝クリックで開閉。三角(▾)が開閉の向きを示す。 */
@@ -402,16 +402,17 @@ a:hover { text-decoration: underline; }
   user-select: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .sidebar .nav-group .group-label:hover { color: #6e5b49; }
 .sidebar .nav-group .caret { font-size: 9px; transition: transform .15s; }
 .sidebar .nav-group.collapsed .caret { transform: rotate(-90deg); }
 .sidebar .nav-group.collapsed .group-items { display: none; }
-.sidebar .nav-icon { width: 18px; text-align: center; }
+.sidebar .nav-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }  /* 線アイコン（SVG・NavIcon）2026-11-11 */
+.sidebar .nav-icon svg { display: block; }
 .sidebar .userbox {
   margin-top: auto;
-  padding: 14px 22px 0;
+  padding: 16px 24px 0;
   border-top: 1px solid #e0cdb2;
   font-size: 12px;
   color: #9a8675;
@@ -424,8 +425,8 @@ a:hover { text-decoration: underline; }
 .sidebar .pc-mode-btn {
   display: block;
   width: 100%;
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin-top: 16px;
+  padding: 8px 16px;
   border: 1px dashed #c9b596;
   border-radius: 8px;
   background: transparent;
@@ -478,7 +479,7 @@ html.nav-collapsed .sidebar { display: none; }
   background: var(--brand-soft);
   color: var(--brand-dark);
   border-radius: 999px;
-  padding: 4px 12px;
+  padding: 4px 16px;
   font-size: 12px;
   font-weight: 600;
 }
@@ -491,9 +492,9 @@ html.nav-collapsed .sidebar { display: none; }
   border: 1px solid #f6d9a7;
   color: #8a5a00;
   border-radius: 8px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   font-size: 12.5px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 /* ===== カード・パネル ===== */
@@ -502,15 +503,15 @@ html.nav-collapsed .sidebar { display: none; }
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
-  padding: 20px;
+  padding: 24px;
 }
-.panel + .panel { margin-top: 20px; }
-.panel h2 { font-size: 16px; margin: 0 0 14px; }
-.panel-head { display: flex; align-items: center; margin: 0 0 14px; }
+.panel + .panel { margin-top: 24px; }
+.panel h2 { font-size: 16px; margin: 0 0 16px; }
+.panel-head { display: flex; align-items: center; margin: 0 0 16px; }
 .panel-head h2 { margin: 0; }
 .panel-head .spacer { flex: 1; }
 
-.grid { display: grid; gap: 20px; }
+.grid { display: grid; gap: 24px; }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
@@ -521,7 +522,7 @@ html.nav-collapsed .sidebar { display: none; }
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
-  padding: 18px 20px;
+  padding: 16px 24px;
 }
 .stat .label { color: var(--muted); font-size: 13px; }
 .stat .value { font-size: 30px; font-weight: 700; margin-top: 4px; }
@@ -534,7 +535,7 @@ html.nav-collapsed .sidebar { display: none; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 table.tbl th, table.tbl td {
   text-align: left;
-  padding: 10px 12px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--line);
 }
 table.tbl th { color: var(--muted); font-weight: 600; font-size: 12.5px; background: #f8f3ea; }
@@ -544,7 +545,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ===== バッジ ===== */
 .badge {
   display: inline-block;
-  padding: 2px 9px;
+  padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
@@ -566,7 +567,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid var(--line);
   background: #fff;
   color: var(--ink);
@@ -580,12 +581,12 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .btn.primary { background: var(--brand-fill); border-color: var(--brand); color: #fff; }
 .btn.primary:hover { background: var(--brand-fill-hover); }
 .btn.ghost { background: transparent; }
-.btn.sm { padding: 5px 11px; font-size: 12.5px; }
+.btn.sm { padding: 4px 8px; font-size: 12.5px; }
 
 /* ===== フォーム ===== */
 .form-row { margin-bottom: 16px; }
-.form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
-.form-row label .req { color: var(--danger); margin-left: 3px; }
+.form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.form-row label .req { color: var(--danger); margin-left: 4px; }
 .form-row .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .form-row input[type="text"],
 .form-row input[type="number"],
@@ -599,7 +600,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .form-row select,
 .form-row textarea {
   width: 100%;
-  padding: 9px 11px;
+  padding: 8px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 14px;
@@ -609,7 +610,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .form-row input:focus,
 .form-row select:focus,
 .form-row textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
 
 /* ===== バー（充足率など） ===== */
 .bar { background: #ece3d4; border-radius: 999px; height: 8px; overflow: hidden; }
@@ -621,9 +622,9 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ===== 警告リスト ===== */
 .alert {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-start;
-  padding: 10px 14px;
+  padding: 8px 16px;
   border-radius: 8px;
   font-size: 13px;
   margin-bottom: 8px;
@@ -646,27 +647,27 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
    案件編集画面の下の履歴欄と、専用画面（/project-history）で共通に使う。
    表ではなく「1件＝1行のカード」にしているのは、スマホでも折り返して読めるため。
    ========================================================================= */
-.hist-panel { margin-top: 14px; }
+.hist-panel { margin-top: 16px; }
 .hist-empty { color: #6b7280; font-size: 13px; margin: 0; }
 .hist-list { list-style: none; margin: 0; padding: 0; }
-.hist-item { padding: 9px 0; border-bottom: 1px solid #eef0f3; }
+.hist-item { padding: 8px 0; border-bottom: 1px solid #eef0f3; }
 .hist-item:last-child { border-bottom: 0; }
-.hist-meta { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 12px; color: #6b7280; }
+.hist-meta { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12px; color: #6b7280; }
 .hist-when { font-variant-numeric: tabular-nums; }
 .hist-who { font-weight: 600; color: #374151; }
-.hist-body { margin-top: 3px; font-size: 13.5px; line-height: 1.7; word-break: break-word; }
-.hist-field { font-weight: 600; margin-right: 6px; }
+.hist-body { margin-top: 4px; font-size: 13.5px; line-height: 1.7; word-break: break-word; }
+.hist-field { font-weight: 600; margin-right: 8px; }
 .hist-field::after { content: '：'; font-weight: 400; color: #9ca3af; }
 .hist-old { color: #9ca3af; text-decoration: line-through; }
-.hist-arrow { margin: 0 6px; color: #9ca3af; }
+.hist-arrow { margin: 0 8px; color: #9ca3af; }
 .hist-new { font-weight: 600; }
-.hist-tag { display: inline-block; margin-right: 7px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.hist-tag { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
 .hist-tag.new { background: #e8f5e9; color: #2e7d32; }
 .hist-tag.del { background: #fdecea; color: #c62828; }
-.hist-more { margin: 10px 0 0; font-size: 12.5px; color: #6b7280; }
+.hist-more { margin: 8px 0 0; font-size: 12.5px; color: #6b7280; }
 .hist-project { font-weight: 600; }
 .hist-project a { color: inherit; }
-.hist-date-head { margin: 16px 0 6px; font-size: 13px; font-weight: 700; color: #374151; }
+.hist-date-head { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: #374151; }
 .hist-date-head:first-child { margin-top: 0; }
 
 /* =========================================================================
@@ -717,8 +718,8 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   html.nav-open body { overflow: hidden; }   /* 後ろの本文がスクロールしないように */
 
   /* メニュー項目は指で押せる大きさにする */
-  .sidebar nav a { padding: 9px 14px; font-size: 14px; }
-  .sidebar .nav-group .group-label { padding: 10px 14px 4px; }
+  .sidebar nav a { padding: 8px 16px; font-size: 14px; }
+  .sidebar .nav-group .group-label { padding: 8px 16px 4px; }
 
   /* 上のバーは画面に貼り付けて、どこまでスクロールしても ☰ を押せるようにする */
   .topbar {
@@ -726,28 +727,28 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
     top: 0;
     z-index: 40;
     height: 52px;
-    padding: 0 12px;
-    gap: 10px;
+    padding: 0 16px;
+    gap: 8px;
   }
   .topbar h1 { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar .role-pill { padding: 3px 9px; font-size: 11px; flex-shrink: 0; }
+  .topbar .role-pill { padding: 4px 8px; font-size: 11px; flex-shrink: 0; }
 
-  .content { padding: 14px 12px; }
+  .content { padding: 16px 16px; }
 
   /* 横に並べていたものは縦積みにする */
-  .grid { gap: 12px; }
+  .grid { gap: 16px; }
   .grid.cols-2,
   .grid.cols-3,
   .grid.cols-4 { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; gap: 0; }
 
-  .panel { padding: 14px; border-radius: 10px; }
-  .panel + .panel { margin-top: 12px; }
+  .panel { padding: 16px; border-radius: 10px; }
+  .panel + .panel { margin-top: 16px; }
   .panel h2 { font-size: 15px; }
   .panel-head { flex-wrap: wrap; gap: 8px; }
   .panel-head .spacer { flex: 1 0 0; }
 
-  .stat { padding: 14px 16px; }
+  .stat { padding: 16px 16px; }
   .stat .value { font-size: 24px; }
 
   /* 入力欄は16px以上にする。これより小さいと iPhone が入力時に勝手に拡大するため。 */
@@ -758,7 +759,7 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .form-row input[type="email"],
   .form-row input[type="password"],
   .form-row select,
-  .form-row textarea { font-size: 16px; padding: 10px 11px; }
+  .form-row textarea { font-size: 16px; padding: 8px 8px; }
 
   /* 表は横になぞって見る。入れ物（.table-scroll）が無い画面でも
      ページごと横に伸びないよう、表そのものをスクロールできるようにしておく。 */
@@ -769,11 +770,11 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
     font-size: 12.5px;
   }
   table.tbl th,
-  table.tbl td { padding: 8px 9px; }
+  table.tbl td { padding: 8px 8px; }
 
   /* ボタンは指で押せる高さに */
-  .btn { padding: 10px 16px; }
-  .btn.sm { padding: 7px 12px; }
+  .btn { padding: 8px 16px; }
+  .btn.sm { padding: 8px 16px; }
 
   /* 編集履歴：横に長い1行を無理に横スクロールさせず、折り返して読ませる。 */
   .hist-body { font-size: 13px; }
@@ -789,9 +790,9 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
    ⚠ 見た目の正本はここ1か所。画面ごとにCSSを書き足さない
      （同じ派遣なのに画面によって色が違う、が起きる）。
    ⚠ 「派」の印＝人（スタッフ・社員）の行と見分けるため。名簿には入らない人たち。 */
-.ecs-dsp { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.ecs-dsp { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .ecs-dsp-row {
-  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
   font-size: 12px; line-height: 1.6;
 }
 /* キャンセル＝消さずに薄く残す（頼んだ事実が消えると経緯が追えない） */
@@ -803,13 +804,13 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .ecs-dsp-agency { color: var(--accent2-ink); font-weight: 700; }
 .ecs-dsp-count {
-  border-radius: 4px; padding: 0 5px; font-size: 11px;
+  border-radius: 4px; padding: 0 4px; font-size: 11px;
   background: var(--accent2-soft); color: var(--accent2-ink);
 }
 .ecs-dsp-role { color: var(--muted); font-size: 11px; }
 /* 状況＝依頼中／確定／キャンセル。言葉の正本は App\Support\DispatchStatus。 */
 .ecs-dsp-st {
-  border-radius: 999px; padding: 0 7px; font-size: 11px; font-weight: 700;
+  border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 700;
   border: 1px solid transparent;
 }
 .ecs-dsp-st.asked { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }

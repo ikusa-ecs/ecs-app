@@ -159,9 +159,11 @@ class AssignSheetController extends Controller
 
         // コンテンツの種別＝新人ページの難易度表の「種類（リアル／オンライン）」と「分類」（2026-11-11 小沼さん：検索で使いたい）。
         // 台帳につながっている行だけ。content_id => ['リアル', '謎解き脱出', …]
-        $contentTags = ContentDifficulty::whereNotNull('content_id')->get(['content_id', 'kind', 'category'])
+        // 必修・推奨のコンテンツには「新人」「新人必修」「新人推奨」も付ける＝「新人」で探すと新人が経験したほうがいい案件だけ残る（2026-11-11 小沼さん）。
+        $contentTags = ContentDifficulty::whereNotNull('content_id')->get(['content_id', 'kind', 'category', 'must', 'recommend'])
             ->groupBy('content_id')
-            ->map(fn ($rows) => $rows->flatMap(fn ($r) => [$r->kind, $r->category])->filter()->unique()->values()->all());
+            ->map(fn ($rows) => $rows->flatMap(fn ($r) => [$r->kind, $r->category,
+                $r->must ? '新人必修' : null, $r->recommend ? '新人推奨' : null])->filter()->unique()->values()->all());
 
         $cards = $monthProjects->map(function (Project $p, int $i) use ($contentTags, $membersByProject, $dispatchesByProject, $slotsByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。

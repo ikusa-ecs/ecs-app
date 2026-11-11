@@ -9,105 +9,105 @@
               この土台(layouts.app)を使うため、囲まないとスタッフに社員用メニューが丸ごと見えていた。
               中身は EnsureTier が守っているので押しても入れないが、メニュー名だけ読めていた（2026-09-07 指摘）。 --}}
     @if (in_array(optional(Auth::user())->permission, ['employee', 'manager', 'admin'], true))
-    <a class="{{ ($active ?? '') === 'dashboard' ? 'active' : '' }}" href="/dashboard"><span class="nav-icon">▣</span> ダッシュボード</a>
-    <a class="{{ ($active ?? '') === 'stats' ? 'active' : '' }}" href="/stats"><span class="nav-icon">📈</span> 集計ダッシュボード</a>
-    <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">🙍</span> マイページ</a>
-    <a class="{{ ($active ?? '') === 'employee_availability' ? 'active' : '' }}" href="/employee-availability"><span class="nav-icon">📅</span> 社員の出勤可能日</a>
-    <a class="{{ ($active ?? '') === 'mypage_finance' ? 'active' : '' }}" href="/mypage-finance"><span class="nav-icon">💰</span> 収支入力</a>
+    <a class="{{ ($active ?? '') === 'dashboard' ? 'active' : '' }}" href="/dashboard"><span class="nav-icon">{!! \App\Support\NavIcon::svg('dashboard') !!}</span> ダッシュボード</a>
+    <a class="{{ ($active ?? '') === 'stats' ? 'active' : '' }}" href="/stats"><span class="nav-icon">{!! \App\Support\NavIcon::svg('trending') !!}</span> 集計ダッシュボード</a>
+    <a class="{{ ($active ?? '') === 'mypage' ? 'active' : '' }}" href="/mypage"><span class="nav-icon">{!! \App\Support\NavIcon::svg('user') !!}</span> マイページ</a>
+    <a class="{{ ($active ?? '') === 'employee_availability' ? 'active' : '' }}" href="/employee-availability"><span class="nav-icon">{!! \App\Support\NavIcon::svg('calendar') !!}</span> 社員の出勤可能日</a>
+    <a class="{{ ($active ?? '') === 'mypage_finance' ? 'active' : '' }}" href="/mypage-finance"><span class="nav-icon">{!! \App\Support\NavIcon::svg('wallet') !!}</span> 収支入力</a>
     {{-- 収支一覧＝月ごとの売上・経費・利益と「入力済みか」。見るのは社員以上ぜんぶ・直すのは担当と管理者以上。 --}}
-    <a class="{{ ($active ?? '') === 'finance_list' ? 'active' : '' }}" href="/finance-list"><span class="nav-icon">📊</span> 収支一覧</a>
+    <a class="{{ ($active ?? '') === 'finance_list' ? 'active' : '' }}" href="/finance-list"><span class="nav-icon">{!! \App\Support\NavIcon::svg('bars') !!}</span> 収支一覧</a>
     {{-- 使い方ガイド（社内向け）。別タブで開く＝作業を邪魔しない。機能が増えたら guide.blade.php を更新。 --}}
-    <a href="/guide" target="_blank" rel="noopener"><span class="nav-icon">📋</span> 使い方ガイド</a>
+    <a href="/guide" target="_blank" rel="noopener"><span class="nav-icon">{!! \App\Support\NavIcon::svg('book') !!}</span> 使い方ガイド</a>
 
     <div class="nav-group" data-group="案件">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> 案件</div>
       <div class="group-items">
-        <a class="{{ ($active ?? '') === 'projects' ? 'active' : '' }}" href="/projects"><span class="nav-icon">▤</span> 案件一覧</a>
+        <a class="{{ ($active ?? '') === 'projects' ? 'active' : '' }}" href="/projects"><span class="nav-icon">{!! \App\Support\NavIcon::svg('list') !!}</span> 案件一覧</a>
         {{-- 年月フォルダ（案件一覧の画面だけJSで中身が入る。他画面では空のまま） --}}
         <div class="ym-tree" id="ymTree"></div>
         {{-- 過去案件（2026-10-09）＝終わった案件を年→月で見る。案件一覧を重くしないために分けた。 --}}
-        <a class="{{ ($active ?? '') === 'past_projects' ? 'active' : '' }}" href="/past-projects"><span class="nav-icon">🗂</span> 過去案件</a>
+        <a class="{{ ($active ?? '') === 'past_projects' ? 'active' : '' }}" href="/past-projects"><span class="nav-icon">{!! \App\Support\NavIcon::svg('archive') !!}</span> 過去案件</a>
         {{-- アサイン表は「案件の分類」なので案件グループに置く（baba 2026-07-16）。 --}}
-        <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">🗒️</span> アサイン表</a>
-        <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">＋</span> 案件登録</a>
-        <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">📣</span> スタッフ公開ボード</a>
+        <a class="{{ ($active ?? '') === 'assign_sheet' ? 'active' : '' }}" href="/assign-sheet"><span class="nav-icon">{!! \App\Support\NavIcon::svg('clipboard') !!}</span> アサイン表</a>
+        <a class="{{ ($active ?? '') === 'project_form' ? 'active' : '' }}" href="/project-form"><span class="nav-icon">{!! \App\Support\NavIcon::svg('plus') !!}</span> 案件登録</a>
+        <a class="{{ ($active ?? '') === 'assign_publish' ? 'active' : '' }}" href="/assign-publish"><span class="nav-icon">{!! \App\Support\NavIcon::svg('megaphone') !!}</span> スタッフ公開ボード</a>
         {{-- 編集履歴＝「誰がいつ何を変えたか」。複数人で同じ案件を触るときの言った言わないを防ぐ。 --}}
-        <a class="{{ ($active ?? '') === 'project_history' ? 'active' : '' }}" href="/project-history"><span class="nav-icon">🕘</span> 編集履歴</a>
-        <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">⏰</span> 人数確定リマインド</a>
+        <a class="{{ ($active ?? '') === 'project_history' ? 'active' : '' }}" href="/project-history"><span class="nav-icon">{!! \App\Support\NavIcon::svg('history') !!}</span> 編集履歴</a>
+        <a class="{{ ($active ?? '') === 'count_reminder' ? 'active' : '' }}" href="/count-reminder"><span class="nav-icon">{!! \App\Support\NavIcon::svg('alarm') !!}</span> 人数確定リマインド</a>
         {{-- 収支未入力リマインド＝締切(イベント終了後3営業日)を過ぎて未入力の案件をDへタスク化。 --}}
-        <a class="{{ ($active ?? '') === 'finance_reminder' ? 'active' : '' }}" href="/finance-reminder"><span class="nav-icon">💸</span> 収支未入力リマインド</a>
-        <a href="#" onclick="(window.openAggWindow ? openAggWindow() : window.open('/projects-agg','ecs_agg','width=820,height=640')); return false;"><span class="nav-icon">📊</span> 社員・ディレクター集計</a>
+        <a class="{{ ($active ?? '') === 'finance_reminder' ? 'active' : '' }}" href="/finance-reminder"><span class="nav-icon">{!! \App\Support\NavIcon::svg('bell') !!}</span> 収支未入力リマインド</a>
+        <a href="#" onclick="(window.openAggWindow ? openAggWindow() : window.open('/projects-agg','ecs_agg','width=820,height=640')); return false;"><span class="nav-icon">{!! \App\Support\NavIcon::svg('pie') !!}</span> 社員・ディレクター集計</a>
         {{-- アクティブスタッフ増加計画（2026-09-17 baba要望）。
              ⚠ 2026-09-18：常時表示にし、設定もこの画面の中に移した。
              ⚠ 置き場所は「案件」のくくり（2026-09-18 baba指定）。 --}}
-        <a class="{{ ($active ?? '') === 'active_bonus' ? 'active' : '' }}" href="/active-bonus"><span class="nav-icon">🔥</span> アクティブスタッフ増加計画</a>
+        <a class="{{ ($active ?? '') === 'active_bonus' ? 'active' : '' }}" href="/active-bonus"><span class="nav-icon">{!! \App\Support\NavIcon::svg('flame') !!}</span> アクティブスタッフ増加計画</a>
       </div>
     </div>
 
     <div class="nav-group" data-group="アサイン">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> アサイン</div>
       <div class="group-items">
-        <a class="{{ ($active ?? '') === 'assign_dashboard' ? 'active' : '' }}" href="/assign-dashboard"><span class="nav-icon">▣</span> アサインダッシュボード</a>
-        <a class="{{ ($active ?? '') === 'assign' ? 'active' : '' }}" href="/assign"><span class="nav-icon">▦</span> 日別ボード</a>
-        <a class="{{ ($active ?? '') === 'assign_detail' ? 'active' : '' }}" href="/assign-detail"><span class="nav-icon">◎</span> 案件別アサイン（案件を選ぶ）</a>
-        <a class="{{ ($active ?? '') === 'pickup' ? 'active' : '' }}" href="/pickup"><span class="nav-icon">📌</span> ピックアップ</a>
-        <a class="{{ ($active ?? '') === 'assign_director' ? 'active' : '' }}" href="/assign-director"><span class="nav-icon">🎬</span> D決め（ディレクター）</a>
+        <a class="{{ ($active ?? '') === 'assign_dashboard' ? 'active' : '' }}" href="/assign-dashboard"><span class="nav-icon">{!! \App\Support\NavIcon::svg('grid') !!}</span> アサインダッシュボード</a>
+        <a class="{{ ($active ?? '') === 'assign' ? 'active' : '' }}" href="/assign"><span class="nav-icon">{!! \App\Support\NavIcon::svg('columns') !!}</span> 日別ボード</a>
+        <a class="{{ ($active ?? '') === 'assign_detail' ? 'active' : '' }}" href="/assign-detail"><span class="nav-icon">{!! \App\Support\NavIcon::svg('target') !!}</span> 案件別アサイン（案件を選ぶ）</a>
+        <a class="{{ ($active ?? '') === 'pickup' ? 'active' : '' }}" href="/pickup"><span class="nav-icon">{!! \App\Support\NavIcon::svg('pin') !!}</span> ピックアップ</a>
+        <a class="{{ ($active ?? '') === 'assign_director' ? 'active' : '' }}" href="/assign-director"><span class="nav-icon">{!! \App\Support\NavIcon::svg('video') !!}</span> D決め（ディレクター）</a>
         {{-- ⚠ 2026-09-10：「エントリー新着（来た順）」はこの一覧の**4つ目のタブ**になりました
              （メニューが長くなったため・baba要望）。`/entry-feed` を開くとそのタブへ転送します。 --}}
-        <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">🙋</span> エントリー一覧</a>
-        <a class="{{ ($active ?? '') === 'auto_assign_month' ? 'active' : '' }}" href="/auto-assign-month"><span class="nav-icon">⚡</span> 月まとめ自動アサイン</a>
+        <a class="{{ ($active ?? '') === 'entries' ? 'active' : '' }}" href="/entries"><span class="nav-icon">{!! \App\Support\NavIcon::svg('user-check') !!}</span> エントリー一覧</a>
+        <a class="{{ ($active ?? '') === 'auto_assign_month' ? 'active' : '' }}" href="/auto-assign-month"><span class="nav-icon">{!! \App\Support\NavIcon::svg('zap') !!}</span> 月まとめ自動アサイン</a>
         {{-- 新人ページ（2026-10-09 baba要望）＝新人ごとの進み具合と、FCに入れる案（見るだけ）。 --}}
-        <a class="{{ ($active ?? '') === 'rookies' ? 'active' : '' }}" href="/rookies"><span class="nav-icon">🌱</span> 新人</a>
+        <a class="{{ ($active ?? '') === 'rookies' ? 'active' : '' }}" href="/rookies"><span class="nav-icon">{!! \App\Support\NavIcon::svg('sprout') !!}</span> 新人</a>
         {{-- 派遣一覧＝どの案件にどこへ何名頼んだかのシート（2026-09-03 baba要望）。
              ⚠ 入れる場所は日別ボードの「＋派遣」。それまでDBに何も残っていなかった。 --}}
-        <a class="{{ ($active ?? '') === 'dispatch_list' ? 'active' : '' }}" href="/dispatch-list"><span class="nav-icon">🤝</span> 派遣一覧</a>
+        <a class="{{ ($active ?? '') === 'dispatch_list' ? 'active' : '' }}" href="/dispatch-list"><span class="nav-icon">{!! \App\Support\NavIcon::svg('user-plus') !!}</span> 派遣一覧</a>
         {{-- 配信・中継案件一覧＝配信／中継のある案件だけを並べ、配信担当を決める画面
              （2026-09-18・FBシート No.21 馬場さん）。 --}}
-        <a class="{{ ($active ?? '') === 'broadcast_list' ? 'active' : '' }}" href="/broadcast-list"><span class="nav-icon">📡</span> 配信・中継案件一覧</a>
+        <a class="{{ ($active ?? '') === 'broadcast_list' ? 'active' : '' }}" href="/broadcast-list"><span class="nav-icon">{!! \App\Support\NavIcon::svg('radio') !!}</span> 配信・中継案件一覧</a>
         {{-- 経験回数＝「このコンテンツをやったことがある人は誰か」を探す画面。名簿の詳細から独立させた（2026-08-28）。 --}}
-        <a class="{{ ($active ?? '') === 'experience' ? 'active' : '' }}" href="/experience"><span class="nav-icon">🏅</span> 経験回数</a>
-        <a href="#" onclick="window.open('/assign-wishlist','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">📊</span> スタッフ集計</a>
+        <a class="{{ ($active ?? '') === 'experience' ? 'active' : '' }}" href="/experience"><span class="nav-icon">{!! \App\Support\NavIcon::svg('award') !!}</span> 経験回数</a>
+        <a href="#" onclick="window.open('/assign-wishlist','ecs_wishlist','width=900,height=720'); return false;"><span class="nav-icon">{!! \App\Support\NavIcon::svg('pie') !!}</span> スタッフ集計</a>
       </div>
     </div>
 
     <div class="nav-group" data-group="その他">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> その他</div>
       <div class="group-items">
-        <a class="{{ ($active ?? '') === 'paper_stock' ? 'active' : '' }}" href="/paper-stock"><span class="nav-icon">📄</span> 謎解きの紙 在庫</a>
+        <a class="{{ ($active ?? '') === 'paper_stock' ? 'active' : '' }}" href="/paper-stock"><span class="nav-icon">{!! \App\Support\NavIcon::svg('file') !!}</span> 謎解きの紙 在庫</a>
       </div>
     </div>
 
     <div class="nav-group" data-group="管理">
       <div class="group-label" onclick="ECStoggleGroup(this)"><span class="caret">▾</span> 管理</div>
       <div class="group-items">
-        <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">☷</span> スタッフ（名簿・稼働状況）</a>
+        <a class="{{ ($active ?? '') === 'staff' ? 'active' : '' }}" href="/staff"><span class="nav-icon">{!! \App\Support\NavIcon::svg('users') !!}</span> スタッフ（名簿・稼働状況）</a>
         {{-- スタッフ別アサイン（請求書チェック）（2026-10-13）。 --}}
-        <a class="{{ ($active ?? '') === 'staff_invoice_check' ? 'active' : '' }}" href="/staff-invoice-check"><span class="nav-icon">🧾</span> 請求書チェック・手当管理表</a>
-        <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">🧑‍💼</span> 社員名簿</a>
+        <a class="{{ ($active ?? '') === 'staff_invoice_check' ? 'active' : '' }}" href="/staff-invoice-check"><span class="nav-icon">{!! \App\Support\NavIcon::svg('receipt') !!}</span> 請求書チェック・手当管理表</a>
+        <a class="{{ ($active ?? '') === 'employees' ? 'active' : '' }}" href="/employees"><span class="nav-icon">{!! \App\Support\NavIcon::svg('briefcase') !!}</span> 社員名簿</a>
         {{-- 社員別アサイン一覧（2026-10-13）。 --}}
-        <a class="{{ ($active ?? '') === 'employee_assignments' ? 'active' : '' }}" href="/employee-assignments"><span class="nav-icon">👥</span> 社員別アサイン一覧</a>
+        <a class="{{ ($active ?? '') === 'employee_assignments' ? 'active' : '' }}" href="/employee-assignments"><span class="nav-icon">{!! \App\Support\NavIcon::svg('users') !!}</span> 社員別アサイン一覧</a>
         {{-- サイズ一覧（靴・服・身長だけ・2026-11-02）。 --}}
-        <a class="{{ ($active ?? '') === 'sizes' ? 'active' : '' }}" href="/sizes"><span class="nav-icon">👕</span> サイズ一覧</a>
+        <a class="{{ ($active ?? '') === 'sizes' ? 'active' : '' }}" href="/sizes"><span class="nav-icon">{!! \App\Support\NavIcon::svg('shirt') !!}</span> サイズ一覧</a>
         @if (in_array(optional(Auth::user())->permission, ['manager', 'admin'], true))
-        <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">🔑</span> アカウント発行</a>
+        <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">{!! \App\Support\NavIcon::svg('key') !!}</span> アカウント発行</a>
         {{-- CSV取込は増やさず1項目に集約。ハブ画面から名簿・コンテンツ・案件の各取込へ。 --}}
-        <a class="{{ in_array(($active ?? ''), ['imports', 'person_import', 'content_import', 'project_import'], true) ? 'active' : '' }}" href="/imports"><span class="nav-icon">⬆</span> CSV一括取込</a>
+        <a class="{{ in_array(($active ?? ''), ['imports', 'person_import', 'content_import', 'project_import'], true) ? 'active' : '' }}" href="/imports"><span class="nav-icon">{!! \App\Support\NavIcon::svg('upload') !!}</span> CSV一括取込</a>
         @endif
         {{-- 共通設定＝マスタ管理・システム設定。MTG日などは社員も変更できるので社員以上に表示（マスタ削除だけAdministrator限定）。 --}}
-        <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">⚙️</span> 共通設定</a>
+        <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">{!! \App\Support\NavIcon::svg('sliders') !!}</span> 共通設定</a>
         {{-- Administrator（全権）専用コンソール。権限変更など「Administratorだけの作業」をここに集約。 --}}
         @if (optional(Auth::user())->permission === 'admin')
-        <a class="{{ ($active ?? '') === 'admin_console' ? 'active' : '' }}" href="/admin-console"><span class="nav-icon">🛡</span> Administrator（管理）</a>
+        <a class="{{ ($active ?? '') === 'admin_console' ? 'active' : '' }}" href="/admin-console"><span class="nav-icon">{!! \App\Support\NavIcon::svg('shield') !!}</span> Administrator（管理）</a>
         @endif
       </div>
     </div>
     @else
     {{-- スタッフはこちら（/profile・/password を開いたとき）。自分の画面へ戻る道だけ出す。 --}}
-    <a href="/staff-portal"><span class="nav-icon">🏠</span> スタッフ画面へ戻る</a>
+    <a href="/staff-portal"><span class="nav-icon">{!! \App\Support\NavIcon::svg('home') !!}</span> スタッフ画面へ戻る</a>
     @if (\App\Http\Controllers\SizeListController::canView(Auth::user()))
-    <a class="{{ ($active ?? '') === 'sizes' ? 'active' : '' }}" href="/sizes"><span class="nav-icon">👕</span> サイズ一覧</a>
+    <a class="{{ ($active ?? '') === 'sizes' ? 'active' : '' }}" href="/sizes"><span class="nav-icon">{!! \App\Support\NavIcon::svg('shirt') !!}</span> サイズ一覧</a>
     @endif
-    <a href="/guide-staff" target="_blank" rel="noopener"><span class="nav-icon">📋</span> 使い方ガイド</a>
+    <a href="/guide-staff" target="_blank" rel="noopener"><span class="nav-icon">{!! \App\Support\NavIcon::svg('book') !!}</span> 使い方ガイド</a>
     @endif
   </nav>
   <div class="userbox">

@@ -466,7 +466,7 @@
     </select>
   </form>
 
-  <input type="search" id="sheetSearch" placeholder="コンテンツ・種別（リアル／謎解き脱出など）・顧客・人の名前で絞り込み" title="種別＝新人ページの難易度表の「種類」と「分類」" oninput="ecsSheetFilter()" style="min-width:190px;">
+  <input type="search" id="sheetSearch" placeholder="コンテンツ・種別（リアル／謎解き脱出など）・新人・顧客・人の名前で絞り込み" title="種別＝新人ページの難易度表の「種類」と「分類」。「新人」で、新人が経験したほうがいい（必修・推奨の）コンテンツの案件だけ残ります（「新人必修」「新人推奨」で片方だけ）" oninput="ecsSheetFilter()" style="min-width:190px;">
 
   <label class="chk"><input type="checkbox" id="sheetShort" onchange="ecsSheetFilter()"> 人数が足りない案件だけ（{{ $shortCount }}）</label>
 

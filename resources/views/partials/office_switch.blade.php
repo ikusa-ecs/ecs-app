@@ -17,14 +17,14 @@
 <style>
   .office-switch {
     display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    margin: 0 0 14px; padding: 10px 12px;
+    margin: 0 0 16px; padding: 8px 16px;
     background: #fbf6ef; border: 1px solid var(--line, #e6d8c8); border-radius: 10px;
   }
   .office-switch .os-label { font-size: 12px; font-weight: 700; color: var(--muted, #8a7a6b); margin-right: 2px; }
   .office-switch .os-chip {
     text-decoration: none; font-size: 13px; font-weight: 600;
     color: var(--ink, #2c2018); background: #fff;
-    border: 1px solid var(--line-strong, #d8c4ae); border-radius: 999px; padding: 5px 13px;
+    border: 1px solid var(--line-strong, #d8c4ae); border-radius: 999px; padding: 4px 16px;
     transition: all .15s;
   }
   .office-switch .os-chip:hover { border-color: var(--brand, #8a5a33); }

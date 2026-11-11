@@ -6,29 +6,29 @@
         「案件ごと」のタブに戻ってしまう）。 --}}
 @push('head')
 <style>
-    .ef-intro { font-size: 12.5px; color: var(--muted, #8a7a6b); margin: 0 0 12px; line-height: 1.7; }
+    .ef-intro { font-size: 12.5px; color: var(--muted, #8a7a6b); margin: 0 0 16px; line-height: 1.7; }
     .ef-filter {
-      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
       background: var(--panel, #fff); border: 1px solid var(--line, #e6d8c8); border-radius: 10px;
-      padding: 10px 12px; margin-bottom: 12px;
+      padding: 8px 16px; margin-bottom: 16px;
     }
     .ef-filter a.chip {
       text-decoration: none; font-size: 13px; font-weight: 600; color: var(--ink, #2c2018);
-      background: var(--panel, #fff); border: 1px solid #d8c4ae; border-radius: 999px; padding: 5px 13px;
+      background: var(--panel, #fff); border: 1px solid #d8c4ae; border-radius: 999px; padding: 4px 16px;
     }
     .ef-filter a.chip.on { background: var(--brand, #8a5a33); color: #fff; border-color: var(--brand, #8a5a33); }
     .ef-filter .lbl { font-size: 12px; font-weight: 700; color: var(--muted, #8a7a6b); }
 
-    .ef-sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .ef-sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .ef-sum .card {
-      background: var(--panel, #fff); border: 1px solid var(--line, #e6d8c8); border-radius: 10px; padding: 8px 14px; min-width: 120px;
+      background: var(--panel, #fff); border: 1px solid var(--line, #e6d8c8); border-radius: 10px; padding: 8px 16px; min-width: 120px;
     }
     .ef-sum .card .n { font-size: 20px; font-weight: 800; }
     .ef-sum .card .t { font-size: 11.5px; color: var(--muted, #8a7a6b); }
 
     table.ef { border-collapse: collapse; width: 100%; background: var(--panel, #fff); }
     table.ef th, table.ef td {
-      border-bottom: 1px solid var(--line, #e6d8c8); padding: 9px 10px; text-align: left; font-size: 13px; vertical-align: top;
+      border-bottom: 1px solid var(--line, #e6d8c8); padding: 8px 8px; text-align: left; font-size: 13px; vertical-align: top;
     }
     table.ef th { background: #faf6ee; font-size: 12px; color: var(--muted, #8a7a6b); white-space: nowrap; }
     table.ef td.when { white-space: nowrap; font-variant-numeric: tabular-nums; color: #6e5b49; }
@@ -47,7 +47,7 @@
     .ef .tag.none   { background: transparent; color: #b9b0a4; font-weight: 400; }
     .ef .wish   { white-space: nowrap; }
     .ef-note { color: #6e5b49; font-size: 12px; }
-    .ef-empty { color: var(--muted, #8a7a6b); padding: 26px 0; text-align: center; }
+    .ef-empty { color: var(--muted, #8a7a6b); padding: 24px 0; text-align: center; }
     .ef-link { font-size: 12px; white-space: nowrap; }
 
     /* ===== 黒ベース（ダークモード）のときの読みやすさ調整 =====
@@ -158,7 +158,7 @@
   </table>
 </div>
 
-<p class="ef-intro" style="margin-top:12px;">
+<p class="ef-intro" style="margin-top:16px;">
   ※ 「新人」は<b>入社日から1年未満</b>の方です（入社日が未登録の方は判定できないため付きません）。<br>
   ※ 「◯件」は、この期間にその方が出したエントリーの件数です（3件以上のときに出ます）。<br>
   ※ エントリーは本人が手を挙げた記録なので、<b>他拠点のスタッフからのエントリーも表示します</b>（案件は拠点で絞られます）。
