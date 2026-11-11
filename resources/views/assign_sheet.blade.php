@@ -8,6 +8,9 @@
   /* ===== アサイン表（東京アサイン表そっくりの縦カード）専用スタイル ===== */
 
   /* 上部の操作バー（月切替・絞り込み・検索） */
+  .month-step { display: inline-block; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; color: var(--ink); background: var(--panel); text-decoration: none; white-space: nowrap; }
+  .month-step:hover { text-decoration: none; filter: brightness(.97); }
+  .month-step.off { opacity: .35; }
   .sheet-controls {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
@@ -454,16 +457,31 @@
 
 <div class="sheet-controls">
   {{-- 月を選ぶと、その月の案件だけ表示（GETで開き直す＝確実で分かりやすい）。 --}}
-  <form method="GET" action="/assign-sheet" style="margin:0;">
+  <form method="GET" action="/assign-sheet" style="margin:0; display:flex; align-items:center; gap:4px;">
     {{-- 選んでいる拠点（管理者のスイッチ）を月切替でも保つ。 --}}
     <input type="hidden" name="office" value="{{ request('office') }}">
+    {{-- 月の選び方（2026-11-11 小沼さん「長くて探しにくい」）：年ごとのまとまり（新しい年が上）＋前月・翌月ボタン。 --}}
+    @php
+      $mVals = collect($months)->pluck('value')->all();
+      $mPos = array_search($selectedMonth, $mVals, true);
+      $mPrev = $mPos !== false && $mPos > 0 ? $mVals[$mPos - 1] : null;
+      $mNext = $mPos !== false && $mPos < count($mVals) - 1 ? $mVals[$mPos + 1] : null;
+      $mByYear = collect($months)->groupBy(fn ($m) => substr($m['value'], 0, 4))->sortKeysDesc();
+    @endphp
+    {{-- ⚠ ボタンにすると送る値が select と二重になり月が変わらない＝リンクにする。 --}}
+    @if ($mPrev)<a class="month-step" href="/assign-sheet?{{ http_build_query(array_filter(['office' => request('office'), 'month' => $mPrev])) }}" title="前の月（案件のある月）">◀ 前月</a>@else<span class="month-step off">◀ 前月</span>@endif
     <select name="month" class="month-sel" onchange="this.form.submit()">
-      @forelse ($months as $m)
-        <option value="{{ $m['value'] }}" @selected($m['value'] === $selectedMonth)>{{ $m['label'] }}</option>
+      @forelse ($mByYear as $y => $ms)
+        <optgroup label="{{ $y }}年">
+          @foreach ($ms as $m)
+            <option value="{{ $m['value'] }}" @selected($m['value'] === $selectedMonth)>{{ $m['label'] }}</option>
+          @endforeach
+        </optgroup>
       @empty
         <option value="">案件なし</option>
       @endforelse
     </select>
+    @if ($mNext)<a class="month-step" href="/assign-sheet?{{ http_build_query(array_filter(['office' => request('office'), 'month' => $mNext])) }}" title="次の月（案件のある月）">翌月 ▶</a>@else<span class="month-step off">翌月 ▶</span>@endif
   </form>
 
   <input type="search" id="sheetSearch" placeholder="コンテンツ・種別（リアル／謎解き脱出など）・新人・顧客・人の名前で絞り込み" title="種別＝新人ページの難易度表の「種類」と「分類」。「新人」で、新人が経験したほうがいい（必修・推奨の）コンテンツの案件だけ残ります（「新人必修」「新人推奨」で片方だけ）" oninput="ecsSheetFilter()" style="min-width:190px;">
@@ -776,16 +794,10 @@
                      ⚠ 入れ替え先は空き行と同じく社員だけ（スタッフは日別ボードで希望を見ながら入れる）。
                      ⚠ Dの行は出さない＝DはD決めの画面が正本（案件側にも写しがあり、ここで外すと元のDが戻ってくる）。 --}}
                 @if ($mSwap)
-                <select class="m-swapname" title="別の社員に入れ替える／外す" onchange="ecsSheetSwapMember(this)">
+                <select class="m-swapname" title="別の社員に入れ替える／外す" onchange="ecsSheetSwapMember(this)" data-self="{{ $m['staffId'] }}">
                   <option value="" selected>{{ $m['name'] }}</option>
                   <option value="__remove">✕ 外す</option>
-                  @foreach ($employeeGroups as $g)
-                    <optgroup label="{{ $g['office'] }}">
-                      @foreach ($g['people'] as $e)
-                        @if ($e['id'] !== $m['staffId'])<option value="{{ $e['id'] }}">{{ $e['name'] }}</option>@endif
-                      @endforeach
-                    </optgroup>
-                  @endforeach
+                  {{-- 社員の名前は ✎編集 を押したときに入れる（本人は除く・ecsSheetFillNames）。 --}}
                 </select>
                 @endif
               </span>
@@ -855,13 +867,31 @@
   window.ECS_QUICK_URL = '/entries/assign';
   window.ECS_CSRF = @json(csrf_token());
 </script>
+{{-- 社員の名前の選択肢（拠点ごと・いま見ている拠点が上）。画面に1回だけ置き、✎編集 を押したカードの選択欄に写す（2026-11-11）。
+     他拠点の社員も入れられる（新入社員の研修など・2026-09-28）。 --}}
+<template id="sheetEmpOpts">@foreach ($employeeGroups as $g)<optgroup label="{{ $g['office'] }}">@foreach ($g['people'] as $e)<option value="{{ $e['id'] }}">{{ $e['name'] }}</option>@endforeach</optgroup>@endforeach</template>
 @verbatim
 <script>
+  // ✎編集 を押したカードの「＋社員」「入れ替え」の選択欄に、社員の名前を入れる（1枚につき1回だけ）。
+  // ⚠ 入れ替えの欄は本人を除く（data-self）。
+  function ecsSheetFillNames(card) {
+    var tpl = document.getElementById('sheetEmpOpts');
+    if (!tpl) return;
+    card.querySelectorAll('select.m-addname, select.m-swapname').forEach(function (sel) {
+      if (sel.dataset.filled) return;
+      sel.dataset.filled = '1';
+      var frag = tpl.content.cloneNode(true);
+      var self = sel.dataset.self || '';
+      if (self) frag.querySelectorAll('option').forEach(function (o) { if (o.value === self) o.remove(); });
+      sel.appendChild(frag);
+    });
+  }
   // 案件カードを「編集モード」に切り替える（役割/担当/巡回の入力欄を出す）。
   function ecsSheetToggleEdit(btn) {
     var card = btn.closest('.acard');
     if (!card) return;
     card.classList.toggle('editing');
+    if (card.classList.contains('editing')) { try { ecsSheetFillNames(card); } catch (e) {} }
     btn.textContent = card.classList.contains('editing') ? '完了' : '✎編集';
   }
   // 変更したメンバーの役割/担当/巡回を assignments に保存する（送ったキーだけ更新）。

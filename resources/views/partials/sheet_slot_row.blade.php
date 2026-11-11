@@ -31,14 +31,8 @@
     {{-- 社員をここから入れる。選ぶと assignments に「仮」で入り、この行は人の行に変わる。 --}}
     <select class="m-edit m-addname" title="社員を入れます（仮で入ります）" onchange="ecsSheetAddMember(this)">
       <option value="">＋社員</option>
-      {{-- 拠点ごとのまとまり（いま見ている拠点が上）。他拠点の社員も入れられる（新入社員の研修など・2026-09-28）。 --}}
-      @foreach ($employeeGroups as $g)
-        <optgroup label="{{ $g['office'] }}">
-          @foreach ($g['people'] as $e)
-            <option value="{{ $e['id'] }}">{{ $e['name'] }}</option>
-          @endforeach
-        </optgroup>
-      @endforeach
+      {{-- 社員の名前は ✎編集 を押したときに入れる（共通の #sheetEmpOpts から写す・ecsSheetFillNames）。
+           ⚠ 2026-11-11：空き行ごとに全社員を書いていて、本番で画面が22MB・選択肢17万個＝開くのが重かった（小沼さん「もっさり」）。 --}}
     </select>
   </span>
   <span class="c-p">
