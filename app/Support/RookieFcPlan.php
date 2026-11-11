@@ -162,6 +162,8 @@ final class RookieFcPlan
                 'busy' => $busy,
                 'plan' => in_array('イベプラ', $p->departmentList(), true),
                 'wishes' => array_flip(array_map('strval', (array) ($p->rookie_wishes ?? []))),
+                // 案で「外す」を押した案件（2026-11-11 小沼さん）。この新人には出さない＝別の案件を探す。
+                'skips' => array_flip(array_map('strval', (array) ($p->rookie_skips ?? []))),
             ];
         }
 
@@ -477,10 +479,19 @@ final class RookieFcPlan
             $room[$c->id] = $need - ($rows->pluck('staff_id')->unique()->count() + ($dispatch[$c->id] ?? 0));
             $cap[$c->id] = self::capFor($c, $need) - $rows->filter(fn ($a) => isset($state[$a->staff_id]))->pluck('staff_id')->unique()->count();
         }
-        $canGo = function (string $id, string $day, $c) use (&$state, &$room, &$cap, $avail, $office) {
-            $prev = self::preStayDay($c);
-            // 研修先（2026-11-11 小沼さん）：その日にいる拠点のイベントだけ。例「15日までは東京・16日から福岡」。
+        // その新人をこの日・この案件に出してよいか（2026-11-11）。⚠ canGo（連日のほかの日）と pickOne（選ぶ本体）の両方で見る。
+        //   ・研修先：その日にいる拠点のイベントだけ（例「15日までは東京・16日から福岡」）。
+        //   ・「外して別の案」を押した案件（連日のイベントは1日目のIDで覚える）は出さない。
+        $allowed = function (string $id, string $day, $c) use (&$state, $office) {
             if ($office && Rookies::officeOn($state[$id]['person'], $day) !== $office) {
+                return false;
+            }
+
+            return ! isset($state[$id]['skips'][(string) $c->id]) && ! isset($state[$id]['skips'][(string) ProjectSeries::rootId($c)]);
+        };
+        $canGo = function (string $id, string $day, $c) use (&$state, &$room, &$cap, $avail, $allowed) {
+            $prev = self::preStayDay($c);
+            if (! $allowed($id, $day, $c)) {
                 return false;
             }
 
@@ -544,7 +555,7 @@ final class RookieFcPlan
 
             while ($room[$lead->id] > 0 && $cap[$lead->id] > 0) {
                 $pick = self::pickOne($state, $leadDay, $avail, $cids, $mustIds, $diff, self::preStayDay($lead),
-                    ProjectScale::of($lead->scale) === '大型');
+                    ProjectScale::of($lead->scale) === '大型', fn ($sid) => $allowed((string) $sid, $leadDay, $lead));
                 if ($pick === null) {
                     break;
                 }
@@ -611,11 +622,15 @@ final class RookieFcPlan
     }
 
     /** @return array{0: array, 1: list<array>}|null いちばん点の高い新人と、候補の一覧 */
-    private static function pickOne(array $state, string $day, $avail, array $cids, array $mustIds, ?int $diff, ?string $prevDay = null, bool $big = false): ?array
+    private static function pickOne(array $state, string $day, $avail, array $cids, array $mustIds, ?int $diff, ?string $prevDay = null, bool $big = false, ?callable $allowed = null): ?array
     {
         $cands = [];
         foreach ($state as $id => $s) {
             if ($s['remain'] <= 0 || isset($s['busy'][$day])) {
+                continue;
+            }
+            // 研修先・外した案件（呼ぶ側の $allowed・2026-11-11）
+            if ($allowed && ! $allowed($id)) {
                 continue;
             }
             // 前泊の案件＝前日も空いていないと入れない（2026-10-09 baba「日曜の案件で土曜が×ならアサインできない」）。

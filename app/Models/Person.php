@@ -56,7 +56,8 @@ class Person extends Model implements AuthenticatableContract
             'hire_date' => 'date',
             'rookie_wishes' => 'array',   // 新人の「参加したいイベント」＝コンテンツIDの並び（2026-10-17）
             'rookie_overrides' => 'array',   // 新人の経験を手で直した印（done/none）。正本＝App\Support\RookieFcPlan
-            'rookie_training' => 'array',   // 新人の研修先（期間 [{from,to,office}]）。正本＝App\Support\Rookies::trainingPeriods（2026-11-11）
+            'rookie_training' => 'array',
+            'rookie_skips' => 'array',   // 新人のFC案で外した案件ID（連日は1日目）。正本＝App\Support\RookieFcPlan（2026-11-11）   // 新人の研修先（期間 [{from,to,office}]）。正本＝App\Support\Rookies::trainingPeriods（2026-11-11）
             'rookie_since' => 'date',   // 新人の「何ヶ月目」を数える起点（空なら入社日）。正本＝App\Support\Rookies
             'active' => 'boolean',
             'experienced_contents' => 'array',

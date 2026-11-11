@@ -55,6 +55,8 @@ class RookieController extends Controller
                 ->flatMap(fn ($r) => collect($r['dCases'])->map(fn ($c) => $c + ['rookie' => $r['name'], 'rookieId' => $r['id']]))
                 ->sortBy('date')->values(),
             'graduated' => Rookies::graduated($office),
+            // FCの案で外した案件（新人ごと・2026-11-11）。画面の「外した案」の一覧と「戻す」に使う。
+            'skipped' => self::skippedList(collect($plan['rookies'])->pluck('id')->all()),
             'others' => OfficeScope::applyToPeople(Person::employees()->where('active', true), $office)
                 ->orderBy('id')->get(['id', 'name'])
                 ->reject(fn ($p) => collect($plan['rookies'])->contains('id', $p->id))->values(),
@@ -147,6 +149,32 @@ class RookieController extends Controller
         $p->save();
 
         return back()->with('ok', $msg);
+    }
+
+    /**
+     * FCの案の「外す」（2026-11-11 小沼さん「微妙だったら外して別のが見たい」）。
+     * この新人にはこの案件（連日のイベントは1日目）を出さない＝開き直すと別の案件を探す。undo=1 で戻す。
+     */
+    public function skipPick(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'exists:people,id'],
+            'project' => ['required', 'string', 'exists:projects,id'],
+            'undo' => ['nullable', 'boolean'],
+        ]);
+        $p = Person::findOrFail($data['id']);
+        $root = (string) \App\Support\ProjectSeries::rootId(\App\Models\Project::findOrFail($data['project']));
+        $skips = array_values(array_unique(array_map('strval', (array) ($p->rookie_skips ?? []))));
+        $skips = ! empty($data['undo'])
+            ? array_values(array_diff($skips, [$root, $data['project']]))
+            : array_values(array_unique(array_merge($skips, [$root])));
+        $p->rookie_skips = $skips ?: null;
+        $p->save();
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back()->with('ok', ! empty($data['undo']) ? '外した案を戻しました。' : $p->name.'さんの案からこの案件を外しました（別の案件を探します）。');
     }
 
     /**
@@ -302,6 +330,21 @@ class RookieController extends Controller
         $d->delete();
 
         return back()->with('ok', $d->kind.'の難易度表から「'.$d->sheet_name.'」を消しました。');
+    }
+
+    /** 外した案の一覧（新人ID・名前・案件ID・案件名・日付）。これからの案件だけ。 */
+    private static function skippedList(array $ids): array
+    {
+        $out = [];
+        foreach (Person::whereIn('id', $ids)->whereNotNull('rookie_skips')->get(['id', 'name', 'rookie_skips']) as $p) {
+            $pids = array_map('strval', (array) $p->rookie_skips);
+            foreach (\App\Models\Project::whereIn('id', $pids)->where('start_date', '>=', Carbon::today()->toDateString())->orderBy('start_date')->get() as $pr) {
+                $out[] = ['rookieId' => $p->id, 'rookie' => $p->name, 'projectId' => $pr->id,
+                    'name' => (string) ($pr->project_name ?? $pr->id), 'date' => optional($pr->start_date)->format('n/j')];
+            }
+        }
+
+        return $out;
     }
 
     /** 難易度表の並び（種類→分類の最初の行の順→id）。同じ分類の行がまとまり、足した行はその分類の最後に来る。 */

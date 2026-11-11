@@ -482,12 +482,21 @@
         <td class="rk-small">{{ $p['why'] }}</td>
         <td class="rk-small">{{ implode('、', $p['others']) }}</td>
         <td style="white-space:nowrap;"><button class="rk-btn" type="button" onclick="rkAssign([this.closest('tr')])" title="この新人を、この案件にFC（仮）で入れます">入れる</button>
-          <button class="rk-btn" type="button" onclick="this.closest('tr').remove(); window.rkDist()" title="この案を表から外します（開き直すと案は作り直されます）">外す</button><span class="rk-small rk-done"></span></td>
+          {{-- 外す＝この新人にはこの案件を出さないと覚えて、別の案件で組み直す（2026-11-11 小沼さん「微妙だったら外して別のが見たい」）。下の「外した案」から戻せる。 --}}
+          <button class="rk-btn" type="button" onclick="rkSkip(this)" title="この新人にはこの案件を出さないようにして、別の案件で案を組み直します（下の「外した案」から戻せます）">外して別の案</button><span class="rk-small rk-done"></span></td>
       </tr>
     @empty
       <tr><td colspan="10" class="rk-small">案はありません（空きのある案件が無い、または新人がこの月の目標に届いています）。</td></tr>
     @endforelse
   </table>
+  @if (!empty($skipped))
+    {{-- 外した案（これからの案件だけ）。戻すと、また案に出るようになる。 --}}
+    <div class="rk-small" style="margin-top:8px;"><b>外した案：</b>
+      @foreach ($skipped as $sk)
+        <span class="rk-chip">{{ $sk['date'] }} {{ $sk['name'] }}（{{ $sk['rookie'] }}）<button type="button" class="rk-chip-x" title="戻す（また案に出るようにする）" onclick="rkSkip(this, true)" data-staff="{{ $sk['rookieId'] }}" data-project="{{ $sk['projectId'] }}">戻す</button></span>
+      @endforeach
+    </div>
+  @endif
   </div>
   @if ($picks)
     <div class="rk-bar" style="margin-top:10px;">
@@ -950,6 +959,21 @@
     form.submit();
   }
 
+  // FCの案の「外して別の案」・外した案の「戻す」（2026-11-11）。覚えてから開き直す＝案が組み直される。
+  function rkSkip(btn, undo) {
+    var tr = btn.closest('tr');
+    var staff = btn.getAttribute('data-staff') || (tr && tr.getAttribute('data-staff'));
+    var project = btn.getAttribute('data-project') || (tr && tr.getAttribute('data-project'));
+    if (!staff || !project) return;
+    btn.disabled = true;
+    var fd = new FormData();
+    fd.append('_token', document.querySelector('input[name=_token]').value);
+    fd.append('id', staff); fd.append('project', project);
+    if (undo) fd.append('undo', '1');
+    fetch('/rookies/skip', { method: 'POST', body: fd, headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw r.status; rkRemember(); location.reload(); })
+      .catch(function () { btn.disabled = false; alert('保存できませんでした。もう一度お試しください。'); });
+  }
   function rkRemember() {
     try {
       var open = [];

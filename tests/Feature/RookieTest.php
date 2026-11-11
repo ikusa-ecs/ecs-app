@@ -166,6 +166,47 @@ class RookieTest extends TestCase
         $this->assertSame([], RookieFcPlan::build(Carbon::today(), '東京')['picks']);
     }
 
+    /** 研修先の期間中は、所属の拠点（福岡）のイベントにFCの案を出さない（pickOne も研修先を見る・2026-11-11）。 */
+    public function test_研修中は所属の拠点の案に出ない(): void
+    {
+        $day = Carbon::today()->addDays(1);
+        if (! $day->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        $rookie = PersonFactory::new()->create(['name' => '福岡の新人', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '福岡',
+            'rookie_training' => [['from' => $day->toDateString(), 'to' => $day->toDateString(), 'office' => '東京']]]);
+        $fk = ProjectFactory::new()->create(['office' => '福岡', 'start_date' => $day->format('Y-m-d'), 'required_count' => 3, 'status' => '調整中']);
+        $tk = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day->format('Y-m-d'), 'required_count' => 3, 'status' => '調整中']);
+
+        $this->assertSame([], array_column(RookieFcPlan::build(Carbon::today(), '福岡')['picks'], 'projectId'), 'この日は東京にいる');
+        $this->assertSame([$tk->id], array_column(RookieFcPlan::build(Carbon::today(), '東京')['picks'], 'projectId'));
+    }
+
+    /** FCの案の「外して別の案」：外した案件は出さず、同じ日のほかの案件を探す。戻せば また出る（2026-11-11 小沼さん）。 */
+    public function test_FCの案を外すと別の案件(): void
+    {
+        $day = Carbon::today()->addDays(1);
+        if (! $day->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        $rookie = PersonFactory::new()->create(['name' => '新人A', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+        $a = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day->format('Y-m-d'), 'required_count' => 3, 'status' => '調整中']);
+        $b = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $day->format('Y-m-d'), 'required_count' => 3, 'status' => '調整中']);
+        $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
+
+        $first = RookieFcPlan::build(Carbon::today(), '東京')['picks'][0]['projectId'];
+        $other = $first === $a->id ? $b->id : $a->id;
+
+        $this->actingAsPerson($me)->postJson('/rookies/skip', ['id' => $rookie->id, 'project' => $first])->assertOk();
+        $this->assertSame([$other], array_column(RookieFcPlan::build(Carbon::today(), '東京')['picks'], 'projectId'), '外した案件は出さず別の案件');
+        $this->actingAsPerson($me)->get('/rookies')->assertOk()->assertSee('外した案：');
+
+        $this->actingAsPerson($me)->postJson('/rookies/skip', ['id' => $rookie->id, 'project' => $first, 'undo' => true])->assertOk();
+        $this->assertNull($rookie->fresh()->rookie_skips);
+    }
+
     /** 1案件に入れる新人＝ふつう1人／8名を超えると2人／大型で12名以上は何人でも（2026-10-09 baba）。 */
     public function test_1案件に入れる新人の数(): void
     {
@@ -366,7 +407,7 @@ class RookieTest extends TestCase
             ->assertSee('この案をぜんぶ入れたら')
             ->assertSee('合計')
             // 案の新人を替える・外す・案に無い案件に入れる・日付で見る（2026-10-14 baba「案の人や案件を変えられない」）。
-            ->assertSee('onchange="rkSwap(this)"', false)->assertSee('>外す</button>', false)
+            ->assertSee('onchange="rkSwap(this)"', false)->assertSee('>外して別の案</button>', false)
             ->assertSee('id="rkAddCase"', false)->assertSee('id="rkDist"', false)->assertSee('window.rkDist = function', false)
             // タブ・新人ごとに見る（2026-10-14 baba「ページが長くて探しにくい」「新人ごとに見られない」）。
             ->assertSee('id="rkTabs"', false)->assertSee('data-tab="settings"', false)

@@ -368,7 +368,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/rookies/state', [\App\Http\Controllers\RookieController::class, 'setState']);
     Route::post('/rookies/ojt', [\App\Http\Controllers\RookieController::class, 'setOjt']);
     Route::post('/rookies/chatwork', [\App\Http\Controllers\RookieController::class, 'setChatwork']);
-    Route::post('/rookies/training', [\App\Http\Controllers\RookieController::class, 'setTraining']);   // 研修先（月ごと・2026-11-11 小沼さん）
+    Route::post('/rookies/training', [\App\Http\Controllers\RookieController::class, 'setTraining']);
+    Route::post('/rookies/skip', [\App\Http\Controllers\RookieController::class, 'skipPick']);   // FCの案の「外す」を覚える（2026-11-11 小沼さん）   // 研修先（月ごと・2026-11-11 小沼さん）
     Route::post('/rookies/wishes', [\App\Http\Controllers\RookieController::class, 'setWishes']);
     Route::post('/rookies/exp', [\App\Http\Controllers\RookieController::class, 'setExp']);
     Route::post('/rookies/targets', [\App\Http\Controllers\RookieController::class, 'setTargets']);
