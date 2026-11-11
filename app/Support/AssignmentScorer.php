@@ -134,6 +134,15 @@ class AssignmentScorer
             $score += 30;
             $reasons[] = '今月まだアサイン0件';
         }
+        // アサイン率が低い人を上へ（エントリーしたのに入れていない人・2026-11-11 小沼さん）
+        if ($this->assignRate !== null && isset($this->assignRate[$id])) {
+            $r = $this->assignRate[$id];
+            $bonus = AssignRate::bonus($r['rate']);
+            if ($bonus > 0) {
+                $score += $bonus;
+                $reasons[] = 'アサイン率が低い '.AssignRate::label($r);
+            }
+        }
         // 自社専属はできるだけ稼働（ただし月上限で頭打ち）
         if ($p->is_exclusive) {
             if ($month >= $this->monthCap) {
@@ -228,6 +237,19 @@ class AssignmentScorer
      * 前泊の前日・後泊の翌日が×の人（本人ID => 札の文字）。正本＝App\Support\StayDayCheck（2026-10-14・FBシート No.23）。
      * 候補には残し、自動のおすすめからは外す。
      */
+    /**
+     * アサイン率（本人ID => entries/assigned/rate・正本＝App\Support\AssignRate）。2026-11-11 小沼さん：低い人を上に。
+     * ⚠ 案件別アサインの画面だけが渡す（月まとめ自動アサインは渡さない＝今までどおり）。
+     */
+    private ?array $assignRate = null;
+
+    public function setAssignRate(array $rates): static
+    {
+        $this->assignRate = $rates;
+
+        return $this;
+    }
+
     public function setStayNg(array $stayNg): static
     {
         $this->stayNg = $stayNg;

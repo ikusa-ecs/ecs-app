@@ -400,7 +400,7 @@
         </p>
       @endif
 
-      <p class="asg-legend">「<b>おすすめ</b>」は、希望・この案件のコンテンツ経験・自社専属・人柄（場を良くする／新人フォロー／自分で動ける）・リピート継続などから<b>自動でつけた目安の点数</b>です（高いほどおすすめ）。あくまで参考で、<b>最終判断は人</b>が行います。この日NG・NGペア同席の人は「除外」として下に薄く表示します。</p>
+      <p class="asg-legend">「<b>おすすめ</b>」は、希望・この案件のコンテンツ経験・自社専属・人柄（場を良くする／新人フォロー／自分で動ける）・リピート継続・<b>アサイン率の低さ</b>（今月エントリーしたのに入れていない人ほど上へ・最大+20）などから<b>自動でつけた目安の点数</b>です（高いほどおすすめ）。あくまで参考で、<b>最終判断は人</b>が行います。この日NG・NGペア同席の人は「除外」として下に薄く表示します。</p>
 
       <div class="panel" style="padding-top:6px;">
         <div class="tbl-scroll" style="overflow-x:auto;">
@@ -410,6 +410,7 @@
               <th class="chk">☑</th>
               <th>スタッフ</th>
               <th>おすすめ</th>
+              <th class="num" title="この月にエントリーした案件のうち、アサインされた案件の割合（キャンセルは除く）">アサイン率<span style="display:block; font-weight:400; font-size:10.5px; color:var(--muted);">今月・入れた/エントリー</span></th>
               <th>区分</th>
               <th>できる役割</th>
               <th class="num">経験</th>
@@ -456,6 +457,8 @@
                   @if (count($s['reasons']))<div class="score-reasons">{{ implode('／', $s['reasons']) }}</div>@endif
                   @if (count($s['warnings']))<div class="score-warn">⚠ {{ implode('／', $s['warnings']) }}</div>@endif
                 </td>
+                {{-- アサイン率（2026-11-11 小沼さん）。50%未満は赤字＝エントリーしてくれたのに入れられていない人。 --}}
+                <td class="num" style="white-space:nowrap;@if (($s['assignRatePct'] ?? null) !== null && $s['assignRatePct'] < 50) color:#dc2626; font-weight:700;@endif">{{ $s['assignRate'] !== '' ? $s['assignRate'] : '—' }}</td>
                 <td><span class="lv {{ $s['level'] }}">{{ $s['level'] }}</span></td>
                 <td>
                   @if (count($s['posLabels']))
@@ -498,7 +501,7 @@
                 </td>
               </tr>
             @empty
-              <tr><td colspan="10" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
+              <tr><td colspan="11" class="muted" style="text-align:center; padding:20px;">スタッフが登録されていません。</td></tr>
             @endforelse
           </tbody>
         </table>

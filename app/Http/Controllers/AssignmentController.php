@@ -10,6 +10,7 @@ use App\Models\Person;
 use App\Models\Project;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\AssignRate;
 use App\Support\AssignmentScorer;
 use App\Support\CrossOfficeHelp;
 use App\Support\DispatchRows;
@@ -162,7 +163,9 @@ class AssignmentController extends Controller
         $scorer = (new AssignmentScorer(
             $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP,
             $seriesEntryIds
-        ))->setProjectMembers(array_keys($existing), $ngPairs)->setStayNg($stayNg);
+        ))->setProjectMembers(array_keys($existing), $ngPairs)->setStayNg($stayNg)
+            // アサイン率（その月にエントリーした案件のうち入れた割合）が低い人を上へ（2026-11-11 小沼さん）。正本＝AssignRate
+            ->setAssignRate($assignRate = $date ? AssignRate::forMonth($date) : []);
 
         // ── 候補スタッフを拠点で絞る（全拠点運用・2026-08-05 baba確定＝アサイン画面は第1弾）──
         // 管理者以上はスイッチで選んだ拠点（未選択＝全拠点）、一般社員は自拠点固定。null＝絞らない。
@@ -180,7 +183,7 @@ class AssignmentController extends Controller
             ->with(['roleEligibilities', 'ngRelations'])
             ->orderByDesc('experience_count')
             ->get()
-            ->map(function (Person $p) use ($wish, $entries, $scorer, $ngPairs) {
+            ->map(function (Person $p) use ($wish, $entries, $scorer, $ngPairs, $assignRate) {
                 $can = $p->roleEligibilities->pluck('position')->all();
                 // 「できる役割」バッジは D・MC・OP・軍師 だけ表示（FC・CK等は全員できるので出さない／baba 2026-07-17）。
                 $canShown = array_values(array_filter($can, fn ($k) => in_array($k, self::CAN_SHOWN, true)));
@@ -221,6 +224,9 @@ class AssignmentController extends Controller
                     //     自動で仮置きは隠れている行まで拾って、応募も稼働可でもない人を入れていた）
                     'eligible' => array_key_exists($p->id, $entries)
                         || in_array($wish[$p->id] ?? null, ['希望', '稼働可'], true),
+                    // アサイン率（例 33%（2/6件））。その月にエントリーが無い人は空＝「—」。
+                    'assignRate' => isset($assignRate[$p->id]) ? AssignRate::label($assignRate[$p->id]) : '',
+                    'assignRatePct' => isset($assignRate[$p->id]) ? (int) round($assignRate[$p->id]['rate'] * 100) : null,
                     'score' => $eval['score'],
                     'reasons' => $eval['reasons'],
                     'warnings' => $eval['warnings'],
