@@ -66,6 +66,24 @@ class ProjectCancelTest extends TestCase
         $this->assertFalse((bool) $p->fresh()->is_cancelled);
     }
 
+    /** 案件の登録／編集画面からもキャンセルできる（2026-11-11 小沼さん：ほかの画面から飛ぶ先なので、そこで完結させる）。 */
+    public function test_edit_form_shows_cancel_button(): void
+    {
+        $me = $this->manager();
+        $p = $this->project();
+
+        $this->actingAsPerson($me)->get('/project-form?project='.$p->id)->assertOk()
+            ->assertSee('✖ この案件をキャンセルにする')->assertDontSee('この案件はキャンセルになっています');
+
+        $p->is_cancelled = true;
+        $p->save();
+        $this->actingAsPerson($me)->get('/project-form?project='.$p->id)->assertOk()
+            ->assertSee('この案件はキャンセルになっています')->assertSee('↩ 実施に戻す');
+
+        $this->actingAsPerson($me)->get('/project-form')->assertOk()
+            ->assertDontSee('✖ この案件をキャンセルにする', false);   // 新規登録のときは出さない
+    }
+
     /** ⚠ 実施形態・状態・アサインは消さない（記録なので残す）。 */
     public function test_cancel_keeps_the_record(): void
     {

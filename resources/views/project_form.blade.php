@@ -325,6 +325,30 @@
 @elseif(!empty($editProject))
 <div class="mock-note" style="background:#eef6ff;border-color:#bcd8f0;color:#1d4ed8;">
   ✎ 既存案件「{{ $editProject['id'] }}」を編集しています。内容を直して「確定」を押すと、この案件に上書き保存されます。
+  {{-- 案件のキャンセル（2026-11-11 小沼さん要望）。ほかの画面から案件を開くとここに来るので、ここで完結させる。
+       保存先は案件一覧の「✖ キャンセル」と同じ POST /projects/cancel（拠点チェック・編集履歴もそちらと同じ）。 --}}
+  <div style="margin-top:6px;">
+    @if (!empty($editProject['is_cancelled']))
+      <b style="color:#dc2626;">この案件はキャンセルになっています。</b>
+      <button type="button" class="btn" style="padding:2px 10px;" onclick="pfSetCancelled(false)">↩ 実施に戻す</button>
+    @else
+      <button type="button" class="btn" style="padding:2px 10px;color:#dc2626;border-color:#f3b4b4;" onclick="pfSetCancelled(true)"
+              title="中止になった案件に印を付けます（記録は消しません）">✖ この案件をキャンセルにする</button>
+    @endif
+  </div>
+  <script>
+    function pfSetCancelled(next) {
+      if (next && !confirm('この案件をキャンセルにします。\nイベント数に数えなくなり、アサインの画面とスタッフの画面からも見えなくなります。\n（記録は消えません。あとで戻せます）')) return;
+      fetch('/projects/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ id: @json($editProject['id']), cancelled: next })
+      })
+      .then(r => r.json().catch(() => ({})).then(j => { if (!r.ok) throw new Error(j.message || 'save failed'); }))
+      .then(() => location.reload())
+      .catch(e => alert(e.message && e.message !== 'save failed' ? e.message : 'キャンセルの保存に失敗しました。もう一度お試しください。'));
+    }
+  </script>
   @if (($editProject['date_type'] ?? '本番') === '本番')
     {{-- 本番案件を編集しているときだけ、ここから枝分かれの日程を作れるようにする（2026-09-28 baba要望）。
          ⚠ 実際の作り方が「まず本番を登録 → あとから予備日を足す」なので、入口を本番案件の側に置く。 --}}
@@ -1086,7 +1110,7 @@
 
       <!-- ===== 下部アクション ===== -->
       <div class="form-actions">
-        <a class="btn" href="/projects">キャンセル</a>
+        <a class="btn" href="/projects">← 保存せずに一覧へ戻る</a>
         <div class="spacer"></div>
         <button type="button" class="btn" id="addNextBtn" style="display:none;" onclick="saveAndNext()">＋ 同じ内容で次の日程を追加</button>
         <button type="button" class="btn" onclick="saveDraft()">下書きとして保存</button>

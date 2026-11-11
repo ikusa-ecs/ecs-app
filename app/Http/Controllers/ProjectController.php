@@ -384,6 +384,7 @@ class ProjectController extends Controller
                     'id' => $p->id,
                     'content_names' => $contentNames,
                     'oneoff_content_names' => $oneOffNames,
+                    'is_cancelled' => (bool) $p->is_cancelled,   // 編集画面からもキャンセルを切り替える（2026-11-11 小沼さん）
                     'category' => $p->category,
                     'is_toc' => (bool) $p->is_toc,
                     'yomi' => $p->yomi,
