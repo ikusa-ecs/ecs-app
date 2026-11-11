@@ -466,7 +466,7 @@
     </select>
   </form>
 
-  <input type="search" id="sheetSearch" placeholder="コンテンツ・顧客・人の名前で絞り込み" oninput="ecsSheetFilter()" style="min-width:190px;">
+  <input type="search" id="sheetSearch" placeholder="コンテンツ・種別（リアル／謎解き脱出など）・顧客・人の名前で絞り込み" title="種別＝新人ページの難易度表の「種類」と「分類」" oninput="ecsSheetFilter()" style="min-width:190px;">
 
   <label class="chk"><input type="checkbox" id="sheetShort" onchange="ecsSheetFilter()"> 人数が足りない案件だけ（{{ $shortCount }}）</label>
 
@@ -613,7 +613,7 @@
       <div class="acard"
            data-project="{{ $c['id'] }}"
            {{-- 人の名前でも探せる（2026-11-09）＝メンバー・営業・物品も入れる。空白は抜く（「西本 蓮太郎」も「西本蓮太郎」で当たるように）。 --}}
-           data-search="{{ preg_replace('/[\s　]+/u', '', mb_strtolower($c['content'] . '|' . $c['client'] . '|' . $c['agency'] . '|' . $c['sales'] . '|' . $c['goods'] . '|' . implode('|', array_column($c['members'], 'name')))) }}"
+           data-search="{{ preg_replace('/[\s　]+/u', '', mb_strtolower($c['content'] . '|' . ($c['contentTags'] ?? '') . '|' . $c['client'] . '|' . $c['agency'] . '|' . $c['sales'] . '|' . $c['goods'] . '|' . implode('|', array_column($c['members'], 'name')))) }}"
            data-short="{{ $short ? '1' : '0' }}">
 
         {{-- 頭＋案件名は sticky でスクロール枠の上端に残す（下のメンバーを見ても案件名が消えない）。 --}}

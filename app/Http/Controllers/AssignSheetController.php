@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Content;
+use App\Models\ContentDifficulty;
 use App\Models\ContentRoleRequirement;
 use App\Models\Person;
 use App\Models\Project;
@@ -156,7 +157,13 @@ class AssignSheetController extends Controller
                 ->get(['content_id', 'scale', 'position', 'count', 'note', 'patrol'])
                 ->groupBy('content_id');
 
-        $cards = $monthProjects->map(function (Project $p, int $i) use ($membersByProject, $dispatchesByProject, $slotsByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
+        // コンテンツの種別＝新人ページの難易度表の「種類（リアル／オンライン）」と「分類」（2026-11-11 小沼さん：検索で使いたい）。
+        // 台帳につながっている行だけ。content_id => ['リアル', '謎解き脱出', …]
+        $contentTags = ContentDifficulty::whereNotNull('content_id')->get(['content_id', 'kind', 'category'])
+            ->groupBy('content_id')
+            ->map(fn ($rows) => $rows->flatMap(fn ($r) => [$r->kind, $r->category])->filter()->unique()->values()->all());
+
+        $cards = $monthProjects->map(function (Project $p, int $i) use ($contentTags, $membersByProject, $dispatchesByProject, $slotsByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。
             $members = ($membersByProject->get($p->id) ?? collect())
                 ->map(function ($a) use ($people) {
@@ -228,6 +235,8 @@ class AssignSheetController extends Controller
                 'category'    => $p->category ?? '',
                 'lodging'     => $this->clean($p->lodging),
                 'content'     => $content,
+                // 検索用：難易度表の種類・分類（例「リアル|謎解き脱出」）。画面には出さず data-search にだけ入れる。
+                'contentTags' => implode('|', array_unique(array_merge(...array_map(fn ($cid) => $contentTags[$cid] ?? [], array_values(array_filter(is_array($p->content_ids) ? $p->content_ids : [])))))),
                 'scale'       => $this->clean($p->scale),
                 'sales'       => $sales,
                 'onlineTool'  => $this->clean($p->online_tool),
