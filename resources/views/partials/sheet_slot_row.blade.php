@@ -33,6 +33,8 @@
   <span class="c-nm">
     @if ($sMark !== '')<span class="slot-mark">{{ $sMark }}</span>@endif
     @if ($auto)<span class="auto-mark">空き</span>@endif
+    {{-- 書いてある枠（イベプラ・ポジション・備考など）を枠ごと消す（2026-11-11 小沼さん）。✎編集 のときだけ出る。 --}}
+    @if ($slotId !== '')<button type="button" class="m-edit m-slotdel" title="この枠を消す（イベプラの印・ポジション・担当・備考ごと）" onclick="ecsSheetDeleteSlot(this)">✕ 枠を消す</button>@endif
     {{-- 社員をここから入れる。選ぶと assignments に「仮」で入り、この行は人の行に変わる。 --}}
     {{-- 名前を少し打つと候補が出る（2026-11-11 小沼さん）。候補は画面に1つの #sheetEmpList（全社員を空き行ごとに書かない＝軽さはそのまま）。 --}}
     <input class="m-edit m-addname" type="text" list="sheetEmpList" placeholder="＋社員（名前を打つ）" autocomplete="off" title="社員を入れます（仮で入ります）。名前を少し打つと候補が出ます" onchange="ecsSheetAddMember(this)">

@@ -157,6 +157,8 @@
   .mrow.mblk .m-addname { display: none; width: 100%; font-size: 10px; padding: 1px 2px;
     border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
   .acard.editing .mrow.mblk .m-addname { display: block; }
+  .mrow.mblk .m-slotdel { display: none; font-size: 9.5px; padding: 0 4px; margin-bottom: 2px; border: 1px solid #f0b9b9; border-radius: 5px; background: #fff; color: var(--danger); cursor: pointer; }
+  .acard.editing .mrow.mblk .m-slotdel { display: inline-block; }
   /* 名前の入れ替え・外す（2026-10-05）。編集モードだけ、名前の表示を選ぶ欄に差し替える。 */
   .mrow.mblk .m-swapname { display: none; width: 100%; }   /* 2026-11-11：中は候補つきの入力欄（.m-swapin）＋✕ */
   .acard.editing .mrow.mblk .m-swapname { display: flex; gap: 2px; align-items: center; }
@@ -924,6 +926,21 @@
   // ⚠ はじめて書いたときはサーバー側で枠が作られる。返ってきたIDを行に覚えさせて、
   //   2回目からは同じ枠を直す（覚えないと、1マスごとに別の枠ができてしまう）。
   // ⚠ 全部空にすると枠ごと消える（サーバー側）。そのときはIDも消す。
+  // 枠ごと消す（イベプラの印・ポジション・担当・備考ごと・2026-11-11 小沼さん）。
+  function ecsSheetDeleteSlot(btn) {
+    var row = btn.closest('.mrow');
+    if (!row || !confirm('この枠を消します（イベプラの印・ポジション・担当・備考ごと）。よろしいですか？')) return;
+    btn.disabled = true;
+    fetch('/assign-sheet/slot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ project_id: row.getAttribute('data-project'), slot_id: row.getAttribute('data-slot'), field: 'delete', value: '' })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { if (!(res && res.ok)) { btn.disabled = false; alert('消せませんでした。' + (res && res.message ? '
+' + res.message : '')); return; } ecsSheetReload(); })
+      .catch(function () { btn.disabled = false; alert('通信エラーで消せませんでした。'); });
+  }
   function ecsSheetSaveSlot(inp, field, value) {
     var row = inp.closest('.mrow');
     if (!row) return;

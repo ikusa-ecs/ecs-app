@@ -435,7 +435,8 @@ class AssignSheetController extends Controller
         $data = $request->validate([
             'project_id' => ['required', 'string'],
             'slot_id' => ['nullable', 'integer'],         // 既にある枠を直すとき
-            'field' => ['required', 'string', 'in:role,note,patrol,remark,placeholder'],
+            // delete＝枠ごと消す（2026-11-11 小沼さん「イベプラをアサイン表で消せるように」）。
+            'field' => ['required', 'string', 'in:role,note,patrol,remark,placeholder,delete'],
             'value' => ['nullable', 'string'],
         ]);
 
@@ -464,6 +465,12 @@ class AssignSheetController extends Controller
         $slot = $slotId
             ? ProjectSlot::where('project_id', $project->id)->find($slotId)
             : null;
+
+        if ($field === 'delete') {
+            $slot?->delete();
+
+            return response()->json(['ok' => true, 'slot_id' => null]);
+        }
 
         if (! $slot) {
             if ($value === '') {

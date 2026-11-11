@@ -115,6 +115,11 @@ class AssignSlotTest extends TestCase
         $this->assertCount(1, $slots, '2回押しても増えない');
         $this->assertSame('D', $slots[0]->role);
         $this->assertSame(AssignSlots::EVENT_PLANNER, $slots[0]->placeholder);
+
+        // アサイン表で枠ごと消せる（イベプラの印も・2026-11-11 小沼さん）
+        $this->sheet($p)->assertSee('✕ 枠を消す', false)->assertSee('ecsSheetDeleteSlot(this)', false);
+        $this->actingAsPerson($me)->postJson('/assign-sheet/slot', ['project_id' => $p->id, 'slot_id' => $slots[0]->id, 'field' => 'delete'])->assertOk();
+        $this->assertSame(0, ProjectSlot::where('project_id', $p->id)->count());
     }
 
     /** Dの枠は、アサイン済みの人より上（1番）に来る。 */
