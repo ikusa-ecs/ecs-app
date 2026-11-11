@@ -164,7 +164,7 @@ class AssignmentController extends Controller
             $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP,
             $seriesEntryIds
         ))->setProjectMembers(array_keys($existing), $ngPairs)->setStayNg($stayNg)
-            // アサイン率（その月にエントリーした案件のうち入れた割合）が低い人を上へ（2026-11-11 小沼さん）。正本＝AssignRate
+            // アサイン率（その月に出られると示した日のうち入れた日の割合）が低い人を上へ（2026-11-11 小沼さん）。正本＝AssignRate
             ->setAssignRate($assignRate = $date ? AssignRate::forMonth($date) : []);
 
         // ── 候補スタッフを拠点で絞る（全拠点運用・2026-08-05 baba確定＝アサイン画面は第1弾）──
@@ -224,7 +224,7 @@ class AssignmentController extends Controller
                     //     自動で仮置きは隠れている行まで拾って、応募も稼働可でもない人を入れていた）
                     'eligible' => array_key_exists($p->id, $entries)
                         || in_array($wish[$p->id] ?? null, ['希望', '稼働可'], true),
-                    // アサイン率（例 33%（2/6件））。その月にエントリーが無い人は空＝「—」。
+                    // アサイン率（例 10%（1/10日））。その月に出られる日も入れた日も無い人は空＝「—」。
                     'assignRate' => isset($assignRate[$p->id]) ? AssignRate::label($assignRate[$p->id]) : '',
                     'assignRatePct' => isset($assignRate[$p->id]) ? (int) round($assignRate[$p->id]['rate'] * 100) : null,
                     'score' => $eval['score'],
