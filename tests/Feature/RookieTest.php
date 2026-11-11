@@ -98,8 +98,8 @@ class RookieTest extends TestCase
             \App\Http\Controllers\RookieController::orderedDifficulties()->pluck('sheet_name')->all());
     }
 
-    /** 研修先（月ごと）：福岡の新人を12月だけ東京の新人ページにも出す。名簿の拠点は変えない（2026-11-11 小沼さん）。 */
-    public function test_研修先の拠点にその月だけ出る(): void
+    /** 研修先（期間）：福岡の新人を「12/1〜12/15は東京」。名簿の拠点は変えない（2026-11-11 小沼さん）。 */
+    public function test_研修先の期間() : void
     {
         $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
         $r = PersonFactory::new()->create(['name' => '福岡の新人', 'role' => 'employee', 'office' => '福岡',
@@ -107,17 +107,25 @@ class RookieTest extends TestCase
         \App\Models\Office::firstOrCreate(['name' => '東京']);
         \App\Models\Office::firstOrCreate(['name' => '福岡']);
 
-        $this->actingAsPerson($me)->post('/rookies/training', ['id' => $r->id, 'month' => '2026-12', 'office' => '東京'])->assertRedirect();
-        $this->assertSame(['2026-12' => '東京'], $r->fresh()->rookie_training);
-        $this->assertSame('福岡', $r->fresh()->office, '名簿の拠点は変えない');
+        $this->actingAsPerson($me)->post('/rookies/training', ['id' => $r->id, 'from' => '2026-12-01', 'to' => '2026-12-15', 'office' => '東京'])->assertRedirect();
+        $r->refresh();
+        $this->assertSame('福岡', $r->office, '名簿の拠点は変えない');
+        $this->assertSame('東京', \App\Support\Rookies::officeOn($r, '2026-12-15'));
+        $this->assertSame('福岡', \App\Support\Rookies::officeOn($r, '2026-12-16'), '16日からは福岡');
 
         $names = fn ($office, $ym) => \App\Support\Rookies::list($office, \Illuminate\Support\Carbon::parse($ym.'-01'))->pluck('name')->all();
         $this->assertContains('福岡の新人', $names('東京', '2026-12'));
         $this->assertNotContains('福岡の新人', $names('東京', '2027-01'), '翌月は東京に出ない');
         $this->assertContains('福岡の新人', $names('福岡', '2026-12'), '所属の拠点からも消さない');
+        $this->actingAsPerson($me)->get('/rookies?office=東京&month=2026-12')->assertOk()->assertSee('12/1〜12/15は東京で研修');
 
-        // 所属の拠点のままに戻す＝印を消す
-        $this->actingAsPerson($me)->post('/rookies/training', ['id' => $r->id, 'month' => '2026-12', 'office' => ''])->assertRedirect();
+        // 最初の形（月ごと {"2026-12":"東京"}）も月まるごととして読む
+        $r->rookie_training = ['2026-12' => '東京'];
+        $r->save();
+        $this->assertSame('東京', \App\Support\Rookies::officeOn($r->fresh(), '2026-12-31'));
+
+        // 外す
+        $this->actingAsPerson($me)->post('/rookies/training', ['id' => $r->id, 'remove_from' => '2026-12-01'])->assertRedirect();
         $this->assertNull($r->fresh()->rookie_training);
     }
 

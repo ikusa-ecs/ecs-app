@@ -123,7 +123,7 @@ final class RookieFcPlan
                 'name' => $p->name,
                 // 所属の拠点と、この月の研修先（2026-11-11 小沼さん）。
                 'office' => (string) ($p->office ?? ''),
-                'training' => Rookies::trainingOffice($p, $month),
+                'training' => Rookies::trainingInMonth($p, $month),   // [{from,to,office}]
                 'dept' => (string) ($p->department ?? ''),
                 'hire' => optional($p->hire_date)->format('Y-m-d'),
                 'since' => optional($p->rookie_since)->format('Y-m-d'),
@@ -157,9 +157,7 @@ final class RookieFcPlan
             ];
             $state[$p->id] = [
                 'person' => $p,
-                // この月は別の拠点で研修中なら、ここ（所属の拠点）ではFCの案を出さない＝研修先の拠点の案で組む（2026-11-11）。
-                'remain' => ($office && ($tr = Rookies::trainingOffice($p, $month)) !== '' && $tr !== $office)
-                    ? 0 : ($target ? max(0, $target['fc'] - $fcThisMonth) : 0),
+                'remain' => $target ? max(0, $target['fc'] - $fcThisMonth) : 0,
                 'fcDone' => $fcDone,
                 'busy' => $busy,
                 'plan' => in_array('イベプラ', $p->departmentList(), true),
@@ -479,8 +477,12 @@ final class RookieFcPlan
             $room[$c->id] = $need - ($rows->pluck('staff_id')->unique()->count() + ($dispatch[$c->id] ?? 0));
             $cap[$c->id] = self::capFor($c, $need) - $rows->filter(fn ($a) => isset($state[$a->staff_id]))->pluck('staff_id')->unique()->count();
         }
-        $canGo = function (string $id, string $day, $c) use (&$state, &$room, &$cap, $avail) {
+        $canGo = function (string $id, string $day, $c) use (&$state, &$room, &$cap, $avail, $office) {
             $prev = self::preStayDay($c);
+            // 研修先（2026-11-11 小沼さん）：その日にいる拠点のイベントだけ。例「15日までは東京・16日から福岡」。
+            if ($office && Rookies::officeOn($state[$id]['person'], $day) !== $office) {
+                return false;
+            }
 
             return $room[$c->id] > 0 && $cap[$c->id] > 0 && ! isset($state[$id]['busy'][$day])
                 && ! in_array($avail[$id.'|'.$day] ?? '', ['NG', '希望休'], true)

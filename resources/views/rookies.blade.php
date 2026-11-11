@@ -142,21 +142,27 @@
     @forelse ($rookies as $r)
       <tr data-rookie="{{ $r['id'] }}">
         <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div>
-          {{-- 研修先（2026-11-11 小沼さん：福岡に入社して最初の月は東京で研修 など）。名簿の拠点は変えない。
-               その月だけ研修先の拠点の新人ページにも出て、FCの案は研修先の拠点のイベントで組む。 --}}
-          @if ($r['training'] !== '')
-            <div class="rk-small" style="color:#1d4ed8; font-weight:700;">🏢 {{ $month->format('n月') }}は{{ $r['training'] }}で研修@if ($r['training'] === ($office ?? '') && $r['office'] !== '')（所属：{{ $r['office'] }}）@endif</div>
-          @endif
+          {{-- 研修先（期間・2026-11-11 小沼さん：福岡に入社して「15日までは東京・16日から福岡」など）。名簿の拠点は変えない。
+               期間中は研修先の拠点の新人ページにも出て、FCの案はその日にいる拠点のイベントで組む。正本＝Rookies::trainingPeriods / officeOn --}}
+          @foreach ($r['training'] as $t)
+            <div class="rk-small" style="color:#1d4ed8; font-weight:700;">🏢 {{ \Illuminate\Support\Carbon::parse($t['from'])->format('n/j') }}〜{{ \Illuminate\Support\Carbon::parse($t['to'])->format('n/j') }}は{{ $t['office'] }}で研修@if ($t['office'] === ($office ?? '') && $r['office'] !== '')（所属：{{ $r['office'] }}）@endif
+              @if ($canEdit)
+                <form method="POST" action="/rookies/training" style="display:inline;" data-msg="この研修の期間を外します。" onsubmit="return confirm(this.dataset.msg)">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}"><input type="hidden" name="remove_from" value="{{ $t['from'] }}"><button class="rk-btn" type="submit" title="この期間を外す" style="padding:0 6px;">✕</button></form>
+              @endif
+            </div>
+          @endforeach
           @if ($canEdit)
-            <form method="POST" action="/rookies/training" class="rk-small" style="margin-top:4px;">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}"><input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
-              {{ $month->format('n月') }}の研修先
-              <select class="rk-in" name="office" onchange="rkRemember(); this.form.submit()">
-                <option value="">所属の拠点のまま{{ $r['office'] !== '' ? '（'.$r['office'].'）' : '' }}</option>
-                @foreach (\App\Support\OfficeScope::options() as $o)
-                  @if ($o !== $r['office'])<option @selected($r['training'] === $o)>{{ $o }}</option>@endif
-                @endforeach
-              </select>
-            </form>
+            <details class="rk-small" style="margin-top:4px;"><summary>🏢 研修先を入れる（別の拠点で研修する期間）</summary>
+              <form method="POST" action="/rookies/training" style="margin-top:4px;">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
+                <input class="rk-in" type="date" name="from" value="{{ $month->copy()->startOfMonth()->format('Y-m-d') }}" required>〜<input class="rk-in" type="date" name="to" value="{{ $month->copy()->endOfMonth()->format('Y-m-d') }}" required>
+                <select class="rk-in" name="office" required>
+                  @foreach (\App\Support\OfficeScope::options() as $o)
+                    @if ($o !== $r['office'])<option>{{ $o }}</option>@endif
+                  @endforeach
+                </select>で研修
+                <button class="rk-btn" type="submit" onclick="rkRemember()">入れる</button>
+              </form>
+            </details>
           @endif
           {{-- チャットワークIDはここで入れる（2026-10-28 baba）。空だとメンションが付かないので「未登録」を赤で出す。 --}}
           @if ($canEdit)

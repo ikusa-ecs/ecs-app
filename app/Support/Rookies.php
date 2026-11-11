@@ -101,17 +101,56 @@ final class Rookies
     }
 
     /** 卒業した人（取り消しボタン用）。 */
-    /** その月の研修先（無ければ空）。例：{"2026-12": "東京"} の人は 2026-12 に「東京」。 */
-    public static function trainingOffice(Person $p, Carbon $month): string
+    /**
+     * 研修先の期間（2026-11-11 小沼さん：「15日までは東京・16日以降は福岡」のように日付で区切る）。
+     * 保存の形＝[{from: Y-m-d, to: Y-m-d, office: 拠点}, …]（開始日の順）。
+     * ⚠ 最初は月ごと {"2026-12": "東京"} で作った＝その形が残っていても、その月まるごとの期間として読む。
+     *
+     * @return list<array{from:string, to:string, office:string}>
+     */
+    public static function trainingPeriods(Person $p): array
     {
-        return (string) (($p->rookie_training ?? [])[$month->format('Y-m')] ?? '');
+        $out = [];
+        foreach ((array) ($p->rookie_training ?? []) as $k => $v) {
+            if (is_array($v) && ! empty($v['from']) && ! empty($v['to']) && ! empty($v['office'])) {
+                $out[] = ['from' => (string) $v['from'], 'to' => (string) $v['to'], 'office' => (string) $v['office']];
+            } elseif (is_string($k) && preg_match('/^\d{4}-\d{2}$/', $k) && is_string($v) && $v !== '') {
+                $m = Carbon::parse($k.'-01');
+                $out[] = ['from' => $m->toDateString(), 'to' => $m->copy()->endOfMonth()->toDateString(), 'office' => $v];
+            }
+        }
+        usort($out, fn ($a, $b) => strcmp($a['from'], $b['from']));
+
+        return $out;
     }
 
-    /** その月にこの拠点で研修する人のID。 */
+    /** その月にかかっている研修の期間だけ。 */
+    public static function trainingInMonth(Person $p, Carbon $month): array
+    {
+        $from = $month->copy()->startOfMonth()->toDateString();
+        $to = $month->copy()->endOfMonth()->toDateString();
+
+        return array_values(array_filter(self::trainingPeriods($p), fn ($t) => $t['from'] <= $to && $t['to'] >= $from));
+    }
+
+    /** その日にいる拠点（研修の期間中なら研修先・それ以外は所属の拠点。所属が空は東京）。 */
+    public static function officeOn(Person $p, string $day): string
+    {
+        foreach (self::trainingPeriods($p) as $t) {
+            if ($t['from'] <= $day && $day <= $t['to']) {
+                return $t['office'];
+            }
+        }
+
+        return ($p->office ?? '') !== '' ? $p->office : OfficeScope::DEFAULT_OFFICE;
+    }
+
+    /** その月に、1日でもこの拠点で研修する人のID。 */
     public static function traineeIds(string $office, Carbon $month): array
     {
         return Person::employees()->whereNotNull('rookie_training')->get(['id', 'rookie_training'])
-            ->filter(fn (Person $p) => self::trainingOffice($p, $month) === $office)->pluck('id')->all();
+            ->filter(fn (Person $p) => collect(self::trainingInMonth($p, $month))->contains('office', $office))
+            ->pluck('id')->all();
     }
 
     public static function graduated(?string $office = null): Collection

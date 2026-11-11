@@ -117,31 +117,36 @@ class RookieController extends Controller
     }
 
     /**
-     * 新人の研修先（月ごと・2026-11-11 小沼さん）。空＝所属の拠点のまま（その月の印を消す）。
-     * 名簿の拠点は変えない＝ほかの画面には効かない。新人ページだけ、その月は研修先の拠点にも出る。
+     * 新人の研修先（期間・2026-11-11 小沼さん「15日までは東京・16日以降は福岡みたいな場合は？」）。
+     * 足す＝from・to・office／外す＝remove_from（その期間の開始日）。保存の形の正本＝Rookies::trainingPeriods。
+     * 名簿の拠点は変えない＝ほかの画面には効かない。新人ページだけ、期間中は研修先の拠点にも出て、FCの案はその日にいる拠点で組む。
      */
     public function setTraining(Request $request)
     {
         $data = $request->validate([
             'id' => ['required', 'string', 'exists:people,id'],
-            'month' => ['required', 'date_format:Y-m'],
-            'office' => ['nullable', 'string', 'in:'.implode(',', \App\Support\OfficeScope::options())],
+            'remove_from' => ['nullable', 'date_format:Y-m-d'],
+            'from' => ['required_without:remove_from', 'nullable', 'date_format:Y-m-d'],
+            'to' => ['required_without:remove_from', 'nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'office' => ['required_without:remove_from', 'nullable', 'string', 'in:'.implode(',', OfficeScope::options())],
         ]);
         $p = Person::findOrFail($data['id']);
-        $t = (array) ($p->rookie_training ?? []);
-        if (($data['office'] ?? '') === '' || $data['office'] === ($p->office ?? '')) {
-            unset($t[$data['month']]);
+        $periods = Rookies::trainingPeriods($p);
+        if (! empty($data['remove_from'])) {
+            $periods = array_values(array_filter($periods, fn ($t) => $t['from'] !== $data['remove_from']));
+            $msg = $p->name.'さんの研修の期間を外しました。';
         } else {
-            $t[$data['month']] = $data['office'];
+            // 重なる期間は、新しく入れたほうで置きかえる（同じ日に2つの拠点にいないように）。
+            $periods = array_values(array_filter($periods, fn ($t) => $t['to'] < $data['from'] || $t['from'] > $data['to']));
+            $periods[] = ['from' => $data['from'], 'to' => $data['to'], 'office' => $data['office']];
+            usort($periods, fn ($a, $b) => strcmp($a['from'], $b['from']));
+            $msg = $p->name.'さんは '.Carbon::parse($data['from'])->format('n/j').'〜'.Carbon::parse($data['to'])->format('n/j')
+                .' を'.$data['office'].'で研修にしました（その間は'.$data['office'].'の新人ページにも出て、FCの案は'.$data['office'].'のイベントで組みます）。';
         }
-        ksort($t);
-        $p->rookie_training = $t ?: null;
+        $p->rookie_training = $periods ?: null;
         $p->save();
-        $ym = Carbon::parse($data['month'].'-01')->format('Y年n月');
 
-        return back()->with('ok', isset($t[$data['month']])
-            ? $p->name.'さんは'.$ym.'、'.$t[$data['month']].'で研修にしました（'.$t[$data['month']].'の新人ページにも出ます）。'
-            : $p->name.'さんの'.$ym.'の研修先を外しました（所属の拠点だけに出ます）。');
+        return back()->with('ok', $msg);
     }
 
     /**
