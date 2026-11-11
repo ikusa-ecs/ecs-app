@@ -1166,6 +1166,28 @@
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
   })();
+  // ===== スプシのようにダブルクリックで入力（2026-11-11 小沼さん「名前のところダブルクリックしたら入力できるように」） =====
+  // メンバー・空き行をダブルクリックすると、そのカードを ✎編集 にして、押したところの入力欄（名前なら社員の選択欄）を開く。
+  // ⚠ D の行は名前の選択欄が無い（DはD決めの画面が正本）＝編集の状態になるだけ。
+  document.addEventListener('dblclick', function (e) {
+    var row = e.target.closest ? e.target.closest('.acard .mrow.mblk') : null;
+    if (!row || e.target.closest('select, input, textarea, button, a')) return;
+    var card = row.closest('.acard');
+    try {
+      if (!card.classList.contains('editing')) {
+        var btn = card.querySelector('[onclick*="ecsSheetToggleEdit"]');
+        if (btn) ecsSheetToggleEdit(btn);
+      }
+      var cell = e.target.closest('.mrow.mblk > span') || row.querySelector('.c-nm');
+      var field = cell && cell.querySelector('select, input:not([type="hidden"]):not([type="checkbox"]), textarea');
+      if (!field) field = row.querySelector('.c-nm select');
+      if (field) {
+        field.focus();
+        if (field.tagName === 'SELECT' && field.showPicker) { try { field.showPicker(); } catch (x) {} }
+      }
+      if (window.getSelection) window.getSelection().removeAllRanges();   // ダブルクリックで文字が選ばれたのを消す
+    } catch (x) {}
+  });
 </script>
 @endverbatim
 @endpush
