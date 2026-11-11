@@ -80,11 +80,13 @@ class AssignSheetNoteAndVacancyTest extends TestCase
         $html = $this->sheet($date)->assertOk()->getContent();
 
         $this->assertStringContainsString('大阪の新人', $html);
-        $tokyo = strpos($html, '<optgroup label="東京">');
-        $osaka = strpos($html, '<optgroup label="大阪">');
+        // 2026-11-11：選択欄 → 名前を打つと候補が出る入力（datalist #sheetEmpList）。並びは いま見ている拠点が上のまま。
+        $tokyo = strpos($html, '<option value="東京の社員">');
+        $osaka = strpos($html, '<option value="大阪の新人">');
         $this->assertNotFalse($tokyo);
         $this->assertNotFalse($osaka);
         $this->assertLessThan($osaka, $tokyo, 'いま見ている拠点（東京）が上');
+        $this->assertStringContainsString('list="sheetEmpList"', $html);
     }
 
     public function test_運営人数が空なら黄色にしない(): void

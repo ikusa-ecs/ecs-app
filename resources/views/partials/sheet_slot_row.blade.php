@@ -34,11 +34,8 @@
     @if ($sMark !== '')<span class="slot-mark">{{ $sMark }}</span>@endif
     @if ($auto)<span class="auto-mark">空き</span>@endif
     {{-- 社員をここから入れる。選ぶと assignments に「仮」で入り、この行は人の行に変わる。 --}}
-    <select class="m-edit m-addname" title="社員を入れます（仮で入ります）" onchange="ecsSheetAddMember(this)">
-      <option value="">＋社員</option>
-      {{-- 社員の名前は ✎編集 を押したときに入れる（共通の #sheetEmpOpts から写す・ecsSheetFillNames）。
-           ⚠ 2026-11-11：空き行ごとに全社員を書いていて、本番で画面が22MB・選択肢17万個＝開くのが重かった（小沼さん「もっさり」）。 --}}
-    </select>
+    {{-- 名前を少し打つと候補が出る（2026-11-11 小沼さん）。候補は画面に1つの #sheetEmpList（全社員を空き行ごとに書かない＝軽さはそのまま）。 --}}
+    <input class="m-edit m-addname" type="text" list="sheetEmpList" placeholder="＋社員（名前を打つ）" autocomplete="off" title="社員を入れます（仮で入ります）。名前を少し打つと候補が出ます" onchange="ecsSheetAddMember(this)">
   </span>
   <span class="c-p">
     @if ($sRole !== '')<span class="pos-badge slot-pos">{{ $sRole }}</span>@endif

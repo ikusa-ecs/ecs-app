@@ -301,7 +301,8 @@ class AssignSheetController extends Controller
                     $members->all(),
                     $dispatchesByProject[$p->id] ?? [],
                     array_merge($slotsByProject[$p->id] ?? [], AssignSlots::autoSlots(
-                        PositionTemplate::of($p), $members->all(), $dispatchesByProject[$p->id] ?? [], $slotsByProject[$p->id] ?? []
+                        PositionTemplate::of($p), $members->all(), $dispatchesByProject[$p->id] ?? [], $slotsByProject[$p->id] ?? [],
+                        (int) ($p->required_count ?? 0)   // 運営人数を超えて空きを出さない
                     ))
                 ),
                 // Dがまだ決まっていない（人がアサインされていない）＝「D枠を作る」ボタンを出す。

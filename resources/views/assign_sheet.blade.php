@@ -158,9 +158,12 @@
     border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
   .acard.editing .mrow.mblk .m-addname { display: block; }
   /* 名前の入れ替え・外す（2026-10-05）。編集モードだけ、名前の表示を選ぶ欄に差し替える。 */
-  .mrow.mblk .m-swapname { display: none; width: 100%; font-size: 10px; padding: 1px 2px;
-    border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
-  .acard.editing .mrow.mblk .m-swapname { display: block; }
+  .mrow.mblk .m-swapname { display: none; width: 100%; }   /* 2026-11-11：中は候補つきの入力欄（.m-swapin）＋✕ */
+  .acard.editing .mrow.mblk .m-swapname { display: flex; gap: 2px; align-items: center; }
+  /* 入れ替えの名前の入力（候補つき）と「✕ 外す」（2026-11-11） */
+  .mrow.mblk .m-swapin { flex: 1; min-width: 0; font-size: 10px; padding: 1px 2px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-family: inherit; }
+  .mrow.mblk .m-out { font-size: 10px; padding: 0 4px; border: 1px solid #f0b9b9; border-radius: 5px; background: #fff; color: var(--danger); cursor: pointer; line-height: 1.4; }
+  html[data-theme="dark"] .mrow.mblk .m-swapin { background: var(--surface-2); color: var(--ink); border-color: var(--field-line); }
   .acard.editing .mrow.mblk .m-swappable .m-nm-read { display: none; }
   .mblk-foot { display: none; padding: 3px 6px; border-bottom: 1px solid var(--line); }
   .acard.editing .mblk-foot { display: block; }
@@ -307,7 +310,7 @@
     .acard.editing .m-role,
     .acard.editing .m-note,
     .acard.editing .m-remark,
-    .acard.editing .m-swapname,
+    .acard.editing .m-swapin,
     .acard.editing .m-patrol { font-size: 16px; padding: 4px 6px; }
     .acard.editing .pe-in { width: 100%; }
     .acard.editing .pe-in.num { width: 72px; }
@@ -797,11 +800,8 @@
                      ⚠ 入れ替え先は空き行と同じく社員だけ（スタッフは日別ボードで希望を見ながら入れる）。
                      ⚠ Dの行は出さない＝DはD決めの画面が正本（案件側にも写しがあり、ここで外すと元のDが戻ってくる）。 --}}
                 @if ($mSwap)
-                <select class="m-swapname" title="別の社員に入れ替える／外す" onchange="ecsSheetSwapMember(this)" data-self="{{ $m['staffId'] }}">
-                  <option value="" selected>{{ $m['name'] }}</option>
-                  <option value="__remove">✕ 外す</option>
-                  {{-- 社員の名前は ✎編集 を押したときに入れる（本人は除く・ecsSheetFillNames）。 --}}
-                </select>
+                {{-- 名前を少し打つと候補が出る（2026-11-11 小沼さん）。候補は #sheetEmpList（画面に1つ）。 --}}
+                <span class="m-swapname"><input class="m-swapin" type="text" list="sheetEmpList" placeholder="{{ $m['name'] }}" data-oldname="{{ $m['name'] }}" title="別の社員に入れ替える（名前を打つと候補が出ます）" autocomplete="off" onchange="ecsSheetSwapMember(this)"><button type="button" class="m-out" title="この人を外す" onclick="ecsSheetSwapMember(this, true)">✕</button></span>
                 @endif
               </span>
               <span class="c-p">
@@ -872,29 +872,31 @@
 </script>
 {{-- 社員の名前の選択肢（拠点ごと・いま見ている拠点が上）。画面に1回だけ置き、✎編集 を押したカードの選択欄に写す（2026-11-11）。
      他拠点の社員も入れられる（新入社員の研修など・2026-09-28）。 --}}
-<template id="sheetEmpOpts">@foreach ($employeeGroups as $g)<optgroup label="{{ $g['office'] }}">@foreach ($g['people'] as $e)<option value="{{ $e['id'] }}">{{ $e['name'] }}</option>@endforeach</optgroup>@endforeach</template>
+@php
+  // 同じ名前の人がいるときだけ「名前（拠点）」にして見分ける。
+  $empAll = collect($employeeGroups)->flatMap(fn ($g) => collect($g['people'])->map(fn ($e) => $e + ['office' => $g['office']]));
+  $dupNames = $empAll->countBy('name')->filter(fn ($k) => $k > 1)->keys()->all();
+  $empLabel = $empAll->mapWithKeys(fn ($e) => [(in_array($e['name'], $dupNames, true) ? $e['name'].'（'.$e['office'].'）' : $e['name']) => $e['id']]);
+@endphp
+<datalist id="sheetEmpList">@foreach ($empLabel as $label => $id)<option value="{{ $label }}"></option>@endforeach</datalist>
+<script>window.ECS_SHEET_EMP = @json($empLabel);</script>
 @verbatim
 <script>
-  // ✎編集 を押したカードの「＋社員」「入れ替え」の選択欄に、社員の名前を入れる（1枚につき1回だけ）。
-  // ⚠ 入れ替えの欄は本人を除く（data-self）。
-  function ecsSheetFillNames(card) {
-    var tpl = document.getElementById('sheetEmpOpts');
-    if (!tpl) return;
-    card.querySelectorAll('select.m-addname, select.m-swapname').forEach(function (sel) {
-      if (sel.dataset.filled) return;
-      sel.dataset.filled = '1';
-      var frag = tpl.content.cloneNode(true);
-      var self = sel.dataset.self || '';
-      if (self) frag.querySelectorAll('option').forEach(function (o) { if (o.value === self) o.remove(); });
-      sel.appendChild(frag);
-    });
+  // 打った名前 → 社員ID（候補 #sheetEmpList と同じ表記・window.ECS_SHEET_EMP）。見つからなければ空。
+  function ecsSheetEmpId(name) {
+    var map = window.ECS_SHEET_EMP || {};
+    name = (name || '').trim();
+    if (map[name]) return map[name];
+    // 空白の有無の違いは同じ人とみなす（「西本 蓮太郎」と「西本蓮太郎」）
+    var flat = name.replace(/[\s　]+/g, '');
+    for (var k in map) { if (k.replace(/[\s　]+/g, '') === flat) return map[k]; }
+    return '';
   }
   // 案件カードを「編集モード」に切り替える（役割/担当/巡回の入力欄を出す）。
   function ecsSheetToggleEdit(btn) {
     var card = btn.closest('.acard');
     if (!card) return;
     card.classList.toggle('editing');
-    if (card.classList.contains('editing')) { try { ecsSheetFillNames(card); } catch (e) {} }
     btn.textContent = card.classList.contains('editing') ? '完了' : '✎編集';
   }
   // 変更したメンバーの役割/担当/巡回を assignments に保存する（送ったキーだけ更新）。
@@ -948,8 +950,9 @@
   // ⚠ 入れると行の並びが変わる（ポジション順に並べ直す）ので、保存できたら画面を開き直す。
   function ecsSheetAddMember(sel) {
     var row = sel.closest('.mrow');
-    var id = sel.value;
-    if (!row || !id) return;
+    if (!row || !sel.value.trim()) return;
+    var id = ecsSheetEmpId(sel.value);
+    if (!id) { alert('「' + sel.value + '」は社員名簿に見つかりません。候補から選んでください。'); sel.value = ''; return; }
     sel.disabled = true;
     fetch(window.ECS_QUICK_URL, {
       method: 'POST',
@@ -979,13 +982,18 @@
   // ⚠ 入れ替えは「新しい人を入れる → 元の人を外す」の順（先に外すと、失敗したとき誰もいなくなる）。
   // ⚠ 役割・担当・巡回・備考は行の入力欄から引き継ぐ。新しい人は「仮」から始める（本人に確かめていないため）。
   // ⚠ 並び順が変わるので、保存できたら画面を開き直す。
-  function ecsSheetSwapMember(sel) {
-    var row = sel.closest('.mrow');
-    var val = sel.value;
-    if (!row || !val) return;
+  function ecsSheetSwapMember(el, remove) {
+    var row = el.closest('.mrow');
+    var wrap = el.closest('.m-swapname');
+    var sel = wrap ? wrap.querySelector('.m-swapin') : el;   // 名前の入力欄（候補つき・2026-11-11）
+    if (!row || !sel) return;
+    var val = remove ? '__remove' : ecsSheetEmpId(sel.value);
+    if (!remove && !sel.value.trim()) return;
+    if (!val) { alert('「' + sel.value + '」は社員名簿に見つかりません。候補から選んでください。'); sel.value = ''; return; }
     var pid = row.getAttribute('data-project');
     var oldId = row.getAttribute('data-staff');
-    var oldName = sel.options[0].text;
+    var oldName = sel.getAttribute('data-oldname') || '';
+    if (val === oldId) { sel.value = ''; return; }
     var reset = function () { sel.disabled = false; sel.value = ''; };
     var post = function (body) {
       return fetch(window.ECS_QUICK_URL, {
@@ -1010,7 +1018,7 @@
       return;
     }
 
-    var newName = sel.options[sel.selectedIndex].text;
+    var newName = sel.value.trim();
     // すでにこの案件に入っている人を選んだら止める（そのまま進むと、その人の役割が上書きされる）。
     var card = row.closest('.acard');
     if (card && card.querySelector('.mrow[data-staff="' + val + '"]')) {

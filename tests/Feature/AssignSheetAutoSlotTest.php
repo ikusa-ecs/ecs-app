@@ -29,6 +29,11 @@ class AssignSheetAutoSlotTest extends TestCase
 
         $roles = array_column(AssignSlots::autoSlots($need, $members, $dispatches, $slots), 'role');
         $this->assertSame(['OP', 'FC'], $roles, 'MCは手の枠で埋まり・OPは1人いる・FCは派遣2名（キャンセルは数えない）・Dは出さない');
+
+        // 運営人数を超えて空きを出さない（2026-11-11 小沼さん）：運営6名・使っている行＝人2（キャンセル除く）＋派遣2＋手の枠1＝5 → 空きは1つだけ
+        $roles = array_column(AssignSlots::autoSlots($need, $members, $dispatches, $slots, 6), 'role');
+        $this->assertSame(['OP'], $roles);
+        $this->assertSame([], AssignSlots::autoSlots($need, $members, $dispatches, $slots, 5));
     }
 
     public function test_sheet_shows_auto_slot_and_fill_uses_role(): void

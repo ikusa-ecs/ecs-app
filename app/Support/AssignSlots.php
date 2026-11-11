@@ -131,8 +131,11 @@ class AssignSlots
      * @param  array<string,int>  $need  役割コード => 人数（PositionTemplate::of）
      * @return list<array>  slot と同じ形＋auto=true（id は空）
      */
-    public static function autoSlots(array $need, array $members, array $dispatches, array $slots): array
+    public static function autoSlots(array $need, array $members, array $dispatches, array $slots, int $total = 0): array
     {
+        // ⚠ 運営人数（$total）が入っているときは、それを超えて空き枠を出さない（2026-11-11 小沼さん「運営人数を超えて空きで表示されるのはいや」）。
+        //   使える行＝運営人数 −（入っている人＋派遣の人数＋手で作った枠）。足りないときは役割の並び（AssignmentRole順）の前から出す。
+        $used = 0;
         $have = [];
         foreach ($members as $m) {
             if (($m['status'] ?? '') === 'キャンセル') {
@@ -140,6 +143,7 @@ class AssignSlots
             }
             $r = (string) ($m['roleCode'] ?? '');
             $have[$r] = ($have[$r] ?? 0) + 1;
+            $used++;
         }
         foreach ($dispatches as $d) {
             if (! empty($d['cancelled'])) {
@@ -147,10 +151,12 @@ class AssignSlots
             }
             $r = (string) ($d['role'] ?? '');
             $have[$r] = ($have[$r] ?? 0) + max(1, (int) ($d['count'] ?? 1));
+            $used += max(1, (int) ($d['count'] ?? 1));
         }
         foreach ($slots as $sl) {
             $r = (string) ($sl['role'] ?? '');
             $have[$r] = ($have[$r] ?? 0) + 1;
+            $used++;
         }
         $out = [];
         foreach ($need as $role => $n) {
@@ -161,6 +167,10 @@ class AssignSlots
                 $out[] = ['id' => '', 'no' => 0, 'role' => (string) $role, 'note' => '', 'patrol' => null,
                     'remark' => '', 'placeholder' => '', 'auto' => true];
             }
+        }
+
+        if ($total > 0) {
+            $out = array_slice($out, 0, max(0, $total - $used));
         }
 
         return $out;
