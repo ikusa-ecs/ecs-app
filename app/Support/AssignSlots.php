@@ -121,6 +121,51 @@ class AssignSlots
         return $out;
     }
 
+    /**
+     * 必要ポジションの空き枠を自動で作る（2026-11-11 小沼さん「コンテンツで必要なポジションを先に表示して、そこに埋めていく」）。
+     * 必要人数（PositionTemplate＝コンテンツ×規模）から、もう埋まっている分を引いた残りを「その役割の空き枠」にする。
+     *   埋まっている＝その役割で入っている人（キャンセル以外）＋同じ役割の派遣（人数ぶん）＋手で作った同じ役割の枠。
+     * ⚠ 保存しない（必要人数や規模を直せば、勝手に変わる）。名前を入れると、その役割で assignments に入る。
+     * ⚠ D・SD は出さない＝D決めの画面が正本（ここから入れると D決めとずれる）。Dがいないときは今までどおり「D枠を作る」。
+     *
+     * @param  array<string,int>  $need  役割コード => 人数（PositionTemplate::of）
+     * @return list<array>  slot と同じ形＋auto=true（id は空）
+     */
+    public static function autoSlots(array $need, array $members, array $dispatches, array $slots): array
+    {
+        $have = [];
+        foreach ($members as $m) {
+            if (($m['status'] ?? '') === 'キャンセル') {
+                continue;
+            }
+            $r = (string) ($m['roleCode'] ?? '');
+            $have[$r] = ($have[$r] ?? 0) + 1;
+        }
+        foreach ($dispatches as $d) {
+            if (! empty($d['cancelled'])) {
+                continue;
+            }
+            $r = (string) ($d['role'] ?? '');
+            $have[$r] = ($have[$r] ?? 0) + max(1, (int) ($d['count'] ?? 1));
+        }
+        foreach ($slots as $sl) {
+            $r = (string) ($sl['role'] ?? '');
+            $have[$r] = ($have[$r] ?? 0) + 1;
+        }
+        $out = [];
+        foreach ($need as $role => $n) {
+            if (in_array($role, ['D', 'SD'], true)) {
+                continue;
+            }
+            for ($i = ($have[$role] ?? 0); $i < (int) $n; $i++) {
+                $out[] = ['id' => '', 'no' => 0, 'role' => (string) $role, 'note' => '', 'patrol' => null,
+                    'remark' => '', 'placeholder' => '', 'auto' => true];
+            }
+        }
+
+        return $out;
+    }
+
     /** ブロックで使い終わったNOの最後（空き行はこの次から）。 */
     public static function lastNo(array $lines): int
     {

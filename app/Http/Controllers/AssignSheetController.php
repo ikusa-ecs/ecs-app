@@ -16,6 +16,7 @@ use App\Support\Departments;
 use App\Support\DispatchRows;
 use App\Support\Headcount;
 use App\Support\OfficeScope;
+use App\Support\PositionTemplate;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ProjectScale;
@@ -295,10 +296,13 @@ class AssignSheetController extends Controller
                 'dispatches'  => $dispatchesByProject[$p->id] ?? [],
                 // ブロックに並べる行（アサイン済み・派遣・空き枠をポジション順に並べてNOを振ったもの）。
                 // ⚠ 並べ方の正本＝App\Support\AssignSlots::rows（画面で並べ直さない）。
+                // ＋必要ポジションの空き枠（自動・保存しない・2026-11-11 小沼さん）。正本＝AssignSlots::autoSlots / PositionTemplate。
                 'blockLines'  => AssignSlots::rows(
                     $members->all(),
                     $dispatchesByProject[$p->id] ?? [],
-                    $slotsByProject[$p->id] ?? []
+                    array_merge($slotsByProject[$p->id] ?? [], AssignSlots::autoSlots(
+                        PositionTemplate::of($p), $members->all(), $dispatchesByProject[$p->id] ?? [], $slotsByProject[$p->id] ?? []
+                    ))
                 ),
                 // Dがまだ決まっていない（人がアサインされていない）＝「D枠を作る」ボタンを出す。
                 'dUndecided'  => AssignSlots::directorUndecided($members->all()),

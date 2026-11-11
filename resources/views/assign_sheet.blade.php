@@ -145,6 +145,9 @@
   /* まだ人が決まっていない枠（2026-09-28）。書いてあるものは薄い青で「予定」だと分かるようにする。 */
   .mrow.mblk.slot:not(.vacant) { background: #f7fbff; }
   .mrow.mblk.slot .pos-badge.slot-pos { background: #e3edf8; color: #4a6484; }
+  /* 必要ポジションの自動の空き枠（2026-11-11）。「空き」の札で、手で作った枠と見分ける。 */
+  .auto-mark { font-size: 9.5px; font-weight: 800; padding: 0 4px; border-radius: 4px; background: #e3edf8; color: #4a6484; }
+  .acard.editing .mrow.mblk.auto-slot .auto-mark { display: none; }
   /* 運営人数までの行で、まだ名前が入っていない＝黄色（2026-09-28 baba要望）。判定は partials/sheet_slot_row。 */
   .mrow.mblk.slot.need-empty .c-nm { background: #fff1b8; }
   html[data-theme="dark"] .mrow.mblk.slot.need-empty .c-nm { background: var(--warn-soft); }
@@ -955,7 +958,9 @@
         project_id: row.getAttribute('data-project'),
         staff_id: id,
         action: 'assign',
-        status: '仮'
+        status: '仮',
+        // 必要ポジションの自動の空き枠なら、その役割で入れる（2026-11-11）。ふつうの空き行は役割なし（今までどおり）。
+        role: row.getAttribute('data-role') || undefined
       })
     })
       .then(function (r) { return r.json(); })
