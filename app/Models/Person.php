@@ -55,7 +55,8 @@ class Person extends Model implements AuthenticatableContract
             'password' => 'hashed',   // 代入時に自動で暗号化（平文を保存しない）
             'hire_date' => 'date',
             'rookie_wishes' => 'array',   // 新人の「参加したいイベント」＝コンテンツIDの並び（2026-10-17）
-            'rookie_overrides' => 'array',   // 新人の経験を手で直した印（done/none）。正本＝App\Support\RookieFcPlan
+            'rookie_overrides' => 'array',
+            'rookie_training' => 'array',   // 新人の研修先（月 => 拠点）。正本＝App\Support\Rookies::trainingOffice（2026-11-11）   // 新人の経験を手で直した印（done/none）。正本＝App\Support\RookieFcPlan
             'rookie_since' => 'date',   // 新人の「何ヶ月目」を数える起点（空なら入社日）。正本＝App\Support\Rookies
             'active' => 'boolean',
             'experienced_contents' => 'array',

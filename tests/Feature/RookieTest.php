@@ -98,6 +98,29 @@ class RookieTest extends TestCase
             \App\Http\Controllers\RookieController::orderedDifficulties()->pluck('sheet_name')->all());
     }
 
+    /** 研修先（月ごと）：福岡の新人を12月だけ東京の新人ページにも出す。名簿の拠点は変えない（2026-11-11 小沼さん）。 */
+    public function test_研修先の拠点にその月だけ出る(): void
+    {
+        $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
+        $r = PersonFactory::new()->create(['name' => '福岡の新人', 'role' => 'employee', 'office' => '福岡',
+            'department' => 'イベプラ', 'hire_date' => '2026-12-01', 'active' => true]);
+        \App\Models\Office::firstOrCreate(['name' => '東京']);
+        \App\Models\Office::firstOrCreate(['name' => '福岡']);
+
+        $this->actingAsPerson($me)->post('/rookies/training', ['id' => $r->id, 'month' => '2026-12', 'office' => '東京'])->assertRedirect();
+        $this->assertSame(['2026-12' => '東京'], $r->fresh()->rookie_training);
+        $this->assertSame('福岡', $r->fresh()->office, '名簿の拠点は変えない');
+
+        $names = fn ($office, $ym) => \App\Support\Rookies::list($office, \Illuminate\Support\Carbon::parse($ym.'-01'))->pluck('name')->all();
+        $this->assertContains('福岡の新人', $names('東京', '2026-12'));
+        $this->assertNotContains('福岡の新人', $names('東京', '2027-01'), '翌月は東京に出ない');
+        $this->assertContains('福岡の新人', $names('福岡', '2026-12'), '所属の拠点からも消さない');
+
+        // 所属の拠点のままに戻す＝印を消す
+        $this->actingAsPerson($me)->post('/rookies/training', ['id' => $r->id, 'month' => '2026-12', 'office' => ''])->assertRedirect();
+        $this->assertNull($r->fresh()->rookie_training);
+    }
+
     public function test_新人は自動で出て卒業で消える(): void
     {
         $new = PersonFactory::new()->create(['role' => 'employee', 'department' => 'イベプラ', 'hire_date' => Carbon::today()->subMonths(3), 'office' => '東京']);

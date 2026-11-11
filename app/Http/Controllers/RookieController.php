@@ -117,6 +117,34 @@ class RookieController extends Controller
     }
 
     /**
+     * 新人の研修先（月ごと・2026-11-11 小沼さん）。空＝所属の拠点のまま（その月の印を消す）。
+     * 名簿の拠点は変えない＝ほかの画面には効かない。新人ページだけ、その月は研修先の拠点にも出る。
+     */
+    public function setTraining(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'exists:people,id'],
+            'month' => ['required', 'date_format:Y-m'],
+            'office' => ['nullable', 'string', 'in:'.implode(',', \App\Support\OfficeScope::options())],
+        ]);
+        $p = Person::findOrFail($data['id']);
+        $t = (array) ($p->rookie_training ?? []);
+        if (($data['office'] ?? '') === '' || $data['office'] === ($p->office ?? '')) {
+            unset($t[$data['month']]);
+        } else {
+            $t[$data['month']] = $data['office'];
+        }
+        ksort($t);
+        $p->rookie_training = $t ?: null;
+        $p->save();
+        $ym = Carbon::parse($data['month'].'-01')->format('Y年n月');
+
+        return back()->with('ok', isset($t[$data['month']])
+            ? $p->name.'さんは'.$ym.'、'.$t[$data['month']].'で研修にしました（'.$t[$data['month']].'の新人ページにも出ます）。'
+            : $p->name.'さんの'.$ym.'の研修先を外しました（所属の拠点だけに出ます）。');
+    }
+
+    /**
      * 新人のチャットワークID（2026-10-28 baba「入れられるようにしてほしい」）。
      * ⚠ 名簿の登録と同じ決まり（数字だけ・32文字まで）。空にすると消す。
      * ⚠ 社員名簿・スタッフ名簿の画面にはこの欄が無いので、新人ページから入れられるようにしている。

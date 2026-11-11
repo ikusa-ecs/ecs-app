@@ -75,11 +75,13 @@ final class Rookies
      *
      * @return Collection<int, Person>
      */
-    public static function list(?string $office = null): Collection
+    public static function list(?string $office = null, ?Carbon $month = null): Collection
     {
         $limit = Carbon::today()->subMonths(self::AUTO_MONTHS);
+        // その月だけ この拠点で研修する人も出す（名簿の拠点は変えない・2026-11-11 小沼さん）。
+        $trainees = ($office && $month) ? self::traineeIds($office, $month) : [];
 
-        return OfficeScope::applyToPeople(Person::employees()->where('active', true), $office)
+        return OfficeScope::applyToPeople(Person::employees()->where('active', true), $office, $trainees)
             ->orderBy('hire_date')->orderBy('id')->get()
             ->filter(function (Person $p) use ($limit) {
                 // イベプラ・セールスのどちらでもない人は、新人の一覧に出さない（2026-10-28 baba「新人タグを外して」）。
@@ -99,6 +101,19 @@ final class Rookies
     }
 
     /** 卒業した人（取り消しボタン用）。 */
+    /** その月の研修先（無ければ空）。例：{"2026-12": "東京"} の人は 2026-12 に「東京」。 */
+    public static function trainingOffice(Person $p, Carbon $month): string
+    {
+        return (string) (($p->rookie_training ?? [])[$month->format('Y-m')] ?? '');
+    }
+
+    /** その月にこの拠点で研修する人のID。 */
+    public static function traineeIds(string $office, Carbon $month): array
+    {
+        return Person::employees()->whereNotNull('rookie_training')->get(['id', 'rookie_training'])
+            ->filter(fn (Person $p) => self::trainingOffice($p, $month) === $office)->pluck('id')->all();
+    }
+
     public static function graduated(?string $office = null): Collection
     {
         return OfficeScope::applyToPeople(Person::employees()->where('rookie_state', self::OUT), $office)

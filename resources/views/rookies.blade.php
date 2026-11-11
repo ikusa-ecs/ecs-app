@@ -142,6 +142,22 @@
     @forelse ($rookies as $r)
       <tr data-rookie="{{ $r['id'] }}">
         <td><b>{{ $r['name'] }}</b><div class="rk-small">{{ $r['dept'] ?: '所属なし' }}・入社 {{ $r['hire'] ?: '未入力' }}</div>
+          {{-- 研修先（2026-11-11 小沼さん：福岡に入社して最初の月は東京で研修 など）。名簿の拠点は変えない。
+               その月だけ研修先の拠点の新人ページにも出て、FCの案は研修先の拠点のイベントで組む。 --}}
+          @if ($r['training'] !== '')
+            <div class="rk-small" style="color:#1d4ed8; font-weight:700;">🏢 {{ $month->format('n月') }}は{{ $r['training'] }}で研修@if ($r['training'] === ($office ?? '') && $r['office'] !== '')（所属：{{ $r['office'] }}）@endif</div>
+          @endif
+          @if ($canEdit)
+            <form method="POST" action="/rookies/training" class="rk-small" style="margin-top:4px;">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}"><input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+              {{ $month->format('n月') }}の研修先
+              <select class="rk-in" name="office" onchange="rkRemember(); this.form.submit()">
+                <option value="">所属の拠点のまま{{ $r['office'] !== '' ? '（'.$r['office'].'）' : '' }}</option>
+                @foreach (\App\Support\OfficeScope::options() as $o)
+                  @if ($o !== $r['office'])<option @selected($r['training'] === $o)>{{ $o }}</option>@endif
+                @endforeach
+              </select>
+            </form>
+          @endif
           {{-- チャットワークIDはここで入れる（2026-10-28 baba）。空だとメンションが付かないので「未登録」を赤で出す。 --}}
           @if ($canEdit)
             <form method="POST" action="/rookies/chatwork" class="rk-small" style="margin-top:4px;">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">

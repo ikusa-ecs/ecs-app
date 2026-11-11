@@ -33,7 +33,7 @@ final class RookieFcPlan
     {
         $month = $month->copy()->startOfMonth();
         $today = Carbon::today();
-        $rookies = Rookies::list($office);
+        $rookies = Rookies::list($office, $month);
         $ids = $rookies->pluck('id')->all();
         $map = RookieDifficulty::map();
         $contentNames = Content::pluck('content_name', 'id')->all();
@@ -121,6 +121,9 @@ final class RookieFcPlan
             $out[] = [
                 'id' => $p->id,
                 'name' => $p->name,
+                // 所属の拠点と、この月の研修先（2026-11-11 小沼さん）。
+                'office' => (string) ($p->office ?? ''),
+                'training' => Rookies::trainingOffice($p, $month),
                 'dept' => (string) ($p->department ?? ''),
                 'hire' => optional($p->hire_date)->format('Y-m-d'),
                 'since' => optional($p->rookie_since)->format('Y-m-d'),
@@ -154,7 +157,9 @@ final class RookieFcPlan
             ];
             $state[$p->id] = [
                 'person' => $p,
-                'remain' => $target ? max(0, $target['fc'] - $fcThisMonth) : 0,
+                // この月は別の拠点で研修中なら、ここ（所属の拠点）ではFCの案を出さない＝研修先の拠点の案で組む（2026-11-11）。
+                'remain' => ($office && ($tr = Rookies::trainingOffice($p, $month)) !== '' && $tr !== $office)
+                    ? 0 : ($target ? max(0, $target['fc'] - $fcThisMonth) : 0),
                 'fcDone' => $fcDone,
                 'busy' => $busy,
                 'plan' => in_array('イベプラ', $p->departmentList(), true),
