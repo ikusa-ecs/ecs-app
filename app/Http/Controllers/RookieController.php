@@ -223,6 +223,51 @@ class RookieController extends Controller
         return back()->with('ok', $msg);
     }
 
+    /**
+     * 難易度表に1行足す（2026-11-11 小沼さん「CSVじゃなくてそのページで追加削除できるように」）。
+     * 台帳のコンテンツを選んで足す＝最初からつながっている。名前（sheet_name）は台帳の名前。
+     * ⚠ 同じ種類・同じ名前の行がもうあれば足さない（CSVの入れ直しで上書きされる行と同じ決まり＝unique(kind, sheet_name)）。
+     */
+    public function addDifficulty(Request $request)
+    {
+        $data = $request->validate([
+            'kind' => ['required', 'in:'.RookieDifficulty::REAL.','.RookieDifficulty::ONLINE],
+            'content_id' => ['required', 'string', 'exists:contents,id'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'difficulty' => ['nullable', 'integer', 'between:1,4'],
+            'need' => ['nullable', 'in:,must,recommend'],
+            'one_of' => ['nullable', 'boolean'],
+        ]);
+        $name = (string) \App\Models\Content::whereKey($data['content_id'])->value('content_name');
+        $dup = ContentDifficulty::where('kind', $data['kind'])
+            ->where(fn ($q) => $q->where('sheet_name', $name)->orWhere('content_id', $data['content_id']))->exists();
+        if ($dup) {
+            return back()->with('ok', '⚠ '.$data['kind'].'の難易度表に「'.$name.'」はもうあります（足していません）。');
+        }
+        ContentDifficulty::create([
+            'kind' => $data['kind'],
+            'sheet_name' => $name,
+            'category' => ($data['category'] ?? '') !== '' ? $data['category'] : null,
+            'difficulty' => $data['difficulty'] ?? null,
+            'must' => ($data['need'] ?? '') === 'must',
+            'recommend' => ($data['need'] ?? '') === 'recommend',
+            'one_of' => (bool) ($data['one_of'] ?? false),
+            'content_id' => $data['content_id'],
+        ]);
+
+        return back()->with('ok', $data['kind'].'の難易度表に「'.$name.'」を足しました。');
+    }
+
+    /** 難易度表の行を1つ消す（2026-11-11 小沼さん）。新人の経験の記録は消えない（経験はコンテンツにつけてある）。 */
+    public function deleteDifficulty(Request $request)
+    {
+        $data = $request->validate(['id' => ['required', 'integer', 'exists:content_difficulties,id']]);
+        $d = ContentDifficulty::findOrFail($data['id']);
+        $d->delete();
+
+        return back()->with('ok', $d->kind.'の難易度表から「'.$d->sheet_name.'」を消しました。');
+    }
+
     /** 難易度の行を台帳のコンテンツにつなぐ（空＝外す）。 */
     public function link(Request $request)
     {

@@ -547,7 +547,7 @@
 
 <details class="rk-card rk-more" data-tab="settings" @if ($unlinked) open @endif>
   <summary>📚 難易度表（コンテンツ難易度シート）・ECSより前の経験の取込</summary>
-  <p class="sub">スプレッドシート「コンテンツ難易度」のリアル・オンラインをそれぞれCSVで取り込みます（入れ直すと上書き）。
+  <p class="sub">スプレッドシート「コンテンツ難易度」のリアル・オンラインをそれぞれCSVで取り込みます（入れ直すと上書き）。<b>1行ずつなら、下の「＋ 行を足す」と各行の「削除」で直せます</b>（CSVは要りません）。
     名前が台帳と合わない行は、右のプルダウンで台帳のコンテンツを選んでつないでください。つながっていない行は使いません。</p>
   @if ($canEdit)
     <form class="rk-bar" method="POST" action="/rookies/import" enctype="multipart/form-data">@csrf
@@ -564,9 +564,25 @@
       <button class="rk-btn main" type="submit">経験を取り込む</button>
     </form>
   @endif
+  @if ($canEdit)
+    {{-- 難易度表に1行足す（2026-11-11 小沼さん「CSVじゃなくてそのページで追加削除できるように」）。台帳のコンテンツを選ぶ＝最初からつながる。 --}}
+    <form class="rk-bar" method="POST" action="/rookies/difficulty/add" style="margin-top:10px;">@csrf
+      <b>＋ 行を足す：</b>
+      <select class="rk-in" name="kind"><option>リアル</option><option>オンライン</option></select>
+      <select class="rk-in" name="content_id" required>
+        <option value="">台帳のコンテンツを選ぶ</option>
+        @foreach ($contents as $c)<option value="{{ $c->id }}">{{ $c->content_name }}</option>@endforeach
+      </select>
+      <input class="rk-in" name="category" placeholder="分類（例：謎解き脱出）" style="width:11em;">
+      <select class="rk-in" name="difficulty"><option value="">難易度</option>@for ($i = 1; $i <= 4; $i++)<option>{{ $i }}</option>@endfor</select>
+      <select class="rk-in" name="need"><option value="">必修・推奨なし</option><option value="must">必修</option><option value="recommend">推奨</option></select>
+      <label class="rk-small"><input type="checkbox" name="one_of" value="1"> 同じ分類から1つでよい（◻︎）</label>
+      <button class="rk-btn main" type="submit">足す</button>
+    </form>
+  @endif
   <div class="rk-wrap">
   <table class="rk">
-    <tr><th>種類</th><th>分類</th><th>シートの名前</th><th>難易度</th><th>必修</th><th>推奨</th><th>台帳のコンテンツ</th></tr>
+    <tr><th>種類</th><th>分類</th><th>シートの名前</th><th>難易度</th><th>必修</th><th>推奨</th><th>台帳のコンテンツ</th>@if ($canEdit)<th></th>@endif</tr>
     @forelse ($difficulties as $d)
       <tr>
         <td>{{ $d->kind }}</td>
@@ -586,9 +602,12 @@
             {{ optional($contents->firstWhere('id', $d->content_id))->content_name ?? '（つながっていない）' }}
           @endif
         </td>
+        @if ($canEdit)
+          <td><form method="POST" action="/rookies/difficulty/delete" data-msg="{{ $d->kind }}の難易度表から「{{ $d->sheet_name }}」を消します。（新人の経験の記録は消えません）" onsubmit="return confirm(this.dataset.msg)">@csrf<input type="hidden" name="id" value="{{ $d->id }}"><button class="rk-btn" type="submit" style="color:#dc2626;">削除</button></form></td>
+        @endif
       </tr>
     @empty
-      <tr><td colspan="7" class="rk-small">まだ取り込んでいません。</td></tr>
+      <tr><td colspan="8" class="rk-small">まだ取り込んでいません。</td></tr>
     @endforelse
   </table>
   </div>

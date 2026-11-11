@@ -374,6 +374,9 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/rookies/import', [\App\Http\Controllers\RookieController::class, 'import']);
     Route::post('/rookies/import-exp', [\App\Http\Controllers\RookieController::class, 'importExperience']);
     Route::post('/rookies/link', [\App\Http\Controllers\RookieController::class, 'link']);
+    // 難易度表の行を画面で足す・消す（2026-11-11 小沼さん「CSVじゃなくてそのページで追加削除できるように」）。
+    Route::post('/rookies/difficulty/add', [\App\Http\Controllers\RookieController::class, 'addDifficulty']);
+    Route::post('/rookies/difficulty/delete', [\App\Http\Controllers\RookieController::class, 'deleteDifficulty']);
     Route::get('/dispatch-list', [DispatchController::class, 'index']);
     Route::post('/dispatches', [DispatchController::class, 'store']);
     Route::post('/dispatches/{id}', [DispatchController::class, 'update']);

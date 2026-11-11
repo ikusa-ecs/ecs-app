@@ -70,6 +70,27 @@ class RookieTest extends TestCase
         $this->assertStringContainsString('function rkLink(sel)', $this->actingAsPerson($me)->get('/rookies')->getContent());
     }
 
+    /** 難易度表の行を画面で足す・消す（CSVなし・2026-11-11 小沼さん）。 */
+    public function test_難易度表を画面で足して消す(): void
+    {
+        Content::create(['id' => 'CT-5', 'content_name' => '謎解き新作', 'active' => true]);
+        $me = PersonFactory::new()->create(['permission' => 'employee', 'office' => '東京', 'must_onboard' => false]);
+
+        $this->actingAsPerson($me)->get('/rookies')->assertOk()->assertSee('＋ 行を足す');
+        $this->actingAsPerson($me)->post('/rookies/difficulty/add', [
+            'kind' => 'リアル', 'content_id' => 'CT-5', 'category' => '謎解き脱出', 'difficulty' => 2, 'need' => 'must',
+        ])->assertRedirect();
+        $d = ContentDifficulty::where('kind', 'リアル')->sole();
+        $this->assertSame(['謎解き新作', 'CT-5', 2, true, false], [$d->sheet_name, $d->content_id, $d->difficulty, $d->must, $d->recommend]);
+
+        // 同じものは二重に足さない
+        $this->actingAsPerson($me)->post('/rookies/difficulty/add', ['kind' => 'リアル', 'content_id' => 'CT-5']);
+        $this->assertSame(1, ContentDifficulty::count());
+
+        $this->actingAsPerson($me)->post('/rookies/difficulty/delete', ['id' => $d->id])->assertRedirect();
+        $this->assertSame(0, ContentDifficulty::count());
+    }
+
     public function test_新人は自動で出て卒業で消える(): void
     {
         $new = PersonFactory::new()->create(['role' => 'employee', 'department' => 'イベプラ', 'hire_date' => Carbon::today()->subMonths(3), 'office' => '東京']);
