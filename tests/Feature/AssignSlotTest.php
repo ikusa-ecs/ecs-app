@@ -117,7 +117,9 @@ class AssignSlotTest extends TestCase
         $this->assertSame(AssignSlots::EVENT_PLANNER, $slots[0]->placeholder);
 
         // アサイン表で枠ごと消せる（イベプラの印も・2026-11-11 小沼さん）
-        $this->sheet($p)->assertSee('✕ 枠を消す', false)->assertSee('ecsSheetDeleteSlot(this)', false);
+        $html = $this->sheet($p)->assertSee('✕ 枠を消す', false)->assertSee('ecsSheetDeleteSlot(this)', false)->getContent();
+        // ⚠ 2026-11-11：JSの文字列の中に本物の改行が入り、画面の処理がまるごと止まった（検索も ✎編集 も効かない）。見張る。
+        $this->assertDoesNotMatchRegularExpression("/\? '\r?\n/", $html, 'JSの文字列が改行で切れています');
         $this->actingAsPerson($me)->postJson('/assign-sheet/slot', ['project_id' => $p->id, 'slot_id' => $slots[0]->id, 'field' => 'delete'])->assertOk();
         $this->assertSame(0, ProjectSlot::where('project_id', $p->id)->count());
     }

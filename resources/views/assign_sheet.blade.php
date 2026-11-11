@@ -937,8 +937,7 @@
       body: JSON.stringify({ project_id: row.getAttribute('data-project'), slot_id: row.getAttribute('data-slot'), field: 'delete', value: '' })
     })
       .then(function (r) { return r.json(); })
-      .then(function (res) { if (!(res && res.ok)) { btn.disabled = false; alert('消せませんでした。' + (res && res.message ? '
-' + res.message : '')); return; } ecsSheetReload(); })
+      .then(function (res) { if (!(res && res.ok)) { btn.disabled = false; alert('消せませんでした。' + (res && res.message ? '\n' + res.message : '')); return; } ecsSheetReload(); })
       .catch(function () { btn.disabled = false; alert('通信エラーで消せませんでした。'); });
   }
   function ecsSheetSaveSlot(inp, field, value) {
