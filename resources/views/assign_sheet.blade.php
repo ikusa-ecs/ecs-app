@@ -965,7 +965,7 @@
           alert('入れられませんでした。' + (res && res.message ? '\n' + res.message : ''));
           return;
         }
-        location.reload();
+        ecsSheetReload();
       })
       .catch(function () { sel.disabled = false; sel.value = ''; alert('通信エラーで入れられませんでした。'); });
   }
@@ -999,7 +999,7 @@
       unassignOld()
         .then(function (res) {
           if (!(res && res.ok)) { reset(); alert('外せませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
-          location.reload();
+          ecsSheetReload();
         })
         .catch(function () { reset(); alert('通信エラーで外せませんでした。'); });
       return;
@@ -1023,7 +1023,7 @@
         if (!(res && res.ok)) { reset(); alert('入れ替えられませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
         return unassignOld().then(function (res2) {
           if (!(res2 && res2.ok)) alert(newName + ' さんは入りましたが、' + oldName + ' さんを外せませんでした。画面を開き直して確かめてください。');
-          location.reload();
+          ecsSheetReload();
         });
       })
       .catch(function () { reset(); alert('通信エラーで入れ替えられませんでした。画面を開き直して確かめてください。'); });
@@ -1043,7 +1043,7 @@
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (!(res && res.ok)) { btn.disabled = false; alert('作れませんでした。' + (res && res.message ? '\n' + res.message : '')); return; }
-        location.reload();
+        ecsSheetReload();
       })
       .catch(function () { btn.disabled = false; alert('通信エラーで作れませんでした。'); });
   }
@@ -1117,6 +1117,55 @@
     var s = document.getElementById('sheetShown');
     if (s) s.textContent = shown;
   }
+  // ===== 読み込み直しても、見ていた場所に戻す（2026-11-11 小沼さん「編集したら最初に戻る」） =====
+  // 社員を入れる・入れ替える・D枠を足すと画面を読み込み直す。その前に「どこを見ていたか（縦・横のスクロール）」
+  // 「✎編集中のカード」「検索の文字・人数不足だけ」を覚えておき、開き直したら元に戻す。
+  // ⚠ 同じURL（同じ月・拠点）のときだけ戻す。覚えるのはこのタブの中だけ（sessionStorage）。
+  var ECS_SHEET_POS = 'ecsSheetPos';
+  function ecsSheetReload() {
+    try {
+      var box = document.querySelector('.sheet-scroll');
+      var q = document.getElementById('sheetSearch');
+      var sh = document.getElementById('sheetShort');
+      sessionStorage.setItem(ECS_SHEET_POS, JSON.stringify({
+        url: location.pathname + location.search,
+        wy: window.scrollY,
+        sx: box ? box.scrollLeft : 0,
+        sy: box ? box.scrollTop : 0,
+        editing: Array.prototype.map.call(document.querySelectorAll('.acard.editing'), function (c) { return c.getAttribute('data-project'); }),
+        q: q ? q.value : '',
+        short: sh ? sh.checked : false
+      }));
+    } catch (e) {}
+    location.reload();
+  }
+  (function ecsSheetRestore() {
+    var st = null;
+    try { st = JSON.parse(sessionStorage.getItem(ECS_SHEET_POS) || 'null'); sessionStorage.removeItem(ECS_SHEET_POS); } catch (e) {}
+    if (!st || st.url !== location.pathname + location.search) return;
+    var run = function () {
+      try {
+        (st.editing || []).forEach(function (id) {
+          var card = document.querySelector('.acard[data-project="' + id + '"]');
+          var btn = card && card.querySelector('[onclick*="ecsSheetToggleEdit"]');
+          if (btn && !card.classList.contains('editing')) ecsSheetToggleEdit(btn);
+        });
+      } catch (e) {}
+      try {
+        var q = document.getElementById('sheetSearch');
+        var sh = document.getElementById('sheetShort');
+        if (q && st.q) q.value = st.q;
+        if (sh) sh.checked = !!st.short;
+        if (st.q || st.short) ecsSheetFilter();
+      } catch (e) {}
+      try {
+        var box = document.querySelector('.sheet-scroll');
+        if (box) { box.scrollLeft = st.sx || 0; box.scrollTop = st.sy || 0; }
+        window.scrollTo(0, st.wy || 0);
+      } catch (e) {}
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+  })();
 </script>
 @endverbatim
 @endpush
