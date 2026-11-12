@@ -688,4 +688,24 @@ class RookieTest extends TestCase
         $this->assertStringNotContainsString('"'.$month->copy()->addMonth()->toDateString().'":true', $html, 'ほかの月は入れない');
         $this->assertStringContainsString('<span class="cnt">前', $html, '前半・後半・計は名前の横');
     }
+
+    /** 先の月を見ているときは、その月が始まるまでに入っている予定も経験に数える（2026-11-12 小沼さん）。 */
+    public function test_先の月はそれまでの予定を済んだものとして数える(): void
+    {
+        $d1 = Carbon::today()->addDays(1);
+        if (! $d1->isSameMonth(Carbon::today())) {
+            $this->markTestSkipped('月末は翌月になるので見ない');
+        }
+        $rookie = PersonFactory::new()->create(['name' => '新人Z', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => Carbon::today()->startOfMonth(), 'office' => '東京']);
+        $soon = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $d1->format('Y-m-d'), 'required_count' => 1,
+            'status' => '調整中', 'content_ids' => ['C-SOON']]);
+        Assignment::create(['project_id' => $soon->id, 'staff_id' => $rookie->id, 'role' => 'FC', 'status' => '仮', 'date' => $d1->format('Y-m-d')]);
+
+        $now = collect(RookieFcPlan::build(Carbon::today(), '東京')['rookies'])->firstWhere('id', $rookie->id);
+        $this->assertArrayNotHasKey('C-SOON', $now['fcDone'], '今月を見ているときは、まだ開催していないので数えない');
+
+        $next = collect(RookieFcPlan::build(Carbon::today()->addMonthNoOverflow(), '東京')['rookies'])->firstWhere('id', $rookie->id);
+        $this->assertSame(1, $next['fcDone']['C-SOON'] ?? 0, '来月を見ているときは、今月の予定は済んだものとして数える');
+    }
 }

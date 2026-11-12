@@ -273,7 +273,7 @@
           </details>
           <details class="rk-exp">
             <summary class="rk-small" style="cursor:pointer;">📒 経験を見る・手で直す（{{ count($r['exp']) }}件）</summary>
-            <p class="rk-small">「自動」＝アサインから数えた回数（開催済みだけ）。大型で受付だった、など実は経験していないときは「やっていない」、アサインに残っていないが経験したときは「やった」にしてください。</p>
+            <p class="rk-small">「自動」＝アサインから数えた回数（開催済みだけ。先の月を見ているときは、その月が始まるまでに入っている予定も済んだものとして数えます）。大型で受付だった、など実は経験していないときは「やっていない」、アサインに残っていないが経験したときは「やった」にしてください。</p>
             <form method="POST" action="/rookies/exp">@csrf<input type="hidden" name="id" value="{{ $r['id'] }}">
               <table class="rk" style="max-width:640px;">
                 <tr><th>コンテンツ</th><th>FC</th><th>D</th></tr>

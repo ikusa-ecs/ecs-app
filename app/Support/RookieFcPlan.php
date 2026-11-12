@@ -33,6 +33,8 @@ final class RookieFcPlan
     {
         $month = $month->copy()->startOfMonth();
         $today = Carbon::today();
+        // 経験に数える境目＝今日と、見ている月の1日の、遅いほう。
+        $doneBefore = $today->copy()->max($month);
         $rookies = Rookies::list($office, $month);
         $ids = $rookies->pluck('id')->all();
         $map = RookieDifficulty::map();
@@ -74,8 +76,11 @@ final class RookieFcPlan
                         $monthD++;
                     }
                 }
-                if (! $pr || $date->gte($today)) {
-                    continue;   // やったことに数えるのは開催済みだけ
+                // やったことに数えるのは開催済みだけ。ただし先の月を見ているときは、
+                // その月が始まるまでに入っている予定も「済んだもの」として数える
+                // （2026-11-12 小沼さん「12月の案は、11月のアサインが全部済んだとして出してほしい」）。
+                if (! $pr || $date->gte($doneBefore)) {
+                    continue;
                 }
                 foreach (is_array($pr->content_ids) ? $pr->content_ids : [] as $cid) {
                     if ($a->role === 'D') {
