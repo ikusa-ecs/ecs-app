@@ -539,6 +539,24 @@
               <div id="seriesDates"></div>
               <button type="button" class="btn ghost sm" onclick="addSeriesDate()">＋ 日程を足す</button>
             </div>
+
+            <!-- すでにある案件どうしを結ぶ（2026-11-12 小沼さん）。編集で開いた本番の案件にだけ出す。
+                 アサイン表の取込などで1日ずつ別々にできた案件を、あとから同じイベントにまとめるための欄。
+                 ⚠ 押したその場で保存する（下の「保存」は押さなくてよい）。変わるのは結びつきだけ。 -->
+            <div class="expand-box open" id="seriesLinkBox" style="display:none; margin-top:10px;">
+              <div style="font-weight:700; margin-bottom:4px;">すでにある案件と結ぶ（連日イベントにまとめる）</div>
+              <div class="hint" style="margin-bottom:8px;">
+                別々に登録されている<b>同じイベントのほかの日</b>を選んで「結ぶ」を押すと、同じ連日イベントになります。<br>
+                変わるのは結びつきだけです（時間・人数・アサイン・公開はそのまま）。<b>押したその場で保存されます。</b>
+              </div>
+              <div id="seriesLinkNow" class="sub-msg" style="margin-bottom:6px;"></div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <select id="seriesLinkSel" style="min-width:260px; max-width:100%;"></select>
+                <button type="button" class="btn ghost sm" onclick="seriesLink(false)">結ぶ</button>
+                <button type="button" class="btn ghost sm" id="seriesUnlinkBtn" style="display:none;" onclick="seriesLink(true)">結びつきを外す</button>
+              </div>
+              <div id="seriesLinkMsg" class="sub-msg" style="margin-top:6px;"></div>
+            </div>
           </div>
 
           <!-- 日程種別（予備日・リハ日・前日設営）。2026-10-16 baba要望で開催日の下へ移した（もとは「複数案件・配信種別」の下）。 -->
@@ -1227,6 +1245,64 @@
     }
     onMultiChange(); // 日程種別チェックでも「次の日程を追加」ボタンの表示を更新
   }
+
+  // ===== すでにある案件どうしを連日イベントとして結ぶ（2026-11-12 小沼さん）=====
+  // 編集で開いた本番の案件にだけ出す。選択肢は「紐づく本番案件」と同じ一覧（window.ECS_PARENTS）。
+  // 同じ企業名の案件を先頭に（★）。保存先は POST /projects/series-link（結びつきだけ変える）。
+  function buildSeriesLink() {
+    try {
+      const E = window.ECS_EDIT;
+      const box = document.getElementById('seriesLinkBox');
+      if (!box || !E || !E.id || (E.date_type && E.date_type !== '本番')) return;
+      if (!Array.isArray(window.ECS_PARENTS)) return;
+      box.style.display = '';
+      const norm = function (t) { return String(t || '').replace(/[\s　]/g, '').replace(/(株式会社|（株）|\(株\)|有限会社|様)/g, ''); };
+      const mine = norm(E.client);
+      const same = function (p) { const c = norm(p.client); return mine !== '' && c !== '' && (c.indexOf(mine) >= 0 || mine.indexOf(c) >= 0); };
+      const list = window.ECS_PARENTS.filter(function (p) { return p.id !== E.id; });
+      const first = list.filter(same), rest = list.filter(function (p) { return !same(p); });
+      const sel = document.getElementById('seriesLinkSel');
+      sel.innerHTML = '';
+      const add = function (value, text) { const o = document.createElement('option'); o.value = value; o.textContent = text; sel.appendChild(o); };
+      add('', '（結ぶ相手の案件を選ぶ）');
+      first.forEach(function (p) { add(p.id, '★ ' + p.label); });
+      rest.forEach(function (p) { add(p.id, p.label); });
+      const now = document.getElementById('seriesLinkNow');
+      const cur = E.parent_project_id || '';
+      if (cur) {
+        const hit = window.ECS_PARENTS.find(function (p) { return p.id === cur; });
+        now.textContent = 'いま結ばれている案件：' + (hit ? hit.label : cur);
+        document.getElementById('seriesUnlinkBtn').style.display = '';
+      } else {
+        now.textContent = 'いまは、ほかの案件に結ばれていません（この案件が1日目のときも、こう出ます）。';
+      }
+    } catch (e) { console.error(e); }
+  }
+  function seriesLink(unlink) {
+    const E = window.ECS_EDIT || {};
+    const msg = document.getElementById('seriesLinkMsg');
+    const parentId = unlink ? '' : document.getElementById('seriesLinkSel').value;
+    if (!unlink && !parentId) { msg.textContent = '結ぶ相手の案件を選んでください。'; return; }
+    if (unlink && !confirm('連日イベントの結びつきを外しますか？（この案件は1日だけの案件に戻ります）')) return;
+    const tokenEl = document.querySelector('#projForm input[name="_token"]');
+    msg.textContent = '保存しています…';
+    fetch('/projects/series-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': tokenEl ? tokenEl.value : '' },
+      body: JSON.stringify({ id: E.id, parent_id: parentId })
+    }).then(function (r) { return r.json().catch(function () { return { ok: false, message: '保存できませんでした（' + r.status + '）。' }; }); })
+      .then(function (j) {
+        msg.textContent = (j && j.message) || (j && j.ok ? '保存しました。' : '保存できませんでした。');
+        if (j && j.ok) {
+          E.parent_project_id = (j.root && j.root !== E.id) ? j.root : null;
+          document.getElementById('seriesUnlinkBtn').style.display = E.parent_project_id ? '' : 'none';
+          const now = document.getElementById('seriesLinkNow');
+          const hit = E.parent_project_id ? window.ECS_PARENTS.find(function (p) { return p.id === E.parent_project_id; }) : null;
+          now.textContent = E.parent_project_id ? ('いま結ばれている案件：' + (hit ? hit.label : E.parent_project_id)) : 'いまは、ほかの案件に結ばれていません（この案件が1日目のときも、こう出ます）。';
+        }
+      }).catch(function (e) { console.error(e); msg.textContent = '保存できませんでした。通信を確かめて、もう一度押してください。'; });
+  }
+  document.addEventListener('DOMContentLoaded', buildSeriesLink);
 
   // ===== 連日イベント（2026-09-15・FBシート No.16）=====
   // ⚠ 上の「予備日・リハ日・前日設営」とは同時に使えない（あちらは本番に付属する日、

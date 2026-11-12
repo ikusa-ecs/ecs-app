@@ -57,6 +57,7 @@ final class HistorySource
         'project-form/paste' => 'アサイン表から貼り付け',
         'projects/catering' => 'ケータリング',
         'projects/cells' => '表のマスを直接編集',
+        'projects/series-link' => '連日イベントとして結ぶ',
         'projects/archive' => 'アーカイブ',
         'projects/cancel' => 'キャンセル',
         'projects/origin-helps' => '登録拠点のボードにも出す',

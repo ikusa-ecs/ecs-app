@@ -25,6 +25,7 @@ use App\Support\ProjectContentName;
 use App\Support\ProjectFormats;
 use App\Support\ProjectHistoryRecorder;
 use App\Support\ProjectImportColumns;
+use App\Support\ProjectSeries;
 use App\Support\ShareTags;
 use App\Support\RequiredCountEstimate;
 use App\Support\SubDateProject;
@@ -756,9 +757,13 @@ class ProjectController extends Controller
         ] : null;
 
         // 紐づく本番案件は「予備日・リハ日として登録する」にチェックがあるときだけ意味を持つ。
+        // ⚠ 本番の案件を編集したときは、いまの結びつき（連日イベントの2日目など）をそのまま残す。
+        //   以前はここで必ず空にしていたので、連日イベントの2日目を編集画面で保存すると
+        //   結びつきが外れて「1日だけの案件」に戻っていた（2026-11-12 に気づいて直した）。
+        //   結ぶ・外すは編集画面の「ほかの日の案件と結ぶ」（POST /projects/series-link）で行う。
         $parentId = $request->has('has_sub')
             ? ($request->input('parent_project_id') ?: null)
-            : null;
+            : (($editing && ($editing->date_type ?: '本番') === '本番') ? $editing->parent_project_id : null);
 
         $attributes = [
             'project_name' => $projectName,
@@ -966,6 +971,78 @@ class ProjectController extends Controller
         );
 
         return "{$office}に「{$kind}」でお願いする印を付けました。";
+    }
+
+    /**
+     * すでにある本番の案件どうしを「連日イベント」として結ぶ／外す（POST /projects/series-link）。
+     * 2026-11-12 小沼さん：アサイン表の取込で1日ずつ別々にできた4日間のイベントを、あとから1つにまとめたい。
+     *
+     *  ・id＝結びたい案件、parent_id＝同じイベントのほかの日の案件（空なら「外す」）。
+     *  ・結び方は連日イベントの登録と同じ（parent_project_id に「根っこ」を入れる）。
+     *    相手がすでに別の案件に結ばれていれば、その根っこに結ぶ＝まとまりは必ず1つになる。
+     *  ・この案件に結ばれていた日（子）がいれば、一緒に新しい根っこへ移す（宙に浮かせない）。
+     *  ⚠ 結べるのは本番どうしだけ。リハ日・前日設営・予備日は「日程種別」で本番に紐づける。
+     *  ⚠ 中身（時間・人数・アサイン・公開）には一切触らない。変わるのは結びつきだけ。
+     */
+    public function linkSeries(Request $request)
+    {
+        $request->validate([
+            'id' => ['required', 'string', 'exists:projects,id'],
+            'parent_id' => ['nullable', 'string'],
+        ]);
+
+        $project = Project::findOrFail($request->input('id'));
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+        if (($project->date_type ?: '本番') !== '本番') {
+            return response()->json(['ok' => false, 'message' => 'リハ日・前日設営・予備日は、ここでは結べません。「日程種別」で本番の案件に紐づけてください。'], 422);
+        }
+
+        $parentId = trim((string) $request->input('parent_id'));
+
+        // 外す＝この案件を「1日だけの案件」に戻す。
+        if ($parentId === '') {
+            $project->parent_project_id = null;
+            $project->save();
+
+            return response()->json(['ok' => true, 'root' => null, 'days' => 1, 'message' => '連日イベントの結びつきを外しました。']);
+        }
+
+        $target = Project::find($parentId);
+        if (! $target || $target->id === $project->id) {
+            return response()->json(['ok' => false, 'message' => '結ぶ相手の案件が見つかりません。'], 422);
+        }
+        if ($deny = ProjectAccess::denyJson($target)) {
+            return $deny;
+        }
+        if (($target->date_type ?: '本番') !== '本番') {
+            return response()->json(['ok' => false, 'message' => '結ぶ相手は、本番の案件を選んでください。'], 422);
+        }
+
+        // 相手のまとまりの根っこ。相手がこの案件に結ばれている（＝もう同じまとまり）なら何もしない。
+        $rootId = ProjectSeries::rootId($target);
+        if ($rootId !== $project->id) {
+            DB::transaction(function () use ($project, $rootId) {
+                // この案件に結ばれていた日（リハ日なども）を、新しい根っこへ移す。
+                Project::where('parent_project_id', $project->id)->get()
+                    ->each(function (Project $child) use ($rootId) {
+                        if ($child->id !== $rootId) {
+                            $child->parent_project_id = $rootId;
+                            $child->save();
+                        }
+                    });
+                $project->parent_project_id = $rootId;
+                $project->save();
+            });
+        }
+
+        $root = ProjectSeries::rootId($project->fresh());
+        $days = Project::where(fn ($q) => $q->where('id', $root)->orWhere('parent_project_id', $root))
+            ->where(fn ($q) => $q->where('date_type', '本番')->orWhereNull('date_type'))
+            ->count();
+
+        return response()->json(['ok' => true, 'root' => $root, 'days' => $days, 'message' => "連日イベント（全{$days}日）として結びました。"]);
     }
 
     /**

@@ -184,6 +184,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     // 案件一覧の詳細セル（D/SD/物品/移動/音響/準備チェック/備考）を保存する。
     // 備考はアサイン系の画面（日別ボード・案件別アサイン・ピックアップ）からもここへ保存する（入口を1か所に寄せている）。
     Route::post('/projects/cells', [ProjectController::class, 'saveCells']);
+    // すでにある本番の案件どうしを「連日イベント」として結ぶ／外す（2026-11-12 小沼さん）。
+    Route::post('/projects/series-link', [ProjectController::class, 'linkSeries']);
     // 手動アーカイブ（隠す／戻す）を保存する。
     Route::post('/projects/archive', [ProjectController::class, 'setArchive']);
     // キャンセルの切り替え（2026-08-26）。記録は消さず、実施形態の表示を「キャンセル」にして
