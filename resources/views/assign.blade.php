@@ -287,6 +287,16 @@
     .mem-row .m-lv.mid { background: #ece3d4; color: #7a6a58; }
     .mem-row .m-lv.vet { background: var(--ok-soft); color: #15803d; }
     .mem-none { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* 必要ポジションの空き枠（2026-11-12・アサイン表と同じもの）。点線で「まだ人がいない枠」と分かるようにする。 */
+    .mem-row.auto-slot { border: 1px dashed var(--line, #c9d3e0); border-radius: 6px; padding: 1px 4px; margin-top: 2px; color: var(--muted); }
+    .mem-row.auto-slot .as-name { font-weight: 700; }
+    .mem-row.auto-slot .mini { font-size: 10.5px; padding: 0 6px; }
+    .mem-row.auto-slot { cursor: pointer; user-select: none; }
+    /* Dが決まっていない案件の「空き D」＝赤で目立たせる（2026-11-12 小沼さん） */
+    .mem-row.auto-slot.need-d { border: 1.5px solid #dc2626; background: #fef2f2; color: #b91c1c; }
+    .mem-row.auto-slot.need-d .m-no, .mem-row.auto-slot.need-d .as-name { color: #b91c1c; font-weight: 800; }
+    html[data-theme="dark"] .mem-row.auto-slot.need-d { background: rgba(220,38,38,.18); color: #fca5a5; }
+    html[data-theme="dark"] .mem-row.auto-slot.need-d .m-no, html[data-theme="dark"] .mem-row.auto-slot.need-d .as-name { color: #fca5a5; }
     .cand-toggle { color: #b4530a; }   /* 希望者トグルは少し色を変える */
 
     /* 自動アサインボタン */
@@ -401,6 +411,25 @@
     .pick-box .pk-item.busy:hover { background: #fbdcdc; }
     .pick-box .pk-item .busy-tag { color: #b91c1c; font-size: 11px; font-weight: 700; white-space: nowrap; }
     .pick-box .pk-sep { padding: 4px 8px; font-size: 11px; font-weight: 700; color: #b91c1c; background: #fdecec; border-top: 1px solid #f3b7b7; }
+    /* 希望者と、希望を出していない人の境目（赤ではなく落ち着いた色） */
+    .pick-box .pk-sep.plain { color: var(--muted, #8a7a6b); background: var(--panel, #f5f1ea); border-top: 1px solid var(--line); }
+    .pick-box .pk-item .wish-tag { font-size: 10.5px; font-weight: 700; white-space: nowrap; border-radius: 999px; padding: 0 7px; }
+    .pick-box .pk-item .wish-tag.apply { background: #fde7c8; color: #9a4a00; }
+    /* 空き枠のすぐ下に開いたとき（プルダウンの形） */
+    .pick-box.pk-drop { margin: 2px 0 6px; border: 1.5px solid var(--brand, #c2410c); border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.14); }
+    .col-list.pk-open { max-height: none !important; height: auto !important; overflow: visible !important; }
+    .pick-box .pk-close { white-space: nowrap; flex: 0 0 auto; }
+    .pick-box.pk-drop .pk-head { font-weight: 700; font-size: 12px; }
+    .pick-box.pk-drop .pk-list { max-height: 240px; }
+    .pick-box .pk-item > span { white-space: nowrap; }
+    .pick-box .pk-item { flex-wrap: wrap; row-gap: 0; }
+    /* 空き枠の行：＋ボタンをいつも出すので、1行に収まるよう詰める */
+    .mem-row.auto-slot { flex-wrap: wrap; row-gap: 2px; }
+    .mem-row.auto-slot .mini { white-space: nowrap; padding: 0 5px; }
+    /* ワンクリックで入る人（希望者） */
+    .pick-box .pk-item.one { font-weight: 700; }
+    .pick-box .pk-item .one-mark { color: var(--brand, #c2410c); font-size: 10px; width: 13px; text-align: center; }
+    .pick-box .pk-item .wish-tag.cal { background: #dcf3e2; color: #1c6b38; }
     .pick-box .pk-none { padding: 10px 8px; font-size: 12px; color: var(--muted, #8a7a6b); }
     /* ⚠ 枠が細いと「1人を選んでいます」が1文字幅に押しつぶされて縦書きに見えた（2026-11-04 小沼さん）。
        文字は折り返さない＋入りきらなければボタンを次の行へ回す。 */
@@ -843,6 +872,9 @@
       // 必要ポジション（コンテンツ×規模）。⚠ 自動アサインがこれを見て枠を作る。
       //   詰め替えを忘れると、また「MCが2人」「謎解きなのに軍師」に戻る。
       template:(c.template || {}),
+      // 必要ポジションの空き枠（役割コードの並び・2026-11-12）。⚠ 判定はサーバー（正本＝AssignSlots::autoSlots）。
+      //   詰め替えを忘れるとメンバー欄に「空き」が出ない。メンバーを足す・外すと refreshAutoSlots で取り直す。
+      autoSlots:(c.autoSlots || []).slice(),
       // 前泊の前日・後泊の翌日が×の人＝{本人ID: '前日10/24が×（前泊）'}（2026-10-14・FBシート No.23）。
       // 希望者に札を出し、⚡自動アサインでは選ばない。
       stayNg:(c.stayNg || {}),
@@ -1400,7 +1432,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
           body: JSON.stringify({ project_id: c.id, staff_id: p.id, action: 'assign', role: rc, status: '仮' })
-        }).then(r => r.json()).then(res => { if (!(res && res.ok)) render(); }).catch(() => render());
+        }).then(r => r.json()).then(res => { if (!(res && res.ok)) { render(); return; } refreshAutoSlots(c.id); }).catch(() => render());
       });
       const total = filledOf(c);
       // まとめて実行のときは、ここで描き直さない・お知らせも出さない（呼び出し元が最後に1回やる）。
@@ -1447,8 +1479,33 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
         body: JSON.stringify({ project_id: caseId, staff_id: m.id, action: 'unassign' })
-      }).then(r => r.json()).then(res => { if (!(res && res.ok)) render(); }).catch(() => render());
+      }).then(r => r.json()).then(res => { if (!(res && res.ok)) { render(); return; } refreshAutoSlots(caseId); }).catch(() => render());
     }
+  }
+  // 必要ポジションの空き枠を取り直す（メンバーを足す・外す・ポジションを変えたあと・2026-11-12）。
+  // ⚠ 数え方は画面に書かない（正本＝サーバーの AssignSlots::autoSlots）。失敗しても何もしない（読み直せば正しく出る）。
+  // ⚠ 何人かまとめて入れると取り直しが重なる。遅れて返ってきた古い答えで上書きしないよう、最後に頼んだ分だけ使う。
+  const autoSlotSeq = {};
+  function refreshAutoSlots(caseId){
+    if (!USING_DB) return;
+    const seq = (autoSlotSeq[caseId] || 0) + 1;
+    autoSlotSeq[caseId] = seq;
+    fetch('/assign/auto-slots?id=' + encodeURIComponent(caseId), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(res => {
+        if (!(res && res.ok) || autoSlotSeq[caseId] !== seq) return;
+        const c = cases.find(x => x.id === caseId);
+        if (!c) return;
+        c.autoSlots = (res.roles || []).slice();
+        render();
+        // 描き直すと開いていた追加パネルが消えるので、開き直す（打ちかけの文字も戻す）。
+        if (PICK.caseId) {
+          renderPicker();
+          const q = document.querySelector('#pick-' + PICK.caseId + ' .pk-q');
+          if (q && PICK.q) { q.value = PICK.q; renderPickList(); }
+        }
+      })
+      .catch(() => {});
   }
   // 希望者をメンバーに入れる（同じ日に他案件とかぶる場合は確認）。
   // id があれば（DBボード）＝本物のアサインとして quickToggle で保存し、担当/巡回/備考も編集できる形で足す。
@@ -1487,7 +1544,7 @@
       body: JSON.stringify({ project_id: caseId, staff_id: id, action: 'assign', role: rc, status: '仮' })
     })
       .then(r => r.json())
-      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; } noticeHelpRecorded(res); })
+      .then(res => { if (!(res && res.ok)) { alert('メンバー追加の保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; } noticeHelpRecorded(res); refreshAutoSlots(caseId); })
       .catch(() => { alert('通信エラーでメンバー追加を保存できませんでした。'); });
     render();
   }
@@ -1668,6 +1725,53 @@
     .catch(() => alert('保存に失敗しました。通信を確認して、もう一度お試しください。'));
   }
 
+  // 必要ポジションの空き枠（「空き：OP」）をメンバー欄の下に出す（2026-11-12 小沼さん「アサイン表の空き枠を日別ボードにも」）。
+  // ⚠ どの役割が何枠空いているかはサーバーが決める（正本＝AssignSlots::autoSlots）。ここでは並べるだけ。
+  // 手動編集中は「＋スタッフ」「＋社員」から入れると、その役割で入る（保存しない枠＝入れた人が assignments に入る）。
+  function autoSlotRowsHtml(c, editMode){
+    if (!USING_DB) return '';
+    let slotNo = 0;
+    return (c.autoSlots || []).map(role => {
+      try { return slotRowHtml(c, editMode, role, false, 'a' + (slotNo++)); } catch (e) { console.error(e); return ''; }
+    }).join('');
+  }
+  // 空き枠1行。ダブルクリックで、その枠に入れる人を選ぶパネルが開く（2026-11-12 小沼さん・手動編集を押さなくてよい）。
+  // needD＝Dがまだ決まっていない案件の「空き D」（赤で目立たせる）。
+  // slotKey＝カードの中で何番目の空き枠か（'d'＝D未定・'a0','a1'…）。人を選ぶ一覧をこの行のすぐ下に開くための目印。
+  // ⚠ 「＋スタッフ」「＋社員」は手動編集でなくても出す（押すとその場で一覧が開く＝さくさく入れる・2026-11-12 小沼さん）。
+  function slotRowHtml(c, editMode, role, needD, slotKey){
+    const label = (window.ECS_ROLE_OPTIONS || {})[role] || role;
+    const tip = (needD
+      ? 'ディレクター（D）がまだ決まっていません。'
+      : 'このコンテンツ・規模で必要な' + label + 'の空き（マスタの必要人数から自動）。')
+      + '「＋スタッフ」「＋社員」かダブルクリックで、すぐ下に一覧が開きます（' + label + 'で入ります）';
+    const btns = `<button class="mini" onclick="slotOpen('${c.id}','staff','${escAttr(role)}','${slotKey}')" title="${escAttr(tip)}">＋スタッフ</button>`
+        + `<button class="mini" onclick="slotOpen('${c.id}','employee','${escAttr(role)}','${slotKey}')" title="${escAttr(tip)}">＋社員</button>`;
+    return `<div class="mem-row auto-slot${needD ? ' need-d' : ''}" data-role="${escAttr(role)}" data-slot="${c.id}|${slotKey}" title="${escAttr(tip)}" ondblclick="slotOpen('${c.id}','${role === 'D' ? 'employee' : 'staff'}','${escAttr(role)}','${slotKey}', true)"><span class="m-no">空</span><span class="m-name as-name">${needD ? 'D未定' : '空き'}</span><span class="m-pos">${escHtml(label)}</span>${btns}</div>`;
+  }
+  // Dが決まっていない案件は、メンバー欄のいちばん上に赤い「空き D」を出す（2026-11-12 小沼さん）。
+  // 決まっている＝メンバーに役割 D の人がいる（兼任のDも含む）。
+  function dSlotRowHtml(c, editMode){
+    if (!USING_DB) return '';
+    try {
+      const hasD = (c.assigned || []).some(m => m.roleCode === 'D' || m.roleCode2 === 'D');
+      return hasD ? '' : slotRowHtml(c, editMode, 'D', true, 'd');
+    } catch (e) { console.error(e); return ''; }
+  }
+  // 空き枠をダブルクリック＝その案件を手動編集にして、人を選ぶパネルをその役割で開く。
+  // D は社員から、ほかはスタッフから選ぶ（社員を入れたいときは行の「＋社員」）。
+  // 空き枠の「＋スタッフ」「＋社員」・ダブルクリック＝その行のすぐ下に、人を選ぶ一覧を開く（プルダウンのように）。
+  // 同じボタンをもう一度押したら閉じる（ダブルクリックは閉じない＝2回目のクリックで消えないように）。
+  function slotOpen(caseId, kind, role, slotKey, keepOpen){
+    const same = PICK.caseId === caseId && PICK.kind === kind && PICK.role === role && PICK.slot === slotKey;
+    if (same) { if (!keepOpen) closePicker(); return; }
+    closePicker();
+    // 一覧の入れ物は手動編集のときだけカードにある＝先に手動編集にする。
+    if (!editing.has(caseId)) { editing.add(caseId); render(); }
+    PICK = { caseId: caseId, kind: kind, q: '', checked: new Set(), role: role, slot: slotKey };
+    renderPicker();
+  }
+
   // 保存済みの派遣依頼を、メンバー欄の下に出す（2026-09-03）。
   // ⚠ 消すのは派遣一覧（/dispatch-list）から。ここでは見るだけ＝押し間違いで記録が消えないように。
   function dispatchRowsHtml(c){
@@ -1707,19 +1811,26 @@
   //  ・名前でしぼって、**チェックした人をまとめて**入れる
   //  ・スタッフ側で1人も見つからないときだけ「臨時スタッフとして名簿に追加」を出す
   //    （名簿にいない人を入れる道。アサイン画面と同じやり方＝入れ口を増やしていない）
-  let PICK = { caseId: null, kind: 'staff', q: '', checked: new Set() };
+  // role＝必要ポジションの空き枠（「空き：OP」の＋）から開いたときの役割（2026-11-12）。空＝ふつうの追加。
+  let PICK = { caseId: null, kind: 'staff', q: '', checked: new Set(), role: '' };
 
-  function openPicker(caseId, kind){
+  function openPicker(caseId, kind, role){
+    role = role || '';
     // 同じボタンをもう一度押したら閉じる。
-    if (PICK.caseId === caseId && PICK.kind === kind) { closePicker(); return; }
+    if (PICK.caseId === caseId && PICK.kind === kind && PICK.role === role && !PICK.slot) { closePicker(); return; }
     closePicker();
-    PICK = { caseId: caseId, kind: kind, q: '', checked: new Set() };
+    PICK = { caseId: caseId, kind: kind, q: '', checked: new Set(), role: role, slot: '' };
     renderPicker();
   }
   function closePicker(){
     const el = PICK.caseId ? document.getElementById('pick-' + PICK.caseId) : null;
-    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-    PICK = { caseId: null, kind: 'staff', q: '', checked: new Set() };
+    if (el) {
+      el.style.display = 'none'; el.innerHTML = ''; el.classList.remove('pk-drop');
+      document.querySelectorAll('.col-list.pk-open').forEach(x => x.classList.remove('pk-open'));
+      // 空き枠の下へ動かしていたら、元の場所（カードの下）へ戻す。
+      if (el._home && el._home.isConnected) el._home.appendChild(el);
+    }
+    PICK = { caseId: null, kind: 'staff', q: '', checked: new Set(), role: '', slot: '' };
   }
   // しぼり込みの入力。リストだけ書き直す（入力欄を作り直すと文字が消える）。
   function pickerQuery(v){ PICK.q = v; renderPickList(); }
@@ -1754,17 +1865,63 @@
     });
     // 他拠点の社員（研修など・2026-09-29）は、それぞれの中で下へ回す＝いつもの人が上。
     const mineFirst = arr => arr.filter(pp => !pp.otherOffice).concat(arr.filter(pp => pp.otherOffice));
-    return mineFirst(free).concat(mineFirst(busy));
+    // 空き枠から開いたときは、**希望者を先頭に**並べる（2026-11-12 小沼さん）。
+    //   apply＝この案件にエントリーした人 → cal＝その日に〇（稼働可・出勤可）を出している人 → それ以外。
+    //   ⚠ 希望者の出どころは希望者カラムと同じ（c.applicants と ECS_BOARD_AVAIL）＝ここで別の判定を作らない。
+    const wishOf = pickWishMap(c);
+    const wishFirst = arr => {
+      if (!PICK.role) return arr;
+      const tag = arr.map(pp => Object.assign(pp, { wish: wishOf(pp) }));
+      return tag.filter(pp => pp.wish === 'apply').concat(tag.filter(pp => pp.wish === 'cal'), tag.filter(pp => !pp.wish));
+    };
+    return wishFirst(mineFirst(free)).concat(wishFirst(mineFirst(busy)));
+  }
+
+  // 名簿の1人が「この案件にエントリーした（apply）／その日に〇を出している（cal）／どちらでもない（''）」を返す関数を作る。
+  function pickWishMap(c){
+    const applyIds = new Set(), applyNames = new Set(), calIds = new Set(), calNames = new Set();
+    try {
+      ((c && c.applicants) || []).forEach(a => { if (a.id) applyIds.add(a.id); if (a.name) applyNames.add(a.name); });
+      ((c && window.ECS_BOARD_AVAIL && window.ECS_BOARD_AVAIL[c.off]) || []).forEach(a => { if (a.id) calIds.add(a.id); if (a.name) calNames.add(a.name); });
+    } catch (e) { console.error(e); }
+    return pp => (applyIds.has(pp.id) || applyNames.has(pp.name)) ? 'apply'
+      : ((calIds.has(pp.id) || calNames.has(pp.name)) ? 'cal' : '');
+  }
+  // 希望者の名前を押したとき＝その人がその役割ですぐ入る（一覧は閉じる）。
+  function pickOne(id){
+    const caseId = PICK.caseId, role = PICK.role || '';
+    closePicker();
+    try { addRosterMember(caseId, id, role); } catch (e) { console.error(e); }
   }
 
   function renderPicker(){
     const el = document.getElementById('pick-' + PICK.caseId);
     if (!el) return;
+    // 空き枠から開いたときは、その行のすぐ下へ入れ物を動かす（プルダウンのように押した場所で開く）。
+    // 行が見つからないとき（空きが埋まって番号がずれた等）は、カードの下のいつもの場所のまま。
+    if (PICK.slot) {
+      let row = null;
+      try { row = document.querySelector('.auto-slot[data-slot="' + PICK.caseId + '|' + PICK.slot + '"]'); } catch (e) { console.error(e); }
+      if (row) {
+        if (!el._home) el._home = el.parentElement;
+        row.after(el);
+        el.classList.add('pk-drop');
+        // メンバー欄は高さが決まっていて中でスクロールする＝そのままだと一覧が欄の中に隠れる。
+        // 開いている間だけ欄を広げて、一覧を全部見せる（閉じたら戻す）。
+        const listBox = row.closest('.col-list');
+        if (listBox) listBox.classList.add('pk-open');
+      }
+    }
     const label = PICK.kind === 'employee' ? '社員' : 'スタッフ';
+    // 空き枠から開いたときは「空き：OP に入れます」と出す（チェックした人はその役割で入る）。
+    const roleName = PICK.role ? ((window.ECS_ROLE_OPTIONS || {})[PICK.role] || PICK.role) : '';
+    // 空き枠の下に開いたときは幅がせまいので、見出しは短く（「OP に入れるスタッフ」）。
+    const shortRole = String(roleName).replace(/（.*$/, '');
+    const head = PICK.role ? (escHtml(shortRole) + ' に入れる' + label) : (label + 'を追加');
     el.style.display = 'block';
     el.innerHTML =
-      '<div class="pk-head"><span>' + label + 'を追加</span><span class="sp"></span>'
-      + '<button class="mini" onclick="closePicker()">閉じる</button></div>'
+      '<div class="pk-head"><span>' + head + '</span><span class="sp"></span>'
+      + '<button class="mini pk-close" onclick="closePicker()" title="閉じる">✕ 閉じる</button></div>'
       + '<input class="pk-q" type="text" placeholder="名前でしぼる（例）山田" oninput="pickerQuery(this.value)">'
       + '<div class="pk-list" id="pkList"></div>'
       + '<div class="pk-foot" id="pkFoot"></div>'
@@ -1790,6 +1947,9 @@
       // ⚠ 別案件に入っている人は下にまとまる（pickCandidates で並べ替え済み）。
       //   その境目に見出しを1本入れて、どこから先が「その日もう埋まっている人」か分かるようにする。
       let sepDone = false;
+      // 希望者が先頭に来ているとき、希望を出していない人との境目にも見出しを1本入れる。
+      const hasWish = list.some(pp => !pp.busyWhere && pp.wish);
+      let wishSepDone = false;
       box.innerHTML = list.map(pp => {
         const where = pp.busyWhere;
         let head = '';
@@ -1797,16 +1957,31 @@
           sepDone = true;
           head = '<div class="pk-sep">⛔ ここから下は、この日すでに別の案件に入っている人です</div>';
         }
+        if (hasWish && !where && !pp.wish && !wishSepDone) {
+          wishSepDone = true;
+          head += '<div class="pk-sep plain">ここから下は、希望を出していない人です</div>';
+        }
         const tip = where ? busyTitle(pp.name, where) : '';
+        const wishTag = pp.wish === 'apply' ? '<span class="wish-tag apply">🙋 希望</span>'
+          : (pp.wish === 'cal' ? '<span class="wish-tag cal">〇 この日OK</span>' : '');
+        const body = '<span>' + escHtml(pp.name) + '</span>'
+          + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span>'
+          + (pp.otherOffice ? '<span class="lv">' + escHtml(pp.office || '') + '</span>' : '')
+          + wishTag
+          + (where ? '<span class="busy-tag">⛔</span>' : '');
+        // 希望者（🙋 希望・〇 この日OK）＝チェックなし。名前を押すとすぐ入る。
+        // 希望を出していない人・別案件に入っている人＝今までどおりチェックして「チェックした人を追加」。
+        if (PICK.role && pp.wish && !where) {
+          return head
+            + '<div class="pk-item one" title="押すとすぐ入ります" onclick="pickOne(\'' + pp.id + '\')">'
+            + '<span class="one-mark">▶</span>' + body + '</div>';
+        }
         return head
           + '<label class="pk-item' + (where ? ' busy' : '') + '"'
           + (tip ? ' title="' + escHtml(tip) + '"' : '') + '>'
           + '<input type="checkbox" ' + (PICK.checked.has(pp.id) ? 'checked' : '')
           + ' onchange="pickToggle(\'' + pp.id + '\', this.checked)">'
-          + '<span>' + escHtml(pp.name) + '</span>'
-          + '<span class="lv">' + escHtml(pp.lvLabel || '') + '</span>'
-          + (pp.otherOffice ? '<span class="lv">' + escHtml(pp.office || '') + '</span>' : '')
-          + (where ? '<span class="busy-tag">⛔</span>' : '')
+          + body
           + '</label>';
       }).join('')
         // 名前でしぼったとき、同じ名前でもうこの案件に入っている人も一言出す（一覧には出さない＝二重に入れない）。
@@ -1832,7 +2007,7 @@
     const foot = document.getElementById('pkFoot');
     if (!foot) return;
     const n = PICK.checked.size;
-    foot.innerHTML = '<span class="sp">' + (n ? n + '人を選んでいます' : '') + '</span>'
+    foot.innerHTML = '<span class="sp">' + (n ? n + '人を選んでいます' : (PICK.role ? '▶の人は、名前を押すとすぐ入ります' : '')) + '</span>'
       + '<button class="mini" ' + (n ? '' : 'disabled style="opacity:.5; cursor:default;"')
       + ' onclick="addPicked()">チェックした人を追加</button>';
 
@@ -1855,8 +2030,9 @@
   function addPicked(){
     const caseId = PICK.caseId;
     const ids = Array.from(PICK.checked);
+    const role = PICK.role || '';
     closePicker();
-    ids.forEach(id => addRosterMember(caseId, id));
+    ids.forEach(id => { try { addRosterMember(caseId, id, role); } catch (e) { console.error(e); } });
   }
 
   // 名簿にいない方を臨時スタッフとして追加し、そのままこの案件に入れる。
@@ -1890,7 +2066,8 @@
       .catch(() => alert('通信エラーで臨時スタッフを追加できませんでした。'));
   }
   // プルダウンで選んだ人をこの案件のメンバーに追加（かぶり・月上限のチェックは addCandidate と同じ）
-  function addRosterMember(caseId, id){
+  // slotRole＝必要ポジションの空き枠から入れたときの役割（2026-11-12）。あれば、その人のいつもの役割ではなくこの役割で入れる。
+  function addRosterMember(caseId, id, slotRole){
     if (!id) return;
     const c = cases.find(x => x.id === caseId);
     if (!c) return;
@@ -1906,7 +2083,12 @@
     }
     const isEmp = pp.role === 'employee';
     // 役割は「コード」で持つ（保存に必要）。表示ラベルは ECS_ROLE_OPTIONS から引く。
-    const roleCode = isEmp ? ((pp.dexp && pp.dexp.length) ? 'D' : 'FC') : firstPosCodeOf(pp.pos);
+    const roleCode = slotRole ? slotRole : (isEmp ? ((pp.dexp && pp.dexp.length) ? 'D' : 'FC') : firstPosCodeOf(pp.pos));
+    // 空き枠から入れたときは、その枠をすぐ1つ消す（見た目だけ。保存のあとサーバーから取り直す）。
+    if (slotRole && Array.isArray(c.autoSlots)) {
+      const k = c.autoSlots.indexOf(slotRole);
+      if (k >= 0) c.autoSlots.splice(k, 1);
+    }
     const posLabel = (window.ECS_ROLE_OPTIONS || {})[roleCode] || roleCode;
     // id・roleCode・status を持たせる＝追加直後から担当/巡回を編集・保存できる（id が無いと入力欄が出ない）。
     const m = { id: pp.id, name: pp.name, lv: (isEmp ? '-' : (pp.lv || '-')), pos: posLabel, roleCode: roleCode, roleCode2: '', note: '', patrol: null, remark: '', status: '仮', type: (isEmp ? 'emp' : 'staff') };
@@ -2175,6 +2357,7 @@
       .then(res => {
         if (res && res.ok){
           if (m){ m.roleCode = roleCode; m.pos = (window.ECS_ROLE_OPTIONS || {})[roleCode] || roleCode; }
+          refreshAutoSlots(caseId);   // ポジションを変えると、空き枠の数も変わる
         } else {
           alert('ポジションの保存に失敗しました。' + (res && res.message ? '\n' + res.message : ''));
           render();
@@ -3072,7 +3255,7 @@
     const memCol =
       `<div class="cc-col">
          <div class="col-h"><span class="cl-toggle" onclick="toggleCol(this)"><span class="cl-arrow">▾</span> メンバー（${filled}/${c.need}名）</span>${kariN ? `<span class="kari-warn" title="「仮」の人はスタッフの画面に出ません。名前の横の「仮」を押すと確定にできます。">仮 ${kariN}名</span>` : ''}${fixEmpBtn}</div>
-         <div class="col-list">${memRows || '<div class="mem-none">メンバー未割当</div>'}${dispatchRowsHtml(c)}</div>
+         <div class="col-list">${dSlotRowHtml(c, editMode)}${memRows || '<div class="mem-none">メンバー未割当</div>'}${dispatchRowsHtml(c)}${autoSlotRowsHtml(c, editMode)}</div>
          ${editMode ? `<div class="add-row">
              <button class="mini" onclick="openPicker('${c.id}','employee')" title="社員を名前でしぼって、チェックした人をまとめて入れます">＋社員を追加</button>
              <button class="mini" onclick="openPicker('${c.id}','staff')" title="スタッフを名前でしぼって、チェックした人をまとめて入れます。LINEで入れると言われた方もここから。">＋スタッフを追加</button>

@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\ProjectShare;
 use App\Models\ShiftPreference;
 use App\Support\AssignmentRole;
+use App\Support\AssignSlots;
 use App\Support\DateChange;
 use App\Support\Departments;
 use App\Support\RepeatHistory;
@@ -127,6 +128,65 @@ class AssignBoardController extends Controller
             // 「🗑 まとめて削除」を出すか（2026-10-05・一時的）。Administratorだけ＋共通設定のスイッチ。
             'bulkDelete' => \App\Support\BoardBulkDelete::visibleFor($request->user()),
         ]);
+    }
+
+    /**
+     * 1案件ぶんの「必要ポジションの空き枠」を取り直す（日別ボードでメンバーを足す・外したあとに画面が呼ぶ・2026-11-12）。
+     * 返り値＝{ok, roles: ['OP','FC',…]}。⚠ 判定はカードを作るときと同じ autoSlotRoles（画面に判定を写さない）。
+     */
+    public function autoSlots(Request $request)
+    {
+        $project = Project::find((string) $request->query('id', ''));
+        if (! $project) {
+            return response()->json(['ok' => false, 'message' => '案件が見つかりません。'], 404);
+        }
+        if ($deny = ProjectAccess::denyJson($project)) {
+            return $deny;
+        }
+
+        $assigned = self::onePerPerson(
+            Assignment::where('project_id', $project->id)->where('status', '!=', 'キャンセル')
+                ->get(['project_id', 'staff_id', 'date', 'role', 'status']),
+            $project
+        )->map(fn ($a) => ['roleCode' => (string) ($a->role ?? ''), 'status' => $a->status])->values()->all();
+
+        return response()->json(['ok' => true, 'roles' => self::autoSlotRoles(
+            $project,
+            $assigned,
+            DispatchRows::forProjects([$project->id])[$project->id] ?? [],
+            AssignSlots::forProjects([$project->id])[$project->id] ?? []
+        )]);
+    }
+
+    /**
+     * 必要ポジションの空き枠を役割コードの並びで返す。正本＝AssignSlots::autoSlots（アサイン表と同じ入力＝運営人数を超えない・D/SDは出さない）。
+     *
+     * @param  array<int, array<string, mixed>>  $assigned  roleCode・status を持つメンバー（人ごとに1行）
+     * @return list<string>
+     */
+    private static function autoSlotRoles(Project $p, array $assigned, array $dispatches, array $slots): array
+    {
+        return array_column(
+            AssignSlots::autoSlots(PositionTemplate::of($p), $assigned, $dispatches, $slots, (int) ($p->required_count ?? 0)),
+            'role'
+        );
+    }
+
+    /**
+     * アサインを人ごとに1行にまとめる（2日以上の案件は同じ人の行が日数ぶんあるため・2026-09-07）。
+     * 残す1行＝その案件の開催日の行を優先、次に「確定」を優先。
+     */
+    private static function onePerPerson(Collection $rows, Project $p): Collection
+    {
+        $startDate = $p->start_date?->format('Y-m-d');
+
+        return $rows
+            ->sortBy(fn ($a) => [
+                (optional($a->date)->format('Y-m-d') === $startDate) ? 0 : 1,
+                ($a->status === '確定') ? 0 : 1,
+                optional($a->date)->format('Y-m-d') ?? '9999-12-31',
+            ])
+            ->unique('staff_id');
     }
 
     /** 表示の基準日。?from=YYYY-MM-DD が正しい日付ならその日、無ければ今日。 */
@@ -554,6 +614,9 @@ class AssignBoardController extends Controller
         // ⚠ 2026-09-16、読み方と見せ方を App\Support\DispatchRows に集めた
         //   （アサイン表・案件別アサイン・ピックアップにも同じものを出すため）。
         $dispatchesByProject = DispatchRows::forProjects($projectIds);
+        // アサイン表で手で作った枠（project_slots）。必要ポジションの空き枠を数えるときに「埋まった分」に入れる
+        // （アサイン表と同じ数え方にするため・2026-11-12）。
+        $slotsByProject = AssignSlots::forProjects($projectIds);
 
         // 拠点間の関わり（ヘルプ／巻き取り）。2026-09-18 baba要望
         // 「他拠点からの巻き取りとかヘルプのときはそれもわかるようにしてほしい」。
@@ -581,7 +644,7 @@ class AssignBoardController extends Controller
         $groupDays = collect(ProjectSeries::daysFor($projects->map(fn ($pair) => $pair[0])->all()))
             ->filter(fn ($rows) => count($rows) > 1)->all();
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $sharesByProject, $office, $stayNg, $groupDays) {
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $slotsByProject, $sharesByProject, $office, $stayNg, $groupDays) {
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -603,14 +666,7 @@ class AssignBoardController extends Controller
             $splitCounts = OfficeCounts::of($p, $shares);
             $splitNeed = OfficeCounts::needFor($p, $office, $shares);
 
-            $startDate = $p->start_date?->format('Y-m-d');
-            $assigned = ($assignedByProject->get($p->id) ?? collect())
-                ->sortBy(fn ($a) => [
-                    (optional($a->date)->format('Y-m-d') === $startDate) ? 0 : 1,
-                    ($a->status === '確定') ? 0 : 1,
-                    optional($a->date)->format('Y-m-d') ?? '9999-12-31',
-                ])
-                ->unique('staff_id')
+            $assigned = self::onePerPerson($assignedByProject->get($p->id) ?? collect(), $p)
                 ->map(function ($a) use ($people, $splitNeed, $office) {
                     $person = $people->get($a->staff_id);
 
@@ -774,6 +830,10 @@ class AssignBoardController extends Controller
                 //   正本＝App\Support\PositionTemplate（アサイン画面・月まとめと同じもの）。
                 //   ⚠ ここを渡し忘れると、また「MCが2人」「謎解きなのに軍師」が起きる。
                 'template' => PositionTemplate::of($p),
+                // 必要ポジションの空き枠（役割コードの並び・2026-11-12 小沼さん「アサイン表の空き枠を日別ボードにも」）。
+                // ⚠ 判定はサーバーだけ（正本＝AssignSlots::autoSlots・アサイン表と同じ入力）。画面で数え直さない。
+                //   メンバーを足す・外すと画面が /assign/auto-slots から取り直す。
+                'autoSlots' => self::autoSlotRoles($p, $assigned, $dispatchesByProject[$p->id] ?? [], $slotsByProject[$p->id] ?? []),
                 // 案件規模（MCの規模別の判定に使う。空のときの扱いは App\Support\ProjectScale が正本）。
                 'scale' => (string) ($p->scale ?? ''),
                 'archived' => false,

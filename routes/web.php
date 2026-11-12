@@ -309,6 +309,8 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/assign-dashboard/export.csv', [AssignDashboardController::class, 'exportCsv']);
     // 割当メンバーの仮データに使う名前は DB（people のスタッフ）から渡す（NAME_POOL の単一ソース化）。
     Route::get('/assign', [AssignBoardController::class, 'assign']);
+    // 日別ボードの「必要ポジションの空き枠」を1案件ぶん取り直す（メンバーを足す・外したあと・2026-11-12）。正本＝AssignSlots::autoSlots。
+    Route::get('/assign/auto-slots', [AssignBoardController::class, 'autoSlots']);
     // D決め（S-017）。本物の案件＋社員（people）をカレンダーに表示し、D/SDを保存する。
     // ※ 2026-06-25 並行作業：サブエージェント2が AssignDirectorController を作成中。
     Route::get('/assign-director', [AssignDirectorController::class, 'index']);
