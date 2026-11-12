@@ -236,6 +236,21 @@ class AssignSheetController extends Controller
                 'date'        => $this->fmtDate($p->start_date),
                 'dayType'     => $p->date_type ?? '本番',
                 'category'    => $p->category ?? '',
+                // ヨミ（Aヨミ・Bヨミ・Cヨミ・確定）。日付の下の札に出す（2026-11-12 小沼さん）。
+                'yomi'        => $this->clean($p->yomi),
+                // 巻き取りの札の文字（空＝巻き取りなし）。自拠点の案件なら「大阪が巻き取り」、
+                // 他拠点の案件を自拠点が巻き取ったなら「大阪から巻き取り」。
+                'takeoverTag' => (function () use ($shareRows, $ownerOffice, $myOffice) {
+                    $take = $shareRows->filter(fn ($s) => $s['kind'] === '巻き取り');
+                    if ($take->isEmpty()) {
+                        return '';
+                    }
+                    if ($ownerOffice !== $myOffice && $take->contains(fn ($s) => $s['office'] === $myOffice)) {
+                        return ($ownerOffice !== '' ? $ownerOffice.'から' : '').'巻き取り';
+                    }
+
+                    return $take->pluck('office')->filter()->implode('・').'が巻き取り';
+                })(),
                 'lodging'     => $this->clean($p->lodging),
                 'content'     => $content,
                 // 検索用：難易度表の種類・分類（例「リアル|謎解き脱出」）。画面には出さず data-search にだけ入れる。

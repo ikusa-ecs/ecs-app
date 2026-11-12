@@ -417,6 +417,8 @@ class AssignBoardController extends Controller
                     'status' => $status,
                 ] + AssignmentStamp::forCreate($status));
             }
+            // まとめて消したぶんは Assignment の見張りを通らない＝Dを外したとき用に、ここで写しの合わせ直しを予約する。
+            \App\Support\DirectorSync::queueRefresh($project->id);
         });
 
         return response()->json(['ok' => true, 'count' => count($members), 'date' => $date]);

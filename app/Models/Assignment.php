@@ -52,6 +52,21 @@ class Assignment extends Model
     {
         static::saved(fn (Assignment $a) => \App\Support\CalendarSyncQueue::markAssignmentChanged($a));
         static::deleted(fn (Assignment $a) => \App\Support\CalendarSyncQueue::markAssignmentChanged($a));
+
+        // D／SD の行が変わったら、案件の古い列（director_id / sd_id）の写しも合わせ直す（2026-11-12 小沼さん）。
+        // 正本＝App\Support\DirectorSync::queueRefresh（なぜ要るかはそちら）。
+        // ⚠ まとめて消す処理（->where(...)->delete()）はここを通らない＝その場所で queueRefresh を呼ぶ。
+        $mirror = function (Assignment $a) {
+            $roles = [$a->role, $a->getOriginal('role')];
+            if (array_intersect($roles, [\App\Support\AssignmentRole::D, \App\Support\AssignmentRole::SD])) {
+                \App\Support\DirectorSync::queueRefresh($a->project_id);
+                if ($a->getOriginal('project_id') && $a->getOriginal('project_id') !== $a->project_id) {
+                    \App\Support\DirectorSync::queueRefresh($a->getOriginal('project_id'));
+                }
+            }
+        };
+        static::saved($mirror);
+        static::deleted($mirror);
     }
 
     /** 確定だけを取り出すクエリスコープ（回数集計などに使う）。 */

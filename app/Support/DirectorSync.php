@@ -150,6 +150,64 @@ class DirectorSync
         }
     }
 
+    /** 写しを合わせ直す予定の案件ID（同じ保存の中で何度呼ばれても、最後に1回だけ合わせる）。 */
+    private static array $pendingMirror = [];
+
+    /**
+     * 「この案件の写しを、いまのアサインに合わせ直して」と予約する（2026-11-12 小沼さん）。
+     *
+     * ■ なぜ要るか
+     *   Dのアサインを D決め・案件一覧のセル**以外**（日別ボード・案件別アサイン・取込・自動アサインの取り消し）で
+     *   外すと、古い列（projects.director_id / sd_id）の写しが残った。アサイン表と案件一覧は写しを読むので、
+     *   **外したはずの人がDに出続けた**（12/11 電脳都市に水内さん）。
+     *   → アサインが変わったら、どの画面からでも写しが追いかけるようにする。
+     *
+     * ■ なぜ「予約」か
+     *   日別ボードなどは「全部消してから入れ直す」保存をする。途中（SDは入れたがDはまだ）で合わせると、
+     *   写しが一度空になって編集履歴に「D → 空」「空 → D」が毎回残る。保存が終わってから1回だけ合わせる。
+     */
+    public static function queueRefresh(?string $projectId): void
+    {
+        $projectId = (string) $projectId;
+        if ($projectId === '') {
+            return;
+        }
+        $first = self::$pendingMirror === [];
+        self::$pendingMirror[$projectId] = true;
+        if ($first) {
+            // 保存のまとまり（トランザクション）の外ならすぐ、中なら終わったあとに動く。
+            \Illuminate\Support\Facades\DB::afterCommit(fn () => self::flushRefresh());
+        }
+    }
+
+    /** 予約されている案件の写しを、いまのアサインに合わせる。 */
+    public static function flushRefresh(): void
+    {
+        $ids = array_keys(self::$pendingMirror);
+        self::$pendingMirror = [];
+        foreach ($ids as $id) {
+            try {
+                self::refreshMirror($id);
+            } catch (\Throwable $e) {
+                report($e);   // 写しの失敗で、本体の保存を失敗にしない
+            }
+        }
+    }
+
+    /**
+     * 1案件の写しを、いまのアサイン（assignments の D／SD）に合わせる。
+     * ⚠ 開催日が無い案件は触らない（アサインを持てないので、写しだけが正＝apply() の skipped と同じ事情）。
+     */
+    public static function refreshMirror(string $projectId): void
+    {
+        $project = Project::find($projectId);
+        if (! $project || ! $project->start_date) {
+            return;
+        }
+        [$d, $sd] = self::current($project);
+        self::mirrorToProject($project, $d, $sd);
+    }
+
     /**
      * assignments に入っている今のD／SDを読む＝[D社員ID, SD社員ID]（未定は null）。
      * 移行②で表示側を切り替えるときに使う（古い列の代わりにここを読む）。

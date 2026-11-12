@@ -973,6 +973,8 @@ class PastProjectImportController extends Controller
                         $wasConfirmed[(string) $o->staff_id] = $o->only(['assigned_by', 'assigned_at', 'confirmed_by', 'confirmed_at']);
                     }
                     $old->delete();
+                    // まとめて消したぶんは Assignment の見張りを通らない＝Dを外したとき用に、写しの合わせ直しを予約する。
+                    \App\Support\DirectorSync::queueRefresh($project->id);
                 }
 
                 foreach ($assignments as $a) {

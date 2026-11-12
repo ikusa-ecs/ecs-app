@@ -459,6 +459,8 @@ class AssignmentController extends Controller
                     // 誰が・いつ（＋確定なら確定の記録）は AssignmentStamp の1か所で付ける。
                 ] + AssignmentStamp::forCreate($data['status']));
             }
+            // まとめて消したぶんは Assignment の見張りを通らない＝Dを外したとき用に、ここで写しの合わせ直しを予約する。
+            \App\Support\DirectorSync::queueRefresh($project->id);
         });
 
         $n = count($staffIds);

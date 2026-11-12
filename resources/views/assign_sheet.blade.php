@@ -77,6 +77,8 @@
   .htag.fill-ok { background: #2e9e6b; }
   .htag.fill-short { background: #e0692b; }
   .htag.extra { background: rgba(0,0,0,.32); }
+  .htag.takeover { background: #6d28d9; color: #fff; }
+  .htag.yomi { background: #fde68a; color: #7a4a00; }
   .htag.dtype { background: rgba(0,0,0,.30); }
 
   /* 項目行：ラベル＋値（詰める） */
@@ -655,6 +657,9 @@
             @if ($c['format'] !== '')<span class="htag fmt">{{ $c['format'] }}</span>@endif
             @if ($c['dayType'] !== '本番')<span class="htag dtype">{{ $c['dayType'] }}</span>@endif
             @if ($c['category'] === '追加案件')<span class="htag extra">追加</span>@endif
+            {{-- 巻き取り・ヨミも実施形態の横に出す（2026-11-12 小沼さん）。ヨミは「確定」以外のときだけ（確定が大半で、全部に出すと目立たなくなる）。 --}}
+            @if (($c['takeoverTag'] ?? '') !== '')<span class="htag takeover" title="他拠点との巻き取り">{{ $c['takeoverTag'] }}</span>@endif
+            @if (($c['yomi'] ?? '') !== '' && $c['yomi'] !== '確定')<span class="htag yomi" title="ヨミ（受注の見込み）">{{ $c['yomi'] }}</span>@endif
             @if ($c['lodging'] !== '')<span class="htag">{{ $c['lodging'] }}</span>@endif
             @if ($c['need_i'] > 0)
               <span class="htag {{ $short ? 'fill-short' : 'fill-ok' }}">{{ $c['filled'] }}/{{ $c['need_i'] }}名</span>

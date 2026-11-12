@@ -160,10 +160,19 @@ class MonthAutoAssignController extends Controller
         //     （役割を替えた・備考を書いた・担当メモを入れた行。2026-09-08 baba指摘
         //      「置いた人がいなくなっていた」＝ここが消えていた可能性がある）
         //   見分け方＝作った時刻より更新の時刻が後なら「あとから誰かが触った」。
+        $touched = Assignment::where('auto_run_id', $run->id)
+            ->where('status', '仮')
+            ->whereColumn('updated_at', '<=', 'created_at')
+            ->whereIn('role', [\App\Support\AssignmentRole::D, \App\Support\AssignmentRole::SD])
+            ->pluck('project_id')->unique()->all();
         $removed = Assignment::where('auto_run_id', $run->id)
             ->where('status', '仮')
             ->whereColumn('updated_at', '<=', 'created_at')
             ->delete();
+        // まとめて消したぶんは Assignment の見張りを通らない＝D／SDを消した案件は、写しを合わせ直す。
+        foreach ($touched as $pid) {
+            \App\Support\DirectorSync::queueRefresh($pid);
+        }
 
         $keptConfirmed = Assignment::where('auto_run_id', $run->id)->where('status', '確定')->count();
         $keptEdited = Assignment::where('auto_run_id', $run->id)
