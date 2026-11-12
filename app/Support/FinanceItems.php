@@ -47,7 +47,7 @@ class FinanceItems
         ['key' => 'lodging', 'name' => '宿泊費', 'price' => 11000, 'unit' => '泊', 'note' => '5人で泊まったら5泊。前泊・後泊手当も含む'],
         ['key' => 'trainer', 'name' => '研修講師費', 'price' => 77000, 'unit' => '日', 'note' => 'OODAチャンバラ・サバ研はスタッフ費で計上'],
         // ── 実費（金額を直接入力。1,000円単位に切り上げ） ──
-        ['key' => 'highway', 'name' => '高速費（ガソリン・ETC含む）', 'price' => null, 'unit' => '実費', 'note' => '片道：30km1,800/50km3,000/90km5,400/120km7,200/150km9,000/180km10,800/210km12,600'],
+        ['key' => 'highway', 'name' => '高速費（ガソリン・ETC含む）', 'price' => null, 'unit' => '実費', 'note' => '往復の金額。片道のキロ数を入れると自動で入ります（片道1kmあたり60円×往復。例：片道30km＝3,600）。手で直すこともできます'],
         ['key' => 'rentacar', 'name' => 'レンタカー費', 'price' => null, 'unit' => '実費', 'note' => 'ハイエース基準：1泊2日16,000/2泊3日29,000/3泊4日42,000/4泊5日55,000'],
         ['key' => 'food_cater', 'name' => 'フード手配費', 'price' => null, 'unit' => '実費', 'note' => 'ケータリング/オードブル/BBQ/格付け/マグロ等。業者別ルールは収支定義を参照'],
         ['key' => 'outsource', 'name' => '外注費', 'price' => null, 'unit' => '実費', 'note' => 'MC・音響・配信・警備・設備など'],
@@ -64,7 +64,26 @@ class FinanceItems
      */
     public static function all(): array
     {
-        return self::ITEMS;
+        return array_map(function (array $item) {
+            if ($item['key'] === 'highway') {
+                // 片道1kmあたりの**往復**の金額。画面はキロ数×これを金額欄に入れる。
+                $item['perKm'] = self::HIGHWAY_YEN_PER_KM * 2;
+            }
+
+            return $item;
+        }, self::ITEMS);
+    }
+
+    /** 高速費の目安：片道1kmあたりの金額（これまでの表＝30km 1,800円 と同じ割合）。 */
+    public const HIGHWAY_YEN_PER_KM = 60;
+
+    /**
+     * 高速費の目安（片道のキロ数 → **往復**の金額）。FBシート No.30・2026-11-12。
+     * 画面はキロ数を入れると金額欄に入るだけで、保存するのは今までどおり金額（amount）だけ。
+     */
+    public static function highwayRoundTrip(int $km): int
+    {
+        return max(0, $km) * self::HIGHWAY_YEN_PER_KM * 2;
     }
 
     /** 費目キー → 表示名（一覧・CSVの見出しに使う）。未知のキーはそのまま返す。 */

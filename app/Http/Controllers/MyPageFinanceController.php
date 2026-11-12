@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assignment;
 use App\Models\Project;
 use App\Models\ProjectFinance;
 use App\Support\FinanceAccess;
@@ -62,11 +63,38 @@ class MyPageFinanceController extends Controller
             'cases' => $cases,
             'myAssign' => PersonalCases::myAssign($me),
             'finances' => $finances,
+            'staffCounts' => self::staffCounts($cases->pluck('id')->all()),
             // 経費の費目＝サーバー側の正本（App\Support\FinanceItems）から渡す。
             // 画面のJSに単価をベタ書きすると、一覧（/finance-list）の計算と食い違うため。
             'costItems' => FinanceItems::all(),
             'forcedCase' => $forcedCase,   // 一覧から来た案件（権限OKのときだけ入る。null＝通常）
         ]);
+    }
+
+    /**
+     * 案件ID → アサインされている**スタッフ**の人数（社員とキャンセルは数えない）。
+     * 当日スタッフ費の数量の「仮の数字」に使う（FBシート No.28・2026-11-12）。
+     * 社員には当日スタッフ費が出ないので、運営人数そのままだと多く入ってしまっていた。
+     * ⚠ アサインが1人もいない案件はキーを入れない＝画面は今までどおり運営人数を仮に入れる。
+     *
+     * @param  list<string>  $projectIds
+     * @return array<string, int>
+     */
+    public static function staffCounts(array $projectIds): array
+    {
+        $out = [];
+        foreach (array_chunk($projectIds, 500) as $chunk) {
+            $rows = Assignment::query()
+                ->join('people', 'people.id', '=', 'assignments.staff_id')
+                ->whereIn('assignments.project_id', $chunk)
+                ->where('assignments.status', '!=', 'キャンセル')
+                ->get(['assignments.project_id', 'people.role as person_role']);
+            foreach ($rows as $r) {
+                $out[$r->project_id] = ($out[$r->project_id] ?? 0) + ($r->person_role === 'staff' ? 1 : 0);
+            }
+        }
+
+        return $out;
     }
 
     /**

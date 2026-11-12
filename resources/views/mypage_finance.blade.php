@@ -54,14 +54,16 @@
     .price-cell .jisshi { color: var(--muted); font-size: 12px; }
     .amount-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
     .note-cell { font-size: 11.5px; color: var(--muted); }
-    /* 経費表の備考は1行に収め、はみ出しは「…」で省略（マウスで全文表示） */
+    /* 経費表の備考は折り返して全部見せる（以前は1行に省略していて後ろが読めなかった＝FBシート No.29・2026-11-12） */
     #costBody td.note-cell {
-      max-width: 240px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      min-width: 220px;
+      max-width: 380px;
+      white-space: normal;
+      line-height: 1.55;
     }
-    #costBody td.note-cell:hover { cursor: help; }
+    /* 高速費：片道のキロ数を入れる欄（FBシート No.30） */
+    .km-wrap { white-space: nowrap; font-size: 12px; color: var(--muted); }
+    .km-wrap .km-input { width: 70px; }
 
     tr.total-row td { background: var(--brand-soft); font-weight: 800; color: var(--brand-dark); }
     tr.profit-row td { background: #eef6ee; font-weight: 800; }
@@ -299,6 +301,8 @@
   window.ROLE_LABELS = @json(\App\Support\AssignmentRole::LABELS);
   // 保存済みの収支（案件ID→{revenue, items, memo}）。案件を選ぶとこの値で各欄を復元する。
   window.ECS_FINANCES = @json($finances ?? new stdClass);
+  // 案件ID→アサインされているスタッフの人数（社員・キャンセルを除く）。アサインが1人もいない案件は入らない。
+  window.ECS_STAFF_COUNTS = @json($staffCounts ?? new stdClass);
   // 保存（POST）に必要な合言葉（CSRFトークン）。他画面と同じ ECS_CSRF を使う。
   window.ECS_CSRF = @json(csrf_token());
   // 経費の費目＝サーバー側の正本（App\Support\FinanceItems）。ここが唯一の定義で、
@@ -397,12 +401,30 @@
       return '<tr data-key="'+it.key+'">' +
         '<td>'+it.name+'</td>' +
         '<td class="num price-cell"><span class="jisshi">実費</span></td>' +
-        '<td class="num">—</td>' +
+        '<td class="num">'+(it.perKm ? '<span class="km-wrap">片道 <input class="yen-input km-input" type="number" min="0" step="1" data-role="km" data-per-km="'+it.perKm+'" placeholder="0" oninput="kmInput(this)"> km</span>' : '—')+'</td>' +
         '<td class="unit-cell">'+it.unit+'</td>' +
         '<td class="num"><input class="yen-input" type="number" min="0" step="1000" data-role="amount-input" value="0" oninput="recalc()"></td>' +
         '<td class="note-cell" title="'+it.note+'">'+it.note+'</td>' +
       '</tr>';
     }).join('');
+  }
+
+  // 高速費：片道のキロ数を入れると、往復の金額を金額欄に入れる（手で直してもよい）。FBシート No.30。
+  // 1kmきざみで入れられる（2026-11-12 小沼さん「もっと細かく」）。1kmあたりの金額はサーバーの正本（FinanceItems）から来る。
+  function kmInput(inp){
+    const tr = inp.closest('tr');
+    const km = Math.max(0, Math.floor(Number(inp.value || 0)));
+    tr.querySelector('[data-role="amount-input"]').value = km * Number(inp.dataset.perKm);
+    recalc();
+  }
+  // 金額からキロ数の欄を合わせる（保存したものを開き直したとき用）。ちょうど割り切れる金額のときだけ入れ、違えば空にする。
+  // ⚠ いまキロ数を打っている最中は触らない（打ちかけの数字が消えるため）。
+  function syncKm(tr){
+    const inp = tr.querySelector('[data-role="km"]');
+    if (!inp || document.activeElement === inp) return;
+    const per = Number(inp.dataset.perKm);
+    const amt = Number(tr.querySelector('[data-role="amount-input"]').value || 0);
+    inp.value = (amt > 0 && per > 0 && amt % per === 0) ? String(amt / per) : '';
   }
 
   // 金額の再計算
@@ -419,6 +441,7 @@
         // 実費は1,000円単位に切り上げ（例：499円→1,000円）。注記のルールに合わせて計算する。
         const raw = Number(tr.querySelector('[data-role="amount-input"]').value || 0);
         amount = raw > 0 ? Math.ceil(raw / 1000) * 1000 : 0;
+        syncKm(tr);
       }
       total += amount;
     });
@@ -469,7 +492,10 @@
     // 当日スタッフ費の「仮の数量」＝案件の運営人数（DB）。まだ保存が無い案件だけ自動で入れる（手で変更可）。
     // 実施形態に合う行に入れる（オンライン→staff_online／リアルロング→staff_long／それ以外→staff_real）。
     const staffKey = c.fmt === 'online' ? 'staff_online' : (c.fmt === 'long' ? 'staff_long' : 'staff_real');
-    const defaultStaff = Number(c.need) || 0;
+    // ⚠ アサインが入っている案件は「社員を除いたスタッフの人数」を入れる（社員には当日スタッフ費が出ないため＝FBシート No.28）。
+    //   数えるのはサーバー（MyPageFinanceController::staffCounts）。アサインがまだ無い案件だけ運営人数。
+    const SC = window.ECS_STAFF_COUNTS || {};
+    const defaultStaff = (id in SC) ? Number(SC[id]) || 0 : (Number(c.need) || 0);
     COST_ITEMS.forEach(it => {
       const tr = document.querySelector('#costBody tr[data-key="'+it.key+'"]');
       const saved = (f.items && f.items[it.key]) || {};
