@@ -100,16 +100,16 @@ class GoogleCalendarTest extends TestCase
         $this->assertSame('me@ikusa.co.jp', $link->google_email);
         $this->assertNotSame('RT', \DB::table('google_calendar_links')->value('refresh_token'), '鍵は暗号化して保存');
 
-        // ② 1回目：5つ作る。
-        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['ok' => true, 'created' => 5, 'updated' => 0, 'cases' => 1]);
+        // ② 1回目：予定を5つ作る。数は案件で数える＝1（前後の移動・前泊・後泊は案件に付いているもの・2026-11-13 小沼さん）。
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['ok' => true, 'created' => 1, 'updated' => 0, 'cases' => 1]);
         $this->assertSame(5, GoogleCalendarEvent::where('person_id', $me->id)->count());
 
         // ③ 2回目：重ならない（全部上書き）。
-        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['created' => 0, 'updated' => 5]);
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['created' => 0, 'updated' => 1]);
 
         // ④ アサインが外れたら、その予定を消す。
         Assignment::where('staff_id', $me->id)->update(['status' => 'キャンセル']);
-        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['deleted' => 5]);
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['deleted' => 1]);
         $this->assertSame(0, GoogleCalendarEvent::where('person_id', $me->id)->count());
         Http::assertSent(fn ($r) => $r->method() === 'DELETE');
 
@@ -138,7 +138,7 @@ class GoogleCalendarTest extends TestCase
         ]);
 
         // ① カレンダーが空なら、今までどおり5つ入る。
-        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['created' => 5, 'skipped' => 0]);
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['created' => 1, 'skipped' => 0]);
         $sent = collect(Http::recorded())->map(fn ($pair) => $pair[0])->filter(fn ($r) => $r->method() === 'POST' && str_ends_with($r->url(), '/events'))->values();
         $this->assertCount(5, $sent);
 
@@ -157,21 +157,21 @@ class GoogleCalendarTest extends TestCase
         ];
         // まず聞き返す＝何も書かない（どうするかは本人が決める）。
         $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()
-            ->assertJson(['ok' => true, 'ask' => true, 'overlaps' => 2, 'created' => 0, 'updated' => 0]);
+            ->assertJson(['ok' => true, 'ask' => true, 'overlaps' => 1, 'created' => 0, 'updated' => 0]);   // 2つかぶっていても案件は1つ
         $this->assertSame(5, GoogleCalendarEvent::where('person_id', $me->id)->count());
         Http::assertSentCount(1 + 1 + 5 + 1 + 1);   // 1回目＝鍵・一覧・作る5／聞き返し＝鍵・一覧だけ
 
         // 「飛ばす」を選んだ＝二重になっていたECS側の2つを消し、残り3つは上書き。
         $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'skip'])->assertOk()
-            ->assertJson(['created' => 0, 'updated' => 3, 'skipped' => 2, 'failed' => 0]);
+            ->assertJson(['created' => 0, 'updated' => 0, 'skipped' => 1, 'failed' => 0]);   // 案件の結果＝本体の予定の結果
         $this->assertSame(3, GoogleCalendarEvent::where('person_id', $me->id)->count(), '二重になっていたECS側の2つは消す');
         Http::assertNotSent(fn ($r) => $r->method() === 'DELETE' && str_contains($r->url(), 'gas'));   // 相手の予定には触らない
 
         // ③ もう一度「飛ばす」でも、飛ばした2つは入れ直さない。
-        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'skip'])->assertOk()->assertJson(['created' => 0, 'updated' => 3, 'skipped' => 2]);
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'skip'])->assertOk()->assertJson(['created' => 0, 'updated' => 0, 'skipped' => 1]);
 
         // ④ 「かぶっていても入れる」を選んだ＝飛ばさずに全部入る。
-        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'add'])->assertOk()->assertJson(['created' => 2, 'updated' => 3, 'skipped' => 0]);
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'add'])->assertOk()->assertJson(['created' => 1, 'updated' => 0, 'skipped' => 0]);
     }
 
     public function test_staff_cannot_use_it(): void

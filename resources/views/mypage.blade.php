@@ -1143,7 +1143,7 @@
           // かぶりがあった＝まだ何も入れていない。飛ばすか・かぶっても入れるかを本人が選ぶ。
           msg.textContent = '';
           const p = document.createElement('div');
-          p.textContent = '🔁 同じ時刻の予定が、すでにカレンダーに ' + j.overlaps + ' 件あります（'
+          p.textContent = '🔁 同じ時刻の予定が、すでにカレンダーにある案件が ' + j.overlaps + ' 件あります（'
             + (j.titles || []).join('／') + (j.overlaps > (j.titles || []).length ? ' ほか' : '') + '）。この分はどうしますか？';
           msg.appendChild(p);
           [['skip', 'かぶっている分は飛ばす', 'btn primary'], ['add', 'かぶっていても入れる（二重になります）', 'btn']].forEach(([d, label, cls]) => {
@@ -1156,8 +1156,8 @@
         }
         msg.style.color = 'var(--ok-ink, #166534)';
         msg.textContent = '✅ 登録しました（' + j.cases + '案件／新しく ' + j.created + '・上書き ' + j.updated + '・消した ' + j.deleted + '）'
-          + (j.skipped ? '　🔁 ' + j.skipped + '件は、同じ時刻の予定がすでにカレンダーにあるので入れていません' : '')
-          + (j.failed ? '　⚠ ' + j.failed + '件は入りませんでした。もう一度押してください' : '');
+          + (j.skipped ? '　🔁 ' + j.skipped + '案件は、同じ時刻の予定がすでにカレンダーにあるので入れていません' : '')
+          + (j.failed ? '　⚠ ' + j.failed + '案件は入りませんでした。もう一度押してください' : '');
         if (window.ECS_GCAL) { const t = new Date(); window.ECS_GCAL.syncedAt = (t.getMonth() + 1) + '/' + t.getDate() + ' ' + pad2(t.getHours()) + ':' + pad2(t.getMinutes()); }
       })
       .catch(err => { msg.style.color = '#b91c1c'; msg.textContent = '⚠ ' + err.message; })

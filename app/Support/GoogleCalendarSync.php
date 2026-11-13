@@ -119,10 +119,22 @@ final class GoogleCalendarSync
         $foreign = self::foreignSlots($token, $bodies);
         // かぶりをどうするかは本人が決める（2026-11-13 小沼さん）。ask＝かぶりがあれば何も書かずに聞き返す／skip＝飛ばす／add＝かぶっても入れる。
         if ($dup === 'ask') {
-            $hits = array_values(array_filter($events, fn ($e) => isset($foreign[self::slotKey($bodies[$e['uid']])])));
-            if ($hits) {
-                return $count + ['ask' => true, 'overlaps' => count($hits),
-                    'titles' => array_map(fn ($e) => ($e['day'] ?? $e['start'])->format('n/j').' '.$e['title'], array_slice($hits, 0, 5))];
+            // 件数は案件で数える（移動・前泊・後泊だけがかぶっていても、その案件を1件として見せる）。見せる名前は本体の予定の題名。
+            $hitCases = [];
+            foreach ($events as $e) {
+                if (isset($foreign[self::slotKey($bodies[$e['uid']])])) {
+                    $hitCases[self::caseOf($e['uid'])] = true;
+                }
+            }
+            if ($hitCases) {
+                $titles = [];
+                foreach ($events as $e) {
+                    if (str_ends_with($e['uid'], '-main') && isset($hitCases[self::caseOf($e['uid'])]) && count($titles) < 5) {
+                        $titles[] = ($e['day'] ?? $e['start'])->format('n/j').' '.$e['title'];
+                    }
+                }
+
+                return $count + ['ask' => true, 'overlaps' => count($hitCases), 'titles' => $titles];
             }
         }
         if ($dup === 'add') {
@@ -130,6 +142,8 @@ final class GoogleCalendarSync
         }
 
         $seen = [];
+        $done = [];   // 予定ごとの結果（uid => created / updated / skipped / failed）
+        $gone = [];   // 予定を消した案件
         foreach ($events as $e) {
             $seen[$e['uid']] = true;
             $body = $bodies[$e['uid']];
@@ -139,26 +153,26 @@ final class GoogleCalendarSync
                 if ($row) {
                     $res = Http::withToken($token)->delete(self::EVENTS_URL.'/'.rawurlencode($row->event_id));
                     if (! $res->successful() && ! in_array($res->status(), [404, 410], true)) {
-                        $count['failed']++;
+                        $done[$e['uid']] = 'failed';
 
                         continue;
                     }
                     $row->delete();
                 }
-                $count['skipped']++;
+                $done[$e['uid']] = 'skipped';
 
                 continue;
             }
             if ($row) {
                 $res = Http::withToken($token)->put(self::EVENTS_URL.'/'.rawurlencode($row->event_id), $body);
                 if ($res->successful()) {
-                    $count['updated']++;
+                    $done[$e['uid']] = 'updated';
                     $row->update(['case_date' => $e['caseDate']]);
 
                     continue;
                 }
                 if (! in_array($res->status(), [404, 410], true)) {
-                    $count['failed']++;
+                    $done[$e['uid']] = 'failed';
 
                     continue;
                 }
@@ -166,11 +180,11 @@ final class GoogleCalendarSync
             }
             $res = Http::withToken($token)->post(self::EVENTS_URL, $body);
             if ($res->successful() && $res->json('id')) {
-                $count['created']++;
+                $done[$e['uid']] = 'created';
                 GoogleCalendarEvent::updateOrCreate(['person_id' => $me->id, 'uid' => $e['uid']],
                     ['event_id' => (string) $res->json('id'), 'case_date' => $e['caseDate']]);
             } else {
-                $count['failed']++;
+                $done[$e['uid']] = 'failed';
             }
         }
 
@@ -181,12 +195,25 @@ final class GoogleCalendarSync
             }
             $res = Http::withToken($token)->delete(self::EVENTS_URL.'/'.rawurlencode($row->event_id));
             if ($res->successful() || in_array($res->status(), [404, 410], true)) {
-                $count['deleted']++;
+                $gone[self::caseOf($uid)] = true;
                 $row->delete();
             } else {
-                $count['failed']++;
+                $done[$uid] = 'failed';
             }
         }
+        // 数は案件で数える（前後の「移動」や前泊・後泊は案件に付いているものなので、別に数えない・2026-11-13 小沼さん）。
+        // 案件の結果＝本体の予定（-main）の結果。どれか1つでも入らなければ「入らなかった」。
+        $byCase = [];
+        foreach ($done as $uid => $st) {
+            $c = self::caseOf($uid);
+            if ($st === 'failed' || ! isset($byCase[$c]) || (str_ends_with($uid, '-main') && $byCase[$c] !== 'failed')) {
+                $byCase[$c] = $st;
+            }
+        }
+        foreach ($byCase as $st) {
+            $count[$st]++;
+        }
+        $count['deleted'] = count($gone);
         $link->update(['synced_at' => Carbon::now()]);
 
         return $count;
@@ -238,6 +265,12 @@ final class GoogleCalendarSync
         }
 
         return $slots;
+    }
+
+    /** 予定の名前（uid＝案件ID-役割-種類）から、案件のぶん（案件ID-役割）だけを取り出す。 */
+    private static function caseOf(string $uid): string
+    {
+        return (string) preg_replace('/-(move-before|main|move-after|stay-pre|stay-post)$/', '', $uid);
     }
 
     /** 予定の「始まり|終わり」。時刻つきは時間帯の書き方が違っても同じになるよう秒に直す。終日は日付のまま。 */
