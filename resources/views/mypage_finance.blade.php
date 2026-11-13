@@ -303,6 +303,11 @@
   window.ECS_FINANCES = @json($finances ?? new stdClass);
   // 案件ID→アサインされているスタッフの人数（社員・キャンセルを除く）。アサインが1人もいない案件は入らない。
   window.ECS_STAFF_COUNTS = @json($staffCounts ?? new stdClass);
+  // 飲食費・宿泊費の仮の数量に使う（FBシート No.28 後半）。全員の人数（スタッフ＋社員）と、泊まる回数（前泊1・後泊1）。
+  window.ECS_HEAD_COUNTS = @json((object) ($headCounts ?? []));
+  window.ECS_STAY_NIGHTS = @json((object) ($stayNights ?? []));
+  // 案件ごとの「入っている人」（名前・役割・社員かどうか）。見出しに当日の人数と名前を出す。
+  window.ECS_ROSTER = @json((object) ($roster ?? []));
   // 保存（POST）に必要な合言葉（CSRFトークン）。他画面と同じ ECS_CSRF を使う。
   window.ECS_CSRF = @json(csrf_token());
   // 経費の費目＝サーバー側の正本（App\Support\FinanceItems）。ここが唯一の定義で、
@@ -479,7 +484,20 @@
       b.textContent = lg;
       head.appendChild(b);
     }
-    document.getElementById('caseSub').textContent = fmtDate(c.off) + '　/　' + role + '　/　必要人数 ' + (c.need||'—') + '名';
+    // 必要人数ではなく「当日入っている人数と名前」を出す（2026-11-13 小沼さん「誰がいたか分かれば思い出せる」）。⚠ 派遣は名簿に無いので出ない。
+    const people = (window.ECS_ROSTER || {})[id] || [];
+    const emps = people.filter(p => p.emp), staffs = people.filter(p => !p.emp);
+    document.getElementById('caseSub').textContent = fmtDate(c.off) + '　/　' + role + '　/　'
+      + (people.length ? '当日 ' + people.length + '名（社員 ' + emps.length + '・スタッフ ' + staffs.length + '）' : 'アサインはまだ入っていません');
+    let rosterEl = document.getElementById('caseRoster');
+    if (!rosterEl) {
+      rosterEl = document.createElement('div');
+      rosterEl.id = 'caseRoster';
+      rosterEl.style.cssText = 'font-size:12.5px; margin-top:4px; line-height:1.7; color:var(--ink);';
+      document.getElementById('caseSub').insertAdjacentElement('afterend', rosterEl);
+    }
+    const names = (list) => list.map(p => p.name + (p.role ? '（' + roleShort(p.role) + '）' : '')).join('・');
+    rosterEl.textContent = [emps.length ? '社員：' + names(emps) : '', staffs.length ? 'スタッフ：' + names(staffs) : ''].filter(Boolean).join('　／　');
 
     // 保存済みの収支は「サーバの値」が正（開き直しても残る）。
     // サーバに無い案件だけ、これまでのブラウザ記憶（localStorage）を使う。
@@ -489,19 +507,24 @@
       : (loadStore()[id] || {});
     document.getElementById('revInput').value = f.rev || '';
     document.getElementById('memoInput').value = f.memo || '';
-    // 当日スタッフ費の「仮の数量」＝案件の運営人数（DB）。まだ保存が無い案件だけ自動で入れる（手で変更可）。
+    // 当日スタッフ費の「仮の数量」。まだ保存が無い案件だけ自動で入れる（手で変更可）。
     // 実施形態に合う行に入れる（オンライン→staff_online／リアルロング→staff_long／それ以外→staff_real）。
     const staffKey = c.fmt === 'online' ? 'staff_online' : (c.fmt === 'long' ? 'staff_long' : 'staff_real');
     // ⚠ アサインが入っている案件は「社員を除いたスタッフの人数」を入れる（社員には当日スタッフ費が出ないため＝FBシート No.28）。
-    //   数えるのはサーバー（MyPageFinanceController::staffCounts）。アサインがまだ無い案件だけ運営人数。
+    //   数えるのはサーバー（MyPageFinanceController::staffCounts）。⚠ アサインが1人もいない案件は何も入れない（2026-11-13 小沼さん。前は運営人数を入れていた）。
     const SC = window.ECS_STAFF_COUNTS || {};
-    const defaultStaff = (id in SC) ? Number(SC[id]) || 0 : (Number(c.need) || 0);
+    const defaultStaff = Number(SC[id]) || 0;
+    const HC = window.ECS_HEAD_COUNTS || {};
+    const defaultAll = Number(HC[id]) || 0;
     COST_ITEMS.forEach(it => {
       const tr = document.querySelector('#costBody tr[data-key="'+it.key+'"]');
       const saved = (f.items && f.items[it.key]) || {};
       if (it.price !== null) {
-        // 保存済みならその値。未保存の案件は、当日スタッフ費の行だけ運営人数を仮入力。
-        const fallback = (it.key === staffKey) ? defaultStaff : 0;
+        // 保存済みならその値。未保存の案件は、当日スタッフ費・飲食費・宿泊費だけ仮の数量を入れる。
+        // 飲食費＝全員（スタッフ＋社員）の人数／宿泊費＝全員×泊まる回数（前泊・後泊のある案件だけ）。2026-11-13 小沼さん決定。
+        const fallback = (it.key === staffKey) ? defaultStaff
+          : (it.key === 'food') ? defaultAll
+          : (it.key === 'lodging') ? defaultAll * (Number((window.ECS_STAY_NIGHTS || {})[id]) || 0) : 0;
         tr.querySelector('[data-role="qty"]').value = ('qty' in saved) ? saved.qty : fallback;
       } else {
         tr.querySelector('[data-role="amount-input"]').value = saved.amount || 0;

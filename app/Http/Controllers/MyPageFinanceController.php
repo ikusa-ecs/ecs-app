@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\ProjectFinance;
 use App\Support\FinanceAccess;
 use App\Support\FinanceItems;
+use App\Support\Lodging;
 use App\Support\PersonalCases;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -64,6 +65,9 @@ class MyPageFinanceController extends Controller
             'myAssign' => PersonalCases::myAssign($me),
             'finances' => $finances,
             'staffCounts' => self::staffCounts($cases->pluck('id')->all()),
+            'headCounts' => self::headCounts($cases->pluck('id')->all()),
+            'roster' => self::roster($cases->pluck('id')->all()),
+            'stayNights' => self::stayNights($cases->pluck('lodging', 'id')->all()),
             // 経費の費目＝サーバー側の正本（App\Support\FinanceItems）から渡す。
             // 画面のJSに単価をベタ書きすると、一覧（/finance-list）の計算と食い違うため。
             'costItems' => FinanceItems::all(),
@@ -75,7 +79,7 @@ class MyPageFinanceController extends Controller
      * 案件ID → アサインされている**スタッフ**の人数（社員とキャンセルは数えない）。
      * 当日スタッフ費の数量の「仮の数字」に使う（FBシート No.28・2026-11-12）。
      * 社員には当日スタッフ費が出ないので、運営人数そのままだと多く入ってしまっていた。
-     * ⚠ アサインが1人もいない案件はキーを入れない＝画面は今までどおり運営人数を仮に入れる。
+     * ⚠ アサインが1人もいない案件はキーを入れない＝画面は仮の数量を入れない（2026-11-13 小沼さん。それまでは運営人数を入れていた）。
      *
      * @param  list<string>  $projectIds
      * @return array<string, int>
@@ -91,6 +95,85 @@ class MyPageFinanceController extends Controller
                 ->get(['assignments.project_id', 'people.role as person_role']);
             foreach ($rows as $r) {
                 $out[$r->project_id] = ($out[$r->project_id] ?? 0) + ($r->person_role === 'staff' ? 1 : 0);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * 案件ID → アサインされている**全員**の人数（スタッフ＋社員。キャンセルは数えない）。
+     * 飲食費・宿泊費の数量の「仮の数字」に使う（FBシート No.28 後半・2026-11-13 小沼さん決定＝社員も数える）。
+     * ⚠ アサインが1人もいない案件はキーを入れない＝画面は仮の数量を入れない。
+     *
+     * @param  list<string>  $projectIds
+     * @return array<string, int>
+     */
+    public static function headCounts(array $projectIds): array
+    {
+        $out = [];
+        foreach (array_chunk($projectIds, 500) as $chunk) {
+            $rows = Assignment::query()
+                ->whereIn('project_id', $chunk)
+                ->where('status', '!=', 'キャンセル')
+                ->selectRaw('project_id, count(distinct staff_id) as n')
+                ->groupBy('project_id')
+                ->get();
+            foreach ($rows as $r) {
+                $out[$r->project_id] = (int) $r->n;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * 案件ID → その案件に入っている人の一覧（名前・役割・社員かどうか。キャンセルは出さない。社員が先）。
+     * 収支入力の見出しに「当日の人数と、誰がいたか」を出す（2026-11-13 小沼さん「必要人数ではなく当日の人数と名前を。思い出せるから」）。
+     * ⚠ 派遣は名簿に入らないので、ここには出ない。
+     *
+     * @param  list<string>  $projectIds
+     * @return array<string, list<array{name:string, role:string, emp:bool}>>
+     */
+    public static function roster(array $projectIds): array
+    {
+        $out = [];
+        foreach (array_chunk($projectIds, 500) as $chunk) {
+            $rows = Assignment::query()
+                ->join('people', 'people.id', '=', 'assignments.staff_id')
+                ->whereIn('assignments.project_id', $chunk)
+                ->where('assignments.status', '!=', 'キャンセル')
+                ->orderBy('assignments.id')
+                ->get(['assignments.project_id', 'assignments.staff_id', 'assignments.role', 'people.name', 'people.role as person_role']);
+            foreach ($rows as $r) {
+                // 同じ人が2日入っていても1回だけ出す。
+                $out[$r->project_id][$r->staff_id] ??= ['name' => (string) $r->name, 'role' => (string) $r->role, 'emp' => $r->person_role !== 'staff'];
+            }
+        }
+
+        return array_map(function (array $people) {
+            $list = array_values($people);
+            usort($list, fn ($a, $b) => ($b['emp'] <=> $a['emp']));   // 社員が先（同じ中では入れた順のまま）
+
+            return $list;
+        }, $out);
+    }
+
+    /**
+     * 案件ID → 泊まる回数（前泊あり＝1・後泊あり＝1・両方＝2）。0 の案件はキーを入れない。
+     * 宿泊費の数量（泊）の仮の数字＝人数×これ。⚠ 誰が泊まるかの記録は無いので、全員が泊まるとして数える（画面で直せる）。
+     * 前泊・後泊の言葉の正本＝Lodging。
+     *
+     * @param  array<string, ?string>  $lodgingById
+     * @return array<string, int>
+     */
+    public static function stayNights(array $lodgingById): array
+    {
+        $out = [];
+        foreach ($lodgingById as $id => $lodging) {
+            $n = (Lodging::hasPreStay($lodging) ? 1 : 0) + (Lodging::hasPostStay($lodging) ? 1 : 0);
+            if ($n > 0) {
+                $out[$id] = $n;
             }
         }
 
