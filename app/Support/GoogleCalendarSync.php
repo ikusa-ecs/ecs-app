@@ -95,9 +95,9 @@ final class GoogleCalendarSync
     /**
      * 今日から先のアサインを本人のメインのカレンダーへ書く。
      *
-     * @return array{created:int, updated:int, deleted:int, failed:int, cases:int}
+     * @return array{created:int, updated:int, deleted:int, failed:int, skipped:int, cases:int}
      */
-    public static function sync(Person $me, ?Carbon $today = null): array
+    public static function sync(Person $me, ?Carbon $today = null, string $dup = 'ask'): array
     {
         $link = GoogleCalendarLink::find($me->id);
         if (! $link) {
@@ -107,14 +107,48 @@ final class GoogleCalendarSync
         $today = ($today ?? Carbon::today())->copy()->startOfDay();
         $events = MyCalendarEvents::for($me, $today);
         $known = GoogleCalendarEvent::where('person_id', $me->id)->get()->keyBy('uid');
-        $count = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'failed' => 0,
+        $count = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'failed' => 0, 'skipped' => 0,
             'cases' => count(array_filter($events, fn ($e) => str_ends_with($e['uid'], '-main')))];   // 案件の数＝本体の予定の数
+
+        // すでにカレンダーにある「ECSが入れたのではない予定」（アサイン表のGAS・本人の手入力）の時刻。
+        // 始まりと終わりがぴったり同じ予定があれば、ECSからは入れない＝二重にしない（2026-11-13 小沼さん）。
+        $bodies = [];
+        foreach ($events as $e) {
+            $bodies[$e['uid']] = self::body($e);
+        }
+        $foreign = self::foreignSlots($token, $bodies);
+        // かぶりをどうするかは本人が決める（2026-11-13 小沼さん）。ask＝かぶりがあれば何も書かずに聞き返す／skip＝飛ばす／add＝かぶっても入れる。
+        if ($dup === 'ask') {
+            $hits = array_values(array_filter($events, fn ($e) => isset($foreign[self::slotKey($bodies[$e['uid']])])));
+            if ($hits) {
+                return $count + ['ask' => true, 'overlaps' => count($hits),
+                    'titles' => array_map(fn ($e) => ($e['day'] ?? $e['start'])->format('n/j').' '.$e['title'], array_slice($hits, 0, 5))];
+            }
+        }
+        if ($dup === 'add') {
+            $foreign = [];
+        }
 
         $seen = [];
         foreach ($events as $e) {
             $seen[$e['uid']] = true;
-            $body = self::body($e);
+            $body = $bodies[$e['uid']];
             $row = $known->get($e['uid']);
+            if (isset($foreign[self::slotKey($body)])) {
+                // 前にECSが入れていた分は消す（二重になった分の片づけ）。⚠ 相手の予定（ECSが入れていない方）には触らない。
+                if ($row) {
+                    $res = Http::withToken($token)->delete(self::EVENTS_URL.'/'.rawurlencode($row->event_id));
+                    if (! $res->successful() && ! in_array($res->status(), [404, 410], true)) {
+                        $count['failed']++;
+
+                        continue;
+                    }
+                    $row->delete();
+                }
+                $count['skipped']++;
+
+                continue;
+            }
             if ($row) {
                 $res = Http::withToken($token)->put(self::EVENTS_URL.'/'.rawurlencode($row->event_id), $body);
                 if ($res->successful()) {
@@ -156,6 +190,62 @@ final class GoogleCalendarSync
         $link->update(['synced_at' => Carbon::now()]);
 
         return $count;
+    }
+
+    /**
+     * これから入れる予定の期間にある「ECSが入れたのではない予定」の時刻の一覧（slotKey の形）。
+     * ECSが入れた予定は extendedProperties.private.ecsUid の印で見分ける。読めなかったときは空＝今までどおり全部入れる。
+     *
+     * @param  array<string, array<string, mixed>>  $bodies
+     * @return array<string, true>
+     */
+    private static function foreignSlots(string $token, array $bodies): array
+    {
+        $min = null;
+        $max = null;
+        foreach ($bodies as $b) {
+            $s = Carbon::parse($b['start']['dateTime'] ?? $b['start']['date'].' 00:00:00', 'Asia/Tokyo');
+            $e = Carbon::parse($b['end']['dateTime'] ?? $b['end']['date'].' 00:00:00', 'Asia/Tokyo');
+            $min = $min === null || $s->lt($min) ? $s : $min;
+            $max = $max === null || $e->gt($max) ? $e : $max;
+        }
+        if ($min === null) {
+            return [];
+        }
+        $slots = [];
+        $page = null;
+        for ($i = 0; $i < 20; $i++) {   // 1回2500件まで。念のため20ページで打ち切る
+            $res = Http::withToken($token)->get(self::EVENTS_URL, array_filter([
+                'timeMin' => $min->copy()->subDay()->toRfc3339String(),
+                'timeMax' => $max->copy()->addDay()->toRfc3339String(),
+                'singleEvents' => 'true',
+                'maxResults' => 2500,
+                'pageToken' => $page,
+            ]));
+            if (! $res->successful()) {
+                return [];
+            }
+            foreach ((array) $res->json('items', []) as $it) {
+                if (($it['extendedProperties']['private']['ecsUid'] ?? '') !== '' || ! isset($it['start'], $it['end'])) {
+                    continue;
+                }
+                $slots[self::slotKey($it)] = true;
+            }
+            $page = $res->json('nextPageToken');
+            if (! $page) {
+                break;
+            }
+        }
+
+        return $slots;
+    }
+
+    /** 予定の「始まり|終わり」。時刻つきは時間帯の書き方が違っても同じになるよう秒に直す。終日は日付のまま。 */
+    private static function slotKey(array $ev): string
+    {
+        $one = fn (array $p) => isset($p['dateTime']) ? (string) Carbon::parse($p['dateTime'])->getTimestamp() : 'd'.($p['date'] ?? '');
+
+        return $one($ev['start']).'|'.$one($ev['end']);
     }
 
     /** 鍵（refresh_token）から、その場で使う通行証（access_token）をもらう。 */

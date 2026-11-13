@@ -53,7 +53,9 @@ class GoogleCalendarController extends Controller
     public function sync()
     {
         try {
-            $c = GoogleCalendarSync::sync(Auth::user());
+            // dup＝同じ時刻の予定がすでにあるとき：ask（聞き返す・はじめ）／skip（飛ばす）／add（かぶっても入れる）
+            $dup = in_array(request('dup'), ['skip', 'add'], true) ? request('dup') : 'ask';
+            $c = GoogleCalendarSync::sync(Auth::user(), null, $dup);
         } catch (\Throwable $e) {
             report($e);
 

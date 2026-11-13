@@ -85,6 +85,7 @@ class GoogleCalendarTest extends TestCase
         $n = 0;
         Http::fake([
             'oauth2.googleapis.com/token' => Http::response(['access_token' => 'AT', 'refresh_token' => 'RT', 'id_token' => $idToken]),
+            'www.googleapis.com/calendar/v3/calendars/primary/events?*' => Http::response(['items' => []], 200),
             'www.googleapis.com/calendar/v3/calendars/primary/events/*' => Http::response(['id' => 'same'], 200),
             'www.googleapis.com/calendar/v3/calendars/primary/events' => function () use (&$n) { return Http::response(['id' => 'ev'.(++$n)], 200); },
         ]);
@@ -115,6 +116,62 @@ class GoogleCalendarTest extends TestCase
         // ⑤ 連携をやめる。
         $this->actingAsPerson($me)->post('/google-calendar/disconnect')->assertRedirect('/mypage');
         $this->assertNull(GoogleCalendarLink::find($me->id));
+    }
+
+    /**
+     * 同じ時刻の予定（アサイン表のGASや手入力で入れたもの）がすでにあれば、ECSからは入れない（2026-11-13 小沼さん）。
+     * すでにECSが入れて二重になっていた分は、ECSが入れた方だけ消す。
+     */
+    public function test_sync_skips_slots_already_on_the_calendar(): void
+    {
+        config(['services.google_calendar.client_id' => 'cid', 'services.google_calendar.client_secret' => 'sec']);
+        [$me] = $this->setUpCase();
+        GoogleCalendarLink::create(['person_id' => $me->id, 'refresh_token' => 'RT', 'google_email' => 'me@ikusa.co.jp']);
+
+        $n = 0;
+        $foreign = [];
+        Http::fake([
+            'oauth2.googleapis.com/token' => Http::response(['access_token' => 'AT']),
+            'www.googleapis.com/calendar/v3/calendars/primary/events?*' => function () use (&$foreign) { return Http::response(['items' => $foreign], 200); },
+            'www.googleapis.com/calendar/v3/calendars/primary/events/*' => Http::response(['id' => 'same'], 200),
+            'www.googleapis.com/calendar/v3/calendars/primary/events' => function () use (&$n) { return Http::response(['id' => 'ev'.(++$n)], 200); },
+        ]);
+
+        // ① カレンダーが空なら、今までどおり5つ入る。
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()->assertJson(['created' => 5, 'skipped' => 0]);
+        $sent = collect(Http::recorded())->map(fn ($pair) => $pair[0])->filter(fn ($r) => $r->method() === 'POST' && str_ends_with($r->url(), '/events'))->values();
+        $this->assertCount(5, $sent);
+
+        // ② そのうち2つと同じ時刻の予定が、ECSの印なしで入っていた（＝スプシで登録ずみ）。ECSが入れた予定（印あり）は数えない。
+        //    時間帯の書き方が違っても（UTC）同じ時刻なら同じとみなす。
+        $utc = function (array $p) {
+            return isset($p['dateTime']) ? ['dateTime' => \Illuminate\Support\Carbon::parse($p['dateTime'])->utc()->format('Y-m-d\TH:i:s\Z')] : $p;
+        };
+        $a = $sent[0]->data();
+        $b = $sent[1]->data();
+        $c = $sent[2]->data();
+        $foreign = [
+            ['id' => 'gas1', 'summary' => 'スプシから', 'start' => $utc($a['start']), 'end' => $utc($a['end'])],
+            ['id' => 'gas2', 'summary' => '別の題名', 'start' => $b['start'], 'end' => $b['end']],
+            ['id' => 'ecs3', 'start' => $c['start'], 'end' => $c['end'], 'extendedProperties' => ['private' => ['ecsUid' => 'x']]],
+        ];
+        // まず聞き返す＝何も書かない（どうするかは本人が決める）。
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync')->assertOk()
+            ->assertJson(['ok' => true, 'ask' => true, 'overlaps' => 2, 'created' => 0, 'updated' => 0]);
+        $this->assertSame(5, GoogleCalendarEvent::where('person_id', $me->id)->count());
+        Http::assertSentCount(1 + 1 + 5 + 1 + 1);   // 1回目＝鍵・一覧・作る5／聞き返し＝鍵・一覧だけ
+
+        // 「飛ばす」を選んだ＝二重になっていたECS側の2つを消し、残り3つは上書き。
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'skip'])->assertOk()
+            ->assertJson(['created' => 0, 'updated' => 3, 'skipped' => 2, 'failed' => 0]);
+        $this->assertSame(3, GoogleCalendarEvent::where('person_id', $me->id)->count(), '二重になっていたECS側の2つは消す');
+        Http::assertNotSent(fn ($r) => $r->method() === 'DELETE' && str_contains($r->url(), 'gas'));   // 相手の予定には触らない
+
+        // ③ もう一度「飛ばす」でも、飛ばした2つは入れ直さない。
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'skip'])->assertOk()->assertJson(['created' => 0, 'updated' => 3, 'skipped' => 2]);
+
+        // ④ 「かぶっていても入れる」を選んだ＝飛ばさずに全部入る。
+        $this->actingAsPerson($me)->postJson('/google-calendar/sync', ['dup' => 'add'])->assertOk()->assertJson(['created' => 2, 'updated' => 3, 'skipped' => 0]);
     }
 
     public function test_staff_cannot_use_it(): void

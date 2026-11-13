@@ -1129,16 +1129,34 @@
       + '　<button type="button" class="btn sm" onclick="gcalDisconnect()" style="font-size:11px;">連携をやめる</button></p>';
   }
   function escHtmlG(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function gcalSync() {
+  // dup＝同じ時刻の予定がすでにあるとき：なし（まず確かめて聞く）／'skip'（飛ばす）／'add'（かぶっても入れる）
+  function gcalSync(dup) {
     const btn = document.getElementById('gcalSyncBtn');
     const msg = document.getElementById('gcalMsg');
     btn.disabled = true; msg.style.color = ''; msg.textContent = '登録中…（件数が多いと少しかかります）';
-    fetch('/google-calendar/sync', { method: 'POST', headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json' } })
+    fetch('/google-calendar/sync', { method: 'POST', headers: { 'X-CSRF-TOKEN': window.ECS_CSRF || '', 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dup: dup === 'skip' || dup === 'add' ? dup : 'ask' }) })
       .then(r => r.json().then(j => ({ ok: r.ok, j: j })))
       .then(({ ok, j }) => {
         if (!ok || !j.ok) throw new Error(j.message || '登録できませんでした');
+        if (j.ask) {
+          // かぶりがあった＝まだ何も入れていない。飛ばすか・かぶっても入れるかを本人が選ぶ。
+          msg.textContent = '';
+          const p = document.createElement('div');
+          p.textContent = '🔁 同じ時刻の予定が、すでにカレンダーに ' + j.overlaps + ' 件あります（'
+            + (j.titles || []).join('／') + (j.overlaps > (j.titles || []).length ? ' ほか' : '') + '）。この分はどうしますか？';
+          msg.appendChild(p);
+          [['skip', 'かぶっている分は飛ばす', 'btn primary'], ['add', 'かぶっていても入れる（二重になります）', 'btn']].forEach(([d, label, cls]) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = cls; b.textContent = label; b.style.margin = '8px 8px 0 0';
+            b.onclick = () => gcalSync(d);
+            msg.appendChild(b);
+          });
+          return;
+        }
         msg.style.color = 'var(--ok-ink, #166534)';
         msg.textContent = '✅ 登録しました（' + j.cases + '案件／新しく ' + j.created + '・上書き ' + j.updated + '・消した ' + j.deleted + '）'
+          + (j.skipped ? '　🔁 ' + j.skipped + '件は、同じ時刻の予定がすでにカレンダーにあるので入れていません' : '')
           + (j.failed ? '　⚠ ' + j.failed + '件は入りませんでした。もう一度押してください' : '');
         if (window.ECS_GCAL) { const t = new Date(); window.ECS_GCAL.syncedAt = (t.getMonth() + 1) + '/' + t.getDate() + ' ' + pad2(t.getHours()) + ':' + pad2(t.getMinutes()); }
       })
