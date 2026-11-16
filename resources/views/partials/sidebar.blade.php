@@ -92,6 +92,10 @@
         <a class="{{ ($active ?? '') === 'account_new' ? 'active' : '' }}" href="/account-new"><span class="nav-icon">{!! \App\Support\NavIcon::svg('key') !!}</span> アカウント発行</a>
         {{-- CSV取込は増やさず1項目に集約。ハブ画面から名簿・コンテンツ・案件の各取込へ。 --}}
         <a class="{{ in_array(($active ?? ''), ['imports', 'person_import', 'content_import', 'project_import'], true) ? 'active' : '' }}" href="/imports"><span class="nav-icon">{!! \App\Support\NavIcon::svg('upload') !!}</span> CSV一括取込</a>
+        {{-- Salesforce連携（2026-11-16）。受信箱＝SFの商談が入る場所（登録を押すまで案件は変わらない）。
+             商品の対応表＝SFの商品をECSのコンテンツにつなぐ表。どちらも管理者以上だけ（門は routes の tier:manager）。 --}}
+        <a class="{{ ($active ?? '') === 'sf_inbox' ? 'active' : '' }}" href="/sf-inbox"><span class="nav-icon">{!! \App\Support\NavIcon::svg('archive') !!}</span> Salesforce受信箱</a>
+        <a class="{{ ($active ?? '') === 'sf_products' ? 'active' : '' }}" href="/sf-products"><span class="nav-icon">{!! \App\Support\NavIcon::svg('clipboard') !!}</span> Salesforce商品の対応表</a>
         @endif
         {{-- 共通設定＝マスタ管理・システム設定。MTG日などは社員も変更できるので社員以上に表示（マスタ削除だけAdministrator限定）。 --}}
         <a class="{{ ($active ?? '') === 'settings' ? 'active' : '' }}" href="/settings"><span class="nav-icon">{!! \App\Support\NavIcon::svg('sliders') !!}</span> 共通設定</a>

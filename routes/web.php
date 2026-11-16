@@ -501,4 +501,15 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::post('/masters/offices/{id}/{dir}/move', [MasterController::class, 'officeMove'])->where('dir', 'up|down'); // 上下並び替え
     Route::post('/masters/offices/{id}/delete', [MasterController::class, 'officeDestroy'])->middleware('tier:admin'); // 削除はAdministratorのみ
 
+    // Salesforce連携（2026-11-16・SFへつなぐ部分はまだ無い）。管理者以上だけ。
+    // ・商品の対応表＝SFの商品をECSのコンテンツにつなぐ／無視する（205件の仕分け）。
+    // ・受信箱＝SFの商談はまずここに入るだけ。「案件として登録」を押したときだけ案件ができる。
+    Route::get('/sf-products', [\App\Http\Controllers\SfProductController::class, 'index'])->middleware('tier:manager');
+    Route::post('/sf-products/save', [\App\Http\Controllers\SfProductController::class, 'save'])->middleware('tier:manager');
+    Route::post('/sf-products/import', [\App\Http\Controllers\SfProductController::class, 'import'])->middleware('tier:manager');
+    Route::get('/sf-inbox', [\App\Http\Controllers\SfInboxController::class, 'index'])->middleware('tier:manager');
+    Route::post('/sf-inbox/{id}/register', [\App\Http\Controllers\SfInboxController::class, 'register'])->whereNumber('id')->middleware('tier:manager');
+    Route::post('/sf-inbox/{id}/skip', [\App\Http\Controllers\SfInboxController::class, 'skip'])->whereNumber('id')->middleware('tier:manager');
+    Route::post('/sf-inbox/{id}/reopen', [\App\Http\Controllers\SfInboxController::class, 'reopen'])->whereNumber('id')->middleware('tier:manager');
+
 }); // ← ログイン必須グループ ここまで
