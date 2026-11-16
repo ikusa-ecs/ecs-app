@@ -44,6 +44,9 @@ final class SheetDiff
      *   ・office / status / staff_published / is_recruiting … シートではなく取込の選択で決まる
      */
     private const FIELDS = [
+        // キャンセル（2026-11-16）。取込が入れるのは「シートに印がある＝キャンセルにする」ときだけ（印が無ければ触らない）。
+        // 先頭に置く＝画面は4件で打ち切るので、いちばん大事な変化を「ほか◯件」に隠さないため。
+        'is_cancelled',
         'start_time', 'end_time',
         'event_enter_time', 'event_start_time', 'event_end_time',
         'required_count', 'required_count_min', 'count_tentative', 'no_assign',

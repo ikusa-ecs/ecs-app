@@ -650,6 +650,93 @@ class PastProjectImportTest extends TestCase
         $this->assertFalse(EventCount::counts($p));
         // 実施形態は空のまま（キャンセルは実施形態ではない）。
         $this->assertNull($p->format);
+        // 2026-11-16 から、案件そのものもキャンセルになる（アサインは消さずに残る）。
+        $this->assertTrue((bool) $p->is_cancelled, 'シートのキャンセルの印で、ECSの案件がキャンセルになっていません');
+        $this->assertSame(1, Assignment::where('project_id', $p->id)->count(), 'キャンセルでもアサインは残す');
+    }
+
+    /** これからの案件として取り込む（キャンセルの取込テスト用）。$type に 'キャンセル' を入れると印付き。 */
+    private function importFuture(string $type = ''): void
+    {
+        $this->actingAsPerson($this->manager())->post('/past-import', [
+            'mode' => 'これから',
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', $type),
+        ])->assertRedirect('/past-import');
+    }
+
+    /** これからの案件の下見の1件目。 */
+    private function previewFuture(string $type = ''): array
+    {
+        return $this->actingAsPerson($this->manager())->postJson('/past-import/preview', [
+            'mode' => 'これから',
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', $type),
+        ])->assertOk()->json('rows.0');
+    }
+
+    /**
+     * すでにある案件にあとからキャンセルの印が付いた＝取り込むとキャンセルになる（2026-11-16 小沼さん決定）。
+     * 下見では「キャンセル：実施する → キャンセル」と出て、編集履歴にも「キャンセル」で残る。
+     */
+    public function test_キャンセルの印が付いたら既存の案件もキャンセルになる(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+        $this->importFuture();
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertFalse((bool) $p->is_cancelled);
+
+        $row = $this->previewFuture('キャンセル');
+        $this->assertTrue($row['willCancel'], '下見で「キャンセルになります」と出ていません');
+        $this->assertSame('changed', $row['diff']['kind']);
+        $this->assertSame('キャンセル', $row['diff']['changes'][0]['label'] ?? null, 'キャンセルの変化が差分の先頭に出ていません');
+
+        $this->importFuture('キャンセル');
+        $this->assertSame(1, Project::count(), '新しい案件が増えている');
+        $this->assertTrue((bool) $p->fresh()->is_cancelled);
+        $this->assertTrue(\App\Models\ProjectHistory::where('project_id', $p->id)->where('field', 'is_cancelled')->exists(),
+            '編集履歴に「キャンセル」の変更が残っていません');
+    }
+
+    /** 印が無ければ is_cancelled に触らない＝ECSで手でキャンセルにした案件を、取込が実施へ戻さない。 */
+    public function test_印が無ければ手でキャンセルにした案件を戻さない(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+        $this->importFuture();
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $p->update(['is_cancelled' => true]);
+
+        $row = $this->previewFuture();
+        $this->assertFalse($row['willCancel']);
+        $this->assertNotContains('キャンセル', array_column($row['diff']['changes'], 'label'));
+
+        $this->importFuture();
+        $this->assertTrue((bool) $p->fresh()->is_cancelled, '取込で勝手に「実施」へ戻っています');
+    }
+
+    /** すでにキャンセルの案件は、印があっても差分に出さない（毎朝「変わります」と出続けないように）。 */
+    public function test_すでにキャンセルの案件は差分に出ない(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+        $this->importFuture('キャンセル');
+        $p = Project::where('project_name', '会議室')->firstOrFail();
+        $this->assertTrue((bool) $p->is_cancelled);
+
+        $row = $this->previewFuture('キャンセル');
+        $this->assertFalse($row['willCancel']);
+        $this->assertSame('same', $row['diff']['kind'], '同じシートを入れ直しただけで「変わります」と出ています');
+    }
+
+    /** 終わった案件の取込は今までどおり＝キャンセルの印があれば入れない（案件を作ってキャンセルにはしない）。 */
+    public function test_終わった案件はキャンセルの印があっても今までどおり入れない(): void
+    {
+        $this->staff('S-001', '鈴木 彩');
+        $row = $this->actingAsPerson($this->manager())->postJson('/past-import/preview', [
+            'csv' => $this->monthlyCsv([['name' => '鈴木 彩', 'role' => 'MC']],
+                '東京アサイン表 - 202609.csv', '9月1日(火)', '会議室', 'キャンセル'),
+        ])->assertOk()->json('rows.0');
+        $this->assertTrue($row['cancelled']);
+        $this->assertFalse($row['willCancel']);
     }
 
     /**

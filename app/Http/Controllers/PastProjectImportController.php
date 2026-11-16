@@ -600,12 +600,17 @@ class PastProjectImportController extends Controller
             //   画面用にここで作り直さない（作り直すと「変化なし」と出たのに書き換わる事故になる）。
             $diff = ['kind' => 'new', 'changes' => [], 'people' => ['add' => [], 'remove' => [], 'role' => []]];
             $memo = null;
+            $willCancel = false;
             if (! $info['errors']) {
                 $attrs = $this->projectAttributes($get, $info['name'], (string) $info['date'], $info['count'],
                     $info['client'], $info['meetTime'] ?? null, $office, $mode, $assignments !== [],
                     $this->countFor($get, $info['name'], $info['count']));
                 $target = SheetDiff::target($found, $edit);
-                $diff = SheetDiff::forCase($this->keepOnUpdate($target, $attrs, $info['name'], $get), $target, $assignments, $info['date']);
+                $kept = $this->keepOnUpdate($target, $attrs, $info['name'], $get);
+                $diff = SheetDiff::forCase($kept, $target, $assignments, $info['date']);
+                // この取込でECSの案件がキャンセルになるか（2026-11-16）。すでにキャンセルの案件は出さない
+                // （毎朝「キャンセルになります」と出続けないように）。
+                $willCancel = ($kept['is_cancelled'] ?? false) === true && ! ($target && $target->is_cancelled);
 
                 // 前回「取り込まない」にした案件か（2026-10-21）。覚えるのは「変わります」の案件だけ。
                 // remembered＝前回と同じ差分→画面ではじめから外す／changedSince＝前回外したあとアサイン表が変わった→いつもどおり見せる。
@@ -628,7 +633,9 @@ class PastProjectImportController extends Controller
                 'skip' => ! empty($edit['skip']),
                 // キャンセルの印が付いていて取り込まない案件（終わった案件のときだけ）。
                 // ⚠ 取込側と同じ判定にしている。画面では灰色にして「キャンセル」と出す。
-                'cancelled' => $mode !== self::MODE_FUTURE && $get('キャンセル') !== '',
+                'cancelled' => $mode !== self::MODE_FUTURE && $this->sheetCancelled($get),
+                // これからの案件で、取り込むとECSの案件がキャンセルになる（2026-11-16 小沼さん決定）。
+                'willCancel' => $willCancel,
                 // すでに入っている案件との重なり（2026-09-01 baba要望）。
                 // ⚠ 判定は findExisting の1か所（下見と取込で同じ）。画面で判定し直さない。
                 'dup' => $this->dupInfo($info, $found, $edit),
@@ -782,8 +789,9 @@ class PastProjectImportController extends Controller
             //   これまでは備考に【キャンセル】を付けて「イベント数に数えない」で入れていた。
             // ⚠ **これからの案件は今までどおり入れる。** これから中止になるかもしれない案件は、
             //   画面で状況を追いたいため（キャンセルの印は備考に残る）。
+            //   2026-11-16 から、これからの案件は案件そのものもキャンセル（is_cancelled）にする（projectAttributes）。
             // ⚠ 黙って捨てない。何件・どの案件を飛ばしたかを必ず知らせる。
-            if ($mode !== self::MODE_FUTURE && $get('キャンセル') !== '') {
+            if ($mode !== self::MODE_FUTURE && $this->sheetCancelled($get)) {
                 $cancelled[] = $entry['label'].'（'.($get('コンテンツ') ?: $entry['label']).'）';
 
                 continue;
@@ -1323,7 +1331,7 @@ class PastProjectImportController extends Controller
             // ⚠ 案件の状態（status）は 未着手/調整中/確定/完了 の4つしか無いので、キャンセルは
             //   ここと備考で表す。数え方の正本は App\Support\EventCount（null＝自動／false＝数えない）。
             // 「営業案件」もイベント数に数えない（体験会・EXPO と同じ扱い。2026-08-27 baba）。
-            'count_as_event' => ($get('キャンセル') !== '' || $get('イベント数') === '数えない') ? false : null,
+            'count_as_event' => ($this->sheetCancelled($get) || $get('イベント数') === '数えない') ? false : null,
             // 案件の状態。過去の実績＝確定。これから＝まだ動くので「調整中」（人が1人も
             // 入っていなければ「未着手」）＝アサインが必要な案件として日別ボードにも出る。
             'status' => $future ? ($hasPeople ? '調整中' : '未着手') : '確定',
@@ -1332,7 +1340,22 @@ class PastProjectImportController extends Controller
             //   クライアント名・会場までスタッフ全員に見えてしまうため。公開の入口は
             //   公開ボードの「公開する」1つだけ、という決まりを崩さない（2026-08-20）。
             'staff_published' => ! $future,
-        ];
+        ] + (
+            // これからの案件でシートにキャンセルの印がある＝ECSの案件もキャンセルにする（2026-11-16 小沼さん決定）。
+            // ⚠ 印が無いときは**列ごと入れない**＝is_cancelled に触らない。ECSで手でキャンセルにした案件を、
+            //   取込が勝手に「実施」へ戻さないため（戻すのは人が「実施に戻す」で行う）。
+            // ⚠ 終わった案件はキャンセルの印があると取り込まない（import の手前で飛ばす）ので、ここは通らない。
+            $future && $this->sheetCancelled($get) ? ['is_cancelled' => true] : []
+        );
+    }
+
+    /**
+     * シートに「キャンセル」の印があるか（2026-11-16）。
+     * ⚠ 判定はここ1か所。下見・取込（飛ばす／案件をキャンセルにする）・イベント数・備考で同じものを使う。
+     */
+    private function sheetCancelled(callable $get): bool
+    {
+        return $get('キャンセル') !== '';
     }
 
     /**
@@ -1351,7 +1374,7 @@ class PastProjectImportController extends Controller
     private function noteWithMarks(callable $get): ?string
     {
         $marks = [];
-        if ($get('キャンセル') !== '') {
+        if ($this->sheetCancelled($get)) {
             $marks[] = 'キャンセル';
         }
         if ($get('拠点間の関わり') !== '') {

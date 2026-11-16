@@ -622,6 +622,8 @@
       if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
       if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
       if (r.cancelled) { notes.unshift('キャンセルの印が付いているので取り込みません'); }
+      // これからの案件：シートのキャンセルの印で、ECSの案件もキャンセルになる（2026-11-16）。
+      if (r.willCancel) { notes.unshift('🚫 シートにキャンセルの印＝取り込むとECSの案件もキャンセルになります（アサインは残ります）'); }
       // 100行目のIDが別の案件を指していた（ブロックの並べ替えなどでずれた）。正しい案件は右の「IDでつなぐ」で選べる。
       if (r.idMismatch) { notes.unshift(r.idMismatch); }
       // 日付しか合わないIDでつながっている（2026-11-02 P-2026-0269）。はじめは取り込まない（下の _skip）。
@@ -1079,6 +1081,10 @@
     }
     fd.append('_token', token);
     fd.append('edits', editsJson || '');
+    // 終わった案件か、これからの案件か（2026-11-16）。取込と同じ扱いで下見する
+    //（送らないと下見だけ「終わった案件」扱いになり、キャンセルの印の案件が「取り込みません」と出ていた）。
+    var modeEl = form.querySelector('input[name="mode"]:checked');
+    if (modeEl) { fd.append('mode', modeEl.value); }
 
     fetch('/past-import/preview', {
       method: 'POST',

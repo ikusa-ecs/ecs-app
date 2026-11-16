@@ -251,6 +251,37 @@ class SheetImportMatchTest extends TestCase
         $this->assertFalse((bool) $p->count_tentative, '0は空欄ではない＝仮の人数を入れない');
     }
 
+    /**
+     * 受信箱からの取込（これからの案件）でも、シートのキャンセルの印で案件がキャンセルになる（2026-11-16 小沼さん決定）。
+     * 印を外したシートを入れ直しても、キャンセルは戻さない（戻すのは人が「実施に戻す」で行う）。
+     */
+    public function test_受信箱からの取込でもキャンセルの印で案件がキャンセルになる(): void
+    {
+        $me = $this->manager();
+        $rows = $this->rows('チャンバラ', '金沢');
+        $rows[1][self::A] = 'キャンセル';   // 日程の上の印
+        config(['ecs.sheet_sync_token' => self::TOKEN]);
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京', 'rows' => $rows])->assertOk();
+        $sync = SheetSync::firstOrFail();
+
+        $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id, 'mode' => 'これから'])->assertRedirect('/past-import');
+        $p = Project::firstOrFail();
+        $this->assertTrue((bool) $p->is_cancelled);
+        $this->assertStringContainsString('キャンセル', (string) $p->note, '備考に印を残す動きは今までどおり');
+
+        // 同じシートの下見＝もうキャンセル済みなので差分に出ない。
+        $row = $this->actingAsPerson($me)->postJson('/past-import/preview', ['sync' => $sync->id, 'mode' => 'これから'])->assertOk()->json('rows.0');
+        $this->assertSame('same', $row['diff']['kind']);
+        $this->assertFalse($row['willCancel']);
+
+        // 印を外したシートを入れ直しても、キャンセルのまま。
+        $this->postJson('/sheet-sync', ['token' => self::TOKEN, 'tab' => '202609', 'office' => '東京',
+            'rows' => $this->rows('チャンバラ', '金沢', $p->id)])->assertOk();
+        $this->actingAsPerson($me)->post('/past-import', ['sync' => $sync->id, 'mode' => 'これから'])->assertRedirect('/past-import');
+        $this->assertSame(1, Project::count());
+        $this->assertTrue((bool) $p->fresh()->is_cancelled, '印が無いだけで「実施」に戻っています');
+    }
+
     /** リハのブロックは、日付の違う本番の案件にシートのIDでつながない（2026-10-09 baba報告）。 */
     public function test_リハのブロックを別の日の本番にIDでつながない(): void
     {
