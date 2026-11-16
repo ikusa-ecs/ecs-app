@@ -38,4 +38,21 @@ class EmployeeAssignmentsTest extends TestCase
             ->assertDontSee('スタッフ太郎')
             ->assertSee('この月にアサインの無い社員：見る人');
     }
+
+    /** D・SDの件数は本番日だけ（2026-11-16 小沼さん決定）。前日設営のDは一覧には出すが、件数には入れない。 */
+    public function test_d_count_is_main_days_only(): void
+    {
+        $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => '見る人']);
+        $e1 = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => 'D花子']);
+        $main = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-12', 'project_name' => '本番の運動会', 'date_type' => '本番']);
+        $setup = ProjectFactory::new()->create(['office' => '東京', 'start_date' => '2026-10-11', 'project_name' => '設営の運動会', 'date_type' => '前日設営']);
+        Assignment::create(['project_id' => $main->id, 'staff_id' => $e1->id, 'role' => 'D', 'status' => '確定', 'date' => '2026-10-12']);
+        Assignment::create(['project_id' => $setup->id, 'staff_id' => $e1->id, 'role' => 'D', 'status' => '確定', 'date' => '2026-10-11']);
+
+        $this->actingAsPerson($me)->get('/employee-assignments?ym=2026-10')->assertOk()
+            ->assertSee('設営の運動会')
+            ->assertSee('D 1／SD 0')
+            ->assertViewHas('list', fn ($list) => collect($list)->firstWhere('name', 'D花子')['d'] === 1
+                && collect($list)->firstWhere('name', 'D花子')['liveCount'] === 2);
+    }
 }

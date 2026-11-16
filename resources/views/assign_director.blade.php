@@ -635,6 +635,7 @@
           <p class="agg-note">
             この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:var(--dirlg-red);font-weight:700;">赤字</span>＝偏りに注意。<br>
             <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
+            ※ <b>D計は本番の日だけ</b>数えます（前日設営・リハ日・予備日のDは数えません）。合計は全部の日を数えます。<br>
             ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
             ※ <b>名前の文字色＝所属</b>です（<span class="dep-plan"><b class="e-nm">イベプラ</b></span>／<span class="dep-sales"><b class="e-nm">セールス</b></span>／<span class="dep-creative"><b class="e-nm">クリエイティブ</b></span>／<span class="dep-other"><b class="e-nm">その他</b></span>）。カレンダーの名前と同じ色です。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
@@ -705,6 +706,9 @@
       dirId:c.dirId || null, sdIds: Array.isArray(c.sdIds) ? c.sdIds.slice() : (c.sdId ? [c.sdId] : []),
       fcIds: Array.isArray(c.fcIds) ? c.fcIds.slice() : [],   // FC（複数可・この画面で増減）
       dayType:c.dayType, status:c.status,
+      // 本番日か（2026-11-16 小沼さん決定：人ごとの D・SD の件数は本番日だけ数える）。
+      // ⚠ サーバーの印（isMain・正本 EventCount::isMainDay）が無い見本データは日程種別から決める（空＝本番）。
+      isMain: (c.isMain !== undefined) ? !!c.isMain : ['', '本番'].includes(String(c.dayType || '').trim()),
       // アサイン表で「D枠を作る（イベプラ）」を押した案件＝イベプラ待ち（2026-09-28）。
       // ⚠ 詰め替えを忘れるとサーバーが渡していても画面に出ない（この画面で何度もやらかしている）。
       plannerWait: !!c.plannerWait,
@@ -1017,13 +1021,14 @@
     }
     // 社員ID → 実日付(Y-m-d) → [{k, label}]
     const cell = {};
-    const add = (id, key, k, label) => { ((cell[id] = cell[id] || {})[key] = cell[id][key] || []).push({ k, label }); };
+    // main＝本番日の案件か（名前横の「D◯」を本番日だけ数えるのに使う・2026-11-16 小沼さん決定）。
+    const add = (id, key, k, label, main) => { ((cell[id] = cell[id] || {})[key] = cell[id][key] || []).push({ k, label, main: !!main }); };
     const shown = new Set(days.map(x => x.key));
     cases.forEach(c => {
       const key = realYmd(addDays(c.off));
       if (!shown.has(key)) return;
       const nm = c.content || c.name || '';
-      if (c.dirId) add(c.dirId, key, 'd', nm + '（D）');
+      if (c.dirId) add(c.dirId, key, 'd', nm + '（D）', c.isMain);
       (c.sdIds || []).forEach(id => add(id, key, 'sd', nm + '（SD）'));
       (c.fcIds || []).forEach(id => add(id, key, 'f', nm + '（FC）'));
     });
@@ -1052,7 +1057,9 @@
         if (items.length) {
           if (x.inMonth) {
             if (x.d <= 15) first += items.length; else second += items.length;
-            dN += items.filter(i => i.k === 'd').length;
+            // ⚠ 「D◯」は本番日だけ数える（2026-11-16 小沼さん決定・前日設営・リハ日・予備日は数えない）。
+            //   前半・後半の数（first/second）とマスの「D」の印は今までどおり全部の日。
+            dN += items.filter(i => i.k === 'd' && i.main).length;
           }
           const order = ['d', 'sd', 'f', 'o'];
           const k = order.find(z => items.some(i => i.k === z));
@@ -1285,7 +1292,9 @@
     cases.forEach(c => {
       if (!inTarget(c)) return;
       const isBig = c.scale === '大型';
-      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); r.d++; r.total++; if (isBig) r.bigD++; }
+      // ⚠ 「D計」は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
+      //   前日設営・リハ日・予備日まで数えると件数がふくらむ）。「合計」「大型D」は今までどおり全部の日を数える。
+      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) r.d++; r.total++; if (isBig) r.bigD++; }
       (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); r.total++; if (isBig) r.bigSD++; });
       (c.fcIds || []).forEach(id => { if (isEmp(id)) ensure(id).total++; });
     });

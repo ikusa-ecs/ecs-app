@@ -169,4 +169,16 @@ class EventCountTest extends TestCase
         $this->assertTrue(EventCount::counts($forced), '手動の「数える」が優先');
         $this->assertSame('数えない（自動・リハ日のため）', EventCount::label($reha));
     }
+
+    /** 本番日かどうかの判定（2026-11-16 小沼さん決定：人ごとのD・SDの件数もこれで本番日だけ数える）。空・null は本番あつかい。 */
+    public function test_is_main_day(): void
+    {
+        $this->assertTrue(EventCount::isMainDay(null));
+        $this->assertTrue(EventCount::isMainDay(''));
+        $this->assertTrue(EventCount::isMainDay(' 本番 '));
+        $this->assertFalse(EventCount::isMainDay('前日設営'));
+        $this->assertFalse(EventCount::isMainDay('リハ日'));
+        $this->assertFalse(EventCount::isMainDay('リハ'));
+        $this->assertFalse(EventCount::isMainDay('予備日'));
+    }
 }

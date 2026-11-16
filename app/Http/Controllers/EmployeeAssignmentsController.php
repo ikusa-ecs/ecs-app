@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\EventCount;
 use App\Support\OfficeScope;
 use App\Support\PersonMonthCases;
 use Illuminate\Http\Request;
@@ -48,7 +49,10 @@ class EmployeeAssignmentsController extends Controller
             }
             // 数えるのは中止になっていない案件だけ（一覧には【案件中止】で出す・2026-10-21 baba）。
             $live = array_values(array_filter($cases, fn ($c) => empty($c['cancelled'])));
-            $roles = array_count_values(array_column($live, 'roleCode'));
+            // D・SD の件数は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
+            // 前日設営・リハ日・予備日まで数えると件数がふくらむ）。一覧の行は今までどおり全部出す。
+            $mainLive = array_filter($live, fn ($c) => EventCount::isMainDay($c['dayType'] ?? null));
+            $roles = array_count_values(array_column($mainLive, 'roleCode'));
             $list[] = [
                 'id' => $p->id,
                 'name' => (string) $p->name,

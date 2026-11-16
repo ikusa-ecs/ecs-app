@@ -7,6 +7,7 @@ use App\Support\Departments;
 use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
+use App\Support\EventCount;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,6 +26,7 @@ use Illuminate\Support\Carbon;
  *  ・大型SD   ＝ リアル かつ 大型 の案件でSDを務めた数。
  *  ・オンラインD＝ 実施形態が「オンライン」の案件でDを務めた数。
  *  ※ 下書き案件は数えない。キャンセルのアサインは除く。
+ *  ※ D・SD は本番日の案件だけ数える（前日設営・リハ日・予備日は数えない・2026-11-16 小沼さん決定）。
  *  ※ 同じ案件で同じ人が複数日Dに入っていても、その案件は1回として数える。
  */
 class ProjectsAggController extends Controller
@@ -84,7 +86,7 @@ class ProjectsAggController extends Controller
 
         // 関係する案件の実施形態・規模・状態。
         $projects = Project::whereIn('id', $rows->pluck('project_id')->unique())
-            ->get(['id', 'format', 'scale', 'status'])
+            ->get(['id', 'format', 'scale', 'status', 'date_type'])
             ->keyBy('id');
 
         // 担当者（社員）の氏名・所属（部署）。所属は名前の色分けに使う（D決め画面と同じ配色）。
@@ -109,7 +111,13 @@ class ProjectsAggController extends Controller
                 continue;   // 同案件・同役割は1回だけ
             }
             $seen[$key] = true;
-            $projSet[$r->project_id] = true;
+            $projSet[$r->project_id] = true;   // 案件数は今までどおり本番以外の日も入れる（D・SDの件数ではないので）
+            // D・SD の件数は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
+            // 前日設営・リハ日・予備日まで数えると件数がふくらむ）。判定の正本＝EventCount::isMainDay。
+            // ⚠ 担当者の行は下で作らない＝本番以外のDしか無い社員も、社員一覧から0件で並ぶ。
+            if (! EventCount::isMainDay($proj->date_type)) {
+                continue;
+            }
             if ($r->role === 'D') {
                 $totalD++;
             } else {

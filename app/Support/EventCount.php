@@ -36,6 +36,19 @@ class EventCount
     /** 自動で「数えない」ことにする語（案件名・クライアント名に含まれていたら対象）。 */
     public const EXCLUDED_WORDS = ['EXPO', 'エキスポ'];
 
+    /**
+     * 日程種別（projects.date_type）が本番か。空・null は本番あつかい。
+     * 「本番」以外（前日設営・リハ日・予備日・古い書き方の「リハ」など）は本番ではない。
+     * イベント数のほか、人ごとの D・SD の件数（D決め・新人ページ・社員のアサイン一覧・ディレクター集計）もこれで決める
+     * （2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、設営やリハの日まで数えると件数がふくらむ）。
+     */
+    public static function isMainDay(?string $dateType): bool
+    {
+        $dayType = trim((string) ($dateType ?? ''));
+
+        return $dayType === '' || $dayType === '本番';
+    }
+
     /** この案件はイベント数として数えるか（手動指定があればそれが優先）。 */
     public static function counts(Project $project): bool
     {
@@ -70,9 +83,8 @@ class EventCount
 
         // リハ日・前日設営・予備日は数えない（2026-10-16 baba決定）。
         // ⚠ 古い案件には「リハ」「予備日」の書き方もあるので、「本番」以外はまとめて外す（空＝本番あつかい）。
-        $dayType = trim((string) ($project->date_type ?? ''));
-        if ($dayType !== '' && $dayType !== '本番') {
-            return $dayType . 'のため';
+        if (! self::isMainDay($project->date_type)) {
+            return trim((string) $project->date_type) . 'のため';
         }
 
         $format = trim((string) ($project->format ?? ''));

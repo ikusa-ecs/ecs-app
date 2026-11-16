@@ -12,6 +12,7 @@ use App\Support\RecentWindow;
 use App\Support\AssignSlots;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
+use App\Support\EventCount;
 use App\Support\Departments;
 use App\Support\OfficeScope;
 use App\Support\PersonNotes;
@@ -178,6 +179,9 @@ class AssignDirectorController extends Controller
                     //   この画面で先に片づけられるようにする。判定の正本＝App\Support\AssignSlots。
                     'plannerWait' => AssignSlots::waitingForPlanner($slotsByProject[$p->id] ?? []),
                     'dayType' => $p->date_type ?? '本番',
+                    // 本番日か（空も本番あつかい）。人ごとの「D計」「SD」「D◯」は本番日だけ数える
+                    // （2026-11-16 小沼さん決定：設営・リハ日まで数えると件数がふくらむ）。判定の正本＝EventCount::isMainDay。
+                    'isMain' => EventCount::isMainDay($p->date_type),
                     'status' => $p->status ?? '',
                     'guests' => $p->guest_count,
                     'teams' => $p->team_count,

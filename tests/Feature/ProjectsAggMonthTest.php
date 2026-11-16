@@ -85,6 +85,25 @@ class ProjectsAggMonthTest extends TestCase
             ->assertViewHas('period', Carbon::today()->format('Y-m'));
     }
 
+    /**
+     * D・SDの件数は本番日だけ（2026-11-16 小沼さん決定）。同じ人が本番と前日設営のDでも1件。
+     * 案件数（projects）は今までどおり前日設営も入れる。
+     */
+    public function test_only_main_days_are_counted_for_d(): void
+    {
+        $me = $this->admin();
+        $day = Carbon::today()->startOfMonth()->addDays(5);
+
+        $this->makeD('P-MAIN', $day->toDateString(), 'E-ADM');
+        $this->makeD('P-SETUP', $day->copy()->subDay()->toDateString(), 'E-ADM');
+        Project::whereKey('P-SETUP')->update(['date_type' => '前日設営']);
+
+        $this->actingAsPerson($me)->get('/projects-agg')
+            ->assertOk()
+            ->assertViewHas('summary', fn ($s) => $s['d'] === 1 && $s['records'] === 1 && $s['projects'] === 2)
+            ->assertViewHas('rows', fn ($rows) => collect($rows)->firstWhere('name', $me->name)['d'] === 1);
+    }
+
     /** 月の切替が画面に出ている。 */
     public function test_the_screen_has_the_month_switch(): void
     {

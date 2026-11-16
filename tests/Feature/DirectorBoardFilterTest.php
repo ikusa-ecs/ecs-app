@@ -235,6 +235,37 @@ class DirectorBoardFilterTest extends TestCase
             ->assertSee('date: realKey', false);
     }
 
+    /**
+     * 「D計」「D◯」は本番日だけ数える（2026-11-16 小沼さん決定）。
+     * サーバーが案件ごとに本番日の印（isMain）を付け、画面はその印のある案件だけDに数える。「合計」は全部の日。
+     */
+    public function test_d_count_uses_main_days_only(): void
+    {
+        $admin = $this->admin();
+        $day = Carbon::today()->addDays(5)->toDateString();
+        $prev = Carbon::today()->addDays(4)->toDateString();
+        Project::create(['id' => 'P-MAIN', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => $day, 'office' => '東京', 'status' => '調整中', 'date_type' => '本番']);
+        Project::create(['id' => 'P-SETUP', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => $prev, 'office' => '東京', 'status' => '調整中', 'date_type' => '前日設営']);
+        Project::create(['id' => 'P-NULL', 'project_name' => '運動会', 'content_names' => ['運動会'],
+            'start_date' => $day, 'office' => '東京', 'status' => '調整中', 'date_type' => '']);   // 空＝本番あつかい
+
+        $this->actingAsPerson($admin)->get('/assign-director')
+            ->assertOk()
+            ->assertViewHas('cases', function ($cases) {
+                $by = collect($cases)->keyBy('id');
+
+                return $by['P-MAIN']['isMain'] === true
+                    && $by['P-SETUP']['isMain'] === false
+                    && $by['P-NULL']['isMain'] === true;
+            })
+            // 画面側：D計は本番日だけ・合計は全部の日／名前横の「D◯」も本番日だけ。
+            ->assertSee('if (c.isMain) r.d++; r.total++;', false)
+            ->assertSee("i.k === 'd' && i.main", false)
+            ->assertSee('isMain: (c.isMain !== undefined)', false);
+    }
+
     /** 保存したら、見ていた月へ戻る（既定の月へ飛ばされない）。 */
     public function test_saving_returns_to_the_month_you_were_looking_at(): void
     {

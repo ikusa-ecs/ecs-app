@@ -708,4 +708,30 @@ class RookieTest extends TestCase
         $next = collect(RookieFcPlan::build(Carbon::today()->addMonthNoOverflow(), '東京')['rookies'])->firstWhere('id', $rookie->id);
         $this->assertSame(1, $next['fcDone']['C-SOON'] ?? 0, '来月を見ているときは、今月の予定は済んだものとして数える');
     }
+
+    /**
+     * Dの件数（D◯件・D済）は本番日だけ数える（2026-11-16 小沼さん決定）。
+     * 同じ新人が本番と前日設営のDでも1件。前日設営のDはFCにも数えない。案件の一覧には両方出る。
+     */
+    public function test_Dの件数は本番日だけ(): void
+    {
+        $month = Carbon::today()->subMonthNoOverflow()->startOfMonth();
+        $rookie = PersonFactory::new()->create(['name' => '新人D', 'role' => 'employee', 'department' => 'イベプラ',
+            'hire_date' => $month->copy(), 'office' => '東京']);
+        $main = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $month->copy()->addDays(9)->format('Y-m-d'),
+            'status' => '調整中', 'content_ids' => ['C-UNDO'], 'date_type' => '本番']);
+        $setup = ProjectFactory::new()->create(['office' => '東京', 'start_date' => $month->copy()->addDays(8)->format('Y-m-d'),
+            'status' => '調整中', 'content_ids' => ['C-UNDO'], 'date_type' => '前日設営', 'parent_project_id' => $main->id]);
+        foreach ([$main, $setup] as $p) {
+            Assignment::create(['project_id' => $p->id, 'staff_id' => $rookie->id, 'role' => 'D', 'status' => '確定', 'date' => $p->start_date->format('Y-m-d')]);
+        }
+
+        $r = collect(RookieFcPlan::build($month, '東京')['rookies'])->firstWhere('id', $rookie->id);
+        $this->assertNotNull($r);
+        $this->assertSame(1, $r['monthD'], '本番日のDだけ');
+        $this->assertSame(0, $r['monthFc'], '前日設営のDをFCに数えない');
+        $this->assertSame(2, $r['monthEvents']);
+        $this->assertCount(2, $r['cases'], '案件の一覧には前日設営も出す');
+        $this->assertSame(1, $r['dDone']['C-UNDO'] ?? 0, 'D済も本番日だけ');
+    }
 }

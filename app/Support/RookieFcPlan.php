@@ -54,7 +54,8 @@ final class RookieFcPlan
             $dDone = [];
             $busy = [];
             $monthEvents = 0;
-            $monthD = 0;
+            $monthD = 0;      // 本番日のDの数（画面の「D◯件」・目標の計算に使う）
+            $monthDAll = 0;   // 本番以外も入れたDの数（FCの数＝全部の件数−これ、を今までどおりにするため）
             $monthCases = [];   // この月に入っている案件（2026-10-09 baba「新人一覧で案件一覧が出るように」）
             foreach ($mine as $a) {
                 $date = Carbon::parse($a->date);
@@ -73,7 +74,12 @@ final class RookieFcPlan
                     ];
                     $monthEvents++;
                     if ($a->role === 'D') {
-                        $monthD++;
+                        $monthDAll++;
+                        // D の件数は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
+                        // 前日設営・リハ日・予備日まで数えると件数がふくらむ）。判定の正本＝EventCount::isMainDay。
+                        if ($pr && EventCount::isMainDay($pr->date_type)) {
+                            $monthD++;
+                        }
                     }
                 }
                 // やったことに数えるのは開催済みだけ。ただし先の月を見ているときは、
@@ -84,7 +90,10 @@ final class RookieFcPlan
                 }
                 foreach (is_array($pr->content_ids) ? $pr->content_ids : [] as $cid) {
                     if ($a->role === 'D') {
-                        $dDone[$cid] = ($dDone[$cid] ?? 0) + 1;
+                        // 「D済」も本番日だけ（2026-11-16 小沼さん決定）。本番以外の日のDはFCにも入れない（今までもFCではなかった）。
+                        if (EventCount::isMainDay($pr->date_type)) {
+                            $dDone[$cid] = ($dDone[$cid] ?? 0) + 1;
+                        }
                     } else {
                         $fcDone[$cid] = ($fcDone[$cid] ?? 0) + 1;
                     }
@@ -117,7 +126,8 @@ final class RookieFcPlan
             $no = Rookies::monthNo($p, $month);
             // 表はセールス版／イベプラ版を所属で選ぶ（2026-10-13）。D数を決めない月は実際のD数で引く。
             $target = Rookies::targetFor($no, Rookies::kindOf($p), $monthD);
-            $fcThisMonth = $monthEvents - $monthD;
+            // ⚠ FCの数は本番以外の日のDも引く（引かないと設営日のDがFCに数えられてしまう）。
+            $fcThisMonth = $monthEvents - $monthDAll;
 
             // 必修・推奨の進み具合（Dでやったら「済」・FCだけなら「D準備OK」）。
             $progress = ['must' => self::progress($mustRows->where('must', true), $fcDone, $dDone, $contentNames),
