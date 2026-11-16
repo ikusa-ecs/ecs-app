@@ -224,6 +224,33 @@ ECS：{{ url('/') }}
       })();
       </script>
 
+      {{-- 日別ボードの「まとめて削除」を出す／隠す（2026-10-05 baba要望）。
+           2026-11-16 小沼さん：使えるのはAdministratorだけなので、共通設定からこのページへ移した。
+           正本＝App\Support\BoardBulkDelete。IDのずれでダブった案件を片づける間だけ出す。
+           保存先は今までどおり POST /settings/board-bulk-delete（押すとこのページに戻る）。 --}}
+      <h2 style="margin:26px 0 4px;">日別ボードの「🗑 まとめて削除」</h2>
+      <p class="muted" style="font-size:12.5px; margin:0 0 12px;">
+        ダブって登録された案件を片づけるための一時的なボタンです。出すと、日別ボードの案件ごとにチェック欄が付き、選んだ案件をまとめて消せます。
+        見えるのは<b>Administratorだけ</b>です。<b>片づけが終わったら「隠す」に戻してください。</b>
+      </p>
+      <div class="panel" style="max-width:720px; padding:14px;">
+        @if (session('board_bulk_delete_status'))
+          <div class="flash" style="margin:0 0 10px;">{{ session('board_bulk_delete_status') }}</div>
+        @endif
+        <form method="POST" action="/settings/board-bulk-delete">
+          @csrf
+          @if (\App\Support\BoardBulkDelete::enabled())
+            <input type="hidden" name="enabled" value="0">
+            <span style="font-weight:700; color:#b91c1c; margin-right:10px;">いま：出している</span>
+            <button type="submit" class="btn">隠す</button>
+          @else
+            <input type="hidden" name="enabled" value="1">
+            <span style="font-weight:700; margin-right:10px;">いま：隠している</span>
+            <button type="submit" class="btn primary">出す</button>
+          @endif
+        </form>
+      </div>
+
       {{-- ③ Administrator専用の作業への集約リンク --}}
       <h2 style="margin:26px 0 4px;">その他のAdministrator向け作業</h2>
       <p class="muted" style="font-size:12.5px; margin:0 0 12px;">

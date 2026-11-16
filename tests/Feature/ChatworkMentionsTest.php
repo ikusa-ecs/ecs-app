@@ -158,18 +158,45 @@ class ChatworkMentionsTest extends TestCase
         $this->assertTrue(ChatworkMentions::mentionDailyReport());
     }
 
-    /** ⑩ 設定画面に、選ぶ人の一覧と「ID未登録」の印が出ている。 */
-    public function test_the_settings_screen_lists_people(): void
+    /**
+     * ⑩ 設定画面：名前を入力して足す形（2026-11-16 小沼さん「全員が並んでいて使いにくい」）。
+     * ・名前の候補に出るのは、チャットワークIDが名簿にある人だけ。
+     * ・選んである人は札で出て、札の中の hidden が保存される（送る中身は今までと同じ mentions[知らせ][]）。
+     */
+    public function test_the_settings_screen_adds_people_by_name(): void
     {
-        $this->emp('山田 太郎', '1111111');
+        $yamada = $this->emp('山田 太郎', '1111111');
         $this->emp('佐藤 次郎', null);
+        ChatworkMentions::save(ChatworkRooms::SHEET_SYNC, [$yamada->id]);
 
-        $this->actingAsPerson($this->admin())
+        $html = $this->actingAsPerson($this->admin())
             ->get('/settings')
             ->assertOk()
             ->assertSee('メンションする人')
-            ->assertSee('山田 太郎')
-            ->assertSee('佐藤 次郎')
-            ->assertSee('ID未登録');
+            ->getContent();
+
+        $this->assertStringContainsString('<option value="山田 太郎"></option>', $html, '候補に出る');
+        $this->assertStringNotContainsString('<option value="佐藤 次郎"></option>', $html, 'IDが無い人は候補に出さない');
+        $this->assertStringContainsString(
+            '<input type="hidden" name="mentions[' . ChatworkRooms::SHEET_SYNC . '][]" value="' . $yamada->id . '">山田 太郎',
+            $html,
+            '選んである人は札で出る'
+        );
+        $this->assertStringContainsString('placeholder="名前を入力して追加"', $html);
+        $this->assertStringNotContainsString('type="checkbox" name="mentions[', $html, '全員を並べるチェック欄は無い');
+    }
+
+    /** ⑪ 共通設定は見出しで畳める／「まとめて削除」のスイッチは Administrator のページへ移した（2026-11-16 小沼さん）。 */
+    public function test_settings_folds_and_bulk_delete_switch_lives_in_admin_console(): void
+    {
+        $admin = $this->admin();
+
+        $settings = $this->actingAsPerson($admin)->get('/settings')->assertOk()->getContent();
+        $this->assertStringContainsString('setFoldAll(false)', $settings, 'すべて開く');
+        $this->assertStringContainsString("localStorage.getItem(KEY", $settings, '開いたかたまりを覚える');
+        $this->assertStringNotContainsString('action="/settings/board-bulk-delete"', $settings, '共通設定には無い');
+
+        $console = $this->actingAsPerson($admin)->get('/admin-console')->assertOk()->getContent();
+        $this->assertStringContainsString('action="/settings/board-bulk-delete"', $console, 'Administratorのページにある');
     }
 }

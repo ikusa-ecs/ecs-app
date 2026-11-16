@@ -1318,7 +1318,7 @@ class ProjectController extends Controller
     public function bulkDestroy(Request $request)
     {
         if (! BoardBulkDelete::enabled()) {
-            return response()->json(['ok' => false, 'message' => 'まとめて削除は、いま共通設定で止めています。'], 403);
+            return response()->json(['ok' => false, 'message' => 'まとめて削除は、いま「Administrator（管理）」のページで止めています。'], 403);
         }
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1', 'max:200'],

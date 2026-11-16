@@ -10,11 +10,11 @@ use App\Models\Setting;
  * 【なぜあるか】
  * アサイン表の取込でIDがずれた関係で、同じ案件がダブって登録されている。
  * 1件ずつ消すのは手間なので、日別ボードで選んだものをまとめて消せるようにした。
- * ⚠ 一時的なもの＝作業が終わったら共通設定のスイッチで隠す（コードは消さない＝また重複が出たら出し直せる）。
+ * ⚠ 一時的なもの＝作業が終わったら「Administrator（管理）」ページのスイッチで隠す（2026-11-16 に共通設定から移した）（コードは消さない＝また重複が出たら出し直せる）。
  *
  * 【決めたこと（baba）】
  *   ・使えるのは **Administrator だけ**（消すと入っている人も一緒に消え、元に戻せないため）。
- *   ・スイッチは共通設定（POST /settings/board-bulk-delete）。既定は「隠す」。
+ *   ・スイッチは「Administrator（管理）」ページ（POST /settings/board-bulk-delete）。既定は「隠す」。
  *   ・消す前に、入っている人・エントリーの件数を見せて確認する（ProjectController::bulkDestroy）。
  */
 final class BoardBulkDelete

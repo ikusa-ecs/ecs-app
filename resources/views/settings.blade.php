@@ -145,8 +145,29 @@
       font-size: 10.5px; color: var(--muted); background: var(--chip-bg);
       border-radius: 999px; padding: 1px 7px; margin-left: 4px;
     }
+    /* メンションする人＝選んだ人だけ札で並べ、名前を入力して足す（2026-11-16 小沼さん）。 */
+    .cw-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 4px; }
+    .cw-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip-bg); color: var(--ink); font-size: 12.5px; }
+    .cw-chip .rm { cursor: pointer; color: var(--muted); font-weight: 700; padding: 0 5px; border-radius: 999px; }
+    .cw-chip .rm:hover { color: var(--danger); }
+    .cw-add { display: flex; gap: 6px; align-items: center; margin-top: 7px; }
+    .cw-add-input { width: 220px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; font-family: inherit; background: var(--panel); color: var(--ink); }
     .cw-ment-alert { font-size: 11.5px; color: var(--danger); margin-top: 7px; line-height: 1.6; }
     html[data-theme="dark"] .cw-ment-alert { color: var(--danger-ink); }
+
+    /* 設定のかたまりは、ふだんは見出しだけに畳む（2026-11-16 小沼さん「長いので、必要なところだけ開きたい」）。
+       見出しを押すと開く。開いたかたまりはこのブラウザが覚える（拠点を切り替えて読み直しても開いたまま）。
+       ⚠ はじめの1行は、JSが動く前に中身が一瞬ぜんぶ見えるのを防ぐためのもの。 */
+    body:not(.set-ready) .settings-wrap:has(> .panel-head) > :not(.panel-head) { display: none; }
+    .settings-wrap.is-collapsed > :not(.panel-head) { display: none; }
+    .settings-wrap.is-collapsed { padding-bottom: 0; }
+    .settings-wrap.is-collapsed > .panel-head { margin-bottom: 0; border-bottom: none; }
+    .settings-wrap.can-fold > .panel-head { cursor: pointer; user-select: none; }
+    .settings-wrap.can-fold > .panel-head h2::before { content: '▾'; display: inline-block; width: 1.2em; color: var(--muted); }
+    .settings-wrap.can-fold.is-collapsed > .panel-head h2::before { content: '▸'; }
+    .settings-wrap.can-fold > .panel-head:hover h2 { text-decoration: underline; }
+    .fold-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
+    .fold-bar button { padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font-size: 12.5px; cursor: pointer; }
   </style>
 @endverbatim
 @endpush
@@ -168,6 +189,12 @@
                     style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;"></select>
           </div>
         </div>
+      </div>
+
+      <div class="fold-bar">
+        <span>見出しを押すと開きます。</span>
+        <button type="button" onclick="setFoldAll(false)">すべて開く</button>
+        <button type="button" onclick="setFoldAll(true)">すべて閉じる</button>
       </div>
 
       <!-- ① アサインMTG日の予定表 -->
@@ -315,6 +342,12 @@
           <div class="flash" style="margin:8px 0; background:#fdecec; color:#b91c1c; border-color:#f3c0c0;">{{ $__msg }}</div>
         @endforeach
 
+        {{-- 名前の候補（入力すると下に出る）。チャットワークIDが名簿にある人だけ。 --}}
+        <datalist id="cwPeopleList">
+          @foreach ($mentionPeople as $__p)
+            @if ($__p['hasId'])<option value="{{ $__p['name'] }}"></option>@endif
+          @endforeach
+        </datalist>
         <form method="POST" action="/settings/chatwork-rooms">
           @csrf
           @foreach (\App\Support\ChatworkRooms::KINDS as $__kind => $__info)
@@ -339,15 +372,20 @@
                    ⚠ チャットワークIDが名簿に無い人は選べない（選んでも [To:] を作れないため）。 --}}
               <div class="cw-ment">
                 <div class="cw-ment-h">メンションする人<span class="cw-ment-n">{{ $__chosen ? count($__chosen).'名' : '選んでいません' }}</span></div>
-                <div class="cw-ment-list">
+                {{-- 2026-11-16 小沼さん「全員が並んでいて使いにくい。名前を入力して増やす形に」。
+                     選んだ人だけを札で並べ、名前を入力して足す。保存で送る中身（mentions[知らせ][]＝名簿のID）は今までと同じ。
+                     ⚠ 札の中の hidden が保存される本体。札を消す＝その人を外す。 --}}
+                <div class="cw-chips" data-kind="{{ $__kind }}">
                   @foreach ($mentionPeople as $__p)
-                    <label class="cw-ment-p {{ $__p['hasId'] ? '' : 'noid' }}">
-                      <input type="checkbox" name="mentions[{{ $__kind }}][]" value="{{ $__p['id'] }}"
-                             @checked(in_array($__p['id'], $__chosen, true))
-                             @disabled(! $__p['hasId'])>
-                      {{ $__p['name'] }}@if (! $__p['hasId'])<span class="cw-ment-warn">ID未登録</span>@endif
-                    </label>
+                    @if (in_array($__p['id'], $__chosen, true))
+                      <span class="cw-chip" data-id="{{ $__p['id'] }}"><input type="hidden" name="mentions[{{ $__kind }}][]" value="{{ $__p['id'] }}">{{ $__p['name'] }}<b class="rm" title="外す" onclick="cwRemove(this)">×</b></span>
+                    @endif
                   @endforeach
+                </div>
+                <div class="cw-add">
+                  <input type="text" class="cw-add-input" list="cwPeopleList" placeholder="名前を入力して追加" autocomplete="off"
+                         onkeydown="if (event.key === 'Enter') { event.preventDefault(); cwAdd(this); }" onchange="cwAdd(this, true)">
+                  <button type="button" class="line-btn" onclick="cwAdd(this.previousElementSibling)">追加</button>
                 </div>
                 @if ($__missing)
                   <div class="cw-ment-alert">⚠ {{ implode('・', $__missing) }} さんはチャットワークIDが登録されていないので、メンションされません。アカウント管理で登録してください。</div>
@@ -386,34 +424,6 @@
           トークンが無いあいだは、ここを設定しても送信されません。
         </p>
       </div>
-
-      {{-- 日別ボードの「まとめて削除」を出す／隠す（2026-10-05 baba要望）。Administratorにだけ見せる。
-           正本＝App\Support\BoardBulkDelete。IDのずれでダブった案件を片づける間だけ出す。
-           ⚠ このコメントにBladeの命令名（＠から始まる語）を書かないこと。 --}}
-      @if ((auth()->user()->permission ?? '') === 'admin')
-      <div class="panel settings-wrap" style="margin-top:20px;">
-        <div class="panel-head"><h2>日別ボードの「🗑 まとめて削除」</h2></div>
-        @if (session('board_bulk_delete_status'))
-          <div class="flash" style="margin:8px 0;">{{ session('board_bulk_delete_status') }}</div>
-        @endif
-        <p class="muted" style="font-size:12.5px; margin:0 0 8px;">
-          ダブって登録された案件を片づけるための一時的なボタンです。出すと、日別ボードの案件ごとにチェック欄が付き、選んだ案件をまとめて消せます。
-          見えるのは<b>Administratorだけ</b>です。<b>片づけが終わったら「隠す」に戻してください。</b>
-        </p>
-        <form method="POST" action="/settings/board-bulk-delete">
-          @csrf
-          @if (\App\Support\BoardBulkDelete::enabled())
-            <input type="hidden" name="enabled" value="0">
-            <span style="font-weight:700; color:#b91c1c; margin-right:10px;">いま：出している</span>
-            <button type="submit" class="btn">隠す</button>
-          @else
-            <input type="hidden" name="enabled" value="1">
-            <span style="font-weight:700; margin-right:10px;">いま：隠している</span>
-            <button type="submit" class="btn primary">出す</button>
-          @endif
-        </form>
-      </div>
-      @endif
 
       {{-- LINEの概要に付ける定型文（2026-09-16 baba要望）。
            ⚠ アサインボード（日別）の「📱 LINE」で出る概要文の、いちばん下に付く文章。
@@ -568,6 +578,84 @@
   window.ECS_STAFF_LINK_LIMITS = @json($staffLinkLimits ?? ['title' => 40, 'memo' => 60, 'url' => 500]);
   // 保存POST用のCSRFトークン。
   window.ECS_CSRF = @json(csrf_token());
+
+  // ===== チャットワークの「メンションする人」：名前を入力して足す（2026-11-16 小沼さん）=====
+  // 名簿の人（id・名前・チャットワークIDがあるか）。保存するのは名簿のID（今までと同じ）。
+  window.ECS_CW_PEOPLE = @json($mentionPeople ?? []);
+  window.ECS_CW_MAX = @json(\App\Support\ChatworkMentions::MAX_PEOPLE);
+  function cwCount(box){
+    var n = box.querySelectorAll('.cw-chip').length;
+    var lab = box.parentNode.querySelector('.cw-ment-n');
+    if (lab) lab.textContent = n ? n + '名（「この送り先・メンションにする」で保存）' : '選んでいません（「この送り先・メンションにする」で保存）';
+  }
+  function cwRemove(x){ var chip = x.closest('.cw-chip'), box = chip.parentNode; chip.remove(); cwCount(box); }
+  // quiet＝候補を選んだだけのとき（見つからなくても文句を言わない＝入力の途中かもしれない）。
+  function cwAdd(input, quiet){
+    var name = String(input.value || '').replace(/[\s　]+/g, '');
+    if (!name) return;
+    var norm = function(s){ return String(s || '').replace(/[\s　]+/g, ''); };
+    var all = window.ECS_CW_PEOPLE || [];
+    var hit = all.filter(function(p){ return norm(p.name) === name; });
+    if (!hit.length) hit = all.filter(function(p){ return norm(p.name).indexOf(name) >= 0; });
+    if (hit.length !== 1) {
+      if (!quiet) alert(hit.length ? '「' + input.value + '」に当てはまる人が ' + hit.length + ' 名います。候補から選ぶか、もう少し長く入力してください。' : '「' + input.value + '」さんは名簿に見つかりません。');
+      return;
+    }
+    var p = hit[0];
+    if (!p.hasId) { alert(p.name + ' さんはチャットワークIDが名簿に登録されていないので、メンションできません。アカウント管理で登録してください。'); return; }
+    var box = input.closest('.cw-ment').querySelector('.cw-chips');
+    var ids = Array.prototype.map.call(box.querySelectorAll('.cw-chip'), function(c){ return c.dataset.id; });
+    if (ids.indexOf(String(p.id)) >= 0) { input.value = ''; return; }
+    if (ids.length >= window.ECS_CW_MAX) { alert('メンションは1つの知らせにつき ' + window.ECS_CW_MAX + ' 名までです。'); return; }
+    var chip = document.createElement('span');
+    chip.className = 'cw-chip'; chip.dataset.id = p.id;
+    var hid = document.createElement('input');
+    hid.type = 'hidden'; hid.name = 'mentions[' + box.dataset.kind + '][]'; hid.value = p.id;
+    var rm = document.createElement('b');
+    rm.className = 'rm'; rm.title = '外す'; rm.textContent = '×'; rm.onclick = function(){ cwRemove(rm); };
+    chip.appendChild(hid); chip.appendChild(document.createTextNode(p.name)); chip.appendChild(rm);
+    box.appendChild(chip);
+    input.value = '';
+    cwCount(box);
+  }
+
+  // ===== 設定のかたまりを畳む（2026-11-16 小沼さん）=====
+  // ふだんは見出しだけ。見出しを押すと開く。開いたかたまりは、このブラウザが覚える。
+  // ⚠ 覚えられないブラウザ（プライベートウィンドウ等）でも動くように、読み書きは必ず try で囲む。
+  (function(){
+    var KEY = 'ecs_settings_open';
+    function load(){ try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function save(o){ try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
+    function panels(){ return Array.prototype.slice.call(document.querySelectorAll('.settings-wrap')).filter(function(p){ return p.querySelector(':scope > .panel-head'); }); }
+    // 見出しの文字をかたまりの名前にする（「（東京）」のような拠点名は外す＝拠点を変えても同じかたまり）。
+    function keyOf(p){ var h = p.querySelector(':scope > .panel-head h2'); return h ? h.textContent.replace(/（.*?）/g, '').trim() : ''; }
+    function apply(){
+      var open = load();
+      panels().forEach(function(p){
+        p.classList.add('can-fold');
+        p.classList.toggle('is-collapsed', !open[keyOf(p)]);
+        var head = p.querySelector(':scope > .panel-head');
+        if (head.dataset.foldBound) return;
+        head.dataset.foldBound = '1';
+        head.setAttribute('title', '押すと開く／閉じる');
+        head.addEventListener('click', function(ev){
+          // 見出しの中のボタン・リンク・入力を押したときは畳まない。
+          if (ev.target.closest('button, a, input, select, textarea, label')) return;
+          var o = load(), k = keyOf(p), nowCollapsed = !p.classList.contains('is-collapsed');
+          p.classList.toggle('is-collapsed', nowCollapsed);
+          if (nowCollapsed) delete o[k]; else o[k] = 1;
+          save(o);
+        });
+      });
+      document.body.classList.add('set-ready');
+    }
+    window.setFoldAll = function(collapse){
+      var o = {};
+      panels().forEach(function(p){ p.classList.toggle('is-collapsed', collapse); if (!collapse) o[keyOf(p)] = 1; });
+      save(o);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+  })();
 </script>
 @verbatim
 <script>
@@ -736,19 +824,30 @@
         '</div>';
     }).join('');
   }
+  // きょうより前の日か（"2026-11-16" の形どうしを文字で比べる）。
+  function isPastDay(d) {
+    const t = new Date();
+    const today = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+    return String(d) < today;
+  }
   function renderDanger() {
     DANGER_DATES.sort();
     const list = document.getElementById('dangerList');
     if (!list) return;
-    if (!DANGER_DATES.length) {
+    // 過ぎた日は並べない（2026-11-16 小沼さん「過去の日程は消えていってほしい」）。
+    // ⚠ 見せないだけ＝データは消さない（過去のカレンダーの印はそのまま残る）。番号 i は元の並びのまま使う。
+    const past = DANGER_DATES.filter(isPastDay).length;
+    const pastNote = past ? '<span class="muted" style="font-size:11.5px; margin-left:6px;">（過ぎた日 ' + past + '件は表示していません）</span>' : '';
+    if (DANGER_DATES.length === past) {
       list.className = 'mtg-empty';
-      list.textContent = 'まだ手動の危険日はありません。上の大型案件日か、下の欄から追加してください。';
+      list.innerHTML = 'まだ手動の危険日はありません。上の大型案件日か、下の欄から追加してください。' + pastNote;
     } else {
       list.className = 'mtg-list';
       list.innerHTML = DANGER_DATES.map(function (d, i) {
+        if (isPastDay(d)) return '';
         return '<span class="mtg-chip danger">' + mdLabel(d) +
                ' <b class="rm" onclick="removeDangerDate(' + i + ')">×</b></span>';
-      }).join('');
+      }).join('') + pastNote;
     }
     renderBigEvents();   // ボタンの「追加済み」表示を更新
   }
@@ -784,15 +883,20 @@
     DANGER_ALL.sort();
     const list = document.getElementById('dangerAllList');
     if (!list) return;
-    if (!DANGER_ALL.length) {
+    // 過ぎた日は並べない（2026-11-16 小沼さん「過去の日程は消えていってほしい」）。
+    // ⚠ 見せないだけ＝データは消さない（過去のカレンダーの印はそのまま残る）。番号 i は元の並びのまま使う。
+    const past = DANGER_ALL.filter(isPastDay).length;
+    const pastNote = past ? '<span class="muted" style="font-size:11.5px; margin-left:6px;">（過ぎた日 ' + past + '件は表示していません）</span>' : '';
+    if (DANGER_ALL.length === past) {
       list.className = 'mtg-empty';
-      list.textContent = 'まだ全拠点の危険日はありません。下の欄から追加してください。';
+      list.innerHTML = 'まだ全拠点の危険日はありません。下の欄から追加してください。' + pastNote;
     } else {
       list.className = 'mtg-list';
       list.innerHTML = DANGER_ALL.map(function (d, i) {
+        if (isPastDay(d)) return '';
         return '<span class="mtg-chip danger">' + mdLabel(d) +
                ' <b class="rm" onclick="removeDangerAllDate(' + i + ')">×</b></span>';
-      }).join('');
+      }).join('') + pastNote;
     }
     renderBigEvents();   // ボタンの「追加済み」表示を更新
   }
