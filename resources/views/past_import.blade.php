@@ -320,7 +320,7 @@
       </div>
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <label for="pjOffice" style="font-size:13px;"><b>どの拠点の案件として入れますか</b></label>
-        <select name="office" id="pjOffice"
+        <select name="office" id="pjOffice" onchange="pjOfficeChanged()"
                 style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
           @foreach ($offices as $o)
             <option value="{{ $o }}" @selected($o === $myOffice)>{{ $o }}</option>
@@ -529,8 +529,13 @@
     var memoChanged = rows.filter(function (r) { return r.skipMemo && r.skipMemo.changedSince; }).length;
 
     var okCount = 0, ngCount = 0, skipCount = 0, peopleCount = 0, cxlCount = 0;
-    var newCount = 0, chgCount = 0, sameCount = 0;
+    var newCount = 0, chgCount = 0, sameCount = 0, othCount = 0, ambCount = 0;
     rows.forEach(function (r) {
+      // 他の拠点の案件（2026-11-16）。取り込まないので、ECSとの違いにも数えない。
+      // ⚠ 判定はサーバー（otherOffice・取込と同じ）。ここで判定し直さない。
+      var oth = r.otherOffice ? r.otherOffice.kind : '';
+      if (oth === 'other' && !r.cancelled) { othCount++; return; }
+      if (oth === 'ambiguous' && r._skip) { ambCount++; }
       // ECSとの違いは、取り込む／取り込まないに関わらず数える（今の食い違いを知るため）。
       var kind = (r.diff && r.diff.kind) || 'new';
       if (!r.cancelled && !(r.errors && r.errors.length)) {
@@ -610,6 +615,17 @@
         + '<br>実施していない案件なので、履歴にもアサインにも入れません（2026-09-01 の決まり）。'
         + '入れたい場合は、シートのキャンセルの印を外してから読み込み直してください。</div>';
     }
+    // 他の拠点の案件（2026-11-16 小沼さん決定）。
+    if (othCount > 0) {
+      w += '<div class="pj-flash warn"><b>他の拠点の案件 ' + othCount + '件は取り込みません。</b>'
+        + '<br>この表に載っている、ヘルプ・巻き取りで関わった他の拠点の案件です（日程の上の「イベント東（ヘルプ）」などの印で見ています）。'
+        + 'その拠点で登録するので、ここでは入れません（二重登録や、その拠点のアサインを消してしまうのを防ぐため）。</div>';
+    }
+    if (ambCount > 0) {
+      w += '<div class="pj-flash warn"><b>どの拠点の案件か決められない ' + ambCount + '件があります。</b>'
+        + '<br>「イベント阪名福（巻き取り）」のように拠点が複数書かれた案件です。はじめは<b>取り込まない</b>ようにしてあります。'
+        + '「どの拠点の案件として入れますか」で選んだ拠点の案件だと分かったら、その行の「取込」にチェックを入れてください。</div>';
+    }
     if (data.unmapped && data.unmapped.length) {
       w += '<div class="pj-flash">取り込まなかった項目：' + pjEsc(data.unmapped.join('・'))
         + '<br>ECSに入れる場所がまだ無い項目です（案件は入ります）。</div>';
@@ -622,24 +638,31 @@
       if (r.missing && r.missing.length) { notes.push('名簿に無い：' + r.missing.join('・')); }
       if (r.ambiguous && r.ambiguous.length) { notes.push('同姓同名：' + r.ambiguous.join('・')); }
       if (r.cancelled) { notes.unshift('キャンセルの印が付いているので取り込みません'); }
+      // 他の拠点の案件・どの拠点か決められない案件（2026-11-16）。文言はサーバー（otherOffice）が作る。
+      var oth = r.otherOffice ? r.otherOffice.kind : '';
+      var othOut = oth === 'other' && !r.cancelled;
+      if (r.otherOffice && !r.cancelled) { notes.unshift(r.otherOffice.note || ''); }
       // これからの案件：シートのキャンセルの印で、ECSの案件もキャンセルになる（2026-11-16）。
       if (r.willCancel) { notes.unshift('🚫 シートにキャンセルの印＝取り込むとECSの案件もキャンセルになります（アサインは残ります）'); }
       // 100行目のIDが別の案件を指していた（ブロックの並べ替えなどでずれた）。正しい案件は右の「IDでつなぐ」で選べる。
       if (r.idMismatch) { notes.unshift(r.idMismatch); }
       // 日付しか合わないIDでつながっている（2026-11-02 P-2026-0269）。はじめは取り込まない（下の _skip）。
       if (r.idWeak) { notes.unshift(r.idWeak); }
-      var cls = (r._skip || r.cancelled) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
+      var cls = (r._skip || r.cancelled || othOut) ? 'row-skip' : (ok ? 'row-ok' : 'row-ng');
       // data-kind / data-date＝上の「まとめてチェック」で使う（new／changed／same・日程）。
       // data-memo-*＝外して取り込んだら覚えるための鍵（案件IDと差分の指紋・2026-10-21）。
       var memo = r.skipMemo || {};
       return '<tr class="' + cls + '" data-index="' + pjEsc(r.index) + '"'
         + ' data-kind="' + pjEsc((r.diff && r.diff.kind) || '') + '" data-date="' + pjEsc(r.date || '') + '"'
-        + ' data-memo-target="' + pjEsc(memo.target || '') + '" data-memo-fp="' + pjEsc(memo.fp || '') + '">'
+        + ' data-memo-target="' + pjEsc(memo.target || '') + '" data-memo-fp="' + pjEsc(memo.fp || '') + '"'
+        + ' data-other="' + pjEsc(oth) + '">'
         + '<td>' + pjEsc(r.label) + '</td>'
         + '<td style="text-align:center;">'
+          // 他の拠点の案件はチェックできない（取り込まない決まり・2026-11-16）。
           + '<input type="checkbox" data-f="skip" onchange="pjToggleSkip(this)"'
-          + ' title="チェックを外すと、この案件は取り込みません"' + (r._skip ? '' : ' checked') + '></td>'
-        + '<td>' + (r._skip ? '—' : (r.cancelled ? 'キャンセル' : (ok ? 'OK' : 'エラー'))) + '</td>'
+          + (othOut ? ' disabled title="他の拠点の案件なので取り込みません"'
+            : ' title="チェックを外すと、この案件は取り込みません"' + (r._skip ? '' : ' checked')) + '></td>'
+        + '<td>' + (othOut ? '他の拠点' : (r._skip ? (oth === 'ambiguous' ? '要確認' : '—') : (r.cancelled ? 'キャンセル' : (ok ? 'OK' : 'エラー')))) + '</td>'
         + '<td>' + pjInput('date', r.date, 'date') + '</td>'
         + '<td>' + pjInput('name', r.name, 'text') + '</td>'
         + '<td>' + pjInput('client', r.client, 'text') + '</td>'
@@ -850,6 +873,8 @@
     Array.prototype.forEach.call(trs, function (tr) {
       var cb = tr.querySelector('[data-f="skip"]');
       if (!cb) return;
+      // 他の拠点の案件・どの拠点か決められない案件は、まとめてチェックでは変えない（1件ずつ人が見る・2026-11-16）。
+      if (tr.dataset.other) return;
       var on;
       if (mode === 'all') { on = true; }
       else if (mode === 'none') { on = false; }
@@ -908,6 +933,9 @@
       var sk = tr.querySelector('[data-f="skip"]');
       // チェックが外れている＝取り込まない。
       if (sk) { if (sk.checked) { delete cur.skip; } else { cur.skip = true; } }
+      // どの拠点の案件か決められない案件に、人がチェックを入れた＝取り込むと決めた（2026-11-16）。
+      // ⚠ これが無いとサーバーは取り込まない（判定の正本＝サーバーの otherOffice）。
+      if (sk && tr.dataset.other === 'ambiguous' && sk.checked) { cur.takeOther = true; } else { delete cur.takeOther; }
       // 「変わります」の案件を外したら、そのときの差分を覚えてもらう（次も同じなら最初から外す・2026-10-21）。
       if (cur.skip && tr.dataset.memoTarget && tr.dataset.memoFp) {
         cur.keepTarget = tr.dataset.memoTarget;
@@ -1085,6 +1113,9 @@
     //（送らないと下見だけ「終わった案件」扱いになり、キャンセルの印の案件が「取り込みません」と出ていた）。
     var modeEl = form.querySelector('input[name="mode"]:checked');
     if (modeEl) { fd.append('mode', modeEl.value); }
+    // どの拠点の案件として入れるか（2026-11-16）。他の拠点の案件を「取り込みません」と出すのに使う（取込と同じ判定）。
+    var officeEl = document.getElementById('pjOffice');
+    if (officeEl) { fd.append('office', officeEl.value); }
 
     fetch('/past-import/preview', {
       method: 'POST',
@@ -1116,6 +1147,12 @@
       : '※ <b>公開済み</b>で入ります＝アサインされた本人が、自分の過去の実績としてすぐ見られます。';
   }
   pjModeChanged();
+
+  // 拠点を選び直したら、読み込み済みの表を確かめ直す（他の拠点の案件かどうかが変わるため・2026-11-16）。
+  function pjOfficeChanged() {
+    var box = document.getElementById('pjResult');
+    if (box && box.style.display !== 'none' && pjHasSource()) { pjRecheck(); }
+  }
 
   function pjSubmit() {
     if (!pjHasSource()) { alert(pjNeedSourceMessage()); return; }

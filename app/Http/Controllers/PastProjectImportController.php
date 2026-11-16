@@ -626,11 +626,18 @@ class PastProjectImportController extends Controller
                 }
             }
 
+            // 他の拠点の案件か（2026-11-16 小沼さん決定・正本＝otherOffice。取込と同じ判定）。
+            $other = self::otherOffice($get('持ち主の拠点'), $office);
+
             $rows[] = [
                 // 何件目か＝画面で直した内容を、取り込みのときに同じ案件へ当てるための鍵。
                 'index' => $i,
                 // 「この件は取り込まない」に印を付けたかどうか（確かめ直しても印が消えないように返す）。
-                'skip' => ! empty($edit['skip']),
+                // どの拠点か決められない案件は、人がチェックを入れる（takeOther）まで取り込まない。
+                'skip' => ! empty($edit['skip'])
+                    || ($other !== null && $other['kind'] === 'ambiguous' && empty($edit['takeOther'])),
+                // 他の拠点の案件（other＝取り込まない／ambiguous＝人が見て選ぶ）。null＝今までどおり。
+                'otherOffice' => $other,
                 // キャンセルの印が付いていて取り込まない案件（終わった案件のときだけ）。
                 // ⚠ 取込側と同じ判定にしている。画面では灰色にして「キャンセル」と出す。
                 'cancelled' => $mode !== self::MODE_FUTURE && $this->sheetCancelled($get),
@@ -756,6 +763,7 @@ class PastProjectImportController extends Controller
         $shared = 0;
         $skipped = 0;
         $cancelled = [];        // キャンセルの印が付いていて取り込まなかった案件（終わった案件のとき）
+        $otherOffices = [];     // 他の拠点の案件なので取り込まなかった案件（2026-11-16・otherOffice）
         $estimated = [];        // 運営人数が空だったので「仮」で入れた案件（黙って入れない・2026-09-09）
         $errors = [];
         $missingNames = [];     // 名簿に無かった人
@@ -770,9 +778,16 @@ class PastProjectImportController extends Controller
 
         foreach ($entries as $i => $entry) {
             $edit = $edits[$i] ?? [];
+            $get = $this->cellReader($entry['header'], $entry['row']);
+
+            // 他の拠点の案件（2026-11-16 小沼さん決定・正本＝otherOffice。下見と同じ判定）。
+            // ⚠ 「取り込まない」のチェックより先に見る＝結果に「他の拠点の案件」として出す（黙って捨てない）。
+            //   どの拠点か決められない案件は、人が下見でチェックを入れた（takeOther）ときだけ入れる。
+            $other = self::otherOffice($get('持ち主の拠点'), $office);
+            $otherBlocked = $other !== null && ($other['kind'] === 'other' || empty($edit['takeOther']));
 
             // 「この件は取り込まない」に印が付いていれば、まるごと飛ばす。
-            if (! empty($edit['skip'])) {
+            if (! empty($edit['skip']) && ! $otherBlocked) {
                 $skipped++;
                 // 「変わります」の案件を外した＝そのときの差分を覚える。次も同じ中身なら最初から外す（2026-10-21）。
                 if (isset($edit['keepTarget'], $edit['keepFp']) && Project::whereKey($edit['keepTarget'])->exists()) {
@@ -781,8 +796,6 @@ class PastProjectImportController extends Controller
 
                 continue;
             }
-
-            $get = $this->cellReader($entry['header'], $entry['row']);
 
             // ⚠ 「キャンセル」の印が付いた**終わった案件**は取り込まない（2026-09-01 baba要望）。
             //   実施していないので、履歴に残す意味がない（アサインまで入ると出勤数にも混ざる）。
@@ -793,6 +806,16 @@ class PastProjectImportController extends Controller
             // ⚠ 黙って捨てない。何件・どの案件を飛ばしたかを必ず知らせる。
             if ($mode !== self::MODE_FUTURE && $this->sheetCancelled($get)) {
                 $cancelled[] = $entry['label'].'（'.($get('コンテンツ') ?: $entry['label']).'）';
+
+                continue;
+            }
+
+            if ($otherBlocked) {
+                $otherOffices[] = $entry['label'].'（'.($get('開催日') !== '' ? $get('開催日').' ' : '')
+                    .($get('案件名') ?: $entry['label']).'・'
+                    .($other['kind'] === 'other'
+                        ? implode(MonthlySheetReader::OWNER_SEP, $other['owners']).'の案件'
+                        : 'どの拠点か決められない＝'.implode(MonthlySheetReader::OWNER_SEP, $other['owners'])).'）';
 
                 continue;
             }
@@ -1082,7 +1105,7 @@ class PastProjectImportController extends Controller
         }
 
         return redirect('/past-import')
-            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled, $estimated, $linked, $unlinked))
+            ->with('status', $this->buildMessage($isMonthly, $created, $updated, $assignCount, $skipped, $errors, $unmapped, $mode, $shared, $cancelled, $estimated, $linked, $unlinked, $otherOffices, $office))
             ->with('past_missing', array_keys($missingNames))
             // 台帳に無かったコンテンツ名（過去の取込のみ。足していないので必ず知らせる）。
             ->with('past_new_contents', array_keys($this->newContentNames))
@@ -1353,9 +1376,50 @@ class PastProjectImportController extends Controller
      * シートに「キャンセル」の印があるか（2026-11-16）。
      * ⚠ 判定はここ1か所。下見・取込（飛ばす／案件をキャンセルにする）・イベント数・備考で同じものを使う。
      */
+    /** 他の拠点の案件を飛ばす判定をしない取込先（東京の表は今までどおり・otherOffice）。 */
+    private const OTHER_OFFICE_CHECK_OFF = ['東京'];
+
     private function sheetCancelled(callable $get): bool
     {
         return $get('キャンセル') !== '';
+    }
+
+    /**
+     * 取込先の拠点と、シートの印から読んだ「案件の持ち主の拠点」が違うか（2026-11-16 小沼さん決定）。
+     * ⚠ 判定はここ1か所。下見（灰色・理由）と取込（飛ばす・結果に出す）で同じものを使う。
+     *
+     * 【なぜ】名古屋の表には、ヘルプ・巻き取りで関わった東京・大阪などの案件も載っている。
+     *   そのまま入れると、東京で取込済みの案件に当たって東京側のアサインを消して入れ直すか、二重登録になる。
+     *
+     *   null … 飛ばさない（持ち主が読めない・取込先と同じ）＝今までどおり
+     *   other … 持ち主がはっきり別の拠点＝取り込まない（人が選んでも入れない）
+     *   ambiguous … 候補が複数で取込先も含む（「イベント阪名福（巻き取り）」）＝勝手に決めない。
+     *               はじめは取り込まない。人が下見でチェックを入れたときだけ入れる（edits の takeOther）。
+     * ⚠ 東京の表の矢印（「東→他拠点」）は持ち主の拠点として読まない（MonthlySheetReader::ownerFromMark）。
+     *
+     * @return array{kind: 'other'|'ambiguous', owners: list<string>, note: string}|null
+     */
+    public static function otherOffice(string $owner, string $office): ?array
+    {
+        // ⚠ 東京として取り込むときは飛ばさない＝東京の表の動きは今までどおり（2026-11-16）。
+        //   東京の表（2025年）にも「イベント阪名福（巻き取り）」「イベント阪名福（ヘルプのみ）」「イベント福」が載っていて、
+        //   東京の表では「東京の案件を地方の拠点が巻き取った・手伝った」の意味で、東京の案件として取込済みのため。
+        if (in_array($office, self::OTHER_OFFICE_CHECK_OFF, true)) {
+            return null;
+        }
+        $owners = array_values(array_filter(array_map('trim', explode(MonthlySheetReader::OWNER_SEP, $owner)), fn ($o) => $o !== ''));
+        if ($owners === [] || $office === '' || $owners === [$office]) {
+            return null;
+        }
+        $names = implode(MonthlySheetReader::OWNER_SEP, $owners);
+        if (count($owners) >= 2 && in_array($office, $owners, true)) {
+            return ['kind' => 'ambiguous', 'owners' => $owners,
+                'note' => '⚠ どの拠点の案件か決められません（シートの印＝'.$names.'）。はじめは取り込みません。'
+                    .$office.'の案件なら、チェックを入れてください'];
+        }
+
+        return ['kind' => 'other', 'owners' => $owners,
+            'note' => '他の拠点の案件なので取り込みません（'.$names.'の案件）'];
     }
 
     /**
@@ -1446,6 +1510,10 @@ class PastProjectImportController extends Controller
             // 「つながった案件は別物＝ECSに無いので新しく登録する」（2026-10-09 baba）。正本＝SheetDiff::target。
             if (! empty($edit['forceNew'])) {
                 $clean['forceNew'] = true;
+            }
+            // どの拠点の案件か決められない案件を、人が見て「取り込む」と決めた（2026-11-16）。正本＝otherOffice。
+            if (! empty($edit['takeOther'])) {
+                $clean['takeOther'] = true;
             }
             // 項目だけ入れる（2026-10-28）。チェックを付けた変更の項目名（案件の項目名・'staff'＝スタッフの変更）。
             // ⚠ 印が無い＝これまでどおり行まるごと。
@@ -1949,7 +2017,8 @@ class PastProjectImportController extends Controller
     /** 画面に出す結果のメッセージ。 */
     private function buildMessage(bool $isMonthly, int $created, int $updated, int $assignCount,
         int $skipped, array $errors, array $unmapped, string $mode = self::MODE_PAST, int $shared = 0,
-        array $cancelled = [], array $estimated = [], int $linked = 0, array $unlinked = []): string
+        array $cancelled = [], array $estimated = [], int $linked = 0, array $unlinked = [],
+        array $otherOffices = [], string $office = ''): string
     {
         $future = $mode === self::MODE_FUTURE;
         $msg = $isMonthly
@@ -1992,6 +2061,14 @@ class PastProjectImportController extends Controller
             $msg .= ' キャンセルの印が付いていた'.count($cancelled).'件は取り込みませんでした：'
                 .implode(' / ', $cancelled)
                 .'（実施していないため。入れたい場合は、シートのキャンセルの印を外してください）';
+        }
+
+        // ⚠ 他の拠点の案件も黙って捨てない（2026-11-16 小沼さん決定）。
+        if ($otherOffices) {
+            $msg .= ' 他の拠点の案件'.count($otherOffices).'件は取り込みませんでした：'
+                .implode(' / ', $otherOffices)
+                .'（'.($office !== '' ? $office.'の' : '').'表に載っている、ヘルプ・巻き取りで関わった案件です。'
+                .'その拠点で登録するため。どの拠点か決められない案件は、'.($office !== '' ? $office : 'この拠点').'の案件なら下見でチェックを入れてから取り込んでください）';
         }
 
         // ⚠ 仮で入れた人数は黙って入れない。どの案件に何名を、どう出したかを必ず出す

@@ -1260,8 +1260,9 @@ class PastProjectImportTest extends TestCase
     {
         $this->staff('S-001', '鈴木 彩');
 
+        // 名古屋の表なので取込先も名古屋（実際の使い方に合わせる。印「イベント名」と取込先がそろう・2026-11-16）。
         $this->actingAsPerson($this->manager())->post('/past-import', [
-            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']]),
+            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']]), 'office' => '名古屋',
         ])->assertRedirect('/past-import');
 
         $p = Project::where('project_name', '水合戦')->firstOrFail();
@@ -1290,6 +1291,7 @@ class PastProjectImportTest extends TestCase
                 ['name' => 'メンバー', 'role' => ''],
                 ['name' => 'メンバー', 'role' => ''],
             ]),
+            'office' => '名古屋',
         ])->assertRedirect('/past-import');
 
         $p = Project::where('project_name', '水合戦')->firstOrFail();
@@ -1368,7 +1370,7 @@ class PastProjectImportTest extends TestCase
         $staff = $this->staff('S-002', '永松 一子');
 
         $this->actingAsPerson($this->manager())->post('/past-import', [
-            'csv' => $this->nagoyaCsv([['name' => '★永松 一子', 'role' => 'FC']]),
+            'csv' => $this->nagoyaCsv([['name' => '★永松 一子', 'role' => 'FC']]), 'office' => '名古屋',
         ])->assertRedirect('/past-import');
 
         $p = Project::where('project_name', '水合戦')->firstOrFail();
@@ -1387,7 +1389,7 @@ class PastProjectImportTest extends TestCase
         $this->staff('S-001', '鈴木 彩');
 
         $this->actingAsPerson($this->manager())->post('/past-import', [
-            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']]),   // 入場は空
+            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']]), 'office' => '名古屋',   // 入場は空
         ])->assertRedirect('/past-import');
 
         $p = Project::where('project_name', '水合戦')->firstOrFail();
@@ -1402,7 +1404,7 @@ class PastProjectImportTest extends TestCase
         $this->staff('S-001', '鈴木 彩');
 
         $this->actingAsPerson($this->manager())->post('/past-import', [
-            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']], '名古屋アサイン表2026 - 202609.csv', '13:00'),
+            'csv' => $this->nagoyaCsv([['name' => '鈴木 彩', 'role' => 'MC']], '名古屋アサイン表2026 - 202609.csv', '13:00'), 'office' => '名古屋',
         ])->assertRedirect('/past-import');
 
         $p = Project::where('project_name', '水合戦')->firstOrFail();
@@ -1483,6 +1485,7 @@ class PastProjectImportTest extends TestCase
             'paste' => $this->pastedSheet([['name' => '鈴木 彩', 'role' => 'MC']]),
             // 貼り付けはファイル名が無いので、何年何月ぶんかを画面で選ぶ。
             'period' => '2026-09',
+            'office' => '名古屋',
         ])->assertRedirect('/past-import');
 
         $p = Project::where('project_name', '謎解き')->firstOrFail();
@@ -1585,7 +1588,7 @@ class PastProjectImportTest extends TestCase
     public function test_missing_names_are_shown_without_star_marks(): void
     {
         $res = $this->actingAsPerson($this->manager())->post('/past-import', [
-            'csv' => $this->nagoyaCsv([['name' => '★永松 一子', 'role' => 'FC']]),
+            'csv' => $this->nagoyaCsv([['name' => '★永松 一子', 'role' => 'FC']]), 'office' => '名古屋',
         ])->assertRedirect('/past-import');
 
         $res->assertSessionHas('past_missing', ['永松 一子']);

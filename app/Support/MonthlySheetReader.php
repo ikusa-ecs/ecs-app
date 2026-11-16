@@ -107,6 +107,13 @@ final class MonthlySheetReader
     private const ASSIGN_ROLE_LABELS = ['P', 'ポジション', '役割'];
 
     /**
+     * 「巡回」の列の見出し（2026-11-16 小沼さん決定）。
+     * 名古屋の表は P列に D/SD しか書かず、受付・MC・競技などの役割をこの列に書いている。
+     * ⚠ 東京の表ではこの列は巡回の数や印（担当メモ）。P列が空の人だけ、ここを役割として読む（roleFromPatrolCell）。
+     */
+    private const ASSIGN_PATROL_LABEL = '巡回';
+
+    /**
      * 氏名の欄に書かれる「まだ決まっていない枠」の書き方（2026-08-27 baba）。
      *
      * 名古屋のシートは、スタッフで埋める予定の枠に**「メンバー」と書いて場所を取ってある**。
@@ -508,6 +515,8 @@ final class MonthlySheetReader
      * カッコの前（イベント東）は**捨てる**。2026-07-31 の全拠点対応で拠点は
      * `projects.office`（画面で選ぶ登録拠点）が正になり、実施形態は「リアル/オンライン」だけを
      * 持つ決まりになったため（カッコ付きの古い形を入れると、拠点を二重に持つことになる）。
+     * ⚠ 2026-11-16 から「持ち主の拠点」としては読む（他拠点の案件を取込で飛ばすため・ownerFromMark）。
+     *   登録拠点は今までどおり画面で選んだ拠点。
      */
     private static function readAbove(array $rows, int $col, array &$unknown): array
     {
@@ -556,6 +565,14 @@ final class MonthlySheetReader
             }
         }
 
+        // ⓪' 案件の持ち主の拠点＝「イベント名（リアル）」の「名」・「イベント大阪」など（2026-11-16 小沼さん決定）。
+        //   名古屋の表には、ヘルプ・巻き取りで関わった他拠点の案件も載っている＝取込で飛ばすのに使う（判定は取込側）。
+        //   ⚠ 実施形態や拠点間の印としての読み方は下でこれまでどおり続ける（ここでは return しない）。
+        $owner = self::ownerFromMark($piece);
+        if ($owner !== null) {
+            $found['持ち主の拠点'] ??= $owner;
+        }
+
         // ① 実施形態（種別）＝「イベント東(リアル)」など。
         $format = self::matchFormat($piece);
         if ($format !== null) {
@@ -595,7 +612,57 @@ final class MonthlySheetReader
             }
         }
 
+        // 2024年の名古屋の表の「イベント大阪」「イベント東京」（カッコなし）＝持ち主の拠点だけの印。
+        // 上で読めたので「取り込まなかった項目」には出さない。
+        if ($owner !== null && self::insideParen($piece) === $piece) {
+            return;
+        }
+
         $unknown[] = $piece;
+    }
+
+    /** 持ち主の拠点が略称で並んでいるとき（「阪名福」）の区切り。 */
+    public const OWNER_SEP = '・';
+
+    /**
+     * 日程の上の印から「案件の持ち主の拠点」を読む（2026-11-16 小沼さん決定）。
+     *   「イベント名（リアル）」「イベント名古屋（リアル）」→ 名古屋
+     *   「イベント阪（ヘルプ）」「イベント大阪」→ 大阪
+     *   「イベント阪名福（巻き取り）」→ 「大阪・名古屋・福岡」（候補が複数＝あいまい。決めるのは取込側）
+     * 読めないときは null（＝今までどおり、拠点では飛ばさない）。
+     *
+     * ⚠ 東京の表の書き方はここでは読まない＝今までどおり：
+     *   ・矢印つき（「イベント東→他拠点(巻き取り)」「東⇒名」）と「他拠点」で始まるもの … crossDirection が読む
+     *   ・「イベント東北(リアル)」… 東北・札幌は略し方の表（OFFICE_ABBR）に無いので読まない。
+     *     東京の表に東京の案件として載っているため（読むと東京の取込で飛ばしてしまう）。
+     */
+    public static function ownerFromMark(string $piece): ?string
+    {
+        $piece = trim($piece);
+        if (! str_starts_with($piece, 'イベント')) {
+            return null;
+        }
+        $head = trim((string) preg_replace('/[（(].*$/u', '', $piece));
+        $head = trim(mb_substr($head, mb_strlen('イベント')));
+        if ($head === '' || preg_match('/[→⇒＞>]/u', $head) || str_starts_with($head, self::OTHER_OFFICE)) {
+            return null;
+        }
+        if (isset(self::OFFICE_ABBR[$head])) {
+            return self::OFFICE_ABBR[$head];
+        }
+        if (in_array($head, self::OFFICE_ABBR, true)) {
+            return $head;
+        }
+        // 略称が並んでいる（「阪名福」）。1文字でも略称でなければ読めない（「東北」の「北」など）。
+        $offices = [];
+        foreach (mb_str_split($head) as $ch) {
+            if (! isset(self::OFFICE_ABBR[$ch])) {
+                return null;
+            }
+            $offices[] = self::OFFICE_ABBR[$ch];
+        }
+
+        return implode(self::OWNER_SEP, array_values(array_unique($offices)));
     }
 
     /**
@@ -641,7 +708,8 @@ final class MonthlySheetReader
     public const OTHER_OFFICE = '他拠点';
 
     /** シートでの拠点の略し方（「東⇒名」など）。正式名もそのまま受け付ける。 */
-    private const OFFICE_ABBR = ['東' => '東京', '名' => '名古屋', '大' => '大阪', '福' => '福岡'];
+    // 「阪」＝大阪（名古屋の表の「イベント阪（ヘルプ）」・2026-11-16 追加）。
+    private const OFFICE_ABBR = ['東' => '東京', '名' => '名古屋', '大' => '大阪', '阪' => '大阪', '福' => '福岡'];
 
     /**
      * 拠点間の印の矢印の左右＝[元（案件の持ち主）, 先（巻き取る・手伝う側）]。
@@ -716,10 +784,14 @@ final class MonthlySheetReader
         // 見出しの行から「氏名の列」「役割の列」を探す（拠点で位置が違っても当たるように）。
         $nameOffset = null;
         $roleOffset = null;
+        $patrolOffset = null;
         for ($off = 0; $off < self::BLOCK_WIDTH; $off++) {
             $v = self::norm(self::cell($rows, $assignRow, $col + $off));
             if ($v === self::norm(self::ASSIGN_NAME_LABEL)) {
                 $nameOffset = $off;
+            }
+            if ($v === self::norm(self::ASSIGN_PATROL_LABEL)) {
+                $patrolOffset = $off;
             }
             foreach (self::ASSIGN_ROLE_LABELS as $label) {
                 if ($v === self::norm($label)) {
@@ -752,10 +824,43 @@ final class MonthlySheetReader
                 continue;
             }
             $role = $roleOffset !== null ? self::cell($rows, $r, $col + $roleOffset) : '';
+            // P列が空なら、巡回の列に書かれた役割を読む（名古屋の表・2026-11-16 小沼さん決定）。
+            // ⚠ P列が書いてある人は P列のまま（巡回の列は見ない）＝東京の表の読み方は変わらない。
+            if ($role === '' && $patrolOffset !== null) {
+                $role = self::roleFromPatrolCell(self::cell($rows, $r, $col + $patrolOffset));
+            }
             $people[] = ['name' => $name, 'role' => $role];
         }
 
         return ['people' => $people, 'slots' => $slots];
+    }
+
+    /**
+     * 「巡回」の列の1マスを、役割として読むかどうか（2026-11-16 小沼さん決定）。役割にしないなら ''。
+     *
+     * ・数字（「3」）・「巡3」「巡回」「巡回2」・○✓ などの印 … 巡回の数や印（東京の表の使い方）＝役割にしない
+     * ・服のサイズ（「L」「M,24,5」）… 2024年の名古屋の表の使い方＝役割にしない
+     * ・それ以外の言葉（「受付」「MC」「競技」）… 役割として返す。
+     *   役割コードへの読み替えは取込側の今までの読み替え（AssignmentRole::fromLabel）をそのまま通す。
+     *   読めない言葉は今までどおり「知らないポジションの書き方」に出て、FCで入り、担当メモに書いたとおりが残る。
+     * ⚠ 「巡回」は FC（巡回ファシリ）とも読めるが、印として扱う（どちらでも FC で入るので結果は同じ）。
+     */
+    public static function roleFromPatrolCell(string $value): string
+    {
+        $v = trim(mb_convert_kana($value, 'as'));
+        if ($v === '') {
+            return '';
+        }
+        if (preg_match('/^(巡回?)?\s*\d+(\.\d+)?\s*(回)?$/u', $v) || preg_match('/^巡回?$/u', $v)
+            || preg_match('/^[○◯〇●✓✔レ]$/u', $v)) {
+            return '';
+        }
+        // 2024年の名古屋の表は、この列に服や靴のサイズ（「L」「M,24,5」「S,26」「L25」）を書いている＝役割ではない。
+        if (preg_match('/^(SS|S|M|L|LL|XL|XXL|3L|4L)(\s*[,、]?\s*\d+([.,]\d)?)?$/iu', $v)) {
+            return '';
+        }
+
+        return trim($value);
     }
 
     /** 氏名の欄が「まだ決まっていない枠」か。 */
