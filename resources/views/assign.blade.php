@@ -2114,6 +2114,17 @@
     document.querySelectorAll('.lh-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.h === v));
   }
 
+  // 顧客名に「様」を付けて見せる（2026-11-16 小沼さん「日別ボードの顧客名は様をつけてほしい」）。
+  // ⚠ 保存している名前は変えない（敬称は保存しない決まり＝正本 ClientName）。ここは見せ方だけ。
+  // すでに「様」「御中」が入っている名前（「A様（B様）」など・古いデータ）はそのまま＝「様様」にしない。
+  // 「顧客名なし」「未定」「？？」のように会社名ではないものにも付けない。
+  function clientSama(name){
+    const s = String(name == null ? '' : name).trim();
+    if (!s) return '';
+    if (/様|御中|さま$|サマ$/.test(s)) return s;
+    if (/^(顧客名なし|未定|不明|なし|[?？\s]+)$/.test(s)) return s;
+    return s + '様';
+  }
   // 文字列をHTMLに安全に埋め込む（備考・担当メモにタグ文字が入っても崩れないように）
   function escHtml(s){
     return String(s == null ? '' : s)
@@ -2130,7 +2141,7 @@
   function escAttr(s){ return escHtml(s); }
 
   // 案件カードのタイトル部分のHTML。タイトルは1行省略（長い分は「…」・ホバーで全文）。
-  // コンテンツ未登録の案件は先頭に小さな「⚠未登録」バッジを付け、案件名で仮表示する。
+  // コンテンツ未登録の案件は先頭に小さな「⚠」の印を付け（乗せると説明が出る・2026-11-16 から記号だけ）、案件名で仮表示する。
   // 確度（Aヨミ/Bヨミ/Cヨミ）の印。⚠ 印も色も案件一覧と同じにそろえる（画面ごとに変えない）。
   //   「確定」は数が多いので印を出さない＝印が付いている＝まだ確定していない、と読める。
   const yomiMark = { 'Aヨミ':{ t:'A', c:'a' }, 'Bヨミ':{ t:'B', c:'b' }, 'Cヨミ':{ t:'C', c:'c' } };
@@ -2245,7 +2256,9 @@
   //   横に並んだカードを目で追うときに見落とすため。
   function titleBlockHtml(c, extraHtml){
     const name = c.name || '';
-    const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツがマスタに未登録です。案件名で仮表示しています。">⚠未登録</span> ' : '';
+    // 印は「⚠」だけ（2026-11-16 小沼さん：「⚠未登録」だと「なにが未登録？」＝アサインのことに読める。
+    //   「コンテンツ未登録」と書くと札が長くてぶかっこう → 記号だけにして、説明は乗せたときに出す）。
+    const badge = c.contentMissing ? '<span class="cc-nocontent" title="コンテンツ未登録：この案件はコンテンツ（マスタ）につながっていません。案件名で仮に表示しています。案件名を押して、コンテンツを選ぶと消えます。（アサインとは関係ありません）">⚠</span> ' : '';
     // 案件名を押したら案件の詳細（編集画面）へ。アサインしながら中身を確認できる（2026-08-21 baba）。
     const inner = USING_DB
       ? `<a href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細・編集を開く">${badge}${name}</a>`
@@ -2600,7 +2613,7 @@
     el.innerHTML = '<div class="dc-head">🚫 この日のキャンセル案件（見るだけ・人数には数えません）</div>'
       + items.map(c => '<div class="dc-row">'
         + `<a class="dc-name" href="/project-form?project=${encodeURIComponent(c.id)}" title="案件の詳細を開きます">${escHtml(c.name)}</a>`
-        + (c.client ? `<span class="dc-client">${escHtml(c.client)}</span>` : '')
+        + (c.client ? `<span class="dc-client">${escHtml(clientSama(c.client))}</span>` : '')
         + `<span class="dc-mem">入っていた人：${c.members && c.members.length ? c.members.map(escHtml).join('、') : 'なし'}</span>`
         + '</div>').join('');
     return el;
@@ -3386,7 +3399,7 @@
         ${bulkDelBoxHtml(c)}
         <div class="cc-headmain">
           ${titleBlockHtml(c, groupBadgeHtml(c) + scaleBadgeHtml(c) + fmtBadgeHtml(c) + shareTagsHtml(c) + tagHtml)}
-          <div class="cc-client">${c.client}</div>
+          <div class="cc-client">${escHtml(clientSama(c.client))}</div>
           <div class="cc-meta">
             <span><span class="ic">🕘</span> 集合 ${c.meet || '—'}〜解散 ${c.leave || '—'}</span>
             <span><span class="ic">📍</span> <span class="venue" title="${c.place || ''}">${c.placeShort || c.place || '—'}</span></span>

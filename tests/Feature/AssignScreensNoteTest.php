@@ -47,6 +47,21 @@ class AssignScreensNoteTest extends TestCase
         $this->assertStringContainsString('/project-form?project=${encodeURIComponent(c.id)}', $html, '案件名のリンク');
     }
 
+    /**
+     * 日別ボード：顧客名は「様」を付けて見せる（2026-11-16 小沼さん）。
+     * 見せ方だけ＝保存している名前は変えない。カードとキャンセル欄の2か所とも同じ部品（clientSama）を通す。
+     */
+    public function test_day_board_shows_client_with_sama(): void
+    {
+        $this->project();
+
+        $html = $this->actingAsPerson($this->emp())->get('/assign')->assertOk()->getContent();
+
+        $this->assertStringContainsString('function clientSama(name)', $html, '「様」を付ける部品');
+        $this->assertStringContainsString('<div class="cc-client">${escHtml(clientSama(c.client))}</div>', $html, 'カードの顧客名');
+        $this->assertStringContainsString('<span class="dc-client">${escHtml(clientSama(c.client))}</span>', $html, 'キャンセル欄の顧客名');
+    }
+
     /** ピックアップ：同じく備考の帯と案件名リンクがある。 */
     public function test_pickup_has_editable_note_and_name_link(): void
     {
