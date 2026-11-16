@@ -635,7 +635,7 @@
           <p class="agg-note">
             この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:var(--dirlg-red);font-weight:700;">赤字</span>＝偏りに注意。<br>
             <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
-            ※ <b>D計は本番の日だけ</b>数えます（前日設営・リハ日・予備日のDは数えません）。合計は全部の日を数えます。<br>
+            ※ <b>D計・大型D・大型SDは本番の日だけ</b>数えます（前日設営・リハ日・予備日は数えません）。合計は全部の日を数えます。<br>
             ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
             ※ <b>名前の文字色＝所属</b>です（<span class="dep-plan"><b class="e-nm">イベプラ</b></span>／<span class="dep-sales"><b class="e-nm">セールス</b></span>／<span class="dep-creative"><b class="e-nm">クリエイティブ</b></span>／<span class="dep-other"><b class="e-nm">その他</b></span>）。カレンダーの名前と同じ色です。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
@@ -1293,9 +1293,11 @@
       if (!inTarget(c)) return;
       const isBig = c.scale === '大型';
       // ⚠ 「D計」は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
-      //   前日設営・リハ日・予備日まで数えると件数がふくらむ）。「合計」「大型D」は今までどおり全部の日を数える。
-      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) r.d++; r.total++; if (isBig) r.bigD++; }
-      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); r.total++; if (isBig) r.bigSD++; });
+      //   前日設営・リハ日・予備日まで数えると件数がふくらむ）。「大型D」「大型SD」も本番日だけ
+      //   （同日の追加決定：D計より大型Dが大きくならないように・社員・ディレクター集計と同じ数え方にそろえる）。
+      //   「合計」だけは今までどおり全部の日を数える。
+      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) r.d++; r.total++; if (isBig && c.isMain) r.bigD++; }
+      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); r.total++; if (isBig && c.isMain) r.bigSD++; });
       (c.fcIds || []).forEach(id => { if (isEmp(id)) ensure(id).total++; });
     });
 

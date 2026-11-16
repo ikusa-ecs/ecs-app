@@ -262,6 +262,9 @@ class DirectorBoardFilterTest extends TestCase
             })
             // 画面側：D計は本番日だけ・合計は全部の日／名前横の「D◯」も本番日だけ。
             ->assertSee('if (c.isMain) r.d++; r.total++;', false)
+            // 大型D・大型SDも本番日だけ（D計より大型Dが大きくならないように）。
+            ->assertSee('if (isBig && c.isMain) r.bigD++;', false)
+            ->assertSee('if (isBig && c.isMain) r.bigSD++;', false)
             ->assertSee("i.k === 'd' && i.main", false)
             ->assertSee('isMain: (c.isMain !== undefined)', false);
     }
