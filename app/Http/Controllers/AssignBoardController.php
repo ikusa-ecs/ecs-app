@@ -646,7 +646,9 @@ class AssignBoardController extends Controller
         $groupDays = collect(ProjectSeries::daysFor($projects->map(fn ($pair) => $pair[0])->all()))
             ->filter(fn ($rows) => count($rows) > 1)->all();
 
-        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $slotsByProject, $sharesByProject, $office, $stayNg, $groupDays) {
+        return $projects->map(function (array $pair) use ($assignedByProject, $appsByProject, $people, $validContentIds, $contentMaster, $dispatchesByProject, $slotsByProject, $sharesByProject, $office, $stayNg, $groupDays, $repeatPrev, $dateChanges) {
+            // ⚠ $repeatPrev と $dateChanges は、ここ（use）に書き忘れると**エラーにならずに空になる**。
+            //   実際に 2026-10-26〜11-16 のあいだ、日別ボードに「🔁 前回」「📅 日付が変わりました」が出ていなかった。
             [$p, $off] = $pair;
 
             // ひもづくコンテンツがマスタに1つも無い＝「コンテンツ未登録」（案件名で代用表示＋印を出す）。
@@ -732,7 +734,8 @@ class AssignBoardController extends Controller
             if (Lodging::hasPreStay($p->lodging)) {
                 $tags[] = '前泊';
             }
-            if ($p->is_repeat) {
+            // 前回があるときは「🔁 前回 ◯/◯」の札が出るので、ここでは足さない（同じことを2つ並べない）。
+            if ($p->is_repeat && ! isset($repeatPrev[(string) $p->id])) {
                 $tags[] = 'リピート';
             }
 
@@ -1104,6 +1107,8 @@ class AssignBoardController extends Controller
         }
 
         $projectIds = $projects->pluck('id');
+        // リピートの「前回」（前回入った人に印を出す・2026-11-16 小沼さん）。正本＝RepeatHistory。
+        $repeatPrev = RepeatHistory::forProjects($projects, false);
 
         // 応募（applications）＝この案件に「エントリーする」を出した人。note＝本人が応募時に書いた一言。
         $apps = Application::whereIn('project_id', $projectIds)->get(['project_id', 'staff_id', 'note']);
@@ -1199,8 +1204,10 @@ class AssignBoardController extends Controller
             }
         }
 
-        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office, $seriesGroups, $seriesApps, $groupDays) {
+        return $projects->map(function (Project $p) use ($today, $appsByProject, $assignedByProject, $statusByProject, $noteByProject, $remarkByProject, $people, $wishByKey, $okByDay, $calPeople, $dispatched, $office, $seriesGroups, $seriesApps, $groupDays, $repeatPrev) {
             $series = ProjectSeries::positionOf($p, $seriesGroups);
+            $prev = $repeatPrev[(string) $p->id] ?? null;
+            $prevIds = array_flip($prev['staffIds'] ?? []);
             // 同じイベントの全部の日（本番＋リハ日など）。1日だけの案件は空。
             $days = $groupDays[ProjectSeries::rootId($p)] ?? [];
             // その人がエントリーしている日（"11/5" の形・開催日順）。同じイベントに他の日が無ければ null。
@@ -1223,11 +1230,13 @@ class AssignBoardController extends Controller
                 ->filter(fn ($sid) => in_array($sid, $assignedIds, true)
                     || OfficeScope::personIn($people->get($sid), $office))
                 ->values()
-                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p, $seriesOn) {
+                ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p, $seriesOn, $prevIds) {
                     $person = $people->get($sid);
 
                     return [
                         'no' => $i + 1,
+                        'prev' => isset($prevIds[(string) $sid]),   // 前回の案件に入った人
+
                         // その日の稼働希望（'ok'＝終日〇／'ng'＝NG・希望休／null＝出していない）。
                         'wish' => ShiftWish::of($wishByKey, $sid, $p->start_date?->format('Y-m-d')),
                         'id' => $sid,                              // スタッフID（エントリー一覧からのアサイン保存に使う）
@@ -1265,6 +1274,7 @@ class AssignBoardController extends Controller
                 $already[$sid] = true;
                 $entrants[] = [
                     'no' => count($entrants) + 1,
+                    'prev' => isset($prevIds[(string) $sid]),    // 前回の案件に入った人
                     'wish' => 'ok',                              // ここに来る人は必ず終日〇
                     'id' => $sid,
                     'name' => $person->name ?? $sid,
@@ -1297,6 +1307,8 @@ class AssignBoardController extends Controller
                 'series' => $series,
                 // 同じイベントの全部の日（本番＋リハ日など）＝「全日エントリー」の数え方。無ければ null。
                 'groupDays' => $days ?: null,
+                // リピートの前回の開催日（"2025/12/5" など）。前回が無ければ null。
+                'repeatPrev' => $prev['date'] ?? null,
                 'state' => $this->boardState($p),
                 'recruit' => (bool) $p->is_recruiting,
                 'archived' => $off < 0,   // 過去の案件は出さない（画面の !archived フィルタで除外）

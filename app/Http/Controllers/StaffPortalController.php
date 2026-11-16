@@ -861,7 +861,8 @@ class StaffPortalController extends Controller
                 // 画面側に書き足さなくてよい（正本＝ProjectFormats::ALL）。
                 'fmtText' => $format,
                 'scale' => $p->scale ?? '',
-                'repeat' => (bool) $p->is_repeat,
+                // 前回の札が出るときは、こちらの「リピート」は出さない（同じことを2つ並べない）。
+                'repeat' => (bool) $p->is_repeat && ! isset($repeatPrev[(string) $p->id]),
                 'lodging' => $p->lodging ?? '無',
                 'dayType' => $p->date_type ?? '本番',
                 'parentId' => $p->parent_project_id,

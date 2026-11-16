@@ -48,6 +48,11 @@
       font-size: 13.5px; font-family: inherit; text-align: right; background: #fff;
     }
     .qty-input { width: 76px; }
+    /* ECSがアサインから自動で入れた「仮の数量」（2026-11-16 小沼さん「どこを埋めてくれたか分かるように」）。
+       自分で直すと外れる。文字色も決め打ち＝画面の色を変えていても読めるように。 */
+    .qty-input.auto-fill { background: #fff3c4; border-color: #e0b84a; color: #5b4300; }
+    .auto-legend { margin: 6px 0 8px; font-size: 12px; }
+    .auto-legend .chip { display: inline-block; padding: 0 8px; border-radius: 6px; background: #fff3c4; border: 1px solid #e0b84a; color: #5b4300; font-weight: 700; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .unit-cell { color: var(--muted); font-size: 12.5px; }
     .price-cell { color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -237,6 +242,7 @@
           <span class="note-cell">※雛型の収支シートには無い項目です。利益を出すために追加しています（不要なら外せます）。</span>
         </div>
 
+        <p class="auto-legend" id="autoLegend" style="display:none;"><span class="chip">黄色</span> の数量は、ECSがアサインから自動で入れた<b>仮の数字</b>です。実際と違うときは直してください（自分で直すと白に戻ります。保存したあとは色は付きません）。</p>
         <table class="tbl">
           <thead>
             <tr><th>種別（経費）</th><th class="num">単価</th><th class="num">数量</th><th>単位</th><th class="num">金額</th><th>備考</th></tr>
@@ -397,7 +403,7 @@
         return '<tr data-key="'+it.key+'">' +
           '<td>'+it.name+'</td>' +
           '<td class="num price-cell">'+yen(it.price)+'</td>' +
-          '<td class="num"><input class="yen-input qty-input" type="number" min="0" step="1" data-role="qty" value="0" oninput="recalc()"></td>' +
+          '<td class="num"><input class="yen-input qty-input" type="number" min="0" step="1" data-role="qty" value="0" oninput="this.classList.remove('auto-fill'); recalc()"></td>' +
           '<td class="unit-cell">'+it.unit+'</td>' +
           '<td class="num amount-cell" data-role="amount">¥0</td>' +
           '<td class="note-cell" title="'+it.note+'">'+it.note+'</td>' +
@@ -525,11 +531,16 @@
         const fallback = (it.key === staffKey) ? defaultStaff
           : (it.key === 'food') ? defaultAll
           : (it.key === 'lodging') ? defaultAll * (Number((window.ECS_STAY_NIGHTS || {})[id]) || 0) : 0;
-        tr.querySelector('[data-role="qty"]').value = ('qty' in saved) ? saved.qty : fallback;
+        const qtyEl = tr.querySelector('[data-role="qty"]');
+        qtyEl.value = ('qty' in saved) ? saved.qty : fallback;
+        // 自動で入れた仮の数量は黄色にする（保存ずみの数字・0のままの行には付けない）。
+        qtyEl.classList.toggle('auto-fill', !('qty' in saved) && fallback > 0);
       } else {
         tr.querySelector('[data-role="amount-input"]').value = saved.amount || 0;
       }
     });
+    // 黄色の説明は、黄色の欄があるときだけ出す。
+    document.getElementById('autoLegend').style.display = document.querySelector('#costBody .qty-input.auto-fill') ? '' : 'none';
     recalc();
     alLoad(id);
   }

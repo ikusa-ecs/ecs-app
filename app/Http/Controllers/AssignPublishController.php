@@ -125,7 +125,8 @@ class AssignPublishController extends Controller
                 'stay'      => Lodging::hasPreStay($p->lodging),
                 'lodging'   => (string) ($p->lodging ?? ''),   // 前泊有などの文字（案件一覧と同じ札に出す）
                 // リピート（2026-10-26 baba要望）。前回の開催日があれば、その日付を札に出す。
-                'repeat'    => (bool) $p->is_repeat,
+                // チェックが無くても、前回があればリピート（2026-11-16 小沼さん・正本 RepeatHistory）。
+                'repeat'    => (bool) $p->is_repeat || isset($repeatPrev[(string) $p->id]),
                 'repeatPrev' => $repeatPrev[(string) $p->id]['date'] ?? null,
                 // 登録拠点と、その案件への関わりの札（2026-09-18）。
                 // ⚠ 文言は App\Support\ShareTags が正本（日別ボードと同じ言い方にそろえる）。

@@ -150,6 +150,8 @@
     /* 月ごとの表：見出しの「🗓 1/4日目・全日◯名」とマスの「全」「1/4」 */
     table.mtx .colseries { font-size:10px; font-weight:700; color:#1d4e89; white-space:nowrap; }
     table.mtx .m-sr { display:inline-block; margin-left:2px; padding:0 4px; border-radius:6px; font-size:9.5px; font-weight:700; line-height:1.5; vertical-align:middle; }
+    table.mtx .m-prev { margin-left:2px; font-size:10px; vertical-align:middle; }
+    .e-badge.prev-badge { background:#e7f0e9; color:#3f7d52; }
     table.mtx .m-sr.all  { background:#15803d; color:#fff; }
     table.mtx .m-sr.part { background:#fff4e0; color:#b45309; border:1px solid #f0d3a6; }
     html[data-theme="dark"] table.mtx .colseries { color:var(--info-ink); }
@@ -801,6 +803,16 @@
       + (subs.length ? '＋' + subs.join('・') : '');
     return `<span class="e-badge series-badge" title="同じイベントの日：${escAttr(groupDaysText(c))}">${esc(text)}</span>`;
   }
+  // リピート（2026-11-16 小沼さん）：同じお客様の前回の案件があるときの札と、前回も入った人の印。
+  // ⚠ 前回かどうかはサーバーが決める（正本＝App\Support\RepeatHistory）。ここで判定しない。
+  function repeatBadge(c){
+    if (!c.repeatPrev) return '';
+    return `<span class="e-badge prev-badge" title="リピート：同じお客様の前回の案件があります。「🔁 前回も」が付いている人は前回も入りました">🔁 リピート（前回 ${esc(c.repeatPrev)}）</span>`;
+  }
+  function prevTag(c, e){
+    if (!e.prev) return '';
+    return ` <span class="e-badge prev-badge" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました">🔁 前回も</span>`;
+  }
   function seriesTag(c, e){
     if (!c.groupDays) return '';
     const on = e.seriesOn || [];
@@ -1053,7 +1065,7 @@
       const rows = ents.map((e, i) => `
         <tr class="${e.assigned?'assigned':''}${(e.src === 'cal') ? ' fromcal' : ''}">
           <td>${i + 1}</td>
-          <td>${esc(e.name)}${seriesTag(c, e)}</td>
+          <td>${esc(e.name)}${prevTag(c, e)}${seriesTag(c, e)}</td>
           <td>${srcTag(e)}</td>
           <td>${wishTag(e.wish)}</td>
           <td><span class="e-lv ${e.lv}">${lvLabel[e.lv]}</span></td>
@@ -1074,7 +1086,7 @@
             <span class="ecase-name">${esc(c.name)}</span>
             <span class="ecase-client">${esc(c.client)}</span>
             <span class="e-badge cat-${c.cat}">${c.cat}</span>
-            ${dt} ${sr} ${recBadge(c)} ${stateBadge(c)}
+            ${dt} ${sr} ${repeatBadge(c)} ${recBadge(c)} ${stateBadge(c)}
           </div>
           <div class="ecase-counts">
             <span class="c">必要 <b>${c.need}</b>名</span>
@@ -1179,7 +1191,7 @@
                    : (e.status === '仮' ? 'tmp'
                    : (e.wish === 'ng' ? 'ng'
                    : ((e.src === 'cal') ? 'cal' : 'ent')));
-          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [] };
+          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [], prev: !!e.prev };
         });
         return m;
       });
@@ -1200,6 +1212,9 @@
           + `<span class="colname">${esc(c.name)}</span><br>`
           + (c.groupDays
               ? `<span class="colseries" title="同じイベントの日：${escAttr(groupDaysText(c))}／全日＝全部の日にエントリーしている人数">🗓 ${esc(groupLabelOf(c))}・全日${all.filter(e => (e.seriesOn || []).length >= groupTotal(c)).length}名</span><br>`
+              : '')
+          + (c.repeatPrev
+              ? `<span class="colseries" title="リピート：同じお客様の前回の案件（${escAttr(c.repeatPrev)}）。🔁 が付いている人は前回も入りました">🔁 前回 ${esc(c.repeatPrev)}</span><br>`
               : '')
           + `<span class="colmeta">必${c.need}/応${entCnt}/空${calCnt}</span></th>`;
       });
@@ -1232,6 +1247,8 @@
             : (srOn >= srTotal
                 ? `<span class="m-sr all" title="同じイベントの全${srTotal}日（リハ日なども含む）にエントリー">全</span>`
                 : `<span class="m-sr part" title="同じイベント${srTotal}日のうち ${srOn}日だけエントリー（${escAttr(e.seriesOn.join('・'))}）">${srOn}/${srTotal}</span>`);
+          // 前回も入った人（リピート・2026-11-16 小沼さん）。
+          const pv = e.prev ? `<span class="m-prev" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました">🔁</span>` : '';
           const rmBtn = (st === 'fix' || st === 'tmp') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';
           const tip = st === 'fix' ? (pub ? '確定＋公開済み（×で解除・確認あり）' : '確定（外すには×）')
                     : st === 'tmp' ? 'クリックで確定／×で外す'
@@ -1244,9 +1261,9 @@
             body += `<td class="cell assignable ${cls}${(st==='fix'&&pub)?' is-pub':''}"`
               + ` data-pid="${esc(c.id)}" data-sid="${esc(e.id)}" data-role="${esc(e.role)}" data-state="${st}"`
               + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${escAttr(caseLabel(c))}"`
-              + ` title="${tip}">` + mark + sr + lock + rmBtn + '</td>';
+              + ` title="${tip}">` + mark + pv + sr + lock + rmBtn + '</td>';
           } else {
-            body += `<td class="cell">${mark}${sr}</td>`;
+            body += `<td class="cell">${mark}${pv}${sr}</td>`;
           }
         });
         body += `</tr>`;

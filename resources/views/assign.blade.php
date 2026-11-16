@@ -318,6 +318,7 @@
                  background: #1d4e89; color: #fff; white-space: nowrap; vertical-align: middle; }
     html[data-theme="dark"] .grp-badge { background: var(--info-soft); color: var(--info-ink); }
     .ctag.repeat { background: #e7f0e9; color: #3f7d52; }
+    .prev-mark { flex: none; margin-left: 3px; padding: 0 4px; border-radius: 6px; background: #e7f0e9; color: #3f7d52; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
     .dchg { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--warn-soft); color: var(--warn-ink); white-space: nowrap; }
     .ymk { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
     .ymk.a { background: var(--brand-soft); color: var(--brand-dark); }
@@ -2164,6 +2165,17 @@
     if (!r) return '';
     return `<span class="ctag repeat" title="リピート：前回の案件を見る" onclick="event.stopPropagation(); showRepeatPrev('${c.id}')" style="cursor:pointer;">🔁 前回 ${escHtml(r.date)}</span>`;
   }
+  // 前回も入った人の印（2026-11-16 小沼さん）。メンバーの行と候補の行の名前の横に出す。
+  // ⚠ 前回かどうかはサーバーが決める（正本＝App\Support\RepeatHistory）。ここは照らし合わせるだけ。
+  function wasPrev(c, p){
+    const r = c && c.repeatPrev;
+    if (!r || !p) return false;
+    if (p.id && (r.staffIds || []).indexOf(String(p.id)) >= 0) return true;
+    return !p.id && !!p.name && (r.staffNames || []).indexOf(p.name) >= 0;
+  }
+  function prevMarkHtml(c, p){
+    return wasPrev(c, p) ? `<span class="prev-mark" title="前回（${escHtml(c.repeatPrev.date)}）もこのお客様の案件に入りました">🔁前回</span>` : '';
+  }
   function showRepeatPrev(id){
     const c = (window.ECS_BOARD_CASES || []).find(x => x.id === id);
     const r = c && c.repeatPrev;
@@ -3256,7 +3268,7 @@
       // 拠点ごとに人数を分けた案件で、ほかの拠点の人（この拠点の人数には数えない・2026-10-09）。
       const away = m.here === false;
       const awayTag = away ? `<span class="m-office" title="${escAttr(m.office)}の人です。この拠点の人数には数えません">${escHtml(m.office)}</span>` : '';
-      return `<div class="mem-row${away ? ' away' : ''}"><span class="m-no">${i+1}</span><span class="m-name ${dup}${kindCls}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${awayTag}${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
+      return `<div class="mem-row${away ? ' away' : ''}"><span class="m-no">${i+1}</span><span class="m-name ${dup}${kindCls}" title="${m.name}">${dup ? '⚠' : ''}${m.name}</span>${prevMarkHtml(c, m)}${awayTag}${typeBadge(m.type)}${statusCellHtml(c, m)}${posCellHtml(c, m)}${role2CellHtml(c, m)}${noteCellHtml(c, m)}${patrolCellHtml(c, m)}${remarkCellHtml(c, m)}${capb}${renkinTag}${x}</div>`;
     }).join('');
     // 「仮」の人数（この人たちはスタッフの画面に出ないので、見出しで気づけるようにする・2026-08-21 baba）
     const kariN = members.filter(m => m.status === '仮').length;
@@ -3296,7 +3308,8 @@
     // 空いている人を先に。同じ組の中の並びは元のまま（勝手に入れ替えない）。
     function sortFreeFirst(list){
       return list.map((p, i) => ({ p: p, i: i }))
-                 .sort((a, b) => (busyRank(a.p) - busyRank(b.p)) || (a.i - b.i))
+                 // 空いている人の中では、前回も入った人を先に（リピート・2026-11-16 小沼さん）。
+                 .sort((a, b) => (busyRank(a.p) - busyRank(b.p)) || ((wasPrev(c, b.p) ? 1 : 0) - (wasPrev(c, a.p) ? 1 : 0)) || (a.i - b.i))
                  .map(x => x.p);
     }
 
@@ -3317,7 +3330,7 @@
       // 本人が応募時に書いた一言。アサインの判断材料なので必ず見せる（2026-08-21 baba）。
       const cmt = (p.notes && p.notes[c.id]) ? p.notes[c.id] : '';
       const cmtHtml = cmt ? `<div class="cand-note" title="本人からの一言">💬 ${escHtml(cmt)}</div>` : '';
-      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span><span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${busyTag}${stayTag}${statTag}${addBtn}${cmtHtml}</div>`;
+      return `<div class="mem-row cand-row ${rowCls}"><span class="m-name">${p.name}</span>${prevMarkHtml(c, p)}<span class="m-lv ${p.lv}">${lvLabel[p.lv]}</span><span class="m-pos">${p.pos}</span>${capBadge(p.name, amap)}${busyTag}${stayTag}${statTag}${addBtn}${cmtHtml}</div>`;
     }
 
     // ⚠ 社員は「基本イベントには出ない」ので、たたんでおく（2026-09-03 baba要望）。

@@ -90,7 +90,10 @@ class FinanceDefaultsTest extends TestCase
             ->assertSee('ECS_ROSTER', false)
             ->assertSee($s1->name, false)
             ->assertSee('"'.$p->id.'":1', false)
-            ->assertSee('km-input', false);
+            ->assertSee('km-input', false)
+            // 自動で入れた仮の数量は黄色にして、手で直すと外す（2026-11-16 小沼さん）。
+            ->assertSee("qtyEl.classList.toggle('auto-fill', !('qty' in saved) && fallback > 0);", false)
+            ->assertSee("this.classList.remove('auto-fill'); recalc()", false);
     }
 
     public function test_高速費は片道のキロ数から往復の金額を出す(): void

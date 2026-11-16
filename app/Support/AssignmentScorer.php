@@ -164,8 +164,10 @@ class AssignmentScorer
 
         // ── 第2優先：コンテンツ・メンバーとの相性 ───────────────────
         // リピート案件で、このクライアントの過去案件にも出ていた＝継続性
-        if ($this->project->is_repeat && in_array($id, $this->repeatStaffIds, true)) {
-            $score += 20;
+        // 2026-11-16 小沼さん決定：+20→+30（「連日の他の日にもエントリー」と同じ重さ）。
+        //   「リピート案件」のチェックは見ない＝前回があるかどうかは RepeatHistory が決める。
+        if (in_array((string) $id, array_map('strval', $this->repeatStaffIds), true)) {
+            $score += 30;
             $reasons[] = 'リピート案件で前回も参加';
         }
         // この案件のコンテンツを経験している

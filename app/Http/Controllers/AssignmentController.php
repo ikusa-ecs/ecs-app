@@ -125,22 +125,9 @@ class AssignmentController extends Controller
         }
 
         // ── 自動アサインの「頭脳」に渡す材料（C-5）──
-        // リピート継続：このクライアントの過去案件に出たスタッフ（is_repeat のとき加点）。
-        $repeatStaffIds = [];
-        if ($project->client) {
-            $priorPids = Project::where('client', $project->client)
-                ->where('id', '!=', $project->id)
-                ->pluck('id');
-            if ($priorPids->isNotEmpty()) {
-                $repeatStaffIds = Assignment::whereIn('project_id', $priorPids)
-                    ->where('status', '!=', 'キャンセル')
-                    ->onLiveProject()
-                    ->pluck('staff_id')
-                    ->unique()
-                    ->values()
-                    ->all();
-            }
-        }
+        // リピート継続：このお客様の前回の案件に入った人（加点）。
+        // 正本＝RepeatHistory（「リピート案件」のチェックが無くても前回があれば効く・2026-11-16 小沼さん）。
+        $repeatStaffIds = \App\Support\RepeatHistory::staffIdsFor($project);
         // コンテンツ経験の一致判定に使う「この案件のコンテンツ名」。
         $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
         $contentNames = $contentIds

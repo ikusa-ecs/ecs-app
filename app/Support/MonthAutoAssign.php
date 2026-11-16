@@ -581,13 +581,8 @@ class MonthAutoAssign
         $contentNames = $contentIds ? Content::whereIn('id', $contentIds)->pluck('content_name')->all() : [];
 
         // リピート案件の継続性＝同じクライアントの過去案件に出ていた人。
-        $repeatIds = [];
-        if ($p->is_repeat && $p->client) {
-            $pastIds = Project::where('client', $p->client)->where('id', '!=', $p->id)->pluck('id');
-            $repeatIds = $pastIds->isEmpty() ? [] : Assignment::whereIn('project_id', $pastIds)
-                ->where('status', '!=', 'キャンセル')->onLiveProject()
-                ->pluck('staff_id')->unique()->values()->all();
-        }
+        // 正本＝RepeatHistory（前回の案件に入った人）。ここで数え直さない。
+        $repeatIds = RepeatHistory::staffIdsFor($p);
 
         return (new AssignmentScorer(
             $p, $p->start_date, $wish, $sameDay, $monthCount, $repeatIds, $contentNames, self::MONTH_CAP
