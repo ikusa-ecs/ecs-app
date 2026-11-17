@@ -50,13 +50,24 @@ class AssignDirectorController extends Controller
         // この画面に出す案件＝完了/下書き以外。拠点で絞るときは「登録拠点」＋「共有された案件」。
         // ※ 先に案件を確定させてから、その案件のD/SD/FCだけを引く（他拠点の分まで数えない）。
         // ⚠ 2026-10-09：3か月より前は読まない（範囲の正本＝RecentWindow）。
-        $projects = RecentWindow::apply(OfficeScope::applyToProjects(Project::query(), $officeScope))
+        // ⚠ 2026-11-17 小沼さん：他拠点に巻き取ってもらう案件は、この拠点でDを決めないので出さない
+        //   （出ていると「D未定」に数えられて、どきっとする）。正本＝OfficeScope::hideTakenOver。
+        //   巻き取った側の拠点には出る。全拠点で見ているときは外さない（札「○○が巻き取り」で見分ける）。
+        //   「登録した拠点からも人を出す」印があっても外す＝Dは巻き取った拠点が決めるため。
+        $projects = RecentWindow::apply(OfficeScope::hideTakenOver(OfficeScope::applyToProjects(Project::query(), $officeScope), $officeScope))
             ->notCancelled()->needsAssign()   // キャンセルになった案件はDを決めない（2026-08-26）
             ->orderBy('start_date')
             ->get()
             ->filter(fn (Project $p) => ! in_array($p->status, ['完了', '下書き'], true))
             ->values();
         $projectIds = $projects->pluck('id')->all();
+
+        // 巻き取りの札に使う「拠点間共有」（2026-11-17 小沼さん「D未定でも、他拠点に巻き取ってもらう案件だと分かるように」）。
+        // いま見ている拠点＝スイッチで選んだ拠点。全拠点で見ているときは自分の拠点。
+        $sharesByProject = $projectIds === []
+            ? collect()
+            : \App\Models\ProjectShare::whereIn('project_id', $projectIds)->get()->groupBy('project_id');
+        $viewOffice = (string) ($officeScope ?: (optional(\Illuminate\Support\Facades\Auth::user())->office ?: '東京'));
 
         // この案件のD/SDを assignments から引く（role='D' / 'SD'）。
         // project_id => ['D'=>['id'=>staff_id,'status'=>...], 'SD'=>...]
@@ -143,7 +154,7 @@ class AssignDirectorController extends Controller
 
         // カレンダーに並べる案件（上で拠点・状態を絞り込んだもの）を画面用の形に詰め替える。
         $cases = $projects
-            ->map(function (Project $p) use ($today, $dirByProject, $fcByProject, $contentNames, $slotsByProject) {
+            ->map(function (Project $p) use ($today, $dirByProject, $fcByProject, $contentNames, $slotsByProject, $sharesByProject, $viewOffice) {
                 $start = $p->start_date;
                 $off = $start ? (int) $today->diffInDays($start, false) : 0;
 
@@ -178,6 +189,11 @@ class AssignDirectorController extends Controller
                     // ⚠ ねらい＝Dがまだ決まっていない案件のうち、「決めると先方に約束した案件」を
                     //   この画面で先に片づけられるようにする。判定の正本＝App\Support\AssignSlots。
                     'plannerWait' => AssignSlots::waitingForPlanner($slotsByProject[$p->id] ?? []),
+                    // 案件の2行目に出す札（2026-11-17 小沼さん「埋まっていないとどきっとする」）。
+                    // ヨミ＝Aヨミ・Bヨミ・Cヨミ（「確定」と空は出さない＝アサイン表と同じ決め）。
+                    // 巻き取り＝「大阪が巻き取り」「大阪から巻き取り」。文字の正本＝App\Support\TakeoverTag。
+                    'yomi' => in_array(trim((string) $p->yomi), ['', '確定'], true) ? '' : trim((string) $p->yomi),
+                    'takeoverTag' => \App\Support\TakeoverTag::of($sharesByProject->get($p->id) ?? [], (string) ($p->office ?? ''), $viewOffice),
                     'dayType' => $p->date_type ?? '本番',
                     // 本番日か（空も本番あつかい）。人ごとの「D計」「SD」「D◯」は本番日だけ数える
                     // （2026-11-16 小沼さん決定：設営・リハ日まで数えると件数がふくらむ）。判定の正本＝EventCount::isMainDay。

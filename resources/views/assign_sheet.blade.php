@@ -539,7 +539,7 @@
         $short = $c['need_i'] > 0 && $c['filled'] < $c['need_i'];
 
         // 各項目を積む。編集できる項目は 'edit'=>true＋'inputs'（欄の指定）を持つ＝編集モードで入力欄に切り替わる。
-        // 空でも常に積み、非編集時は .pe-empty で隠す（上に詰まる）。営業・物品担当もここで直せる（2026-11-09）。Dは読み取りだけ（D決めの画面で）。
+        // 空でも常に積み、非編集時は .pe-empty で隠す（上に詰まる）。営業・物品担当もここで直せる（2026-11-09）。Dは下のメンバーの行で入れ替える（2026-11-17）。
         // 移動・音響の選択肢（2026-11-09 小沼さん要望＝選択式に）。案件一覧と同じく拠点ごとの設定（OfficeOptions）。
         // 「電車+IKUSAカー」のような組み合わせはばらして1つずつにし、今の値にしか無いものも足す（消えないように）。
         $pickAtoms = function (string $kind, string $cur) use ($c) {
@@ -796,7 +796,8 @@
             @php $m = $line['m']; @endphp
             <div class="mrow mblk" data-project="{{ $c['id'] }}" data-staff="{{ $m['staffId'] }}" data-status="{{ $m['status'] ?: '仮' }}">
               <span class="c-no">{{ $line['no'] }}</span>
-              @php $mSwap = ($m['roleCode'] !== 'D'); @endphp
+              {{-- Dの行も入れ替え・外すができる（2026-11-17 小沼さん）。出さないのは、アサインの行が無く案件側の写しだけで補ったDの行。 --}}
+              @php $mSwap = empty($m['mirrorOnly']); @endphp
               <span class="c-nm {{ $mSwap ? 'm-swappable' : '' }}"><span class="m-nm-read"><span class="nm-dep dep-{{ $m['dept'] ?? '' }}">{{ $m['name'] }}</span>@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
                 @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
                 @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
@@ -805,7 +806,8 @@
                 {{-- 編集モードでは名前も直せる（2026-10-05 baba要望「名前を入れたら変更できない」）。
                      別の社員を選ぶ＝入れ替え（役割・担当・巡回・備考は引き継ぐ）／「外す」＝この人を外す。
                      ⚠ 入れ替え先は空き行と同じく社員だけ（スタッフは日別ボードで希望を見ながら入れる）。
-                     ⚠ Dの行は出さない＝DはD決めの画面が正本（案件側にも写しがあり、ここで外すと元のDが戻ってくる）。 --}}
+                     Dの行にも出す（2026-11-17 小沼さん）。以前は「ここで外すと案件側の写しから元のDが戻る」ので出していなかったが、
+                     2026-11-12 から写しがアサインを追いかける（DirectorSync::queueRefresh）ので、その理由は無くなった。 --}}
                 @if ($mSwap)
                 {{-- 名前を少し打つと候補が出る（2026-11-11 小沼さん）。候補は #sheetEmpList（画面に1つ）。 --}}
                 <span class="m-swapname"><input class="m-swapin" type="text" list="sheetEmpList" placeholder="{{ $m['name'] }}" data-oldname="{{ $m['name'] }}" title="別の社員に入れ替える（名前を打つと候補が出ます）" autocomplete="off" onchange="ecsSheetSwapMember(this)"><button type="button" class="m-out" title="この人を外す" onclick="ecsSheetSwapMember(this, true)">✕</button></span>
@@ -1202,7 +1204,7 @@
   })();
   // ===== スプシのようにダブルクリックで入力（2026-11-11 小沼さん「名前のところダブルクリックしたら入力できるように」） =====
   // メンバー・空き行をダブルクリックすると、そのカードを ✎編集 にして、押したところの入力欄（名前なら社員の選択欄）を開く。
-  // ⚠ D の行は名前の選択欄が無い（DはD決めの画面が正本）＝編集の状態になるだけ。
+  // D の行も同じ（2026-11-17）。⚠ アサインの行が無く写しだけで補ったDの行は名前の入力欄が無い＝編集の状態になるだけ。
   document.addEventListener('dblclick', function (e) {
     var row = e.target.closest ? e.target.closest('.acard .mrow.mblk') : null;
     if (!row || e.target.closest('select, input, textarea, button, a')) return;

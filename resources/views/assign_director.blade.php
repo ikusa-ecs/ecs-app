@@ -216,6 +216,10 @@
       background: var(--warn-soft); color: #b45309; cursor: default; }
     .dt-wait { font-size: 10px; font-weight: 700; margin-left: 5px; padding: 0 5px; border-radius: 4px;
       background: var(--warn-soft); color: #b45309; }
+    /* 巻き取り・ヨミの札（アサイン表の .htag と同じ色・2026-11-17）。D未定でも「巻き取ってもらう案件」「Bヨミ」と分かるように。 */
+    .ctag { display: inline-block; font-size: 10px; font-weight: 700; margin-left: 5px; padding: 0 5px; border-radius: 4px; white-space: nowrap; }
+    .ctag.takeover { background: #6d28d9; color: #fff; }
+    .ctag.yomi { background: #fde68a; color: #7a4a00; }
     /* 件数ふきだし */
     .day-tip {
       /* 件数バッジとの間に余白を入れない＝ふきだしの中の案件名リンクまでカーソルを動かせるようにする
@@ -706,6 +710,8 @@
       dirId:c.dirId || null, sdIds: Array.isArray(c.sdIds) ? c.sdIds.slice() : (c.sdId ? [c.sdId] : []),
       fcIds: Array.isArray(c.fcIds) ? c.fcIds.slice() : [],   // FC（複数可・この画面で増減）
       dayType:c.dayType, status:c.status,
+      // 2行目に出す札（2026-11-17 小沼さん）。ヨミ＝確定以外だけ／巻き取り＝「大阪が巻き取り」など。見本データには無い＝空。
+      yomi:c.yomi || '', takeoverTag:c.takeoverTag || '',
       // 本番日か（2026-11-16 小沼さん決定：人ごとの D・SD の件数は本番日だけ数える）。
       // ⚠ サーバーの印（isMain・正本 EventCount::isMainDay）が無い見本データは日程種別から決める（空＝本番）。
       isMain: (c.isMain !== undefined) ? !!c.isMain : ['', '本番'].includes(String(c.dayType || '').trim()),
@@ -864,9 +870,18 @@
   //    同じ言葉が2回並んで見える（「コンテンツが2回出ている」というご指摘の正体）。
   //    そこで2行目は「🏢 企業名（お客様）」にする。企業名が無い案件だけコンテンツを出す。
   // ⚠ 出し方を増やすときはこの1か所だけ直す（ふきだしと担当を決めるパネルで食い違わないように）。
+  // ⚠ 巻き取り・ヨミの札もここで足す（2026-11-17 小沼さん「D未定のままだとどきっとする。
+  //    他拠点に巻き取ってもらう案件・Bヨミの案件だと分かるように」）。色はアサイン表の札と同じ。
+  function caseTags(c){
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[ch]));
+    let h = '';
+    if (c.takeoverTag) h += `<span class="ctag takeover" title="他拠点との巻き取り">${esc(c.takeoverTag)}</span>`;
+    if (c.yomi) h += `<span class="ctag yomi" title="ヨミ（受注の見込み）">${esc(c.yomi)}</span>`;
+    return h;
+  }
   function caseSub(c){
-    if (c.client) return '🏢' + c.client;
-    return c.content ? ('🎯' + c.content) : '';
+    const base = c.client ? ('🏢' + c.client) : (c.content ? ('🎯' + c.content) : '');
+    return base + caseTags(c);
   }
 
   // ===== 件数ふきだし（その日の案件一覧）=====
