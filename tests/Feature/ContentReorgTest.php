@@ -116,6 +116,33 @@ class ContentReorgTest extends TestCase
         $this->assertSame(['マグロ解体ショー'], $p->fresh()->content_names, '案件の名前は残る');
     }
 
+    public function test_終わった行は画面に並べず_残っている行だけ出す(): void
+    {
+        $admin = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京', 'must_onboard' => false]);
+
+        // 何も無い台帳＝「足す（あそ研）」だけが残り、ほかは台帳に無い＝終わった行として隠れる
+        $this->actingAsPerson($admin)->get('/masters/content-reorg')->assertOk()
+            ->assertSee('もう終わっているもの')
+            ->assertSee('実行できるのは 1件')
+            ->assertDontSee(\App\Support\ContentReorg::WHY_GONE);
+
+        // あそ研も足してあれば、残りは無い
+        $this->c('CT-900', 'あそ研');
+        $this->actingAsPerson($admin)->get('/masters/content-reorg')->assertOk()
+            ->assertSee('整理はすべて終わっています')
+            ->assertDontSee(\App\Support\ContentReorg::WHY_ALREADY_ADDED)
+            ->assertDontSee('○の');
+
+        // まだ直せる行・人が見る行（名前が案と違う）は出す
+        $this->c('CT-053', 'ロケットPDCA＋あそ研');
+        $this->c('CT-031', 'ロケットPDCA');
+        $this->c('CT-054', 'ちがう名前');
+        $this->actingAsPerson($admin)->get('/masters/content-reorg')->assertOk()
+            ->assertSee('ロケットPDCA＋あそ研')
+            ->assertSee('IDの名前が案と違います')
+            ->assertDontSee('整理はすべて終わっています');
+    }
+
     public function test_画面はAdministratorだけ(): void
     {
         $admin = PersonFactory::new()->create(['permission' => 'admin', 'office' => '東京', 'must_onboard' => false]);

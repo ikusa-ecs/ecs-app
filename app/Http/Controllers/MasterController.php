@@ -147,9 +147,16 @@ class MasterController extends Controller
     /** コンテンツ台帳の整理（2026-10-09 baba確認済みの案を一気に直す）。正本＝App\Support\ContentReorg。 */
     public function contentReorg()
     {
-        $rows = \App\Support\ContentReorg::preview();
+        $all = \App\Support\ContentReorg::preview();
+        // もう終わった行（足してある・台帳から消えた）は並べない＝残っている行だけ見せる（2026-11-18 小沼さん）。
+        // 見せないだけで、実行（apply）の中身は変えていない。
+        $rows = array_values(array_filter($all, fn ($r) => ! \App\Support\ContentReorg::isFinished($r)));
 
-        return view('content_reorg', ['rows' => $rows, 'okCount' => count(array_filter($rows, fn ($r) => $r['ok']))]);
+        return view('content_reorg', [
+            'rows' => $rows,
+            'okCount' => count(array_filter($rows, fn ($r) => $r['ok'])),
+            'finishedCount' => count($all) - count($rows),
+        ]);
     }
 
     /** 単発にする（台帳から消して、使っている案件には名前だけ残す・2026-10-09 baba要望）。 */

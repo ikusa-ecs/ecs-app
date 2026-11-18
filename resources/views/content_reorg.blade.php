@@ -28,6 +28,13 @@
     案件は消えません（コンテンツのつながりが変わるだけ・編集履歴に残ります）。必要人数・経験・難易度表のつなぎも一緒に付け替えます。<br>
     「✗」の行は直しません（理由を見てください）。<b>実行できるのは {{ $okCount }}件</b>です。
   </p>
+  {{-- もう終わった行は並べない（2026-11-18）。見分けは ContentReorg::isFinished。 --}}
+  @if ($finishedCount > 0)
+    <p class="cr-intro">✅ もう終わっているもの <b>{{ $finishedCount }}件</b>は、ここには出していません。</p>
+  @endif
+  @if (! $rows)
+    <p class="cr-intro"><b>整理はすべて終わっています。残っている行はありません。</b></p>
+  @else
   <table class="cr-table">
     <tr><th>やること</th><th>ID</th><th>いまの名前</th><th>つなぎ先</th><th>案件</th><th></th></tr>
     @foreach ($rows as $r)
@@ -41,6 +48,7 @@
       </tr>
     @endforeach
   </table>
+  @endif
   @if ($okCount > 0)
     <form method="POST" action="/masters/content-reorg" style="margin-top:14px;"
           onsubmit="return confirm('○の {{ $okCount }}件を直します。よろしいですか？（元に戻すボタンはありません）')">

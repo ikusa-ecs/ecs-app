@@ -27,6 +27,25 @@ use Illuminate\Support\Facades\DB;
  */
 final class ContentReorg
 {
+    /**
+     * 「もう終わっている」ことを表す理由の言葉（2026-11-18 小沼さん：終わった行は画面に並べない）。
+     * ⚠ 画面はこの2つを isFinished() で見分けて隠す。言葉を変えるときはここだけ直す。
+     */
+    public const WHY_ALREADY_ADDED = 'もう台帳にあります';
+
+    public const WHY_GONE = '台帳にありません（もう直したか、別の台帳です）';
+
+    /**
+     * その行はもう終わっているか（足すものは足してある／直すものは台帳から消えている）。
+     * 「つなぎ先が台帳にありません」「案件で使われています」などは終わっていない＝人が見る行なので false。
+     *
+     * @param  array{ok: bool, why: string}  $row  preview() の1行
+     */
+    public static function isFinished(array $row): bool
+    {
+        return ! $row['ok'] && in_array($row['why'], [self::WHY_ALREADY_ADDED, self::WHY_GONE], true);
+    }
+
     /** 新しく台帳に足すもの（2026-10-09 決定）。 */
     public const CREATE = ['あそ研'];
 
@@ -143,7 +162,7 @@ final class ContentReorg
 
         foreach (self::CREATE as $name) {
             $out[] = ['kind' => '足す', 'id' => '', 'name' => $name, 'to' => '', 'projects' => 0,
-                'ok' => ! isset($byName[$name]), 'why' => isset($byName[$name]) ? 'もう台帳にあります' : ''];
+                'ok' => ! isset($byName[$name]), 'why' => isset($byName[$name]) ? self::WHY_ALREADY_ADDED : ''];
         }
         foreach (self::MOVES as $m) {
             [$id, $name, $to] = $m;
@@ -316,7 +335,7 @@ final class ContentReorg
     private static function check(string $id, string $name, array $byId, array $stocked): string
     {
         if (! isset($byId[$id])) {
-            return '台帳にありません（もう直したか、別の台帳です）';
+            return self::WHY_GONE;
         }
         if ($byId[$id] !== $name) {
             return 'IDの名前が案と違います（いま「'.$byId[$id].'」）';
