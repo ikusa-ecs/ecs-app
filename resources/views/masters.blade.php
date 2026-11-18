@@ -342,4 +342,35 @@
       取り違えを防ぐため、ここでは追加・変更できません（変更が必要なときは開発で対応します）。
     </p>
   </div>
+
+  {{-- 保存・追加・並び替えのたびに画面がいちばん上（#contents の見出し）へ戻るのを防ぐ（2026-11-18 小沼さん）。
+       押す直前の縦の位置をこのブラウザに覚えておき、読み込み直したあと同じ位置へ戻す。
+       ⚠ 覚えるのは位置だけ（保存の中身には関係しない）。15分より古い位置は使わない＝あとで開いたときに勝手に飛ばないように。 --}}
+  <script>
+  (function () {
+    var KEY = 'ecs_masters_scroll';
+    function remember() {
+      try { sessionStorage.setItem(KEY, JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, t: Date.now() })); } catch (e) {}
+    }
+    function restore() {
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.removeItem(KEY); } catch (e) {}
+      if (!saved || typeof saved.y !== 'number' || Date.now() - saved.t > 15 * 60 * 1000) return;
+      // #contents などの見出しへ飛ぶ動きのあとに戻す（先に戻すと、見出しの位置で上書きされる）
+      var go = function () { window.scrollTo(0, saved.y); };
+      go();
+      window.addEventListener('load', function () { go(); setTimeout(go, 50); });
+    }
+    try {
+      // 保存・追加・並び替え・削除＝どのフォームを送るときも、今の位置を覚える
+      document.addEventListener('submit', remember, true);
+      // 「必要人数」などマスタの別ページへ行くときも覚える（戻ってきたときに同じ行が見えるように）
+      document.addEventListener('click', function (ev) {
+        var a = ev.target && ev.target.closest ? ev.target.closest('a[href^="/masters/"]') : null;
+        if (a) remember();
+      }, true);
+      restore();
+    } catch (e) {}
+  })();
+  </script>
 @endsection
