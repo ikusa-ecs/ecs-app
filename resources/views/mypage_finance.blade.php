@@ -403,7 +403,7 @@
         return '<tr data-key="'+it.key+'">' +
           '<td>'+it.name+'</td>' +
           '<td class="num price-cell">'+yen(it.price)+'</td>' +
-          '<td class="num"><input class="yen-input qty-input" type="number" min="0" step="1" data-role="qty" value="0" oninput="this.classList.remove('auto-fill'); recalc()"></td>' +
+          '<td class="num"><input class="yen-input qty-input" type="number" min="0" step="1" data-role="qty" value="0" oninput="this.classList.remove(\'auto-fill\'); recalc()"></td>' +
           '<td class="unit-cell">'+it.unit+'</td>' +
           '<td class="num amount-cell" data-role="amount">¥0</td>' +
           '<td class="note-cell" title="'+it.note+'">'+it.note+'</td>' +

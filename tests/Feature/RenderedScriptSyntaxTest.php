@@ -77,6 +77,51 @@ class RenderedScriptSyntaxTest extends TestCase
         return array_values(array_unique($urls));
     }
 
+    /** Node が使えるか（無い機械ではこのチェックだけ飛ばす＝テストは落とさない）。 */
+    private static ?bool $hasNode = null;
+
+    /** 同じ中身の <script>（共通の部品）を何度も調べない。 */
+    private static array $nodeSeen = [];
+
+    /**
+     * Node の `--check`（実行せず文法だけ見る）で調べる。問題なければ null、壊れていればエラーの1行。
+     */
+    private function nodeProblem(string $js): ?string
+    {
+        if (self::$hasNode === null) {
+            $out = [];
+            $code = 1;
+            @exec('node --version 2>&1', $out, $code);
+            self::$hasNode = $code === 0;
+        }
+        if (! self::$hasNode || trim($js) === '') {
+            return null;
+        }
+        $key = md5($js);
+        if (array_key_exists($key, self::$nodeSeen)) {
+            return self::$nodeSeen[$key];
+        }
+
+        $file = tempnam(sys_get_temp_dir(), 'ecsjs');
+        $path = $file.'.js';
+        @rename($file, $path);
+        file_put_contents($path, $js);
+        $out = [];
+        $code = 0;
+        @exec('node --check '.escapeshellarg($path).' 2>&1', $out, $code);
+        @unlink($path);
+
+        $msg = null;
+        if ($code !== 0) {
+            // 「SyntaxError: …」の行と、その場所のコードを1行にまとめる
+            $err = array_values(array_filter($out, fn ($l) => str_contains($l, 'SyntaxError')));
+            $where = trim((string) ($out[1] ?? ''));
+            $msg = ($err[0] ?? 'JavaScriptの文法エラー').'　場所：'.mb_substr($where, 0, 120);
+        }
+
+        return self::$nodeSeen[$key] = $msg;
+    }
+
     /** それぞれの画面を出して、<script> の中身を調べる。 */
     private function assertScriptsAreValid($me, array $pages): void
     {
@@ -93,6 +138,13 @@ class RenderedScriptSyntaxTest extends TestCase
             foreach (JsSyntaxCheck::extractScripts($res->getContent()) as $n => $js) {
                 foreach (JsSyntaxCheck::problems($js) as $p) {
                     $bad[] = "{$url} の {$n}個目の<script>： {$p}";
+                }
+                // Node がある機械では、本物の構文チェックもかける（2026-11-18）。
+                // 上の簡易チェックは「引用符とかっこの数」しか見ないので、
+                // '…remove('auto-fill')…' のように **数は合っているのに文として壊れている形**を見逃す。
+                // 収支入力がこれで 11/16〜11/18 のあいだ本番で動かなかった（案件が選べない）。
+                if ($p = $this->nodeProblem($js)) {
+                    $bad[] = "{$url} の {$n}個目の<script>（Nodeの構文チェック）： {$p}";
                 }
             }
         }
