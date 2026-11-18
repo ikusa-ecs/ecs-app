@@ -105,6 +105,64 @@ class SfIntegrationTest extends TestCase
         $this->assertNull(SfProduct::where('sf_product_id', '01tTL00000GeaGTYAZ')->value('content_id'));
     }
 
+    public function test_あそ研の商品ははじめから印つき_画面で外せて取り込み直しても戻らない(): void
+    {
+        Content::create(['id' => 'CT-001', 'content_name' => 'チャンバラ合戦']);
+        SfProductCsv::import((string) file_get_contents(SfProductCsv::bundledPath()));
+        $me = $this->manager();
+
+        // 商品ファミリが「あそ研」の商品だけ、はじめから「あそ研も一緒に付ける」
+        $this->assertGreaterThan(0, SfProduct::where('family', 'あそ研')->count());
+        $this->assertSame(0, SfProduct::where('family', 'あそ研')->where('with_asoken', false)->count());
+        $this->assertSame(0, SfProduct::where('family', '!=', 'あそ研')->where('with_asoken', true)->count());
+
+        $asoken = SfProduct::where('family', 'あそ研')->first();
+        $this->actingAsPerson($me)->get('/sf-products?show=all')->assertOk()->assertSee('も一緒に付ける');
+
+        // 印を送らない保存では、今の印を残す
+        $this->actingAsPerson($me)->postJson('/sf-products/save', ['sf_product_id' => $asoken->sf_product_id, 'handling' => 'content', 'content_id' => 'CT-001'])
+            ->assertOk()->assertJson(['with_asoken' => true]);
+        // 画面で外せる
+        $this->actingAsPerson($me)->postJson('/sf-products/save', ['sf_product_id' => $asoken->sf_product_id, 'handling' => 'content', 'content_id' => 'CT-001', 'with_asoken' => '0'])
+            ->assertOk()->assertJson(['with_asoken' => false]);
+
+        // 取り込み直しても、人が外した印は戻らない
+        SfProductCsv::import((string) file_get_contents(SfProductCsv::bundledPath()));
+        $this->assertFalse((bool) $asoken->fresh()->with_asoken);
+    }
+
+    public function test_あそ研も一緒に付ける商品は_コンテンツとあそ研の2つで案件になる(): void
+    {
+        Content::create(['id' => 'CT-001', 'content_name' => 'チャンバラ合戦']);
+        SfProductCsv::import((string) file_get_contents(SfProductCsv::bundledPath()));
+        SfProduct::where('sf_product_id', '01tTL00000GeaGTYAZ')->update(['handling' => 'content', 'content_id' => 'CT-001', 'with_asoken' => true]);
+        SfProduct::where('sf_product_id', '01tTL00000GeaGjYAJ')->update(['handling' => 'ignore']);
+        $payload = SfInboxSample::payloads()[0];
+
+        // 台帳に「あそ研」が無いあいだは足さずに、注意で知らせる（黙って落とさない）
+        $p = SfOpportunityMap::preview($payload);
+        $this->assertSame(['チャンバラ合戦'], array_column($p['contents'], 'content_name'));
+        $this->assertStringContainsString('あそ研', implode(' ', $p['warnings']));
+
+        // 台帳にあれば、2つ付く
+        Content::create(['id' => 'CT-002', 'content_name' => 'あそ研']);
+        $p = SfOpportunityMap::preview($payload);
+        $this->assertSame(['チャンバラ合戦', 'あそ研'], array_column($p['contents'], 'content_name'));
+        $attrs = SfOpportunityMap::toProjectAttributes($p);
+        $this->assertSame(['CT-001', 'CT-002'], $attrs['content_ids']);
+        $this->assertSame('チャンバラ合戦・あそ研', $attrs['project_name']);
+
+        // 印を外すと1つだけ
+        SfProduct::where('sf_product_id', '01tTL00000GeaGTYAZ')->update(['with_asoken' => false]);
+        $p = SfOpportunityMap::preview($payload);
+        $this->assertSame(['チャンバラ合戦'], array_column($p['contents'], 'content_name'));
+
+        // 「あそ研」そのものにつないだ商品に印が付いていても、あそ研は1つだけ
+        SfProduct::where('sf_product_id', '01tTL00000GeaGTYAZ')->update(['content_id' => 'CT-002', 'with_asoken' => true]);
+        $p = SfOpportunityMap::preview($payload);
+        $this->assertSame(['あそ研'], array_column($p['contents'], 'content_name'));
+    }
+
     // ── 受信箱 ──
 
     public function test_受信箱に入っても見ても案件は増えない(): void

@@ -171,6 +171,7 @@ final class SfOpportunityMap
                 'handling' => 'unknown',
                 'content_id' => null,
                 'content_name' => null,
+                'with_asoken' => false,
             ];
             if ($row) {
                 $item['handling'] = $row->handling;
@@ -179,6 +180,7 @@ final class SfOpportunityMap
                     if ($content) {
                         $item['content_id'] = $content->id;
                         $item['content_name'] = $content->content_name;
+                        $item['with_asoken'] = (bool) $row->with_asoken;
                     } else {
                         // つないだコンテンツが台帳から消えていたら、未対応あつかいに戻して目立たせる
                         $item['handling'] = SfProduct::PENDING;
@@ -230,6 +232,24 @@ final class SfOpportunityMap
 
         $products = self::products($payload);
         $contents = array_values(array_filter($products, fn ($p) => $p['handling'] === SfProduct::CONTENT));
+        // 「あそ研も一緒に付ける」の商品があれば、コンテンツ「あそ研」をもう1つ足す（2026-11-18 小沼さん決定）。
+        // SFの「〇〇（あそ研）」＝ECSでは「〇〇」＋「あそ研」。すでに「あそ研」が入っていれば重ねない。
+        // ⚠ 台帳に「あそ研」が無いときは黙って落とさず、注意に出す（足せなかったことが分かるように）。
+        if (array_filter($contents, fn ($c) => ! empty($c['with_asoken']))) {
+            $asoken = Content::where('content_name', SfProduct::ASOKEN)->first();
+            if (! $asoken) {
+                $warnings[] = '「あそ研も一緒に付ける」の商品ですが、コンテンツ台帳に「'.SfProduct::ASOKEN.'」がありません。登録後に手で足してください。';
+            } elseif (! in_array($asoken->id, array_column($contents, 'content_id'), true)) {
+                $contents[] = [
+                    'sf_id' => null,
+                    'name' => SfProduct::ASOKEN,
+                    'handling' => SfProduct::CONTENT,
+                    'content_id' => $asoken->id,
+                    'content_name' => $asoken->content_name,
+                    'with_asoken' => false,
+                ];
+            }
+        }
         $unmatched = array_values(array_filter($products, fn ($p) => in_array($p['handling'], [SfProduct::PENDING, 'unknown'], true)));
         if ($products === []) {
             $warnings[] = '商品（コンテンツ）が付いていません。';

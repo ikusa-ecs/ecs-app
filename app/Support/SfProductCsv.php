@@ -87,7 +87,7 @@ final class SfProductCsv
 
             $existing = SfProduct::where('sf_product_id', $id)->first();
             if ($existing) {
-                // ⚠ handling / content_id / note は触らない（人が決めたもの）
+                // ⚠ handling / content_id / with_asoken / note は触らない（人が決めたもの）
                 $existing->fill($values);
                 if ($existing->isDirty()) {
                     $existing->save();
@@ -97,6 +97,8 @@ final class SfProductCsv
                 SfProduct::create($values + [
                     'sf_product_id' => $id,
                     'handling' => SfProduct::PENDING,
+                    // 商品ファミリが「あそ研」なら、はじめから「あそ研も一緒に付ける」（人が外せる）
+                    'with_asoken' => $values['family'] === SfProduct::ASOKEN,
                 ]);
                 $created++;
             }

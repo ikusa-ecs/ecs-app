@@ -117,6 +117,8 @@ class SfProductController extends Controller
             'handling' => ['required', 'in:pending,content,ignore'],
             'content_id' => ['nullable', 'string'],
             'note' => ['nullable', 'string', 'max:1000'],
+            // 「あそ研も一緒に付ける」。送られてきたときだけ書き換える（送らない保存では今の印を残す）。
+            'with_asoken' => ['sometimes', 'boolean'],
         ]);
 
         $row = SfProduct::where('sf_product_id', $data['sf_product_id'])->first();
@@ -138,12 +140,16 @@ class SfProductController extends Controller
         if ($request->has('note')) {
             $row->note = $data['note'] ?? null;
         }
+        if ($request->has('with_asoken')) {
+            $row->with_asoken = $request->boolean('with_asoken');
+        }
         $row->updated_by = Auth::id();
         $row->save();
 
         return response()->json([
             'ok' => true,
             'handling' => $row->handling,
+            'with_asoken' => (bool) $row->with_asoken,
             'label' => SfProduct::LABELS[$row->handling],
             'pending' => SfProduct::where('handling', SfProduct::PENDING)->count(),
         ]);

@@ -133,6 +133,8 @@
                     <button class="btn sm" type="button" data-act="ignore">無視する</button>
                     <button class="btn sm ghost" type="button" data-act="pending">未対応に戻す</button>
                   </div>
+                  {{-- SFの「〇〇（あそ研）」＝ECSでは「〇〇」＋「あそ研」の2つにする（2026-11-18）。チェックを変えるとその場で保存。 --}}
+                  <label class="sp-asoken"><input type="checkbox" data-role="asoken" @checked($r->with_asoken)> ＋「あそ研」も一緒に付ける</label>
                   <div class="sp-msg" data-role="msg"></div>
                 </div>
               </td>
@@ -189,6 +191,8 @@
       body.append('sf_product_id', tr.dataset.sf);
       body.append('handling', handling);
       body.append('note', noteInput ? noteInput.value : '');
+      var asoken = tr.querySelector('[data-role=asoken]');
+      if (asoken) body.append('with_asoken', asoken.checked ? '1' : '0');
       if (handling === 'content') {
         var id = byName[(nameInput.value || '').trim()];
         if (!id) {
@@ -236,6 +240,15 @@
             tr.querySelector('[data-role=content]').value = btn.dataset.pick;
           });
         });
+        // 「あそ研も一緒に付ける」を変えたら、いまの扱いのまま保存する（メモと同じ動き）
+        var asokenBox = tr.querySelector('[data-role=asoken]');
+        if (asokenBox) {
+          asokenBox.addEventListener('change', function () {
+            var badge = tr.querySelector('[data-role=badge]');
+            var cur = (badge.className.match(/sp-badge (\w+)/) || [])[1] || 'pending';
+            save(tr, cur);
+          });
+        }
         var note = tr.querySelector('[data-role=note]');
         if (note) {
           note.addEventListener('change', function () {

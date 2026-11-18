@@ -30,10 +30,18 @@ class SfProduct extends Model
         self::IGNORE => '無視する',
     ];
 
+    /**
+     * 「あそ研も一緒に付ける」（with_asoken）で足すコンテンツの名前と、はじめから印を付ける商品ファミリ。
+     * SFの「〇〇（あそ研）」は、ECSでは「〇〇」＋「あそ研」の2コンテンツにする（2026-11-18 小沼さん決定）。
+     * 「〇〇（あそ研）」という別のコンテンツは台帳に作らない。
+     */
+    public const ASOKEN = 'あそ研';
+
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'with_asoken' => 'boolean',
         ];
     }
 }
