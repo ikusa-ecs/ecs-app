@@ -55,6 +55,7 @@ final class RookieFcPlan
             $busy = [];
             $monthEvents = 0;
             $monthD = 0;      // 本番日のDの数（画面の「D◯件」・目標の計算に使う）
+            $monthDSame = [];   // 同じ会場のかけもちで、もう数えた合言葉
             $monthDAll = 0;   // 本番以外も入れたDの数（FCの数＝全部の件数−これ、を今までどおりにするため）
             $monthCases = [];   // この月に入っている案件（2026-10-09 baba「新人一覧で案件一覧が出るように」）
             foreach ($mine as $a) {
@@ -77,8 +78,16 @@ final class RookieFcPlan
                         $monthDAll++;
                         // D の件数は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
                         // 前日設営・リハ日・予備日まで数えると件数がふくらむ）。判定の正本＝EventCount::isMainDay。
+                        // 同じ日・同じ会場・同じお客様のかけもちは1件（2026-11-20 小沼さん決定・正本 SameVenueKey）。
+                        // ⚠ 経験（dDone）はコンテンツごとなので、まとめない（両方のコンテンツを経験したことになる）。
                         if ($pr && EventCount::isMainDay($pr->date_type)) {
-                            $monthD++;
+                            $same = SameVenueKey::of($date->format('Y-m-d'), $pr->client, $pr->location);
+                            if ($same === null || ! isset($monthDSame[$same])) {
+                                $monthD++;
+                            }
+                            if ($same !== null) {
+                                $monthDSame[$same] = true;
+                            }
                         }
                     }
                 }

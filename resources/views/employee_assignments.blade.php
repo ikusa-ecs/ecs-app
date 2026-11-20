@@ -33,7 +33,7 @@
 @section('content')
 
 <p class="ea-intro">
-  月を選ぶと、その月にアサイン（キャンセル以外）がある社員が社歴順に並びます。「明細」を開くと日付・案件・役割・集合／解散・会場住所が出ます。<b>件数は本番の日だけ</b>数えます（前日設営・リハ日・予備日は明細には出ますが、件数には入れず「設営/リハ ○」と分けて出します）。見るだけの画面です（アサインを直すのは今までどおりD決め・日別ボードなど）。
+  月を選ぶと、その月にアサイン（キャンセル以外）がある社員が社歴順に並びます。「明細」を開くと日付・案件・役割・集合／解散・会場住所が出ます。<b>件数は本番の日だけ</b>数えます（前日設営・リハ日・予備日は明細には出ますが、件数には入れず「設営/リハ ○」と分けて出します）。<b>同じ日・同じ会場・同じお客様</b>の案件をかけもちしたときは1件に数え、「かけもち ○」と出します。見るだけの画面です（アサインを直すのは今までどおりD決め・日別ボードなど）。
 </p>
 
 @include('partials.office_switch')
@@ -56,7 +56,7 @@
         <span class="ea-name">{{ $r['name'] }}</span>
         <span class="ea-small">{{ $r['dept'] }}{{ $r['dept'] !== '' && $r['office'] !== '' ? '・' : '' }}{{ $r['office'] }}</span>
         <details class="ea-detail">
-          <summary>明細 {{ $r['liveCount'] }}件{{ $r['tentative'] ? '（うち仮 '.$r['tentative'].'）' : '' }}{{ ($r['otherDays'] ?? 0) ? '・設営/リハ '.$r['otherDays'] : '' }}{{ count($r['cases']) - $r['liveCount'] - ($r['otherDays'] ?? 0) ? '・中止 '.(count($r['cases']) - $r['liveCount'] - ($r['otherDays'] ?? 0)) : '' }}</summary>
+          <summary>明細 {{ $r['liveCount'] }}件{{ $r['tentative'] ? '（うち仮 '.$r['tentative'].'）' : '' }}{{ ($r['otherDays'] ?? 0) ? '・設営/リハ '.$r['otherDays'] : '' }}{{ ($r['sameVenue'] ?? 0) ? '・かけもち '.$r['sameVenue'] : '' }}{{ count($r['cases']) - $r['liveCount'] - ($r['otherDays'] ?? 0) - ($r['sameVenue'] ?? 0) ? '・中止 '.(count($r['cases']) - $r['liveCount'] - ($r['otherDays'] ?? 0) - ($r['sameVenue'] ?? 0)) : '' }}</summary>
           <textarea class="ea-copytext" readonly style="position:absolute; left:-9999px; width:1px; height:1px;">{{ $r['copyText'] }}</textarea>
           <button type="button" class="ea-copy" onclick="eaCopy(this)">📋 コピー</button><span class="ea-small"></span>
           <ul class="ea-cases">

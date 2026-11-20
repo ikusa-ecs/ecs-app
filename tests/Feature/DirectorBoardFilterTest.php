@@ -261,15 +261,19 @@ class DirectorBoardFilterTest extends TestCase
                     && $by['P-NULL']['isMain'] === true;
             })
             // 画面側：D計も合計も本番日だけ（合計は 2026-11-20 小沼さん決定）／名前横の「D◯」「前・後・計」も本番日だけ。
-            ->assertSee('if (c.isMain) { r.d++; r.total++; }', false)
-            ->assertSee('if (busyIsMain(dateKey, id, i)) r.total++;', false)
-            ->assertSee('const mainN = items.filter(i => i.main).length;', false)
+            // 同じ日・同じ会場・同じお客様のかけもちは1件（2026-11-20 小沼さん決定・正本 SameVenueKey）。
+            ->assertSee("if (once(c.dirId, 'd', k)) r.d++; if (once(c.dirId, 't', k)) r.total++;", false)
+            ->assertSee("if (busyIsMain(dateKey, id, i) && once(id, 't', busySameKey(dateKey, id, i))) r.total++;", false)
+            ->assertSee('const mainN = countMain(items);', false)
+            ->assertSee('sameKey: c.sameKey || null,', false)   // 画面の詰め替えで落とさない
+            ->assertViewHas('empBusyKey')
+            ->assertViewHas('cases', fn ($cases) => array_key_exists('sameKey', collect($cases)->keyBy('id')['P-MAIN']))
             // OP・MCなど（EMP_BUSY）にも、本番日かどうかの印を同じ並びで渡す。
             ->assertViewHas('empBusyMain')
             // 大型D・大型SDも本番日だけ（D計より大型Dが大きくならないように）。
-            ->assertSee('if (isBig && c.isMain) r.bigD++;', false)
-            ->assertSee('if (isBig && c.isMain) r.bigSD++;', false)
-            ->assertSee("i.k === 'd' && i.main", false)
+            ->assertSee("if (isBig && once(c.dirId, 'bd', k)) r.bigD++;", false)
+            ->assertSee("if (isBig && once(id, 'bs', k)) r.bigSD++;", false)
+            ->assertSee("dN += countMain(items.filter(i => i.k === 'd'));", false)
             ->assertSee('isMain: (c.isMain !== undefined)', false);
     }
 

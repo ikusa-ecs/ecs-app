@@ -62,4 +62,29 @@ class EmployeeAssignmentsTest extends TestCase
                 && collect($list)->firstWhere('name', 'D花子')['liveCount'] === 1
                 && collect($list)->firstWhere('name', 'D花子')['otherDays'] === 1);
     }
+
+    /**
+     * 同じ日・同じ会場・同じお客様の案件をかけもちしたDは1件（2026-11-20 小沼さん決定・正本 SameVenueKey）。
+     * 明細には2行とも出す。会場が違う案件はまとめない。
+     */
+    public function test_same_day_same_venue_same_client_counts_once(): void
+    {
+        $me = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => '見る人']);
+        $e1 = PersonFactory::new()->create(['role' => 'employee', 'office' => '東京', 'name' => 'D花子']);
+        $same = ['office' => '東京', 'start_date' => '2026-10-12', 'date_type' => '本番', 'client' => 'A社', 'location' => 'ビッグサイト'];
+        $a = ProjectFactory::new()->create($same + ['project_name' => 'かけもちのチャンバラ']);
+        $b = ProjectFactory::new()->create($same + ['project_name' => 'かけもちの防災']);
+        $c = ProjectFactory::new()->create(['location' => '別の会場', 'project_name' => '別会場の運動会'] + $same);
+        foreach ([$a, $b, $c] as $p) {
+            Assignment::create(['project_id' => $p->id, 'staff_id' => $e1->id, 'role' => 'D', 'status' => '確定', 'date' => '2026-10-12']);
+        }
+
+        $this->actingAsPerson($me)->get('/employee-assignments?ym=2026-10')->assertOk()
+            ->assertSee('かけもちのチャンバラ')
+            ->assertSee('かけもちの防災')
+            ->assertSee('D 2／SD 0')
+            ->assertSee('明細 2件・かけもち 1')
+            ->assertSee('のアサイン 2件（ほかに同じ会場のかけもち 1件）')
+            ->assertViewHas('total', 2);
+    }
 }

@@ -6,6 +6,7 @@ use App\Models\Person;
 use App\Support\EventCount;
 use App\Support\OfficeScope;
 use App\Support\PersonMonthCases;
+use App\Support\SameVenueKey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -52,7 +53,15 @@ class EmployeeAssignmentsController extends Controller
             // D・SD の件数は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
             // 前日設営・リハ日・予備日まで数えると件数がふくらむ）。一覧の行は今までどおり全部出す。
             $mainLive = array_filter($live, fn ($c) => EventCount::isMainDay($c['dayType'] ?? null));
-            $roles = array_count_values(array_column($mainLive, 'roleCode'));
+            // 同じ日・同じ会場・同じお客様のかけもちは1件（2026-11-20 小沼さん決定・正本 SameVenueKey）。
+            // D・SD は役割ごとにまとめる（同じ会場でDとSDを別の案件で持つ、は別の仕事なので両方数える）。
+            $sameKeyOf = fn ($c) => $c['sameKey'] ?? null;
+            $roles = [];
+            foreach (['D', 'SD'] as $rc) {
+                $roles[$rc] = count(SameVenueKey::unique(
+                    array_values(array_filter($mainLive, fn ($c) => $c['roleCode'] === $rc)), $sameKeyOf));
+            }
+            $mainCount = count(SameVenueKey::unique(array_values($mainLive), $sameKeyOf));
             $list[] = [
                 'id' => $p->id,
                 'name' => (string) $p->name,
@@ -64,8 +73,10 @@ class EmployeeAssignmentsController extends Controller
                 // 件数（明細○件・のべ○件）も本番日だけ（2026-11-20 小沼さん決定：アサイン表と同じく
                 // 当日運営だけ数える）。設営・リハ日は otherDays に分けて「ほかに設営・リハ○件」と出す。
                 'tentative' => count(array_filter($mainLive, fn ($c) => $c['status'] === '仮')),
-                'liveCount' => count($mainLive),
+                'liveCount' => $mainCount,
                 'otherDays' => count($live) - count($mainLive),
+                // 同じ会場のかけもちで件数から外した数（明細には出したまま「かけもち ○」と出す）。
+                'sameVenue' => count($mainLive) - $mainCount,
                 'copyText' => self::copyText((string) $p->name, $month, $cases),
             ];
         }
@@ -89,9 +100,12 @@ class EmployeeAssignmentsController extends Controller
         // 件数は本番日だけ（2026-11-20 小沼さん決定）。設営・リハ日は「ほかに」に分けて書く。
         $stopped = count(array_filter($cases, fn ($c) => ! empty($c['cancelled'])));
         $live = array_filter($cases, fn ($c) => empty($c['cancelled']));
-        $main = count(array_filter($live, fn ($c) => EventCount::isMainDay($c['dayType'] ?? null)));
-        $other = count($live) - $main;
-        $extra = array_filter([$other ? '設営・リハ '.$other.'件' : '', $stopped ? '中止 '.$stopped.'件' : '']);
+        $mainRows = array_values(array_filter($live, fn ($c) => EventCount::isMainDay($c['dayType'] ?? null)));
+        $other = count($live) - count($mainRows);
+        // 同じ日・同じ会場・同じお客様のかけもちは1件（正本 SameVenueKey）。
+        $main = count(SameVenueKey::unique($mainRows, fn ($c) => $c['sameKey'] ?? null));
+        $same = count($mainRows) - $main;
+        $extra = array_filter([$other ? '設営・リハ '.$other.'件' : '', $same ? '同じ会場のかけもち '.$same.'件' : '', $stopped ? '中止 '.$stopped.'件' : '']);
         $lines = [$name.'さん '.$month->format('n月').'のアサイン '.$main.'件'
             .($extra ? '（ほかに'.implode('・', $extra).'）' : '')];
         foreach ($cases as $c) {

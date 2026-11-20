@@ -13,6 +13,7 @@ use App\Support\AssignSlots;
 use App\Support\AssignmentStamp;
 use App\Support\DirectorSync;
 use App\Support\EventCount;
+use App\Support\SameVenueKey;
 use App\Support\Departments;
 use App\Support\OfficeScope;
 use App\Support\PersonNotes;
@@ -198,6 +199,9 @@ class AssignDirectorController extends Controller
                     // 本番日か（空も本番あつかい）。人ごとの「D計」「SD」「D◯」は本番日だけ数える
                     // （2026-11-16 小沼さん決定：設営・リハ日まで数えると件数がふくらむ）。判定の正本＝EventCount::isMainDay。
                     'isMain' => EventCount::isMainDay($p->date_type),
+                    // 同じ日・同じ会場・同じお客様の合言葉（無ければ null）。同じ人がかけもちしても件数は1件
+                    // （2026-11-20 小沼さん決定）。正本＝App\Support\SameVenueKey。
+                    'sameKey' => SameVenueKey::of(optional($start)->format('Y-m-d'), $p->client, $p->location),
                     'status' => $p->status ?? '',
                     'guests' => $p->guest_count,
                     'teams' => $p->team_count,
@@ -227,11 +231,16 @@ class AssignDirectorController extends Controller
             ->where('status', '!=', 'キャンセル')->onLiveProject()   // キャンセル案件の日は空いている扱い（2026-10-21）
             ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))   // 3か月より前の予定は使わない
             ->get(['staff_id', 'date', 'role', 'project_id']);
-        $busyDayType = Project::whereIn('id', $busyRows->pluck('project_id')->unique()->all())->pluck('date_type', 'id');
-        $busyRows->each(function ($a) use (&$empBusy, &$empBusyMain, $busyDayType) {
+        // $empBusyKey＝同じ並びで「同じ日・同じ会場・同じお客様」の合言葉（無ければ null・正本 SameVenueKey）。
+        $empBusyKey = [];
+        $busyProjects = Project::whereIn('id', $busyRows->pluck('project_id')->unique()->all())
+            ->get(['id', 'date_type', 'client', 'location'])->keyBy('id');
+        $busyRows->each(function ($a) use (&$empBusy, &$empBusyMain, &$empBusyKey, $busyProjects) {
             $key = Carbon::parse($a->date)->format('Y-m-d');
+            $pr = $busyProjects->get($a->project_id);
             $empBusy[$key][$a->staff_id][] = $a->role;
-            $empBusyMain[$key][$a->staff_id][] = EventCount::isMainDay($busyDayType[$a->project_id] ?? null);
+            $empBusyMain[$key][$a->staff_id][] = EventCount::isMainDay($pr?->date_type);
+            $empBusyKey[$key][$a->staff_id][] = $pr ? SameVenueKey::of($key, $pr->client, $pr->location) : null;
         });
 
         // D/SD/FC に入っているのに社員一覧に居ない人（＝スタッフや退職者）の名前。
@@ -271,6 +280,7 @@ class AssignDirectorController extends Controller
             'others' => $others,
             'empBusy' => $empBusy,
             'empBusyMain' => $empBusyMain,
+            'empBusyKey' => $empBusyKey,
             'dayOff' => $dayOff,
             // 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに出す。
             // 例：「10/3 大型入ってるからアサインしない」。正本＝App\Support\PersonNotes。

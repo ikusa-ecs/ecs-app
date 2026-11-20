@@ -54,6 +54,8 @@ final class PersonMonthCases
                 'leave' => $pr ? trim((string) ($pr->end_time ?? '')) : '',
                 'place' => $pr ? trim((string) preg_replace('/\s+/u', ' ', (string) ($pr->location ?? ''))) : '',
                 'status' => (string) $a->status,
+                // 同じ日・同じ会場・同じお客様の合言葉（かけもちは件数1件・2026-11-20 小沼さん決定）。無ければ null。
+                'sameKey' => $pr ? SameVenueKey::of($d->format('Y-m-d'), $pr->client, $pr->location) : null,
                 // 中止になった案件も消さずに印を付けて出す（キャンセル料の請求が来ることがあるため）。
                 'cancelled' => $pr ? (bool) $pr->is_cancelled : false,
             ];

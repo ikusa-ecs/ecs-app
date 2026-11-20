@@ -640,6 +640,7 @@
             この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:var(--dirlg-red);font-weight:700;">赤字</span>＝偏りに注意。<br>
             <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
             ※ <b>合計・D計・大型D・大型SDは、どれも本番の日だけ</b>数えます（前日設営・リハ日・予備日は数えません。合計は 2026-11-20 から）。<br>
+            ※ <b>同じ日・同じ会場・同じお客様</b>の案件をかけもちしたときは、<b>1件</b>に数えます（2026-11-20 から。お客様名か会場が空の案件はまとめません）。<br>
             ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
             ※ <b>名前の文字色＝所属</b>です（<span class="dep-plan"><b class="e-nm">イベプラ</b></span>／<span class="dep-sales"><b class="e-nm">セールス</b></span>／<span class="dep-creative"><b class="e-nm">クリエイティブ</b></span>／<span class="dep-other"><b class="e-nm">その他</b></span>）。カレンダーの名前と同じ色です。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
@@ -658,7 +659,8 @@
   window.ECS_DIR_OTHERS  = @json($others ?? []);  // 社員一覧に居ない人（スタッフ等）の名前
   window.ECS_EMP_BUSY    = @json($empBusy);      // 他ロール(FC等)のアサイン状況: {Y-m-d:{社員ID:[role]}}
   window.ECS_EMP_BUSY_MAIN = @json($empBusyMain ?? []); // 上と同じ並びで「本番日の案件か」: {Y-m-d:{社員ID:[true/false]}}
-  window.ECS_DIR_USINGDB = @json($usingDb);     // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
+  window.ECS_EMP_BUSY_KEY = @json($empBusyKey ?? []); // 上と同じ並びで「同じ日・同じ会場・同じお客様」の合言葉（無ければ null）
+  window.ECS_DIR_USINGDB = @json($usingDb);    // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
   window.ECS_DIR_OFFICE  = @json($officeScope);  // いま絞っている拠点（null＝全拠点）
   window.ECS_DIR_DAYOFF  = @json($dayOff ?? []); // その日お休みの社員 {社員ID:{"Y-M-D":true}}
   {{-- ⚠ メモは「社員ID → 日付 → 中身」の2段（2026-09-03）。1段に戻すと全部の日に同じメモが出る。 --}}
@@ -702,6 +704,25 @@
     const a = (EMP_BUSY_MAIN[dateKey] || {})[id];
     return !a || a[i] === undefined ? true : !!a[i];
   }
+  // 同じ日・同じ会場・同じお客様の合言葉（2026-11-20 小沼さん決定：同じ人がかけもちしても件数は1件）。
+  // 正本＝サーバーの App\Support\SameVenueKey。合言葉が無い（お客様名か会場が空）ものは、まとめない。
+  const EMP_BUSY_KEY = window.ECS_EMP_BUSY_KEY || {};
+  function busySameKey(dateKey, id, i){
+    const a = (EMP_BUSY_KEY[dateKey] || {})[id];
+    return (a && a[i]) || null;
+  }
+  // 「この人の、この数え方で、この合言葉は初めてか」を答える箱を作る。
+  // 合言葉が無いときはいつも true（＝1件ずつ数える）。kind＝'t'合計・'d'D計 など、数え方ごとに分ける。
+  function sameOnce(){
+    const seen = {};
+    return (id, kind, key) => {
+      if (!key) return true;
+      const k = id + '|' + kind + '|' + key;
+      if (seen[k]) return false;
+      seen[k] = true;
+      return true;
+    };
+  }
 
   // ===== 作業用の案件リスト（DB優先・無ければ見本 cases.js）。dirId/sdId をこの場で書き換える =====
   // 見本(cases.js)は姓文字列でD/SDを持つので、見本IDも姓に揃える（empById のキーも姓）。
@@ -723,6 +744,8 @@
       // 本番日か（2026-11-16 小沼さん決定：人ごとの D・SD の件数は本番日だけ数える）。
       // ⚠ サーバーの印（isMain・正本 EventCount::isMainDay）が無い見本データは日程種別から決める（空＝本番）。
       isMain: (c.isMain !== undefined) ? !!c.isMain : ['', '本番'].includes(String(c.dayType || '').trim()),
+      // 同じ日・同じ会場・同じお客様の合言葉（かけもちは件数1件・2026-11-20）。⚠ 詰め替え忘れるとまとまらない。
+      sameKey: c.sameKey || null,
       // アサイン表で「D枠を作る（イベプラ）」を押した案件＝イベプラ待ち（2026-09-28）。
       // ⚠ 詰め替えを忘れるとサーバーが渡していても画面に出ない（この画面で何度もやらかしている）。
       plannerWait: !!c.plannerWait,
@@ -1045,20 +1068,23 @@
     // 社員ID → 実日付(Y-m-d) → [{k, label}]
     const cell = {};
     // main＝本番日の案件か（名前横の「D◯」を本番日だけ数えるのに使う・2026-11-16 小沼さん決定）。
-    const add = (id, key, k, label, main) => { ((cell[id] = cell[id] || {})[key] = cell[id][key] || []).push({ k, label, main: !!main }); };
+    // same＝同じ日・同じ会場・同じお客様の合言葉（かけもちは件数1件・2026-11-20）。無ければ null。
+    const add = (id, key, k, label, main, same) => { ((cell[id] = cell[id] || {})[key] = cell[id][key] || []).push({ k, label, main: !!main, same: same || null }); };
     const shown = new Set(days.map(x => x.key));
     cases.forEach(c => {
       const key = realYmd(addDays(c.off));
       if (!shown.has(key)) return;
       const nm = c.content || c.name || '';
-      if (c.dirId) add(c.dirId, key, 'd', nm + '（D）', c.isMain);
-      (c.sdIds || []).forEach(id => add(id, key, 'sd', nm + '（SD）', c.isMain));
-      (c.fcIds || []).forEach(id => add(id, key, 'f', nm + '（FC）', c.isMain));
+      if (c.dirId) add(c.dirId, key, 'd', nm + '（D）', c.isMain, c.sameKey);
+      (c.sdIds || []).forEach(id => add(id, key, 'sd', nm + '（SD）', c.isMain, c.sameKey));
+      (c.fcIds || []).forEach(id => add(id, key, 'f', nm + '（FC）', c.isMain, c.sameKey));
     });
     days.forEach(x => {
       const busy = EMP_BUSY[x.key] || {};
-      Object.keys(busy).forEach(id => (busy[id] || []).forEach((r, i) => add(id, x.key, 'o', r, busyIsMain(x.key, id, i))));
+      Object.keys(busy).forEach(id => (busy[id] || []).forEach((r, i) => add(id, x.key, 'o', r, busyIsMain(x.key, id, i), busySameKey(x.key, id, i))));
     });
+    // 本番日のものだけ・同じ会場のかけもちは1件にまとめて数える。
+    const countMain = list => { const s = new Set(); let n = 0; list.forEach(i => { if (!i.main) return; if (i.same) { if (s.has(i.same)) return; s.add(i.same); } n++; }); return n; };
     const todayKey = realYmd(addDays(0));
     // 区切りの線＝月のはじめ・16日・翌月のはじめ
     const sep = x => (x.inMonth && (x.d === 1 || x.d === 16)) || (!x.inMonth && x.d === 1 && x.dt > new Date(y, m, 1));
@@ -1082,9 +1108,10 @@
             // ⚠ 件数は本番日だけ数える（前日設営・リハ日・予備日は数えない）。
             //   「D◯」＝2026-11-16、前半・後半・計＝2026-11-20 小沼さん決定（アサイン表と同じ数え方にそろえる）。
             //   マスの印（D・SD・F・他）は今までどおり全部の日に出す＝その日ふさがっているのが分かるように。
-            const mainN = items.filter(i => i.main).length;
+            //   同じ日・同じ会場・同じお客様のかけもちは1件（2026-11-20 小沼さん決定・正本 SameVenueKey）。
+            const mainN = countMain(items);
             if (x.d <= 15) first += mainN; else second += mainN;
-            dN += items.filter(i => i.k === 'd' && i.main).length;
+            dN += countMain(items.filter(i => i.k === 'd'));
           }
           const order = ['d', 'sd', 'f', 'o'];
           const k = order.find(z => items.some(i => i.k === z));
@@ -1313,6 +1340,7 @@
     // ⚠ 行に出すのは**社員だけ**（2026-09-01 baba）。FCに入っているスタッフを混ぜない
     //   ＝Dの偏りを見る表なので、名簿の人が全員並ぶと読み取れなくなる。
     const isEmp = id => !!empById[id];
+    const once = sameOnce();   // 同じ会場のかけもちを1件にまとめる箱（この集計1回ぶん）
 
     cases.forEach(c => {
       if (!inTarget(c)) return;
@@ -1323,9 +1351,12 @@
       //   「合計」も本番日だけ（2026-11-20 小沼さん決定：アサイン表と同じく当日運営だけ数える。
       //   それまでは全部の日を数えていて、設営・リハの多い人の合計がふくらんでいた）。
       //   ⚠ 設営・リハ日だけの人も行には出す（ensure は先に呼ぶ）＝担当に入っているのが分かるように。
-      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) { r.d++; r.total++; } if (isBig && c.isMain) r.bigD++; }
-      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); if (c.isMain) r.total++; if (isBig && c.isMain) r.bigSD++; });
-      (c.fcIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); if (c.isMain) r.total++; });
+      //   同じ日・同じ会場・同じお客様のかけもちは、どの数も1件（2026-11-20 小沼さん決定・正本 SameVenueKey）。
+      //   例：ビッグサイトで「チャンバラ」と「防災ヒーロー」の両方のD＝D計1・合計1。
+      const k = c.sameKey || null;
+      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) { if (once(c.dirId, 'd', k)) r.d++; if (once(c.dirId, 't', k)) r.total++; if (isBig && once(c.dirId, 'bd', k)) r.bigD++; } }
+      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); if (c.isMain) { if (once(id, 't', k)) r.total++; if (isBig && once(id, 'bs', k)) r.bigSD++; } });
+      (c.fcIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); if (c.isMain && once(id, 't', k)) r.total++; });
     });
 
     // ⚠ 合計には **D・SD・FC 以外（OP・MCなど）も入れる**（2026-09-02 baba要望）。
@@ -1339,7 +1370,7 @@
         if (!isEmp(id)) return;
         // 本番日の案件の役割だけ足す（設営・リハ日は数えない・2026-11-20）。
         const r = ensure(id);
-        EMP_BUSY[dateKey][id].forEach((role, i) => { if (busyIsMain(dateKey, id, i)) r.total++; });
+        EMP_BUSY[dateKey][id].forEach((role, i) => { if (busyIsMain(dateKey, id, i) && once(id, 't', busySameKey(dateKey, id, i))) r.total++; });
       });
     });
 

@@ -8,6 +8,7 @@ use App\Models\Assignment;
 use App\Models\Person;
 use App\Models\Project;
 use App\Support\EventCount;
+use App\Support\SameVenueKey;
 use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -86,7 +87,7 @@ class ProjectsAggController extends Controller
 
         // 関係する案件の実施形態・規模・状態。
         $projects = Project::whereIn('id', $rows->pluck('project_id')->unique())
-            ->get(['id', 'format', 'scale', 'status', 'date_type'])
+            ->get(['id', 'format', 'scale', 'status', 'date_type', 'start_date', 'client', 'location'])
             ->keyBy('id');
 
         // 担当者（社員）の氏名・所属（部署）。所属は名前の色分けに使う（D決め画面と同じ配色）。
@@ -96,6 +97,7 @@ class ProjectsAggController extends Controller
 
         $agg = [];     // staff_id => 集計
         $seen = [];    // 案件×人×役割の重複（複数日）を1回にまとめる
+        $seenSame = []; // 同じ日・同じ会場・同じお客様×人×役割（かけもち）を1回にまとめる
         $totalD = 0;   // D担当の総数（全社員ぶん）
         $totalSD = 0;  // SD担当の総数
         $projSet = []; // 対象になった案件IDの集合（重複なし）
@@ -117,6 +119,19 @@ class ProjectsAggController extends Controller
             // ⚠ 担当者の行は下で作らない＝本番以外のDしか無い社員も、社員一覧から0件で並ぶ。
             if (! EventCount::isMainDay($proj->date_type)) {
                 continue;
+            }
+            // 同じ日・同じ会場・同じお客様の案件をかけもちしたときは1件（2026-11-20 小沼さん決定）。
+            // 例：ビッグサイトで「チャンバラ」と「防災ヒーロー」の両方のD＝D 1件。正本＝SameVenueKey。
+            // お客様名か会場が空の案件は合言葉が null＝まとめない。D決めの「D計」と同じ数え方。
+            $same = SameVenueKey::of(
+                $proj->start_date ? \Illuminate\Support\Carbon::parse($proj->start_date)->format('Y-m-d') : null,
+                $proj->client, $proj->location);
+            if ($same !== null) {
+                $sameKey = $same.'|'.$r->staff_id.'|'.$r->role;
+                if (isset($seenSame[$sameKey])) {
+                    continue;
+                }
+                $seenSame[$sameKey] = true;
             }
             if ($r->role === 'D') {
                 $totalD++;
