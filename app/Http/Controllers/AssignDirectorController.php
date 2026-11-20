@@ -216,16 +216,23 @@ class AssignDirectorController extends Controller
         // 形：日付(Y-m-d) => [ staff_id => [role, ...] ]
         // ※ 他拠点の案件で稼働している分も「その日は埋まっている」として数える（本人の予定なので拠点は問わない）。
         //   画面に出ている社員の分だけ渡す（見えない人の予定は使わないため）。
+        // ⚠ $empBusyMain＝同じ並びで「その役割は本番日の案件か」（true/false）。
+        //   件数（合計・前半・後半・計）は本番日だけ数える（2026-11-20 小沼さん決定：アサイン表と同じく
+        //   当日運営だけ数える）。予定そのもの（マスの印・候補の色）は設営・リハ日も今までどおり出すので、
+        //   $empBusy からは抜かず、印を別に渡す。判定の正本＝EventCount::isMainDay。
         $empBusy = [];
-        Assignment::whereIn('staff_id', $employees->pluck('id')->all())
+        $empBusyMain = [];
+        $busyRows = Assignment::whereIn('staff_id', $employees->pluck('id')->all())
             ->whereNotIn('role', [AssignmentRole::D, AssignmentRole::SD, AssignmentRole::FC])
             ->where('status', '!=', 'キャンセル')->onLiveProject()   // キャンセル案件の日は空いている扱い（2026-10-21）
             ->whereDate('date', '>=', RecentWindow::from()->format('Y-m-d'))   // 3か月より前の予定は使わない
-            ->get(['staff_id', 'date', 'role'])
-            ->each(function ($a) use (&$empBusy) {
-                $key = Carbon::parse($a->date)->format('Y-m-d');
-                $empBusy[$key][$a->staff_id][] = $a->role;
-            });
+            ->get(['staff_id', 'date', 'role', 'project_id']);
+        $busyDayType = Project::whereIn('id', $busyRows->pluck('project_id')->unique()->all())->pluck('date_type', 'id');
+        $busyRows->each(function ($a) use (&$empBusy, &$empBusyMain, $busyDayType) {
+            $key = Carbon::parse($a->date)->format('Y-m-d');
+            $empBusy[$key][$a->staff_id][] = $a->role;
+            $empBusyMain[$key][$a->staff_id][] = EventCount::isMainDay($busyDayType[$a->project_id] ?? null);
+        });
 
         // D/SD/FC に入っているのに社員一覧に居ない人（＝スタッフや退職者）の名前。
         // ⚠ これが無いと画面が名前を見つけられず、`S-015` のようなIDがそのまま出る（2026-08-26 baba指摘）。
@@ -263,6 +270,7 @@ class AssignDirectorController extends Controller
             'employees' => $employees,
             'others' => $others,
             'empBusy' => $empBusy,
+            'empBusyMain' => $empBusyMain,
             'dayOff' => $dayOff,
             // 人ごとのメモ（2026-09-02 baba要望）。社員名を押したときのふきだしに出す。
             // 例：「10/3 大型入ってるからアサインしない」。正本＝App\Support\PersonNotes。

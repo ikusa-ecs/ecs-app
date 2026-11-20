@@ -61,8 +61,11 @@ class EmployeeAssignmentsController extends Controller
                 'cases' => $cases,
                 'd' => $roles['D'] ?? 0,
                 'sd' => $roles['SD'] ?? 0,
-                'tentative' => count(array_filter($live, fn ($c) => $c['status'] === '仮')),
-                'liveCount' => count($live),
+                // 件数（明細○件・のべ○件）も本番日だけ（2026-11-20 小沼さん決定：アサイン表と同じく
+                // 当日運営だけ数える）。設営・リハ日は otherDays に分けて「ほかに設営・リハ○件」と出す。
+                'tentative' => count(array_filter($mainLive, fn ($c) => $c['status'] === '仮')),
+                'liveCount' => count($mainLive),
+                'otherDays' => count($live) - count($mainLive),
                 'copyText' => self::copyText((string) $p->name, $month, $cases),
             ];
         }
@@ -83,9 +86,14 @@ class EmployeeAssignmentsController extends Controller
     private static function copyText(string $name, Carbon $month, array $cases): string
     {
         // 件数には中止になった案件を入れない（一覧には【案件中止】で出す・2026-10-21 baba）。
+        // 件数は本番日だけ（2026-11-20 小沼さん決定）。設営・リハ日は「ほかに」に分けて書く。
         $stopped = count(array_filter($cases, fn ($c) => ! empty($c['cancelled'])));
-        $lines = [$name.'さん '.$month->format('n月').'のアサイン '.(count($cases) - $stopped).'件'
-            .($stopped ? '（ほかに中止 '.$stopped.'件）' : '')];
+        $live = array_filter($cases, fn ($c) => empty($c['cancelled']));
+        $main = count(array_filter($live, fn ($c) => EventCount::isMainDay($c['dayType'] ?? null)));
+        $other = count($live) - $main;
+        $extra = array_filter([$other ? '設営・リハ '.$other.'件' : '', $stopped ? '中止 '.$stopped.'件' : '']);
+        $lines = [$name.'さん '.$month->format('n月').'のアサイン '.$main.'件'
+            .($extra ? '（ほかに'.implode('・', $extra).'）' : '')];
         foreach ($cases as $c) {
             $lines[] = $c['date'].' '.$c['name'].($c['client'] !== '' ? '／'.$c['client'] : '')
                 .($c['dayType'] !== '' && $c['dayType'] !== '本番' ? '［'.$c['dayType'].'］' : '')

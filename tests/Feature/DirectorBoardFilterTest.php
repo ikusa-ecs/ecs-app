@@ -260,8 +260,12 @@ class DirectorBoardFilterTest extends TestCase
                     && $by['P-SETUP']['isMain'] === false
                     && $by['P-NULL']['isMain'] === true;
             })
-            // 画面側：D計は本番日だけ・合計は全部の日／名前横の「D◯」も本番日だけ。
-            ->assertSee('if (c.isMain) r.d++; r.total++;', false)
+            // 画面側：D計も合計も本番日だけ（合計は 2026-11-20 小沼さん決定）／名前横の「D◯」「前・後・計」も本番日だけ。
+            ->assertSee('if (c.isMain) { r.d++; r.total++; }', false)
+            ->assertSee('if (busyIsMain(dateKey, id, i)) r.total++;', false)
+            ->assertSee('const mainN = items.filter(i => i.main).length;', false)
+            // OP・MCなど（EMP_BUSY）にも、本番日かどうかの印を同じ並びで渡す。
+            ->assertViewHas('empBusyMain')
             // 大型D・大型SDも本番日だけ（D計より大型Dが大きくならないように）。
             ->assertSee('if (isBig && c.isMain) r.bigD++;', false)
             ->assertSee('if (isBig && c.isMain) r.bigSD++;', false)

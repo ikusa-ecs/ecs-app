@@ -600,7 +600,7 @@
            ⚠ この区間は「そのまま出す」ので、Blade のコメント記号は使えない。 -->
       <div class="dist-panel" style="margin:0 0 14px;">
         <h3>🗓 日付で見る（イベプラ）</h3>
-        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　名前の横＝前半（1〜15日）・後半（16日〜）・計・Dの件数（数えるのはD・SD・FC・他）。<b>薄い列＝前後の月の1週間</b>（前半・後半・計・Dには数えません）</p>
+        <p class="agg-note"><span class="dd-d">D</span>ディレクター　<span class="dd-sd">SD</span>　<span class="dd-f">FC</span>　<span class="dd-o">他</span>＝OP・MCなど　<span class="dd-off">休</span>＝出勤可能日が×・希望休　数字＝その日の件数　名前の横＝前半（1〜15日）・後半（16日〜）・計・Dの件数（数えるのはD・SD・FC・他。<b>本番の日だけ</b>＝前日設営・リハ日・予備日は、マスに印は出ますが件数には入れません）。<b>薄い列＝前後の月の1週間</b>（前半・後半・計・Dには数えません）</p>
         <div class="dist-wrap" id="distBox"></div>
       </div>
 
@@ -639,7 +639,7 @@
           <p class="agg-note">
             この月の担当数です。<b>D計</b>が多い人ほど色が濃く、一番多い人は<span style="color:var(--dirlg-red);font-weight:700;">赤字</span>＝偏りに注意。<br>
             <b>合計</b>＝D・SD・FC に <b>OP・MCなども足した数</b>です（この画面で選べない役割も含みます）。<br>
-            ※ <b>D計・大型D・大型SDは本番の日だけ</b>数えます（前日設営・リハ日・予備日は数えません）。合計は全部の日を数えます。<br>
+            ※ <b>合計・D計・大型D・大型SDは、どれも本番の日だけ</b>数えます（前日設営・リハ日・予備日は数えません。合計は 2026-11-20 から）。<br>
             ※ 並べているのは<b>社員だけ</b>です（FCに入っているスタッフは混ぜません）。<br>
             ※ <b>名前の文字色＝所属</b>です（<span class="dep-plan"><b class="e-nm">イベプラ</b></span>／<span class="dep-sales"><b class="e-nm">セールス</b></span>／<span class="dep-creative"><b class="e-nm">クリエイティブ</b></span>／<span class="dep-other"><b class="e-nm">その他</b></span>）。カレンダーの名前と同じ色です。<br>
             ※ 「リアルD」「オンラインD」を含む詳しい集計は <a href="/projects-agg">社員・ディレクター集計</a> にあります。
@@ -657,7 +657,8 @@
   window.ECS_EMPLOYEES   = @json($employees);    // 社員一覧（id・氏名・姓・部署・新人/イベプラ判定）
   window.ECS_DIR_OTHERS  = @json($others ?? []);  // 社員一覧に居ない人（スタッフ等）の名前
   window.ECS_EMP_BUSY    = @json($empBusy);      // 他ロール(FC等)のアサイン状況: {Y-m-d:{社員ID:[role]}}
-  window.ECS_DIR_USINGDB = @json($usingDb);      // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
+  window.ECS_EMP_BUSY_MAIN = @json($empBusyMain ?? []); // 上と同じ並びで「本番日の案件か」: {Y-m-d:{社員ID:[true/false]}}
+  window.ECS_DIR_USINGDB = @json($usingDb);     // true＝DBの実データを使う（拠点で絞って0件でも見本に戻さない）
   window.ECS_DIR_OFFICE  = @json($officeScope);  // いま絞っている拠点（null＝全拠点）
   window.ECS_DIR_DAYOFF  = @json($dayOff ?? []); // その日お休みの社員 {社員ID:{"Y-M-D":true}}
   {{-- ⚠ メモは「社員ID → 日付 → 中身」の2段（2026-09-03）。1段に戻すと全部の日に同じメモが出る。 --}}
@@ -694,6 +695,13 @@
 
   // 他ロール(FC等)のアサイン状況 {Y-m-d:{社員ID:[role]}}。DBのassignments由来（D/SDは除外済み）。
   const EMP_BUSY = window.ECS_EMP_BUSY || {};
+  // その役割（EMP_BUSY の i 番目）が本番日の案件か。印が無いとき（見本データ）は本番あつかい。
+  // ⚠ 件数（合計・前半・後半・計）は本番日だけ数える（2026-11-20 小沼さん決定）。マスの印は全部の日に出す。
+  const EMP_BUSY_MAIN = window.ECS_EMP_BUSY_MAIN || {};
+  function busyIsMain(dateKey, id, i){
+    const a = (EMP_BUSY_MAIN[dateKey] || {})[id];
+    return !a || a[i] === undefined ? true : !!a[i];
+  }
 
   // ===== 作業用の案件リスト（DB優先・無ければ見本 cases.js）。dirId/sdId をこの場で書き換える =====
   // 見本(cases.js)は姓文字列でD/SDを持つので、見本IDも姓に揃える（empById のキーも姓）。
@@ -1044,12 +1052,12 @@
       if (!shown.has(key)) return;
       const nm = c.content || c.name || '';
       if (c.dirId) add(c.dirId, key, 'd', nm + '（D）', c.isMain);
-      (c.sdIds || []).forEach(id => add(id, key, 'sd', nm + '（SD）'));
-      (c.fcIds || []).forEach(id => add(id, key, 'f', nm + '（FC）'));
+      (c.sdIds || []).forEach(id => add(id, key, 'sd', nm + '（SD）', c.isMain));
+      (c.fcIds || []).forEach(id => add(id, key, 'f', nm + '（FC）', c.isMain));
     });
     days.forEach(x => {
       const busy = EMP_BUSY[x.key] || {};
-      Object.keys(busy).forEach(id => (busy[id] || []).forEach(r => add(id, x.key, 'o', r)));
+      Object.keys(busy).forEach(id => (busy[id] || []).forEach((r, i) => add(id, x.key, 'o', r, busyIsMain(x.key, id, i))));
     });
     const todayKey = realYmd(addDays(0));
     // 区切りの線＝月のはじめ・16日・翌月のはじめ
@@ -1071,9 +1079,11 @@
         let mark = '';
         if (items.length) {
           if (x.inMonth) {
-            if (x.d <= 15) first += items.length; else second += items.length;
-            // ⚠ 「D◯」は本番日だけ数える（2026-11-16 小沼さん決定・前日設営・リハ日・予備日は数えない）。
-            //   前半・後半の数（first/second）とマスの「D」の印は今までどおり全部の日。
+            // ⚠ 件数は本番日だけ数える（前日設営・リハ日・予備日は数えない）。
+            //   「D◯」＝2026-11-16、前半・後半・計＝2026-11-20 小沼さん決定（アサイン表と同じ数え方にそろえる）。
+            //   マスの印（D・SD・F・他）は今までどおり全部の日に出す＝その日ふさがっているのが分かるように。
+            const mainN = items.filter(i => i.main).length;
+            if (x.d <= 15) first += mainN; else second += mainN;
             dN += items.filter(i => i.k === 'd' && i.main).length;
           }
           const order = ['d', 'sd', 'f', 'o'];
@@ -1310,10 +1320,12 @@
       // ⚠ 「D計」は本番日だけ数える（2026-11-16 小沼さん決定：本番日のDがそのイベント全部の日のDなので、
       //   前日設営・リハ日・予備日まで数えると件数がふくらむ）。「大型D」「大型SD」も本番日だけ
       //   （同日の追加決定：D計より大型Dが大きくならないように・社員・ディレクター集計と同じ数え方にそろえる）。
-      //   「合計」だけは今までどおり全部の日を数える。
-      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) r.d++; r.total++; if (isBig && c.isMain) r.bigD++; }
-      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); r.total++; if (isBig && c.isMain) r.bigSD++; });
-      (c.fcIds || []).forEach(id => { if (isEmp(id)) ensure(id).total++; });
+      //   「合計」も本番日だけ（2026-11-20 小沼さん決定：アサイン表と同じく当日運営だけ数える。
+      //   それまでは全部の日を数えていて、設営・リハの多い人の合計がふくらんでいた）。
+      //   ⚠ 設営・リハ日だけの人も行には出す（ensure は先に呼ぶ）＝担当に入っているのが分かるように。
+      if (c.dirId && isEmp(c.dirId)) { const r = ensure(c.dirId); if (c.isMain) { r.d++; r.total++; } if (isBig && c.isMain) r.bigD++; }
+      (c.sdIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); if (c.isMain) r.total++; if (isBig && c.isMain) r.bigSD++; });
+      (c.fcIds || []).forEach(id => { if (!isEmp(id)) return; const r = ensure(id); if (c.isMain) r.total++; });
     });
 
     // ⚠ 合計には **D・SD・FC 以外（OP・MCなど）も入れる**（2026-09-02 baba要望）。
@@ -1325,7 +1337,9 @@
       if (p[0] !== TARGET.y || (p[1] - 1) !== TARGET.m) return;
       Object.keys(EMP_BUSY[dateKey]).forEach(id => {
         if (!isEmp(id)) return;
-        ensure(id).total += EMP_BUSY[dateKey][id].length;
+        // 本番日の案件の役割だけ足す（設営・リハ日は数えない・2026-11-20）。
+        const r = ensure(id);
+        EMP_BUSY[dateKey][id].forEach((role, i) => { if (busyIsMain(dateKey, id, i)) r.total++; });
       });
     });
 
