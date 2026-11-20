@@ -12,7 +12,7 @@ use App\Support\StaffProjectNews;
 use App\Support\ActiveBonus;
 use App\Support\AssignmentRole;
 use App\Support\DispatchRows;
-use App\Support\OfficePublish;
+use App\Support\StaffOfficeReach;
 use App\Support\OfficeScope;
 use App\Support\OfficeSettings;
 use App\Support\ProjectSeries;
@@ -197,6 +197,9 @@ class StaffPortalController extends Controller
             //   （使うと過去の月まで印が付いて、希望の入力と紛らわしくなる）。
             'pastJobs' => $pastJobs,
             'recruitJobs' => $this->recruitJobs($today, $me),
+            // 本人の拠点（案件カードに「自分の拠点ではない案件」の拠点名の印を出すための基準）。
+            // 空（＝拠点が決まらない）のときは印を出さない。
+            'myOffice' => (string) (OfficeScope::filter(request()) ?? ''),
             // 「最近の変更（あなたに関係するもの）」＝社員側の編集履歴のうち、
             // スタッフに関係する項目だけ（2026-09-09 baba要望）。正本＝App\Support\StaffProjectNews。
             'news' => StaffProjectNews::forPerson($me),
@@ -774,13 +777,15 @@ class StaffPortalController extends Controller
             ->where(function ($q) use ($office) {
                 // ⚠ 公開は拠点ごと（2026-09-30）＝**自分の拠点で公開された**案件だけ（正本＝OfficePublish）。
                 //   巻き取られた案件もここで外れる（scopePublishedFor が見る）。
+                // ＋東北の案件は、東北で公開中なら東京のスタッフにも出す（2026-11-20 小沼さん決定）。
+                //   自拠点の決まりと追加の組は、どちらも正本 StaffOfficeReach にまとめてある
+                //   （まとめてエントリーの門＝saveSeriesEntry もこの一覧を使うので、一覧と門がずれない）。
                 if ($office) {
-                    OfficePublish::scopePublishedFor($q, $office);
+                    StaffOfficeReach::scopeVisibleToStaff($q, $office);
                 } else {
                     $q->where('staff_published', true);
                 }
             })
-            ->when($office, fn ($q) => OfficeScope::applyToProjects($q, $office))
             ->orderBy('start_date')
             ->get();
 
@@ -809,6 +814,11 @@ class StaffPortalController extends Controller
         // 通常案件の締切＝**その拠点の**「一斉締切日」（settings）。追加案件は下の deadlineLabel で個別計算。
         // ⚠ 以前は全国共通だったため、東京の締切が東北のスタッフにも出ていた（2026-08-25 baba）。
         $bulkDeadline = OfficeSettings::get(OfficeSettings::DEADLINE, $office);
+        // よその拠点から広げて見せている案件（東京のスタッフに出す東北の案件）は、その拠点の一斉締切（正本＝StaffOfficeReach）。
+        $reachDeadlines = [];
+        foreach (StaffOfficeReach::sourcesFor($office) as $src) {
+            $reachDeadlines[$src] = OfficeSettings::get(OfficeSettings::DEADLINE, $src);
+        }
 
         // 連日イベント（同じ案件を何日かに分けて開催）のまとまり。2026-09-15・FBシート No.16。
         // ⚠ 画面に出ている案件だけで数えない（groupFor が取り直す）。
@@ -831,7 +841,7 @@ class StaffPortalController extends Controller
             ));
         }
 
-        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups, $groupDays, $dateChanges, $repeatPrev, $me) {
+        return $projects->map(function (Project $p) use ($today, $filledByProject, $contentNames, $bulkDeadline, $myApps, $seriesGroups, $groupDays, $dateChanges, $repeatPrev, $me, $office, $reachDeadlines) {
             $off = $p->start_date
                 ? intdiv($p->start_date->copy()->startOfDay()->timestamp - $today->copy()->startOfDay()->timestamp, 86400)
                 : 0;
@@ -856,6 +866,10 @@ class StaffPortalController extends Controller
                 'place' => $p->location ?? '',
                 'meetPlace' => $p->assembly_type ?? '',
                 'area' => $p->operation_place ?? '',
+                // 案件の拠点（どこの拠点の案件か）。画面の「東北の案件のみ」で使う（2026-11-20 小沼さん）。
+                // 東北の案件は東北で公開していれば東京のスタッフにも出す（正本＝StaffOfficeReach・2026-11-20）ので、
+                // 東京のスタッフの一覧に東北の案件が混ざる。⚠ 拠点が空の案件は東京として扱う（一覧に出す条件と同じ＝OfficeScope）。
+                'office' => trim((string) ($p->office ?? '')) !== '' ? (string) $p->office : OfficeScope::DEFAULT_OFFICE,
                 'fmt' => $fmt,
                 // 実施形態の名前そのもの。バッジにこれを出す＝新しい実施形態が増えても
                 // 画面側に書き足さなくてよい（正本＝ProjectFormats::ALL）。
@@ -896,7 +910,11 @@ class StaffPortalController extends Controller
                 'category' => $p->category ?? '通常案件',
                 // スタッフ画面で「追加」として上に出すか（区分とは別・2026-10-07）。正本＝StaffExtra。
                 'staffExtra' => StaffExtra::is($p),
-                'deadline' => $this->deadlineLabel($p, $bulkDeadline),
+                // ⚠ よその拠点から広げて見せている案件（東京のスタッフに出す東北の案件）は、
+                //   その拠点（東北）の一斉締切を出す。アサインを決めるのは東北の担当なので（2026-11-20）。
+                'deadline' => $this->deadlineLabel($p, StaffOfficeReach::isReachedProject($p, $office)
+                    ? ($reachDeadlines[trim((string) $p->office)] ?? $bulkDeadline)
+                    : $bulkDeadline),
                 'recruit' => true,
                 'archived' => $off < 0,   // 過去のイベントは募集タブに出さない
                 'draft' => false,

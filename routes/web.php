@@ -438,6 +438,12 @@ Route::middleware(['auth', 'twofa', 'onboarded', 'tier:employee'])->group(functi
     Route::get('/mypage', [MyPageController::class, 'index']);
     // マイページの通知設定（新人フォロー所感/アサイン確定/締切）を people へ本物保存。
     Route::post('/mypage/notify', [MyPageController::class, 'saveNotify']);
+    // SFの商談を担当営業のマイページから登録・見送り（2026-11-20 小沼さん）。社員でも押せるが、本人あての商談だけ
+    // （本人かどうかはコントローラで App\Support\SfInboxOwner を通して必ず確かめる）。登録の中身は受信箱と同じ SfInboxRegister。
+    Route::post('/mypage/sf-inbox/{id}/register', [\App\Http\Controllers\SfInboxController::class, 'registerMine'])->whereNumber('id');
+    Route::post('/mypage/sf-inbox/{id}/skip', [\App\Http\Controllers\SfInboxController::class, 'skipMine'])->whereNumber('id');
+    // 見送った商談を本人が取り込み待ちに戻す（本人あてだけ・コントローラで確かめる）。
+    Route::post('/mypage/sf-inbox/{id}/reopen', [\App\Http\Controllers\SfInboxController::class, 'reopenMine'])->whereNumber('id');
     // Googleカレンダーに直接登録（2026-11-02 baba決定）。正本＝App\Support\GoogleCalendarSync。
     Route::get('/google-calendar/connect', [\App\Http\Controllers\GoogleCalendarController::class, 'connect']);
     Route::get('/google-calendar/callback', [\App\Http\Controllers\GoogleCalendarController::class, 'callback']);

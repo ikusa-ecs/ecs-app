@@ -39,6 +39,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/staff-invoice-check', // スタッフ別アサイン（請求書チェック）（2026-10-13 に追加）
         '/employee-assignments', // 社員別アサイン一覧（2026-10-13 に追加）
         '/sizes',               // サイズ一覧（2026-11-02 に追加）
+        '/sf-inbox',            // Salesforce受信箱（2026-11-20 に追加）
     ];
 
     private function admin(): Person
@@ -72,6 +73,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/paper-stock',
         '/broadcast-list',
         '/past-projects',
+        '/sf-inbox',
     ];
 
     public function test_全拠点はoffice_allで指定する(): void

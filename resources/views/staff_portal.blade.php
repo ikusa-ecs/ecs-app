@@ -178,6 +178,9 @@
     /* 追加案件は「急ぎ」なので赤で区別する（案件カードの赤枠と揃える）。 */
     .job-toggles .jf-tg.extra { border-color: var(--danger); color: var(--danger); }
     .job-toggles .jf-tg.extra.on { background: var(--danger); border-color: var(--danger); color: #fff; }
+    /* 「東北の案件のみ」はチェックボックス（2026-11-20）。ほかのボタンと同じ丸い形にして、押したら色が変わる。 */
+    .job-toggles .jf-chk { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .job-toggles .jf-chk input { margin: 0; width: 16px; height: 16px; accent-color: #fff; }
 
     /* 募集案件の並び（広い画面では自動で2列に／狭い画面では幅に合わせて1列に縮む） */
     .job-grid {
@@ -237,6 +240,8 @@
     .tag-mini.add  { background: #b91c1c;            color: #fff; }
     .tag-mini.repeat { background: #e7f0e9; color: #3f7d52; }
     .tag-mini.stay { background: #e8833a;            color: #fff; }
+    /* 自分の拠点ではない拠点の案件の印（東北の案件が東京のスタッフにも出るため・2026-11-20） */
+    .tag-mini.office { background: #ede9fe;          color: #5b21b6; }
     /* 中間：予備日・リハ */
     .tag-mini.yobi { background: var(--warn-soft);   color: #b45309; }
     .tag-mini.reha { background: #ece3d4;            color: #7a6a58; }
@@ -953,6 +958,14 @@
           <button type="button" class="jf-tg" id="jfApplied" onclick="setJobState('applied')"
                   title="自分がエントリーした案件だけにしぼります。">★ エントリー中のみ</button>
           <button type="button" class="jf-tg extra" id="jfExtra" onclick="toggleExtraOnly()">🔥 追加案件のみ</button>
+          {{-- 「東北の案件のみ」（2026-11-20 小沼さん）。東北の案件を東京のスタッフにも出す運用にしたので、
+               東北にチェックして東北の案件だけに絞ってからエントリーできるようにする。
+               見分け方＝案件の拠点（office）が「東北」。ほかの絞り込みと重ねて使える。
+               ⚠ 一覧に東北の案件と、それ以外の拠点の案件が両方あるときだけ出す（東北だけ／東北なしなら押す意味が無いので隠す）。 --}}
+          <label class="jf-tg jf-chk" id="jfTohokuWrap" style="display:none;"
+                 title="東北の拠点の案件だけにしぼります。">
+            <input type="checkbox" id="jfTohoku" onchange="toggleTohokuOnly()"> 東北の案件のみ
+          </label>
         </div>
 
         {{-- 表示の切替（リスト／カレンダー）。2026-09-01 baba要望。
@@ -1354,6 +1367,7 @@
   <script>window.ECS_PAST_JOBS = @json($pastJobs ?? []);</script>
   <!-- 募集中タブの案件リスト（DB）。 -->
   <script>window.ECS_RECRUIT_JOBS = @json($recruitJobs ?? []);</script>
+  <script>window.ECS_MY_OFFICE = @json($myOffice ?? '');</script>
   <!-- 設定タブの初期値（本人のDB値）＋保存用のCSRFトークン。test/未ログインは null。 -->
   <script>
     window.ECS_MY_PROFILE = @json($myProfile ?? null);
@@ -1393,7 +1407,7 @@
       const _dl = ECS_caseDate(c.off - 4);
       return {
         id:c.id, content:c.content, client:c.client, place:c.place, meetPlace:c.meetPlace,
-        area:c.area, format:c.fmt, fmtText:c.fmtText, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
+        area:c.area, office:(c.office || ''), format:c.fmt, fmtText:c.fmtText, size:(c.scale === '大型' ? '大型' : ''), repeat:!!c.repeat,
         lodging:c.lodging, dayType:c.dayType, parentId:c.parentId,
         // 連日イベント（◯日目／全◯日）。1日だけの案件は null。
         // ⚠ ここで詰め替え忘れると、サーバーが送っていても画面に出ない。
@@ -1463,6 +1477,8 @@
     // extraOnly      … 追加案件だけに絞るか（上とは別に重ねられる）
     let jobStateFilter = '';
     let extraOnly = false;
+    // tohokuOnly     … 東北の拠点の案件だけに絞るか（2026-11-20・上とは別に重ねられる）
+    let tohokuOnly = false;
     // いま画面で押した案件（エントリーした／取り消した）。絞り込みから外れても一覧に残す。
     // ⚠ 押した瞬間に消えると、できたのかどうか分からない（2026-09-01 baba指摘）。
     //   絞り込みを選び直したときは消す＝ふつうの絞り込みに戻す。
@@ -1713,7 +1729,30 @@
       document.getElementById('jfOpen').classList.toggle('on', jobStateFilter === 'open');
       document.getElementById('jfApplied').classList.toggle('on', jobStateFilter === 'applied');
       document.getElementById('jfExtra').classList.toggle('on', extraOnly);
+      const tw = document.getElementById('jfTohokuWrap');
+      if (tw) tw.classList.toggle('on', tohokuOnly);
     }
+    // 東北の案件か。予備日・リハは本番（親）の拠点で見る（追加案件のみと同じ考え方）。
+    function isTohokuJob(j) {
+      return j.office === '東北' || anchorJob(j).office === '東北';
+    }
+    function toggleTohokuOnly() {
+      const cb = document.getElementById('jfTohoku');
+      tohokuOnly = !!(cb && cb.checked);
+      syncToggleButtons();
+      renderJobs();
+    }
+    // 「東北の案件のみ」は、一覧に東北の案件とそれ以外の案件が両方あるときだけ出す。
+    // ⚠ 1回だけ判定すればよい（案件の一覧は画面を開いたときに決まり、あとから増えない）。
+    (function () {
+      try {
+        const tw = document.getElementById('jfTohokuWrap');
+        if (!tw) return;
+        const hasTohoku = jobs.some(j => j.office === '東北');
+        const hasOther  = jobs.some(j => j.office !== '東北');
+        if (hasTohoku && hasOther) tw.style.display = '';
+      } catch (e) { /* 出せなくても一覧は止めない */ }
+    })();
     // 同じボタンをもう一度押したら解除（＝すべて表示に戻る）。
     function setJobState(v) {
       jobStateFilter = (jobStateFilter === v) ? '' : v;
@@ -1751,6 +1790,11 @@
         if (j.repeatPrev)           tags += '<span class="tag-mini repeat">🔁 前回アサインされた案件（' + j.repeatPrev.date + '）' + (j.repeatPrev.mine ? '・あなたも前回入りました' : '') + '</span>';
         if (j.dateChange)           tags +='<span class="tag-mini dchg">📅 日付が変わりました（' + j.dateChange.from + '→' + j.dateChange.to + '）</span>';
         if (j.extra)                tags += '<span class="tag-mini add">追加</span>';
+        // 自分の拠点ではない拠点の案件にだけ、その拠点名を出す（全部に付けるとじゃまなので）。
+        // 予備日・リハは本番（親）の拠点で見る。拠点名は決め打ちせず案件の office をそのまま出す。
+        // 拠点名はHTMLに埋め込むので、念のため記号をエスケープする。
+        const _of = anchorJob(j).office || j.office;
+        if (_of && window.ECS_MY_OFFICE && _of !== window.ECS_MY_OFFICE) tags += '<span class="tag-mini office" title="自分の拠点ではない拠点の案件です">' + String(_of).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])) + '</span>';
         if (j.dayType === '予備日')  tags += '<span class="tag-mini yobi">予備日</span>';
         else if (j.dayType === 'リハ' || j.dayType === 'リハ日') tags += '<span class="tag-mini reha">リハ</span>';
         else if (j.dayType === '前日設営') tags += '<span class="tag-mini setup">前日設営</span>';
@@ -1873,6 +1917,8 @@
         .filter(j => !fromDate || j.date >= fromDate)   // 「この日から」以降の案件だけ表示
         // 「🔥 追加案件のみ」。予備日・リハは本番（親）が追加案件なら一緒に残す。
         .filter(j => !extraOnly || j.extra || anchorJob(j).extra)
+        // 「東北の案件のみ」（2026-11-20）。案件の拠点が東北のものだけ。
+        .filter(j => !tohokuOnly || isTohokuJob(j))
         .sort((a,b) => {
           const pa = anchorJob(a), pb = anchorJob(b);
           // 追加案件を先頭に。⚠ ただし募集が終わった（締切・満員）追加案件は先頭にしない＝日付の位置に並べる

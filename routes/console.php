@@ -83,3 +83,12 @@ Artisan::command('paper-stock:alert', function () {
 
 Schedule::call(fn () => PaperStockAlert::run())
     ->weekdays()->at('09:00')->timezone('Asia/Tokyo')->name('paper-stock-alert');
+
+// ──────────────────────────────────────────────────────────────────────
+// SFの商談を読んで受信箱に入れる（2026-11-20 MTG決定＝ECSが5〜10分おきに自動で読みに行く）。正本＝App\Support\SfPull。
+// ⚠ 受信箱に入れるだけ＝案件は作らない。鍵（SF_URL ほか）が入るまでは何もしないで終わる。
+// ⚠ 5分おき＝前に読んだ後に変わった商談だけ。明け方に1回だけ全部読み直す
+//   （商品の明細だけ変えたときなど、商談の「変わった時刻」が動かない取りこぼしを拾うため）。
+// 手動でも試せる： php artisan ecs:sf-pull （全部読み直す＝ --all）
+Schedule::command('ecs:sf-pull')->everyFiveMinutes()->withoutOverlapping(10)->name('sf-pull');
+Schedule::command('ecs:sf-pull --all')->dailyAt('05:00')->timezone('Asia/Tokyo')->withoutOverlapping(30)->name('sf-pull-all');

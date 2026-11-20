@@ -43,6 +43,19 @@ return [
         'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
     ],
 
+    // Salesforce（SF）の商談を読む（2026-11-20）。鍵はコードに書かず .env に置く。正本＝App\Support\SfClient / SfPull。
+    //  url           … 会社のSFのURL（https://〜.my.salesforce.com）。「SFの商談を開く」リンクにも使う。
+    //  client_id / client_secret … SFの外部クライアントアプリ（接続アプリ）が出す鍵。連携専用ユーザー（見るだけ）で動く。
+    //  from_date     … この開催日以降の商談だけ読む（2月分から始める＝2027-02-01）。
+    // ⚠ 3つ（url・client_id・client_secret）がそろうまでは、自動の読み取りは何もしない。
+    'salesforce' => [
+        'url' => env('SF_URL', ''),
+        'client_id' => env('SF_CLIENT_ID', ''),
+        'client_secret' => env('SF_CLIENT_SECRET', ''),
+        'api_version' => env('SF_API_VERSION', 'v62.0'),
+        'from_date' => env('SF_FROM_DATE', '2027-02-01'),
+    ],
+
     // チャットワーク。token は「鍵」なのでコードに書かず .env の CHATWORK_TOKEN に置く。
     //
     // ⚠ 部屋の既定値は**持たない**（2026-09-15 に消した）。

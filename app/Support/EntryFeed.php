@@ -86,8 +86,9 @@ class EntryFeed
         // ⚠ 2026-10-07 baba要望：**見ている拠点のスタッフの応募だけ**を出す（エントリー一覧の案件タブと同じ決まり）。
         //   他拠点にヘルプを頼むと、その拠点のスタッフの応募がこちらに混ざっていた。
         //   すでにその案件に入っている人は他拠点でも残す。全拠点で見ているときは全員。正本＝OfficeScope::personIn。
+        //   例外（2026-11-20）：東北の案件を東北で見ているときは東京のスタッフの応募も出す（正本 StaffOfficeReach::applicantShown）。
         $apps = $apps->filter(fn (Application $a) => $assigned->has($a->project_id . '|' . $a->staff_id)
-            || OfficeScope::personIn($people->get($a->staff_id), $office))->values();
+            || StaffOfficeReach::applicantShown($people->get($a->staff_id), $office, $projects->get($a->project_id)))->values();
         if ($apps->isEmpty()) {
             return self::pack(collect());
         }

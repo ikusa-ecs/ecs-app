@@ -36,8 +36,11 @@ class ProjectContentNameTest extends TestCase
 
     private function projectCase(string $projectId): ?array
     {
+        // 案件一覧は1か月ずつ見る形になった（2026-10-28）ので、その案件の開催月を指定して開く。
+        $ym = \Illuminate\Support\Carbon::parse(\App\Models\Project::findOrFail($projectId)->start_date)->format('Y-m');
+
         return collect(
-            $this->actingAsPerson($this->employee())->get('/projects')->assertOk()->original->getData()['cases']
+            $this->actingAsPerson($this->employee())->get('/projects?ym='.$ym)->assertOk()->original->getData()['cases']
         )->firstWhere('id', $projectId);
     }
 

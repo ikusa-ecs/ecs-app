@@ -101,14 +101,14 @@ final class StaffProjectNews
         //      ⚠ 拠点が空の人は東京あつかい（名簿・案件と同じ決まり）。
         $office = trim((string) ($person->office ?? '')) ?: OfficeScope::DEFAULT_OFFICE;
 
-        $open = OfficeScope::applyToProjects(
-            // ⚠ 公開は拠点ごと（2026-09-30）＝自分の拠点で公開された案件だけ（正本＝OfficePublish）。
-            OfficePublish::scopePublishedFor(Project::query(), $office)
-                ->whereNotNull('start_date')
-                ->whereDate('start_date', '>=', $today->format('Y-m-d'))
-                ->notCancelled()->needsAssign(),
-            $office
-        )->pluck('id');
+        // ⚠ 公開は拠点ごと（2026-09-30）＝自分の拠点で公開された案件だけ（正本＝OfficePublish）。
+        // ＋東北の案件は東北で公開中なら東京のスタッフにも出す（2026-11-20）。募集中タブと同じ正本 StaffOfficeReach を通す
+        //   （ここだけ別の式にすると、募集タブに出ている東北の案件の変更がお知らせに出ない）。
+        $open = StaffOfficeReach::scopeVisibleToStaff(Project::query(), $office)
+            ->whereNotNull('start_date')
+            ->whereDate('start_date', '>=', $today->format('Y-m-d'))
+            ->notCancelled()->needsAssign()
+            ->pluck('id');
 
         $ids = $mine->merge($open)->unique()->values();
         if ($ids->isEmpty()) {

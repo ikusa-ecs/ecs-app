@@ -168,7 +168,7 @@ class SfIntegrationTest extends TestCase
     public function test_受信箱に入っても見ても案件は増えない(): void
     {
         SfInboxSample::seed();
-        $this->actingAsPerson($this->manager())->get('/sf-inbox')
+        $this->actingAsPerson($this->manager())->get('/sf-inbox?office=all')
             ->assertOk()->assertSee('案件として登録')->assertSee('見本')->assertSee('要確認')
             ->assertSee('複数日です');
 

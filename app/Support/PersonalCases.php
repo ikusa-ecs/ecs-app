@@ -137,6 +137,8 @@ class PersonalCases
             'fmt' => $fmt,
             // リストのバッジ用（大型・前泊・予備日・リハ）
             'scale' => $p->scale ?? '',
+            // 確度（Aヨミ・Bヨミ・Cヨミ）。マイページの「営業担当の案件」に印で出す（2026-11-20 小沼さん）。確定と空は印を出さないので '' にそろえる。
+            'yomi' => in_array(trim((string) $p->yomi), ['', '確定'], true) ? '' : trim((string) $p->yomi),
             'lodging' => $p->lodging ?? '',
             // 前泊の集合時間（2026-11-02）。Googleカレンダーの前泊の予定のメモに入れる。
             'stayPreMeet' => (string) ($p->stay_pre_meet_time ?? ''),

@@ -63,6 +63,13 @@
     .m-move button { padding: 4px 9px; font-size: 13px; line-height: 1; }
     .m-move button[disabled] { opacity: .35; cursor: default; }
     .m-id { font-size: 12px; color: #8a7a66; font-weight: 700; }
+    /* SFの商品（2026-11-20 小沼さん）。ふだんは畳んでおき、IDの横の「▼」で行の下に開く。
+       行は格子（grid）なので、開いた中身は1列目〜最後の列までぶち抜きで出す。 */
+    .m-sf-btn { margin-left: 3px; padding: 0 4px; font-size: 10px; line-height: 1.6; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; }
+    .m-sf { grid-column: 1 / -1; margin: 0 0 2px 112px; padding: 6px 10px; font-size: 12px; background: var(--surface-2, #f7f1e6); border-radius: 7px; }
+    .m-sf .m-sf-t { font-weight: 700; color: var(--muted); margin-right: 6px; }
+    .m-sf ul { margin: 2px 0 0; padding-left: 18px; }
+    .m-sf code { font-size: 11.5px; color: var(--muted); margin-left: 8px; user-select: all; }
     .m-row input[type=text], .m-row input[type=number] {
       padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px;
       font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box; background: #fff;
@@ -163,7 +170,12 @@
               <span class="m-used" title="削除は Administrator のみ">—</span>
             @endif
           </div>
-          <span class="m-id">{{ $c->id }}</span>
+          {{-- IDの横の「▼」＝つながっているSFの商品を行の下に開く（2026-11-20 小沼さん）。
+               常に出すとじゃまなので畳んでおく。SFの商品が無いコンテンツには▼を出さない（押しても空なので）。
+               type="button" ＝フォームの中なので、付けないと押したとき「すべて保存」が走ってしまう。 --}}
+          <span class="m-id">{{ $c->id }}@if ($sfProductsByContent->has($c->id))<button type="button" class="m-sf-btn" aria-expanded="false"
+                  title="つながっているSalesforceの商品（{{ $sfProductsByContent[$c->id]->count() }}件）を見る"
+                  onclick="var p=this.closest('.m-row').querySelector('.m-sf');p.hidden=!p.hidden;this.textContent=p.hidden?'▼':'▲';this.setAttribute('aria-expanded',p.hidden?'false':'true');">▼</button>@endif</span>
           <input type="text" name="rows[{{ $c->id }}][content_name]" value="{{ $c->content_name }}" required>
           {{-- 略称（2026-08-27 baba要望）。カレンダーの予定名などで正式名のかわりに使う。
                空でよい＝空のときは正式名を使う。 --}}
@@ -197,6 +209,18 @@
                     formnovalidate onclick="return confirm('「{{ $c->content_name }}」を削除しますか？')">削除</button>
             @endif
           </div>
+          {{-- ▼で開く中身＝SFの商品名と18桁の番号。2つ以上つながっていれば全部並べる。
+               ECSの番号（CT-001 など）はそのまま＝ここは見るだけ。 --}}
+          @if ($sfProductsByContent->has($c->id))
+            <div class="m-sf" hidden>
+              <span class="m-sf-t">Salesforceの商品（{{ $sfProductsByContent[$c->id]->count() }}件）</span>
+              <ul>
+                @foreach ($sfProductsByContent[$c->id] as $sp)
+                  <li>{{ $sp->name }}<code>{{ $sp->sf_product_id }}</code></li>
+                @endforeach
+              </ul>
+            </div>
+          @endif
         </div>
       @endforeach
       @endforeach

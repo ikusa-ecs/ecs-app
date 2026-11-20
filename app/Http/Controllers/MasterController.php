@@ -64,6 +64,15 @@ class MasterController extends Controller
             'usedCounts' => $this->contentUsageCounts(),
             // まとめて削除を出すか＝Administrator のみ（1件ずつの削除と同じ線引き）。
             'canDelete' => optional(Auth::user())->permission === 'admin',
+            // コンテンツID => つながっているSFの商品（商品名・18桁の番号）の一覧（2026-11-20 小沼さん）。
+            // 一覧の行の「▼」で開いたときだけ見せる。行ごとに引くと件数ぶんDBを読むので、ここで1回にまとめて引く。
+            // 「つながっている」＝扱いが「コンテンツ」で content_id が入っているもの（無視・未対応は出さない）。
+            'sfProductsByContent' => \App\Models\SfProduct::query()
+                ->where('handling', \App\Models\SfProduct::CONTENT)
+                ->whereNotNull('content_id')
+                ->orderBy('name')
+                ->get(['content_id', 'name', 'sf_product_id'])
+                ->groupBy('content_id'),
         ]);
     }
 

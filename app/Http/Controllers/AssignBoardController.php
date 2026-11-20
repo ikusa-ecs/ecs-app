@@ -31,6 +31,7 @@ use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ProjectSeries;
 use App\Support\ShiftWish;
+use App\Support\StaffOfficeReach;
 use App\Support\ShareTags;
 use App\Support\StayDayCheck;
 use App\Support\RecruitStatus;
@@ -697,10 +698,11 @@ class AssignBoardController extends Controller
             // 応募者（applications → 希望者カラム用 {name, lv, pos}）。cal は画面側で当日の稼働可と突合。
             // 見ている拠点の応募者だけ（2026-11-02 小沼さん「ヘルプで複数拠点に募集しても、自拠点の箇所には自拠点だけ」）。
             // ⚠ すでにこの案件に入っている人は他拠点でも残す（エントリー一覧と同じ決まり・正本 OfficeScope::personIn）。
+            // ＋東北の案件を東北で見ているときは、東京のスタッフの応募も出す（2026-11-20・正本 StaffOfficeReach::applicantShown）。
             $memberIds = ($assignedByProject->get($p->id) ?? collect())->pluck('staff_id')->all();
             $applicants = ($appsByProject->get($p->id) ?? collect())
                 ->unique('staff_id')
-                ->filter(fn ($a) => in_array($a->staff_id, $memberIds, true) || OfficeScope::personIn($people->get($a->staff_id), $office))
+                ->filter(fn ($a) => in_array($a->staff_id, $memberIds, true) || StaffOfficeReach::applicantShown($people->get($a->staff_id), $office, $p))
                 ->values()
                 ->map(function ($a) use ($people) {
                     $sid = $a->staff_id;
@@ -1044,7 +1046,7 @@ class AssignBoardController extends Controller
             $p = $projects->get($a->project_id);
             $person = $people->get($a->staff_id);
             $mine = $asg->get($a->project_id)?->get($a->staff_id);
-            if (! $p || (! $mine && ! OfficeScope::personIn($person, $office))) {
+            if (! $p || (! $mine && ! StaffOfficeReach::applicantShown($person, $office, $p))) {
                 continue;   // 画面と同じ＝他拠点のスタッフの応募は出さない（入っている人は出す）
             }
             $d = $p->start_date;
@@ -1100,6 +1102,8 @@ class AssignBoardController extends Controller
         //   向こうのスタッフは、向こうの拠点で見たときに出る（案件はヘルプで向こうの一覧にも出ている）。
         //   ※ すでにこの案件に入っている人は、他拠点でも出す（誰が入っているか分からなくなるため）。
         //   ※ 全拠点で見ているときは全員出す。拠点の見分けの正本＝OfficeScope::personIn。
+        //   ※ 例外（2026-11-20）：東北の案件を東北で見ているときは、東京のスタッフの応募も出す
+        //     （東北の案件は東京のスタッフにも募集を出すため・正本 StaffOfficeReach::applicantShown）。
         $projects = $this->entriesProjects($office);
 
         if ($projects->isEmpty()) {
@@ -1228,7 +1232,7 @@ class AssignBoardController extends Controller
                 ->pluck('staff_id')->unique()
                 // 見ている拠点のスタッフだけ（すでにこの案件に入っている人は他拠点でも残す）。
                 ->filter(fn ($sid) => in_array($sid, $assignedIds, true)
-                    || OfficeScope::personIn($people->get($sid), $office))
+                    || StaffOfficeReach::applicantShown($people->get($sid), $office, $p))
                 ->values()
                 ->map(function ($sid, $i) use ($people, $assignedIds, $assignedStatus, $entryNotes, $remarks, $wishByKey, $p, $seriesOn, $prevIds) {
                     $person = $people->get($sid);
@@ -1409,7 +1413,7 @@ class AssignBoardController extends Controller
             $assignedIds = $assignedByProject->get($p->id, []);
             // 応募者は見ている拠点の人だけ（すでにこの案件に入っている人は他拠点でも残す）。
             $applicantIds = array_values(array_filter($appsByProject->get($p->id, []),
-                fn ($sid) => in_array($sid, $assignedIds, true) || OfficeScope::personIn($people->get($sid), $office)));
+                fn ($sid) => in_array($sid, $assignedIds, true) || StaffOfficeReach::applicantShown($people->get($sid), $office, $p)));
             $entryNotes = $entryNoteByProject->get($p->id, []);
             $assignInfo = $assignInfoByProject->get($p->id, []);
             $off = $this->offDays($p->start_date ?? $today, $today);

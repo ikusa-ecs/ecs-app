@@ -22,6 +22,7 @@ use App\Support\OfficeScope;
 use App\Support\ProjectAccess;
 use App\Support\ProjectContentName;
 use App\Support\ProjectSeries;
+use App\Support\StaffOfficeReach;
 use App\Support\StayDayCheck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -164,7 +165,15 @@ class AssignmentController extends Controller
 
         // スタッフ名簿。区分・できる役割・NG・この日の希望＋「おすすめ度（点数・理由）」も一緒に。
         // 並びは「おすすめ順（点数の高い順）」。NG該当（この日NG・NGペア同席）は末尾へ回す。
-        $staff = OfficeScope::applyToPeople(Person::staff(), $officeScope, $assignedIds)
+        // ＋東北の案件を東北で見ているときは、エントリーした東京のスタッフも名簿に出す（2026-11-20 小沼さん決定）。
+        //   東北の案件は東京のスタッフにも募集を出すので、その応募者を東北の担当が候補にできるように。
+        //   出してよいかの判定はエントリー一覧と同じ正本（StaffOfficeReach::applicantShown）。
+        $reachEntrantIds = $entries
+            ? Person::whereIn('id', array_keys($entries))->get(['id', 'office'])
+                ->filter(fn (Person $x) => StaffOfficeReach::applicantShown($x, $officeScope, $project))
+                ->pluck('id')->all()
+            : [];
+        $staff = OfficeScope::applyToPeople(Person::staff(), $officeScope, array_merge($assignedIds, $reachEntrantIds))
             // 退職した人は候補に出さない。この案件に入っている人は残す（2026-10-16 baba決定・正本＝Person::inService）。
             ->inService($assignedIds)
             ->with(['roleEligibilities', 'ngRelations'])

@@ -39,6 +39,7 @@
   .si-warn ul { margin: 0; padding-left: 18px; }
   .si-ops { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
   .si-ops select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+  .si-group { font-size: 14px; font-weight: 700; color: var(--ink); margin: 18px 0 8px; }
   .si-empty { font-size: 13px; color: var(--muted); line-height: 1.9; }
 </style>
 @endpush
@@ -64,23 +65,37 @@
     </div>
   @endif
 
+  {{-- 拠点の切替（2026-11-20）。はじめは自分の拠点。拠点が分からない商談は、どの拠点を選んでも上にまとめて出る。 --}}
+  @include('partials.office_switch')
+
   <div class="si-tabs">
     @foreach (['waiting' => '取り込み待ち', 'registered' => '登録ずみ', 'skipped' => '見送り', 'all' => 'ぜんぶ'] as $key => $label)
-      <a class="{{ $show === $key ? 'on' : '' }}" href="/sf-inbox?show={{ $key }}">{{ $label }}（{{ $counts[$key] }}）</a>
+      {{-- ⚠ タブを押しても見ている拠点が変わらないように office を付ける（全拠点は all）。 --}}
+      <a class="{{ $show === $key ? 'on' : '' }}" href="/sf-inbox?show={{ $key }}&amp;office={{ urlencode($officeParam) }}">{{ $label }}（{{ $counts[$key] }}）</a>
     @endforeach
   </div>
 
-  @if ($rows->isEmpty())
+  @if ($rows->isEmpty() && $unknownRows->isEmpty())
     <div class="si-card"><p class="si-empty">ここに出す商談はありません。</p></div>
   @endif
 
-  @foreach ($rows as $row)
+  {{-- 拠点が分からない商談を先に、そのあと選んだ拠点の商談。 --}}
+  @foreach ([['rows' => $unknownRows, 'unknown' => true], ['rows' => $rows, 'unknown' => false]] as $group)
+  @if ($group['rows']->isNotEmpty())
+    @if ($group['unknown'])
+      <h3 class="si-group">拠点が分からない商談（{{ $group['rows']->count() }}件）<span class="si-sub">　Salesforceの担当拠点が空欄・読めない商談です。どの拠点を選んでいてもここに出ます。登録するときに拠点を選んでください。</span></h3>
+    @else
+      <h3 class="si-group">{{ $officeScope ?? '全拠点' }}の商談（{{ $group['rows']->count() }}件）</h3>
+    @endif
+  @endif
+  @foreach ($group['rows'] as $row)
     @php($item = $row['item'])
     @php($p = $row['p'])
     <div class="si-card">
       <div class="si-head">
         <span class="si-badge {{ $item->status }}">{{ \App\Models\SfInboxItem::LABELS[$item->status] ?? $item->status }}</span>
         @if ($item->is_sample)<span class="si-badge sample">見本</span>@endif
+        @include('partials.sf_yomi_badge', ['yomi' => $p['yomi'] ?? null])
         <span class="si-title">{{ $p['sf_name'] ?? '（商談名なし）' }}</span>
         <span class="si-sub">商談Id {{ $item->sf_opportunity_id }}／受け取り {{ optional($item->received_at)->format('Y-m-d H:i') ?? '—' }}@if ($p && $p['stage'])／フェーズ {{ $p['stage'] }}@endif</span>
       </div>
@@ -121,16 +136,22 @@
               <span class="si-dim">なし</span>
             @endif
           </td></tr>
+          <tr><th>会場</th><td>{{ $p['location'] ?? '—' }}</td></tr>
           <tr><th>その他</th><td class="si-sub">
-            規模 {{ $p['scale'] ?? '—' }}／実施形態 {{ $p['format'] ?? '—' }}／会場 {{ $p['location'] ?? '—' }}／営業 {{ $p['sales_owner'] ?? ($p['owner_email'] ?? '—') }}@if ($p['yomi'])／確度 {{ $p['yomi'] }}@endif
+            営業 {{ $p['sales_owner'] ?? ($p['owner_email'] ?? '—') }}@if ($p['yomi'])／確度 {{ $p['yomi'] }}@endif
           </td></tr>
+          {{-- 時間（いつも出す）と残りの項目（ぜんぶ見る）は、マイページと同じ部品で出す（2026-11-20）。 --}}
+          @include('partials.sf_opp_more', ['p' => $p])
         </table>
       @endif
 
       <div class="si-ops">
         @if ($item->status === 'waiting')
-          <form method="POST" action="/sf-inbox/{{ $item->id }}/register" class="si-ops" onsubmit="return confirm('この商談をECSの案件として登録します。よろしいですか？');">
+          {{-- 確認はボタンのその場で出す（partials/sf_inbox_js）。押したあとは押す前の縦の位置に戻す（data-sfx-keep-scroll）。 --}}
+          <form method="POST" action="/sf-inbox/{{ $item->id }}/register" class="si-ops" data-sfx-keep-scroll>
             @csrf
+            {{-- 押したあと、見ていたタブと拠点に戻すため（拠点の値はサーバー側で確かめ直す）。 --}}
+            <input type="hidden" name="show" value="{{ $show }}"><input type="hidden" name="view_office" value="{{ $officeParam }}">
             <label>拠点
               <select name="office" @if (! ($p['office'] ?? null)) required @endif>
                 @if (! ($p['office'] ?? null))<option value="">選んでください</option>@endif
@@ -139,15 +160,22 @@
                 @endforeach
               </select>
             </label>
-            <button class="btn sm primary" type="submit">案件として登録</button>
+            <span class="sfx-confirm">
+              <button class="btn sm primary" type="submit" data-sfx-ask>案件として登録</button>
+              <span class="sfx-ask" hidden>登録しますか？ <button class="btn sm primary" type="submit" data-sfx-yes>はい</button><button class="btn sm" type="button" data-sfx-no>やめる</button></span>
+            </span>
           </form>
-          <form method="POST" action="/sf-inbox/{{ $item->id }}/skip">
+          <form method="POST" action="/sf-inbox/{{ $item->id }}/skip" data-sfx-keep-scroll>
             @csrf
+            {{-- 押したあと、見ていたタブと拠点に戻すため（拠点の値はサーバー側で確かめ直す）。 --}}
+            <input type="hidden" name="show" value="{{ $show }}"><input type="hidden" name="view_office" value="{{ $officeParam }}">
             <button class="btn sm" type="submit">見送り</button>
           </form>
         @elseif ($item->status === 'skipped')
-          <form method="POST" action="/sf-inbox/{{ $item->id }}/reopen">
+          <form method="POST" action="/sf-inbox/{{ $item->id }}/reopen" data-sfx-keep-scroll>
             @csrf
+            {{-- 押したあと、見ていたタブと拠点に戻すため（拠点の値はサーバー側で確かめ直す）。 --}}
+            <input type="hidden" name="show" value="{{ $show }}"><input type="hidden" name="view_office" value="{{ $officeParam }}">
             <button class="btn sm" type="submit">取り込み待ちに戻す</button>
           </form>
         @elseif ($item->status === 'registered' && $item->project_id)
@@ -156,5 +184,8 @@
       </div>
     </div>
   @endforeach
+  @endforeach
 </div>
+{{-- ぜんぶ見る・その場の確認・押したあと元の位置に戻す（マイページと同じ部品）。 --}}
+@include('partials.sf_inbox_js', ['scrollKey' => 'ecs_sf_inbox_scroll'])
 @endsection

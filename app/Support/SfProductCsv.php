@@ -23,6 +23,22 @@ final class SfProductCsv
         return database_path('data/sf_products_205.csv');
     }
 
+    /** 日本語見出し → 従来の見出し。 */
+    private const HEADER_ALIASES = [
+        '商品ファミリー' => 'Family',
+        '商品名' => 'Name',
+        '商品ID18桁' => 'Id',
+        '有効(商品)' => 'IsActive',
+    ];
+
+    /** 見出し1つを整える（前後の空白・BOM・全角かっこを除いて、別名なら従来の名前に）。 */
+    private static function normalizeHeader(string $h): string
+    {
+        $h = trim(str_replace(['（', '）'], ['(', ')'], preg_replace('/^﻿/', '', $h)));
+
+        return self::HEADER_ALIASES[$h] ?? $h;
+    }
+
     /**
      * CSVの本文を取り込む。
      *
@@ -41,7 +57,9 @@ final class SfProductCsv
         }
 
         // 見出し → 列の位置（並びが変わっても読めるように名前で探す）
-        $header = array_map(fn ($h) => trim((string) $h), array_shift($rows));
+        // SFの「商品」レポートを日本語見出しのまま出したCSV（2026-11-20）も読めるよう、従来の英語見出しに読み替える。
+        // なぜ：画面から落としたCSVを手で直さず、そのまま取り込めるようにするため。従来の見出しはそのまま通る。
+        $header = array_map(fn ($h) => self::normalizeHeader((string) $h), array_shift($rows));
         $col = array_flip($header);
         foreach (['Id', 'Name'] as $need) {
             if (! isset($col[$need])) {
@@ -51,7 +69,9 @@ final class SfProductCsv
         // 最終列＝「コンテンツ以外の可能性」。見出しの名前は長いので、Id〜IsActive 以外の最後の列とみなす。
         $hintCol = null;
         $lastIndex = count($header) - 1;
-        if ($lastIndex >= 0 && ! in_array($header[$lastIndex], ['Id', 'Name', 'ProductCode', 'Family', 'IsActive'], true)) {
+        // 日本語見出しのCSVは作成日・更新者の列が並ぶだけで「候補メモ」の列は無いので、hintには写さない（更新者名が候補になってしまうため）。
+        $isJpFormat = isset($col['商品: 作成日']) || isset($col['商品: 最終更新者(別名)']);
+        if (! $isJpFormat && $lastIndex >= 0 && ! in_array($header[$lastIndex], ['Id', 'Name', 'ProductCode', 'Family', 'IsActive'], true)) {
             $hintCol = $lastIndex;
         }
 
@@ -81,7 +101,7 @@ final class SfProductCsv
             $values = [
                 'name' => $name,
                 'family' => $get($row, $col['Family'] ?? null) ?: null,
-                'is_active' => $active === '' ? true : in_array($active, ['TRUE', '1', 'YES'], true),
+                'is_active' => $active === '' ? true : in_array($active, ['TRUE', '1', 'YES', '有効'], true),
                 'hint' => $get($row, $hintCol) ?: null,
             ];
 

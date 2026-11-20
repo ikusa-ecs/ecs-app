@@ -325,6 +325,16 @@
 @elseif(!empty($editProject))
 <div class="mock-note" style="background:#eef6ff;border-color:#bcd8f0;color:#1d4ed8;">
   ✎ 既存案件「{{ $editProject['id'] }}」を編集しています。内容を直して「確定」を押すと、この案件に上書き保存されます。
+  {{-- SFから登録した案件だけ、SFの商談へのボタン＋どの商談から来たかの一文（2026-11-20 小沼さん：目立たせる）。
+       URL・商談名は App\Support\SfOpportunityLink で作る。つなぎ先（URL）が未設定なら、ボタンだけ出さない。 --}}
+  @if (!empty($sfOpportunity))
+    <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+      @if (!empty($sfOpportunity['url']))
+        <a href="{{ $sfOpportunity['url'] }}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:6px 14px; border:2px solid #1d4ed8; border-radius:8px; background:#fff; color:#1d4ed8; font-weight:700; text-decoration:none;">🔗 Salesforceの商談を開く</a>
+      @endif
+      <span>この案件はSalesforceの商談『{{ $sfOpportunity['name'] ?? '（商談名なし）' }}』から登録しました</span>
+    </div>
+  @endif
   {{-- 案件のキャンセル（2026-11-11 小沼さん要望）。ほかの画面から案件を開くとここに来るので、ここで完結させる。
        保存先は案件一覧の「✖ キャンセル」と同じ POST /projects/cancel（拠点チェック・編集履歴もそちらと同じ）。 --}}
   <div style="margin-top:6px;">
@@ -715,6 +725,8 @@
                   <label><input type="radio" name="onlineTool" value="webex"> webex</label>
                   <label><input type="radio" name="onlineTool" value="meet"> meet</label>
                   <label><input type="radio" name="onlineTool" value="rebako"> rebako</label>
+                  <!-- remo（2026-11-20 小沼さん）：SFの選択肢にあってECSに無かったため足した。SFからの取込の変換表（SfOpportunityMap）と同じ綴り。 -->
+                  <label><input type="radio" name="onlineTool" value="remo"> remo</label>
                 </div>
               </div>
             </div>

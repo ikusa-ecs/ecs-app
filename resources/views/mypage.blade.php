@@ -480,6 +480,12 @@
       <div class="panel mp-wrap" style="margin-top:12px;">
         <div class="panel-head"><h2>営業担当の案件</h2></div>
         <p class="sec-count">自分が営業担当（セールス）として登録した案件です。<span id="salCount"></span></p>
+@endverbatim
+{{-- SFから届いた自分あての商談（2026-11-20）。営業担当の案件の見出しのすぐ下・一覧の上に出す。
+     ここだけ「verbatim区間」をいったん閉じている（区間の中だと Blade が動かないため）。前後で区間を閉じ・開き直している。
+     ⚠ このコメントにアットマーク付きで verbatim と書かない（コメントの中でも区間の始まりと読まれて画面が消える）。 --}}
+@include('partials.sf_my_inbox')
+@verbatim
 
         <table class="tbl">
           <thead>
@@ -915,6 +921,12 @@
   function caseTags(c) {
     let t = '';
     if (c.scale === '大型') t += '<span class="mtag big">大型</span>';
+    // 確度（Aヨミ・Bヨミ・Cヨミ）。まだ確定していない案件だと分かるように出す。確定は出さない（2026-11-20 小沼さん）。
+    // 色は文字と面を決め打ち（どの画面の色でも読めるように）。SFの商談の印と同じ色。
+    if (c.yomi) {
+      const yc = { 'Aヨミ': ['#dbeafe', '#1e40af'], 'Bヨミ': ['#fef3c7', '#92400e'], 'Cヨミ': ['#e5e7eb', '#374151'] }[c.yomi] || ['#e5e7eb', '#374151'];
+      t += '<span class="mtag" style="background:' + yc[0] + '; color:' + yc[1] + ';">' + String(c.yomi).replace(/[&<>"]/g, '') + '</span>';
+    }
     // ⚠ 2026-09-15 に直した：以前は 'リハ' と比べていたが、保存される値は 'リハ日' なので
     //   リハの印が一度も出ていなかった。本番以外はそのまま印を出す形にして、
     //   種別を増やしてもここを直さなくてよいようにした（前日設営を足したため）。
@@ -976,7 +988,8 @@
   function salRow(c) {
     return '<tr class="' + rowClass(c).trim() + '">' +
       '<td>' + fmtDate(c.off) + '</td>' +
-      '<td><strong>' + c.name + '</strong>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
+      // 案件名を押すと編集画面へ（2026-11-20 小沼さん）。収支入力は右のボタンのまま。
+      '<td><a href="/project-form?project=' + encodeURIComponent(c.id) + '" title="この案件の編集画面を開きます"><strong>' + c.name + '</strong></a>' + caseTags(c) + '<br><span class="sub-loc">' + c.client + '</span>' + lodgingTag(c) + '</td>' +
       '<td>' + (c.dir || '—') + '</td>' +
       '<td>' + (c.meet || '—') + '〜' + (c.leave || '—') + '</td>' +
       '<td>' + (c.placeShort || '—') + '</td>' +

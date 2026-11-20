@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\GoogleCalendarLink;
 use App\Support\GoogleCalendarSync;
+use App\Support\OfficeScope;
 use App\Support\PersonalCases;
+use App\Support\SfInboxOwner;
+use App\Support\SfOffice;
+use App\Support\SfOpportunityMap;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -38,6 +42,8 @@ class MyPageController extends Controller
             'deadline' => (bool) ($saved['deadline'] ?? false),
         ];
 
+        $sfOffices = OfficeScope::options() ?: SfOffice::ECS_OFFICES;
+
         return view('mypage', [
             'me' => PersonalCases::meInfo($me),
             'cases' => PersonalCases::cases($today, $me),
@@ -50,7 +56,41 @@ class MyPageController extends Controller
                 'email' => $me ? (string) (GoogleCalendarLink::find($me->id)->google_email ?? '') : '',
                 'syncedAt' => $me ? optional(GoogleCalendarLink::find($me->id)?->synced_at)->format('n/j H:i') : null,
             ],
+            // 自分が担当営業の、SFから届いた「取り込み待ち」の商談（2026-11-20）。本人が見て登録／見送りを押す。
+            'sfMine' => $this->sfMine($me),
+            // 本人が見送った商談（マイページから戻せるように・2026-11-20 小沼さん）。
+            'sfSkipped' => $me ? SfInboxOwner::skippedFor($me)->map(fn ($item) => [
+                'item' => $item,
+                'name' => (string) (SfOpportunityMap::get($item->payload ?? [], SfOpportunityMap::F_NAME) ?? '（商談名なし）'),
+                'date' => SfOpportunityMap::get($item->payload ?? [], SfOpportunityMap::F_DATE),
+            ])->all() : [],
+            'sfOffices' => $sfOffices,
+            // 登録フォームの拠点のはじめの値＝押す本人の拠点（2026-11-20 小沼さん）。SFの担当拠点は表に参考として出すだけ。
+            // 本人の拠点が選択肢に無い／空なら null＝「選んでください」＋必須（推測で東京などに入れない）。
+            'sfMyOffice' => ($me && in_array(trim((string) $me->office), $sfOffices, true)) ? trim((string) $me->office) : null,
         ]);
+    }
+
+    /**
+     * 自分あての取り込み待ちの商談と、その下見（受信箱と同じ SfOpportunityMap::preview）。
+     * ⚠ どのヨミ（確度）も自動では登録しない＝ここは並べるだけ。登録は本人が押したときだけ。
+     * ⚠ 1件の中身が壊れていても、マイページ全体は止めない。
+     */
+    private function sfMine($me): array
+    {
+        if (! $me) {
+            return [];
+        }
+
+        return SfInboxOwner::waitingFor($me)->map(function ($item) {
+            try {
+                $p = SfOpportunityMap::preview($item->payload ?? []);
+            } catch (\Throwable $e) {
+                $p = null;
+            }
+
+            return ['item' => $item, 'p' => $p];
+        })->all();
     }
 
     /**

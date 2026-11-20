@@ -65,17 +65,18 @@ class IkusaCountTest extends TestCase
         $this->assertSame(4, $p->ikusa_count_min, '少ないほう');
     }
 
-    /** 確定で保存するときは必須（2026-09-18 baba「マストで」）。 */
-    public function test_publish_requires_the_ikusa_count(): void
+    /** 確定で保存するときも、運営人数（IKUSA）は空でよい（2026-10-26 に必須から外した。9/18 の「マストで」はここで変わった）。 */
+    public function test_publish_does_not_require_the_ikusa_count(): void
     {
         $this->actingAsPerson($this->manager())->post('/project-form', [
             'content_names'  => '水合戦',
             'start_date'     => '2026-10-01',
             'required_count' => '16',
             'intent'         => 'publish',
-        ])->assertSessionHasErrors(['ikusa_count']);
+        ])->assertSessionHasNoErrors();
 
-        $this->assertSame(0, Project::count(), '不備があれば登録しない');
+        $p = Project::firstOrFail();
+        $this->assertNull($p->ikusa_count, '空のまま登録できる');
     }
 
     /** 「人数は仮（未定）」にチェックが入っていれば、2つとも空でも通る。 */

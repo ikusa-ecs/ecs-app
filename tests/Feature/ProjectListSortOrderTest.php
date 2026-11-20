@@ -42,7 +42,10 @@ class ProjectListSortOrderTest extends TestCase
         // 3日前に登録した、という状態にする。
         Project::where('id', $p->id)->update(['created_at' => Carbon::today()->copy()->subDays(3)]);
 
-        $this->open()->assertOk()->assertViewHas('cases', function ($cases) use ($p) {
+        // 案件一覧は1か月ずつ見る形になった（2026-10-28）ので、その案件の開催月を指定して開く。
+        $this->actingAsPerson(PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京']))
+            ->get('/projects?ym='.Carbon::today()->copy()->addDays(30)->format('Y-m'))
+            ->assertOk()->assertViewHas('cases', function ($cases) use ($p) {
             $c = collect($cases)->firstWhere('id', $p->id);
 
             return $c && ($c['added'] ?? null) === -3;

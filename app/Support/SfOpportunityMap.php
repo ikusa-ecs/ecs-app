@@ -88,8 +88,12 @@ final class SfOpportunityMap
         'webex' => 'webex',
         'meet' => 'meet',
         'rebako' => 'rebako',
+        'remo' => 'remo',
         '利用無し' => null,
     ];
+
+    /** 複数日の商談で、まとめて作る日数の上限。これを超えたら初日だけ作る（日数の打ち間違いで案件が大量にできないように）。 */
+    public const MAX_SERIES_DAYS = 14;
 
     private const LODGINGS = ['無', '前泊有', '一部前泊有', '後泊あり', '前後泊あり'];
 
@@ -226,8 +230,20 @@ final class SfOpportunityMap
         $office = SfOffice::toEcs($officeRaw);
 
         $days = self::int($payload, self::F_DAYS);
+        // 登録すると何日ぶんの案件を作るか（2026-11-20 小沼さん：複数日の商談は連日イベントとしてまとめて作る）。
+        // ⚠ 登録（SfInboxRegister）もこの数をそのまま使う＝下見の注意書きと、実際にできる案件の数が食い違わないように。
+        $seriesDays = 1;
         if ($days !== null && $days >= 2) {
-            $warnings[] = "複数日です（{$days}日間）。人が分けてください。登録すると初日の1件だけ作ります。参加人数は全日の合計の可能性があります。";
+            if ($date === null) {
+                // 初日が分からないと2日目からの日付も決められない（推測で日付を入れない）
+                $warnings[] = "複数日です（{$days}日間）。開催日が空なので、登録すると1件だけ作ります。開催日を入れてから、案件登録の「連日イベント」で2日目からを足してください。";
+            } elseif ($days > self::MAX_SERIES_DAYS) {
+                // 日数の打ち間違い（例：30日）で案件が大量にできる事故を防ぐ
+                $warnings[] = "複数日です（{$days}日間）。日数が多いので、安全のため登録すると初日の1件だけ作ります。2日目からは、登録後に案件登録の「連日イベント」で足してください。";
+            } else {
+                $seriesDays = $days;
+                $warnings[] = "複数日です（{$days}日間）。登録すると{$days}日ぶんの案件を連日イベントとして作ります。日付が連続していない・参加人数が全日の合計の場合は、登録後に直してください。";
+            }
         }
 
         $products = self::products($payload);
@@ -291,6 +307,7 @@ final class SfOpportunityMap
             'amount' => self::int($payload, self::F_AMOUNT),
             'date' => $date,
             'days' => $days,
+            'series_days' => $seriesDays,  // 登録で作る案件の数（初日＋連続した翌日…）
             'client_raw' => self::text($payload, self::F_ACCOUNT),
             'client' => ClientName::normalize(self::text($payload, self::F_ACCOUNT)),
             'agency' => self::text($payload, self::F_AGENCY),
@@ -301,6 +318,9 @@ final class SfOpportunityMap
             'scale' => in_array(self::text($payload, self::F_SCALE), ['小型', '中型', '大型'], true) ? self::text($payload, self::F_SCALE) : null,
             'format' => $format,
             'online_tool' => $tool,
+            'online_tool_raw' => $toolRaw,     // SFの値そのまま（画面の参考表示用）
+            // 案件に実際に入れるオンラインツール（実施形態がオンラインのときだけ）。下見と登録で同じ値を使う。
+            'online_tool_entered' => ($format !== null && str_contains($format, 'オンライン')) ? $tool : null,
             'location' => self::text($payload, self::F_VENUE),
             'team_count' => self::int($payload, self::F_TEAMS),
             'start_time' => self::text($payload, self::F_MEET),
@@ -335,12 +355,9 @@ final class SfOpportunityMap
         }
         $names = array_values(array_unique($names));
 
-        // 備考：SF側の備考＋どの商談から来たか（あとでSFを探せるように）
-        $noteLines = [];
-        if ($p['note'] !== null) {
-            $noteLines[] = $p['note'];
-        }
-        $noteLines[] = 'Salesforceの商談から登録：'.($p['sf_name'] ?? '').'（'.($p['sf_id'] ?? '').'）';
+        // 備考：SF側の備考（ECS_Note__c）だけ（2026-11-20 小沼さん）。
+        // ⚠ 以前は「Salesforceの商談から登録：商談名（商談Id）」も書いていたが、やめた。
+        //   どの商談から来たかは受信箱（sf_inbox_items.project_id）に残り、案件の編集画面に商談名とリンクが出るため。
 
         return [
             'project_name' => $names !== [] ? implode('・', $names) : '（コンテンツ未定）',
@@ -357,7 +374,7 @@ final class SfOpportunityMap
             'event_start_time' => $p['event_start_time'],
             'event_end_time' => $p['event_end_time'],
             'format' => $p['format'],
-            'online_tool' => ($p['format'] !== null && str_contains($p['format'], 'オンライン')) ? $p['online_tool'] : null,
+            'online_tool' => $p['online_tool_entered'],
             'location' => $p['location'],
             'lodging' => $p['lodging'],
             'is_outdoor' => $p['is_outdoor'],
@@ -366,7 +383,7 @@ final class SfOpportunityMap
             'required_count' => $p['staff_count'],
             // 運営人数がSFに無いときは「仮（未定）」の印を立てる＝人が決めたら直す
             'count_tentative' => $p['staff_count'] === null,
-            'note' => implode("\n", $noteLines),
+            'note' => $p['note'],
         ];
     }
 }

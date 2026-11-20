@@ -22,6 +22,9 @@ class ScheduledJobsTest extends TestCase
         'sheet-sync-watch',
         // 謎解きの紙が120部を切ったら1回だけ知らせる（2026-10-15 baba要望＝自動で送ってほしい）。
         'paper-stock-alert',
+        // SFの商談を読んで受信箱に入れるだけ（誰にも送信しない・案件も作らない）。2026-11-20 MTG決定＝ECSが5分おきに自動で読む。
+        'sf-pull',
+        'sf-pull-all',
     ];
 
     private function names(): array

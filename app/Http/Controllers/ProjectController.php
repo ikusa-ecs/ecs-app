@@ -576,6 +576,10 @@ class ProjectController extends Controller
 
         return view('project_form', [
             'editProject' => $editProject,
+            // SFから登録した案件なら、SFの商談の名前とURL（2026-11-20）。それ以外は null＝何も出さない。
+            // url はつなぎ先未設定なら null＝ボタンだけ出さない（「…から登録しました」の一文は出す）。
+            // ⚠ 複製で開いたとき（新しい案件になる）は出さない。
+            'sfOpportunity' => ($editProject && ! $copyFrom) ? \App\Support\SfOpportunityLink::forProjectInfo($editProject['id'] ?? null) : null,
             'dayLoad' => $dayLoad,
             'histories' => $histories,
             'historyTotal' => $historyTotal,

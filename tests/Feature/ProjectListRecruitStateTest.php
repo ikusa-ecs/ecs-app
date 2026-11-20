@@ -30,7 +30,7 @@ class ProjectListRecruitStateTest extends TestCase
     {
         ProjectFactory::new()->create([
             'project_name'    => '未公開の案件',
-            'start_date'      => '2026-09-10',
+            'start_date'      => now()->toDateString(),   // 一覧は今月ぶんだけ出る（2026-10-28）ので今日の日付で作る
             'office'          => '東京',
             'is_recruiting'   => true,
             'staff_published' => false,
@@ -44,7 +44,7 @@ class ProjectListRecruitStateTest extends TestCase
     {
         ProjectFactory::new()->create([
             'project_name'    => '公開ずみの案件',
-            'start_date'      => '2026-09-11',
+            'start_date'      => now()->toDateString(),   // 一覧は今月ぶんだけ出る（2026-10-28）ので今日の日付で作る
             'office'          => '東京',
             'is_recruiting'   => true,
             'staff_published' => true,
