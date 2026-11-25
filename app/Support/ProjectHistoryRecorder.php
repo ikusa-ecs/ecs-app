@@ -130,6 +130,18 @@ class ProjectHistoryRecorder
         self::write($project, 'updated', null, $old, $new, $label);
     }
 
+    /**
+     * アサインの変更を1行残す（2026-11-25）。呼ぶのは App\Support\AssignmentHistory だけ。
+     * field に目印（AssignmentHistory::FIELD）を入れて、「案件の情報」の履歴と見分けられるようにする。
+     */
+    public static function recordAssignment(Project $project, string $label, ?string $old, ?string $new): void
+    {
+        if (! self::available()) {
+            return;
+        }
+        self::write($project, 'updated', AssignmentHistory::FIELD, $old, $new, $label);
+    }
+
     /** 1行書き込む。誰が変えたかはログイン中の利用者から取る（不明なら空＝バッチ処理など）。 */
     private static function write(Project $project, string $action, ?string $field, ?string $old, ?string $new, ?string $label = null): void
     {
@@ -150,7 +162,7 @@ class ProjectHistoryRecorder
             'project_name' => $project->project_name,
             'action'       => $action,
             'field'        => $field,
-            'field_label'  => $field ? ProjectFieldLabels::label($field) : $label,
+            'field_label'  => $label ?? ($field ? ProjectFieldLabels::label($field) : null),
             'old_value'    => $old,
             'new_value'    => $new,
             'person_id'    => $me->id ?? null,

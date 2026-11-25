@@ -29,6 +29,15 @@
     .ph-bar select { max-width: none; }
     .ph-count { margin-left: 0; }
   }
+  /* ページの切替（案件の情報／アサイン・2026-11-25）。 */
+  .ph-tabs { display: flex; gap: 8px; margin: 0 0 16px; border-bottom: 2px solid var(--line, #e6dccf); }
+  .ph-tab {
+    text-decoration: none; font-size: 14px; font-weight: 700; color: var(--muted, #8a7a6b);
+    padding: 8px 16px; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  }
+  .ph-tab:hover { color: var(--ink, #2c2018); }
+  .ph-tab.active { color: var(--brand-ink, #8a5a33); border-bottom-color: var(--brand, #b5673a); }
+  .ph-tab .n { font-size: 12px; font-weight: 600; margin-left: 4px; }
 </style>
 @endverbatim
 @endpush
@@ -40,6 +49,18 @@
   案件登録画面・案件一覧・アサイン表・公開ボード・ディレクター決めのどこから変えても、ここに残ります。<br>
   ※ 見るだけの画面です。記録は消せません（消せると記録の意味が無くなるため）。
 </p>
+
+{{-- 拠点の切替（2026-11-25 小沼さん「拠点ごとに編集履歴もわかるように」）。管理者以上にだけ出る。 --}}
+@include('partials.office_switch')
+
+{{-- ページの切替：案件の情報が変わった記録／アサインの記録（2026-11-25 小沼さん）。
+     選んでいる案件・人・期間・拠点はそのまま持ち越す（ページ番号だけ1に戻す）。 --}}
+<div class="ph-tabs">
+  <a class="ph-tab {{ $kind === 'project' ? 'active' : '' }}"
+     href="{{ request()->fullUrlWithQuery(['kind' => null, 'page' => null]) }}">案件の情報<span class="n">{{ number_format($kindCounts['project']) }}</span></a>
+  <a class="ph-tab {{ $kind === 'assign' ? 'active' : '' }}"
+     href="{{ request()->fullUrlWithQuery(['kind' => 'assign', 'page' => null]) }}">アサイン<span class="n">{{ number_format($kindCounts['assign']) }}</span></a>
+</div>
 
 @if ($needsSetup)
   {{-- 履歴の保存先テーブルがまだ無いサーバー（`php artisan migrate` 未実行）。
@@ -55,6 +76,9 @@
 {{-- 絞り込み。選ぶとそのまま送信する（「表示」ボタンを押させない）。 --}}
 <div class="panel">
   <form method="get" action="/project-history" class="ph-bar">
+    {{-- 絞り込みを変えても、いまのページ（アサイン）と拠点を持ち越す。 --}}
+    @if ($kind === 'assign')<input type="hidden" name="kind" value="assign">@endif
+    @if (request()->filled('office'))<input type="hidden" name="office" value="{{ request()->query('office') }}">@endif
     <label for="ph-project">案件</label>
     <select name="project" id="ph-project" onchange="this.form.submit()">
       <option value="">すべての案件</option>
@@ -95,7 +119,7 @@
   @endif
 
   @if ($histories->isEmpty())
-    <p class="hist-empty">この条件に当てはまる記録はありません。期間を「すべて」にすると、もっと古いところまで見られます。</p>
+    <p class="hist-empty">この条件に当てはまる記録はありません。期間を「すべて」にすると、もっと古いところまで見られます。@if ($kind === 'assign')<br><small>※ アサインの記録は 2026年11月25日 の更新より後のぶんから残ります。</small>@endif</p>
   @else
     <ul class="hist-list">
       @foreach ($histories as $h)

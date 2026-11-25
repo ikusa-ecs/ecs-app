@@ -67,6 +67,11 @@ class Assignment extends Model
         };
         static::saved($mirror);
         static::deleted($mirror);
+
+        // 案件の編集履歴に「だれを入れた・外した・仮→確定」を残す（2026-11-25 小沼さん）。
+        // ここでは「新しく出来た行」を覚えるだけ。消す・書き換えるはDBへの命令を見張って拾い、
+        // 書くのは保存が終わったあと（正本＝App\Support\AssignmentHistory）。
+        static::created(fn (Assignment $a) => \App\Support\AssignmentHistory::noteCreated($a));
     }
 
     /** 確定だけを取り出すクエリスコープ（回数集計などに使う）。 */

@@ -45,6 +45,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\NoStoreWhenSignedIn::class,
             // 退職にした人は、ログイン中でもその場でログアウトさせる（2026-10-16 baba要望）。
             \App\Http\Middleware\LogoutRetired::class,
+            // アサインの変更を、保存が終わったところでまとめて編集履歴に書く（2026-11-25 小沼さん）。
+            \App\Http\Middleware\RecordAssignmentHistory::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

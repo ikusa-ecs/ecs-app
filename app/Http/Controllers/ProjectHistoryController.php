@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectHistory;
+use App\Support\AssignmentHistory;
 use App\Support\LineGroupText;
 use App\Support\OfficeScope;
 use App\Support\ProjectHistoryRecorder;
@@ -50,12 +51,16 @@ class ProjectHistoryController extends Controller
                 'projectOptions' => collect(),
                 'projectInfo'    => [],
                 'needsSetup'     => true,
+                'kind'           => 'project',
+                'kindCounts'     => ['project' => 0, 'assign' => 0],
             ]);
         }
 
         $projectId = trim((string) $request->query('project', ''));
         $personId  = trim((string) $request->query('person', ''));
         $period    = (string) $request->query('period', '30');
+        // どちらのページか（2026-11-25 小沼さん）：project＝案件の情報の変更／assign＝アサイン（入れた・外した・仮→確定）。
+        $kind      = $request->query('kind') === 'assign' ? 'assign' : 'project';
         if (! isset(self::PERIODS[$period])) {
             $period = '30';
         }
@@ -80,6 +85,17 @@ class ProjectHistoryController extends Controller
         if ($period !== 'all') {
             $query->where('created_at', '>=', Carbon::today()->subDays((int) $period));
         }
+
+        // ページごとの件数（タブに出す）。⚠ 分ける前に数える。
+        $kindCounts = [
+            'assign'  => (clone $query)->where('field', AssignmentHistory::FIELD)->count(),
+            'project' => (clone $query)->where(fn ($q) => $q->whereNull('field')->orWhere('field', '!=', AssignmentHistory::FIELD))->count(),
+        ];
+        // ⚠ field が空（新規登録・削除・エントリーの付け替え）は「案件の情報」の側に入れる。
+        //    `!=` だけだと空（NULL）の行が落ちるので、whereNull と並べる。
+        $kind === 'assign'
+            ? $query->where('field', AssignmentHistory::FIELD)
+            : $query->where(fn ($q) => $q->whereNull('field')->orWhere('field', '!=', AssignmentHistory::FIELD));
 
         $histories = $query->paginate(self::PER_PAGE)->withQueryString();
 
@@ -134,6 +150,8 @@ class ProjectHistoryController extends Controller
             'projectOptions' => $projectOptions,
             'projectInfo'    => $projectInfo,
             'needsSetup'     => false,
+            'kind'           => $kind,
+            'kindCounts'     => $kindCounts,
         ]);
     }
 
