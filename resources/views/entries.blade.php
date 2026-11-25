@@ -1192,7 +1192,7 @@
                    : (e.status === '仮' ? 'tmp'
                    : (e.wish === 'ng' ? 'ng'
                    : ((e.src === 'cal') ? 'cal' : 'ent')));
-          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [], prev: !!e.prev };
+          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [], prev: !!e.prev, entryNote: e.entryNote || '' };
         });
         return m;
       });
