@@ -96,6 +96,9 @@
   <div class="card"><div class="n">{{ $feedTodoCount }}</div><div class="t">まだアサインしていない</div></div>
 </div>
 
+{{-- 上の絞り込みが効いているときだけ出す一言（上の件数カードは絞る前の数のままなので、取り違えないように）。 --}}
+<p class="ef-intro" id="efFilteredNote" style="display:none; margin:0 0 8px;"></p>
+
 <div class="panel" style="padding:0; overflow-x:auto;">
   <table class="ef">
     <thead>
@@ -111,7 +114,12 @@
     </thead>
     <tbody>
       @forelse ($feedRows as $r)
-        <tr class="{{ $r['isNew'] ? 'is-new' : '' }}">
+        {{-- data-* は、上の絞り込み（見たい日・案件名・スタッフ名）で行を隠すための目印（2026-11-25）。
+             絞るのは entries.blade.php の filterFeed()。 --}}
+        <tr class="ef-row {{ $r['isNew'] ? 'is-new' : '' }}"
+            data-iso="{{ $r['iso'] ?? '' }}"
+            data-kw="{{ $r['projectName'] }} {{ $r['client'] }}"
+            data-staff="{{ $r['staffName'] }}">
           <td class="when">{{ $r['whenLabel'] }}</td>
           <td class="name">
             <strong>{{ $r['staffName'] }}</strong>
@@ -154,6 +162,8 @@
       @empty
         <tr><td colspan="7" class="ef-empty">この条件に合うエントリーはありません。</td></tr>
       @endforelse
+      {{-- 上の絞り込みで全部の行が隠れたときに出す行（ふだんは隠してある）。 --}}
+      <tr id="efFilteredEmpty" style="display:none;"><td colspan="7" class="ef-empty">上の絞り込み（見たい日・案件名・スタッフ名）に合うエントリーはありません。</td></tr>
     </tbody>
   </table>
 </div>

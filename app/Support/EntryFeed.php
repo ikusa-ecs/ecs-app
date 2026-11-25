@@ -133,6 +133,8 @@ class EntryFeed
                 'projectName' => $contentName ?: '（名称未定）',
                 'client'     => $p->client ?? '',
                 'date'       => $p->start_date ? $p->start_date->format('n/j') : '日付未定',
+                // 画面の「見たい日」で絞るための目印（開催日・2026-11-25）。
+                'iso'        => $p->start_date ? $p->start_date->format('Y-m-d') : '',
                 'dow'        => $p->start_date ? ['日', '月', '火', '水', '木', '金', '土'][(int) $p->start_date->dayOfWeek] : '',
                 'isExtra'    => StaffExtra::is($p),   // スタッフ画面の「追加」（区分とは別・2026-10-07）
                 'office'     => $p->office ?? '',

@@ -702,6 +702,7 @@
     } catch (e) {}
     // 新着タブの中身はサーバーが作って置いてあるので、画面のJSで作り直す必要はない。
     if (v !== 'feed') render();
+    else { try { filterFeed(); } catch (e) {} }   // 行を隠すだけ（上の絞り込みを新着にも効かせる）
   }
 
   function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -943,8 +944,40 @@
     render();
   }
 
+  // ===== 新着タブにも、上の絞り込みを効かせる（2026-11-25 小沼さん「見たい日でしぼっても新着がしぼれない」）=====
+  // ⚠ 新着の表はサーバーが作って置いてある＝作り直さず、合わない行を隠すだけ。
+  //    効かせるのは「見たい日（開催日）」「案件名・会社名」「スタッフ名」の3つ。
+  //    「この日から」は効かせない（はじめから今日が入っているので、何もしていないのに行が減って見えるため）。
+  function filterFeed(){
+    const rows = document.querySelectorAll('#view-feed tr.ef-row');
+    if (!rows.length) return;
+    const days = daysFilter();
+    const kw = document.getElementById('fKeyword').value.trim();
+    const st = staffFilter();
+    let shown = 0;
+    rows.forEach(tr => {
+      let ok = true;
+      if (days.size && !days.has(tr.dataset.iso || '')) ok = false;
+      if (ok && kw && !(tr.dataset.kw || '').includes(kw)) ok = false;
+      if (ok && st && !(tr.dataset.staff || '').includes(st)) ok = false;
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const filtering = days.size > 0 || !!kw || !!st;
+    const empty = document.getElementById('efFilteredEmpty');
+    if (empty) empty.style.display = (filtering && shown === 0) ? '' : 'none';
+    const note = document.getElementById('efFilteredNote');
+    if (note) {
+      note.style.display = filtering ? '' : 'none';
+      note.textContent = filtering
+        ? '上の絞り込みで ' + rows.length + ' 件のうち ' + shown + ' 件を出しています（上の件数は絞る前の数です）。'
+        : '';
+    }
+  }
+
   function render(){
     renderDayChips();
+    try { filterFeed(); } catch (e) {}
     const list = targetCases().filter(passFilter);
     renderSummary(list);
     if (currentView === 'bycase') renderByCase(list);
