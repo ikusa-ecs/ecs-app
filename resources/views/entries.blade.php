@@ -151,6 +151,7 @@
     table.mtx .colseries { font-size:10px; font-weight:700; color:#1d4e89; white-space:nowrap; }
     table.mtx .m-sr { display:inline-block; margin-left:2px; padding:0 4px; border-radius:6px; font-size:9.5px; font-weight:700; line-height:1.5; vertical-align:middle; }
     table.mtx .m-prev { margin-left:2px; font-size:10px; vertical-align:middle; }
+    table.mtx .m-note { margin-left:2px; font-size:10px; vertical-align:middle; cursor:help; }
     .e-badge.prev-badge { background:#e7f0e9; color:#3f7d52; }
     table.mtx .m-sr.all  { background:#15803d; color:#fff; }
     table.mtx .m-sr.part { background:#fff4e0; color:#b45309; border:1px solid #f0d3a6; }
@@ -1249,6 +1250,8 @@
                 : `<span class="m-sr part" title="同じイベント${srTotal}日のうち ${srOn}日だけエントリー（${escAttr(e.seriesOn.join('・'))}）">${srOn}/${srTotal}</span>`);
           // 前回も入った人（リピート・2026-11-16 小沼さん）。
           const pv = e.prev ? `<span class="m-prev" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました">🔁</span>` : '';
+          // 本人メモ（エントリーのときに本人が書いたひとこと）があれば 💬 を出す。カーソルを乗せると読める（2026-11-25 FB No.31）。
+          const nt = e.entryNote ? `<span class="m-note" title="本人メモ：${escAttr(e.entryNote)}">💬</span>` : '';
           const rmBtn = (st === 'fix' || st === 'tmp') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';
           const tip = st === 'fix' ? (pub ? '確定＋公開済み（×で解除・確認あり）' : '確定（外すには×）')
                     : st === 'tmp' ? 'クリックで確定／×で外す'
@@ -1261,9 +1264,9 @@
             body += `<td class="cell assignable ${cls}${(st==='fix'&&pub)?' is-pub':''}"`
               + ` data-pid="${esc(c.id)}" data-sid="${esc(e.id)}" data-role="${esc(e.role)}" data-state="${st}"`
               + ` data-pub="${pub?'1':''}" data-sname="${esc(name)}" data-cname="${escAttr(caseLabel(c))}"`
-              + ` title="${tip}">` + mark + pv + sr + lock + rmBtn + '</td>';
+              + ` title="${tip}">` + mark + pv + nt + sr + lock + rmBtn + '</td>';
           } else {
-            body += `<td class="cell">${mark}${pv}${sr}</td>`;
+            body += `<td class="cell">${mark}${pv}${nt}${sr}</td>`;
           }
         });
         body += `</tr>`;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Project;
+use App\Support\OfficeScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,10 @@ class AssignDetailController extends Controller
 
         // ② 案件指定なし（または見つからない）＝「アサインする案件を選ぶ」一覧を表示。
         $today = Carbon::today();
-        $projects = Project::with('director:id,name')
+        // 表示する拠点で絞る（2026-11-25 FB No.32・正本 OfficeScope）。はじめは自分の拠点。
+        // 他拠点から巻き取った・ヘルプで関わる案件も、ほかの画面と同じ決まりで出る。
+        $office = OfficeScope::filter($request);
+        $projects = OfficeScope::applyToProjects(Project::with('director:id,name'), $office)
             ->whereNotNull('start_date')
             ->notCancelled()   // キャンセルになった案件は「アサインする案件」に並べない（2026-10-21）
             ->whereNotIn('status', ['完了', '下書き'])

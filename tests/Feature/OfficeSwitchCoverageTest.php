@@ -40,6 +40,7 @@ class OfficeSwitchCoverageTest extends TestCase
         '/employee-assignments', // 社員別アサイン一覧（2026-10-13 に追加）
         '/sizes',               // サイズ一覧（2026-11-02 に追加）
         '/sf-inbox',            // Salesforce受信箱（2026-11-20 に追加）
+        '/assign-detail',       // 案件別アサイン（案件を選ぶ）（2026-11-25 に追加・FB No.32）
     ];
 
     private function admin(): Person

@@ -130,6 +130,15 @@ class AssignSheetController extends Controller
 
         $membersByProject = $assignments->groupBy('project_id');
 
+        // 本人メモ（エントリーのときに本人が書いたひとこと）。名前の横に 💬 で出す（2026-11-25 FB No.31）。
+        // メモが書いてある分だけ読む。「案件ID|人のID」=> メモ
+        $entryNotes = $projectIds->isEmpty()
+            ? collect()
+            : \App\Models\Application::whereIn('project_id', $projectIds)
+                ->whereNotNull('note')->where('note', '!=', '')
+                ->get(['project_id', 'staff_id', 'note'])
+                ->mapWithKeys(fn ($a) => [$a->project_id.'|'.$a->staff_id => (string) $a->note]);
+
         // 派遣依頼（2026-09-16）。メンバー欄の下に「派遣会社＋人数＋状況（依頼中など）」を出す。
         // ⚠ 名簿（people）には入らない人たちなので、assignments からは絶対に出てこない。
         //   読み方と見せ方の正本＝App\Support\DispatchRows。
@@ -166,13 +175,14 @@ class AssignSheetController extends Controller
             ->map(fn ($rows) => $rows->flatMap(fn ($r) => [$r->kind, $r->category,
                 $r->must ? '新人必修' : null, $r->recommend ? '新人推奨' : null])->filter()->unique()->values()->all());
 
-        $cards = $monthProjects->map(function (Project $p, int $i) use ($contentTags, $membersByProject, $dispatchesByProject, $slotsByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare) {
+        $cards = $monthProjects->map(function (Project $p, int $i) use ($contentTags, $membersByProject, $dispatchesByProject, $slotsByProject, $people, $contentNames, $reqByContent, $sharesByProject, $myOffice, $canManageShare, $entryNotes) {
             // メンバー行（assignments → {name, pos, status, type}）。Dが先頭に来るよう優先順で並べる。
             $members = ($membersByProject->get($p->id) ?? collect())
-                ->map(function ($a) use ($people) {
+                ->map(function ($a) use ($people, $entryNotes) {
                     $person = $people->get($a->staff_id);
 
                     return [
+                        'entryNote' => $entryNotes[$a->project_id.'|'.$a->staff_id] ?? '',   // 本人メモ（読むだけ）
                         'name' => $person->name ?? $a->staff_id,
                         'staffId' => $a->staff_id,
                         'roleCode' => $a->role ?: '',

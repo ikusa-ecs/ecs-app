@@ -125,6 +125,7 @@
   /* 人の名前で探したときの印。⚠ 黄色は「人数が足りない」の色なので使わない（2026-11-09 小沼さん）。 */
   .mblk .c-nm .m-nm-read.nm-hit { background: rgba(56, 189, 248, .35); outline: 2px solid #0ea5e9; border-radius: 3px; font-weight: 700; }
   .mblk .c-nm .emp { font-size: 9px; color: #b8875a; margin-left: 2px; }
+  .mblk .c-nm .m-enote { font-size: 10px; margin-left: 2px; cursor: help; }
   /* 社員の名前は部署の色（2026-10-19 baba）。イベプラ＝オレンジ／セールス＝紺／クリエイティブ＝黄緑。
      その他・未設定・スタッフは色なし。部署の見分けの正本＝App\Support\Departments::code。 */
   .mblk .c-nm .nm-dep.dep-plan,
@@ -801,6 +802,8 @@
               <span class="c-nm {{ $mSwap ? 'm-swappable' : '' }}"><span class="m-nm-read"><span class="nm-dep dep-{{ $m['dept'] ?? '' }}">{{ $m['name'] }}</span>@if($m['type'] === 'emp')<span class="emp">社員</span>@endif
                 @php $mHelp = (! empty($m['office']) && $c['office'] !== '' && $m['office'] !== $c['office']); @endphp
                 @if ($mHelp)<span class="m-help">{{ $m['office'] }}ヘルプ</span>@endif
+                {{-- 本人メモがあれば 💬。カーソルを乗せると読める（2026-11-25 FB No.31）。 --}}
+                @if (! empty($m['entryNote']))<span class="m-enote" title="本人メモ：{{ $m['entryNote'] }}">💬</span>@endif
                 @if ($m['status'] === '仮')<span class="st kari">仮</span>@endif
                 </span>
                 {{-- 編集モードでは名前も直せる（2026-10-05 baba要望「名前を入れたら変更できない」）。
