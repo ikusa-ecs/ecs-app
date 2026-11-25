@@ -26,6 +26,19 @@ class MonthAutoAssignTest extends TestCase
 {
     use RefreshDatabase;
 
+    // 月まとめ自動アサインは過ぎた日の案件を対象にしない（2026-11-25）。月の終わりに回しても落ちないよう、テストの「今日」を月初に固定する。
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Carbon::setTestNow(Carbon::today()->startOfMonth());
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     private function wish($staff, Carbon $day): void
     {
         ShiftPreference::create([
@@ -61,6 +74,36 @@ class MonthAutoAssignTest extends TestCase
         $this->assertSame(0, $plan['totals']['stillShort']);
         // ⚠ プレビューはDBを書き換えない。
         $this->assertSame(0, Assignment::count());
+    }
+
+    /**
+     * 過ぎた日の案件は対象にしない・チェック欄にも並べない（2026-11-25 小沼さん）。今日の案件は対象のまま。
+     * チェック欄はふだん畳んである（open=1 のときだけ開く）。
+     */
+    public function test_past_days_are_left_out_and_checks_are_folded(): void
+    {
+        $today = Carbon::today()->startOfMonth()->addDays(10);
+        Carbon::setTestNow($today);
+        $past = $today->copy()->subDays(3);
+        foreach ([[$past, 'PAST-CASE-X'], [$today, 'TODAY-CASE-X']] as [$day, $name]) {
+            ProjectFactory::new()->published()->create([
+                'start_date' => $day->format('Y-m-d'), 'required_count' => 1, 'office' => '東京', 'project_name' => $name,
+            ]);
+            $s = PersonFactory::new()->staff()->create(['office' => '東京']);
+            $this->wish($s, $day);
+        }
+
+        $engine = new MonthAutoAssign($today->format('Y-m'));
+        $this->assertSame([$today->format('Y-m-d')], array_keys($engine->candidateDays()));
+        $this->assertSame(['TODAY-CASE-X'], array_column($engine->candidateProjects(), 'name'));
+        $this->assertSame(1, $engine->plan()['totals']['added']);
+
+        $me = PersonFactory::new()->create(['permission' => 'manager', 'office' => '東京', 'must_onboard' => false]);
+        $url = '/auto-assign-month?period='.$today->format('Y-m');
+        $this->actingAsPerson($me)->get($url)->assertOk()
+            ->assertSee('TODAY-CASE-X')->assertDontSee('PAST-CASE-X')
+            ->assertSee('<details class="s-fold" >', false);
+        $this->actingAsPerson($me)->get($url.'&open=1')->assertOk()->assertSee('<details class="s-fold" open>', false);
     }
 
     /** ⚠ その日がNGの人は入れない。 */

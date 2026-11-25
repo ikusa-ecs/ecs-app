@@ -24,6 +24,19 @@ class NgPairsTest extends TestCase
 {
     use RefreshDatabase;
 
+    // 月まとめ自動アサインは過ぎた日の案件を対象にしない（2026-11-25）。月の終わりに回しても落ちないよう、テストの「今日」を月初に固定する。
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Carbon::setTestNow(Carbon::today()->startOfMonth());
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     private function wish($staff, Carbon $day): void
     {
         ShiftPreference::create([

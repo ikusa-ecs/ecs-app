@@ -45,6 +45,10 @@
     padding:10px 14px; margin:0 0 14px; }
   .am-skip .s-label { font-size:12.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:7px; }
   .am-skip .s-days { display:flex; flex-wrap:wrap; gap:6px; }
+  .am-skip .s-fold > summary { cursor:pointer; font-size:13px; font-weight:700; color:var(--ink); }
+  .am-skip .s-fold > summary .s-sum { font-size:12px; font-weight:400; color:var(--muted); margin-left:8px; }
+  .am-skip .s-fold > summary .s-sum b { color:var(--brand-dark); }
+  .am-skip .s-fold[open] > summary { margin-bottom:12px; }
   .am-skip .s-day { display:inline-flex; align-items:center; gap:4px; cursor:pointer;
     border:1px solid var(--line-strong,#d8c4ae); border-radius:8px; padding:4px 9px; font-size:12.5px; background:#fff; }
   .am-skip .s-day:hover { background:#f7f1e8; }
@@ -196,6 +200,20 @@
   <input type="hidden" name="period" value="{{ $period }}">
   {{-- ⚠ 全拠点（all）のときも必ず持っていく。省くと「はじめは自拠点」に戻ってしまう。 --}}
   <input type="hidden" name="office" value="{{ \App\Support\OfficeScope::param($officeScope) }}">
+  {{-- チェック欄はふだん畳んでおく（2026-11-25 小沼さん「チェックボックスがずらっと並んでいてとても邪魔」）。
+       開いてチェックすると画面を開き直すので、open=1 を一緒に送って開いたままにする（1つ押すたびに閉じると続けて選べない）。
+       メニューから開いたとき・「チェックを全部外す」を押したときは畳んだ状態に戻る。 --}}
+  <details class="s-fold" {{ request()->query('open') ? 'open' : '' }}>
+  <summary>
+    自動で入れない日・案件を選ぶ
+    <span class="s-sum">
+      @if (count($skipDays) > 0 || count($skipProjects) > 0)<b>いま 日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} を外しています</b>@else 外している日・案件はありません @endif
+      @if (count($handMade) > 0)／🖐 手で入っている案件 {{ count($handMade) }}件 @endif
+      @if (count($unpublished) > 0)／🔒 未公開 {{ count($unpublished) }}件 @endif
+      （押すと開きます）
+    </span>
+  </summary>
+  <input type="hidden" name="open" value="1">
   <span class="s-label">この日はアサインしない（チェックした日は自動で入れません）：</span>
   <div class="s-days">
     @foreach ($candidateDays as $day => $cnt)
@@ -263,6 +281,7 @@
   @if (count($skipDays) > 0 || count($skipProjects) > 0 || count($includeHandMade) > 0)
     <a class="s-clear" href="?{{ http_build_query(array_filter(['period' => $period, 'office' => \App\Support\OfficeScope::param($officeScope)])) }}">チェックを全部外す（日 {{ count($skipDays) }}・案件 {{ count($skipProjects) }} 除外中）</a>
   @endif
+  </details>
 </form>
 @endif
 

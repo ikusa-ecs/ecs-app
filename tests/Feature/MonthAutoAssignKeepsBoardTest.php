@@ -23,6 +23,19 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
 {
     use RefreshDatabase;
 
+    // 月まとめ自動アサインは過ぎた日の案件を対象にしない（2026-11-25）。月の終わりに回しても落ちないよう、テストの「今日」を月初に固定する。
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Carbon::setTestNow(Carbon::today()->startOfMonth());
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow(Carbon::today()->startOfMonth());
+        parent::tearDown();
+    }
+
     private function wish($staff, Carbon $day): void
     {
         ShiftPreference::create([
@@ -314,7 +327,7 @@ class MonthAutoAssignKeepsBoardTest extends TestCase
             'project_id' => $p->id, 'staff_id' => $edited->staff_id,
             'action' => 'assign', 'role' => 'MC', 'status' => '仮',
         ])->assertOk();
-        Carbon::setTestNow();
+        Carbon::setTestNow(Carbon::today()->startOfMonth());
 
         $run = \App\Models\AutoAssignRun::latest('id')->first();
         $this->actingAsPerson($me)->post('/auto-assign-month/undo', ['run_id' => $run->id])->assertRedirect();

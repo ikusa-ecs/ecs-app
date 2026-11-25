@@ -438,6 +438,7 @@ class MonthAutoAssign
     {
         return $this->monthProjects()
             ->filter(fn (Project $p) => ! $p->staff_published
+                && ! $p->start_date->lt(Carbon::today())   // 過ぎた日は並べない（2026-11-25）
                 && ! in_array($p->status, ['下書き', '完了'], true)
                 && $p->is_archived !== true)
             ->map(fn (Project $p) => [
@@ -475,6 +476,12 @@ class MonthAutoAssign
                     return false;
                 }
                 if (in_array($p->status, ['下書き', '完了'], true) || $p->is_archived === true) {
+                    return false;
+                }
+                // ⚠ 過ぎた日の案件には入れない・チェック欄にも並べない（2026-11-25 小沼さん）。
+                //    月の終わりごろに開くと、もう終わった日のチェックがずらっと並んで邪魔だった。
+                //    終わった案件に「仮」で人を足しても意味が無いので、下見・実行の対象からも外す。今日の案件は対象のまま。
+                if ($p->start_date->lt(Carbon::today())) {
                     return false;
                 }
                 // ⚠ **スタッフに公開していない案件は埋めない**（2026-09-09 baba要望）。
