@@ -318,6 +318,7 @@
                  background: #1d4e89; color: #fff; white-space: nowrap; vertical-align: middle; }
     html[data-theme="dark"] .grp-badge { background: var(--info-soft); color: var(--info-ink); }
     .ctag.repeat { background: #e7f0e9; color: #3f7d52; }
+    .prev-mark.past { background: #f1f3f1; color: #6b7f70; }
     .prev-mark { flex: none; margin-left: 3px; padding: 0 4px; border-radius: 6px; background: #e7f0e9; color: #3f7d52; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
     .dchg { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; background: var(--warn-soft); color: var(--warn-ink); white-space: nowrap; }
     .ymk { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; margin-left: 6px; }
@@ -2163,7 +2164,10 @@
   function repeatPrevHtml(c){
     const r = c.repeatPrev;
     if (!r) return '';
-    return `<span class="ctag repeat" title="リピート：前回の案件を見る" onclick="event.stopPropagation(); showRepeatPrev('${c.id}')" style="cursor:pointer;">🔁 前回 ${escHtml(r.date)}</span>`;
+    // カーソルを乗せると、前回のD・MCが読める（押すと、これまでのぶんも出る）。
+    const h0 = (r.roleHistory || [])[0];
+    const tip = h0 ? '前回のD：' + roleNames(h0.D) + '／MC：' + roleNames(h0.MC) + '（押すと、これまでのD・MCも出ます）' : 'リピート：前回の案件を見る';
+    return `<span class="ctag repeat" title="${escHtml(tip)}" onclick="event.stopPropagation(); showRepeatPrev('${c.id}')" style="cursor:pointer;">🔁 ${r.count ? r.count + '回目・' : ''}前回 ${escHtml(r.date)}</span>`;
   }
   // 前回も入った人の印（2026-11-16 小沼さん）。メンバーの行と候補の行の名前の横に出す。
   // ⚠ 前回かどうかはサーバーが決める（正本＝App\Support\RepeatHistory）。ここは照らし合わせるだけ。
@@ -2173,16 +2177,44 @@
     if (p.id && (r.staffIds || []).indexOf(String(p.id)) >= 0) return true;
     return !p.id && !!p.name && (r.staffNames || []).indexOf(p.name) >= 0;
   }
+  // このお客様の案件に過去何回入ったか（前回に入っていない人も数える・2026-11-25 小沼さん）。
+  // ⚠ 回数はサーバーが数える（正本＝App\Support\RepeatHistory・月で数える）。
+  function pastCount(c, p){
+    const r = c && c.repeatPrev;
+    if (!r || !p) return 0;
+    if (p.id) return (r.staffCounts || {})[String(p.id)] || 0;
+    return p.name ? ((r.nameCounts || {})[p.name] || 0) : 0;
+  }
+  // 人ごとの印：前回も入った人＝「🔁前回」（2回以上なら回数も）／前回は入っていないが前に入った人＝「🔁過去○回」。
   function prevMarkHtml(c, p){
-    return wasPrev(c, p) ? `<span class="prev-mark" title="前回（${escHtml(c.repeatPrev.date)}）もこのお客様の案件に入りました">🔁前回</span>` : '';
+    const n = pastCount(c, p);
+    if (wasPrev(c, p)) {
+      return `<span class="prev-mark" title="前回（${escHtml(c.repeatPrev.date)}）もこのお客様の案件に入りました。これまでに${n || 1}回">🔁前回${n > 1 ? '・計' + n + '回' : ''}</span>`;
+    }
+    if (n > 0) {
+      return `<span class="prev-mark past" title="前回（${escHtml(c.repeatPrev.date)}）は入っていませんが、このお客様の案件にこれまで${n}回入りました">🔁過去${n}回</span>`;
+    }
+    return '';
   }
   function showRepeatPrev(id){
     const c = (window.ECS_BOARD_CASES || []).find(x => x.id === id);
     const r = c && c.repeatPrev;
     if (!r) return;
     const who = (r.staffNames || []).length ? r.staffNames.join('、') : '（記録なし）';
-    alert('🔁 前回の案件：' + r.date + '「' + r.name + '」\n前回アサインされた人：\n' + who);
+    // これまでに入ったことがある人（回数の多い順）。
+    const nc = r.nameCounts || {};
+    const ever = Object.keys(nc).sort((a, b) => nc[b] - nc[a]).map(n => n + '（' + nc[n] + '回）');
+    // だれがD・MCだったか（2026-11-25 小沼さん）。先頭が前回、2件目からは「これまで」。
+    const hist = r.roleHistory || [];
+    const h0 = hist[0];
+    const older = hist.slice(1).map(h => h.date + '　D：' + roleNames(h.D) + '　MC：' + roleNames(h.MC));
+    alert('🔁 リピート：今回で' + (r.count || '?') + '回目\n前回の案件：' + r.date + '「' + r.name + '」'
+      + (h0 ? '\n前回のD：' + roleNames(h0.D) + '\n前回のMC：' + roleNames(h0.MC) : '')
+      + '\n前回アサインされた人：\n' + who
+      + (older.length ? '\n\nその前のD・MC：\n' + older.join('\n') : '')
+      + (ever.length ? '\n\nこれまでに入ったことがある人：\n' + ever.join('、') : ''));
   }
+  function roleNames(list){ return (list || []).length ? list.join('、') : '（記録なし）'; }
 
   // 実施形態のバッジ（2026-09-01 baba要望）。現地かオンラインかで声を掛ける人が変わるため、
   // アサインを詰めるこの画面にも出す。

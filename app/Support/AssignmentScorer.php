@@ -86,6 +86,17 @@ class AssignmentScorer
         $this->isMorning = $this->detectMorning($project);
     }
 
+    /** このお客様の案件に過去何回入ったか（人のID => 回数）。正本＝RepeatHistory の staffCounts。 */
+    private array $repeatCounts = [];
+
+    /** リピートの回数を渡す（2026-11-25・上乗せ制）。渡さなければ、前回入った人を1回として数える。 */
+    public function setRepeatCounts(array $counts): static
+    {
+        $this->repeatCounts = $counts;
+
+        return $this;
+    }
+
     /**
      * スタッフ1人を評価して返す。
      *
@@ -166,9 +177,18 @@ class AssignmentScorer
         // リピート案件で、このクライアントの過去案件にも出ていた＝継続性
         // 2026-11-16 小沼さん決定：+20→+30（「連日の他の日にもエントリー」と同じ重さ）。
         //   「リピート案件」のチェックは見ない＝前回があるかどうかは RepeatHistory が決める。
-        if (in_array((string) $id, array_map('strval', $this->repeatStaffIds), true)) {
-            $score += 30;
-            $reasons[] = 'リピート案件で前回も参加';
+        // 2026-11-25 小沼さん決定：**上乗せ制**。このお客様の案件に入った回数（RepeatHistory が月で数える）1回につき +10（上限 +40＝4回ぶん）。
+        //   前回も入った人は、さらに +20。＝前回だけ入った人は 10+20＝30 で今までと同じ／前回は入っていないが前に入った人にも点が付く。
+        $wasPrev = in_array((string) $id, array_map('strval', $this->repeatStaffIds), true);
+        $times = (int) ($this->repeatCounts[(string) $id] ?? 0);
+        if ($wasPrev && $times < 1) {
+            $times = 1;   // 回数をもらっていない呼び出しでも、前回入った人は1回として数える
+        }
+        if ($times > 0) {
+            $score += min($times, 4) * 10 + ($wasPrev ? 20 : 0);
+            $reasons[] = $wasPrev
+                ? 'リピート案件で前回も参加'.($times > 1 ? '（このお客様 '.$times.'回）' : '')
+                : 'このお客様の案件に過去'.$times.'回参加';
         }
         // この案件のコンテンツを経験している
         if ($this->hasContentExperience($p)) {

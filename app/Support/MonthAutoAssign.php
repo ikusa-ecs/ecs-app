@@ -589,11 +589,14 @@ class MonthAutoAssign
 
         // リピート案件の継続性＝同じクライアントの過去案件に出ていた人。
         // 正本＝RepeatHistory（前回の案件に入った人）。ここで数え直さない。
-        $repeatIds = RepeatHistory::staffIdsFor($p);
+        // 回数も渡す（2026-11-25 上乗せ制＝入った回数ぶん点を足す）。
+        $rep = RepeatHistory::forProjects([$p], false)[(string) $p->id] ?? [];
+        $repeatIds = $rep['staffIds'] ?? [];
 
         return (new AssignmentScorer(
             $p, $p->start_date, $wish, $sameDay, $monthCount, $repeatIds, $contentNames, self::MONTH_CAP
-        ))->setProjectMembers(array_keys($memberOf[$p->id] ?? []), $this->ngPairs ?? NgPairs::load())
+        ))->setRepeatCounts($rep['staffCounts'] ?? [])
+            ->setProjectMembers(array_keys($memberOf[$p->id] ?? []), $this->ngPairs ?? NgPairs::load())
             ->setStayNg($this->stayNg[$p->id] ?? []);
     }
 

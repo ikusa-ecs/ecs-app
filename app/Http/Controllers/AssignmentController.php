@@ -128,7 +128,9 @@ class AssignmentController extends Controller
         // ── 自動アサインの「頭脳」に渡す材料（C-5）──
         // リピート継続：このお客様の前回の案件に入った人（加点）。
         // 正本＝RepeatHistory（「リピート案件」のチェックが無くても前回があれば効く・2026-11-16 小沼さん）。
-        $repeatStaffIds = \App\Support\RepeatHistory::staffIdsFor($project);
+        // 回数も渡す（2026-11-25 上乗せ制＝入った回数ぶん点を足す）。
+        $repeatInfo = \App\Support\RepeatHistory::forProjects([$project], false)[(string) $project->id] ?? [];
+        $repeatStaffIds = $repeatInfo['staffIds'] ?? [];
         // コンテンツ経験の一致判定に使う「この案件のコンテンツ名」。
         $contentIds = is_array($project->content_ids) ? array_filter($project->content_ids) : [];
         $contentNames = $contentIds
@@ -151,7 +153,7 @@ class AssignmentController extends Controller
         $scorer = (new AssignmentScorer(
             $project, $date, $wish, $sameDay, $monthCount, $repeatStaffIds, $contentNames, self::MONTH_CAP,
             $seriesEntryIds
-        ))->setProjectMembers(array_keys($existing), $ngPairs)->setStayNg($stayNg)
+        ))->setRepeatCounts($repeatInfo['staffCounts'] ?? [])->setProjectMembers(array_keys($existing), $ngPairs)->setStayNg($stayNg)
             // アサイン率（その月に出られると示した日のうち入れた日の割合）が低い人を上へ（2026-11-11 小沼さん）。正本＝AssignRate
             ->setAssignRate($assignRate = $date ? AssignRate::forMonth($date) : []);
 

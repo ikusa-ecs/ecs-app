@@ -542,7 +542,7 @@
       series: c.series || null, seriesRoot: c.seriesRoot || '', groupDays: c.groupDays || null,
       // 確度・札（大型・オンライン・前泊・リピート）。⚠ 書き写さないと印が出ない（この画面はカードを作り直すつくり）。
       yomi: c.yomi, big: c.big, online: c.online, stay: c.stay, lodging: c.lodging,
-      repeat: c.repeat, repeatPrev: c.repeatPrev,
+      repeat: c.repeat, repeatPrev: c.repeatPrev, repeatCount: c.repeatCount, repeatRoles: c.repeatRoles || {},
       staffMeet: c.staffMeet, staffLeave: c.staffLeave, memo: c.memo,
       // スタッフ本人に伝えること（本人の「確定アサイン」の詳細にそのまま出る）
       meetDetail: c.meetDetail || '', belongings: c.belongings || '',
@@ -1037,7 +1037,7 @@
     if (c.big)    h += '<span class="big-mark">大型</span>';
     if (c.online) h += '<span class="fbadge fmt-online">オンライン</span>';
     if (c.stay)   h += `<span class="tag-mini stay">${escapeHtml(c.lodging || '前泊')}</span>`;
-    if (c.repeat) h += `<span class="tag-mini repeat" title="リピート案件です">🔁 リピート${c.repeatPrev ? '（前回 ' + escapeHtml(c.repeatPrev) + '）' : ''}</span>`;
+    if (c.repeat) h += `<span class="tag-mini repeat" title="リピート案件です${(c.repeatRoles || {}).all ? '&#10;これまでのD・MC：&#10;' + escapeHtml(c.repeatRoles.all).replace(/\n/g, '&#10;') : ''}">🔁 リピート${c.repeatCount ? ' ' + c.repeatCount + '回目' : ''}${c.repeatPrev ? '（前回 ' + escapeHtml(c.repeatPrev) + ((c.repeatRoles || {}).prev ? '・' + escapeHtml(c.repeatRoles.prev) : '') + '）' : ''}</span>`;
     return h;
   }
 

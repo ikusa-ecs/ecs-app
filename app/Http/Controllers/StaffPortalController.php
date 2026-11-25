@@ -875,8 +875,9 @@ class StaffPortalController extends Controller
                 // 画面側に書き足さなくてよい（正本＝ProjectFormats::ALL）。
                 'fmtText' => $format,
                 'scale' => $p->scale ?? '',
-                // 前回の札が出るときは、こちらの「リピート」は出さない（同じことを2つ並べない）。
-                'repeat' => (bool) $p->is_repeat && ! isset($repeatPrev[(string) $p->id]),
+                // ⚠ スタッフの画面の「リピート」は、下の repeatPrev（＝本人が入ったことがある案件）だけ（2026-11-25 小沼さん）。
+                //   入ったことがない人はリピートかどうかを知らないので、「リピート案件」のチェックだけでは札を出さない。
+                'repeat' => false,
                 'lodging' => $p->lodging ?? '無',
                 'dayType' => $p->date_type ?? '本番',
                 'parentId' => $p->parent_project_id,
@@ -888,8 +889,8 @@ class StaffPortalController extends Controller
                 // 同じイベントの全部の日（2日以上あるときだけ）。⚠ 募集していない日も入る＝画面で「募集前」と出す。
                 'groupDays' => count($groupDays[ProjectSeries::rootId($p)] ?? []) > 1 ? $groupDays[ProjectSeries::rootId($p)] : null,
                 'dateChange' => $dateChanges[(string) $p->id] ?? null,   // 日付が変わった印（旧→新・7日間）
-                // リピートの前回：前回の開催日と、この人が前回も入ったか（名前は出さない）。
-                'repeatPrev' => isset($repeatPrev[(string) $p->id]) ? [
+                // リピートの札：**この人が、このお客様の案件に入ったことがあるときだけ**出す（前回・前々回は問わない。名前は出さない）。
+                'repeatPrev' => ($repeatPrev[(string) $p->id]['staffCounts'][(string) $me->id] ?? 0) > 0 ? [
                     'date' => $repeatPrev[(string) $p->id]['date'],
                     'mine' => in_array((string) $me->id, $repeatPrev[(string) $p->id]['staffIds'], true),
                 ] : null,

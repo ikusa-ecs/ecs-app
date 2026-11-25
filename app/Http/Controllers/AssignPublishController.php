@@ -78,7 +78,8 @@ class AssignPublishController extends Controller
         // ⚠ 本番だけで数えると、リハ日を公開し忘れても「全日公開」に見える。
         $groupDays = ProjectSeries::daysFor($cases);
         // リピートの前回（日付だけ見せる。名前は社員・管理者の日別ボードで見る）。正本＝App\Support\RepeatHistory。
-        $repeatPrev = RepeatHistory::forProjects($cases, false);
+        // ⚠ 名前つきで引く（D・MCを出すため・2026-11-25 小沼さん）。この画面は社員・管理者だけ。
+        $repeatPrev = RepeatHistory::forProjects($cases);
 
         $cases = $cases->map(function (Project $p) use ($today, $office, $sharesByProject, $seriesGroups, $groupDays, $repeatPrev) {
             // off ＝ 今日から開催日まで何日後か（マイナス＝過去）。画面が日付・月分けに使う。
@@ -128,6 +129,8 @@ class AssignPublishController extends Controller
                 // チェックが無くても、前回があればリピート（2026-11-16 小沼さん・正本 RepeatHistory）。
                 'repeat'    => (bool) $p->is_repeat || isset($repeatPrev[(string) $p->id]),
                 'repeatPrev' => $repeatPrev[(string) $p->id]['date'] ?? null,
+                'repeatCount' => $repeatPrev[(string) $p->id]['count'] ?? null,   // 何回目のリピートか（2026-11-25）
+                'repeatRoles' => RepeatHistory::roleText($repeatPrev[(string) $p->id] ?? null),   // 前回のD・MCと、これまでのぶん
                 // 登録拠点と、その案件への関わりの札（2026-09-18）。
                 // ⚠ 文言は App\Support\ShareTags が正本（日別ボードと同じ言い方にそろえる）。
                 'office'    => (string) ($p->office ?? ''),

@@ -155,6 +155,8 @@
        ⚠ 黄色は人数不足・水色は検索の色なので使わない。 */
     table.mtx .m-note { display:inline-block; margin-left:2px; padding:0 4px; border-radius:6px; background:#7c3aed; color:#fff; font-size:9.5px; font-weight:700; line-height:1.5; vertical-align:middle; cursor:help; }
     .e-badge.prev-badge { background:#e7f0e9; color:#3f7d52; }
+    .e-badge.prev-badge.past { background:#f1f3f1; color:#6b7f70; }
+    table.mtx .m-prev.past { opacity:.45; }
     table.mtx .m-sr.all  { background:#15803d; color:#fff; }
     table.mtx .m-sr.part { background:#fff4e0; color:#b45309; border:1px solid #f0d3a6; }
     html[data-theme="dark"] table.mtx .colseries { color:var(--info-ink); }
@@ -810,11 +812,23 @@
   // ⚠ 前回かどうかはサーバーが決める（正本＝App\Support\RepeatHistory）。ここで判定しない。
   function repeatBadge(c){
     if (!c.repeatPrev) return '';
-    return `<span class="e-badge prev-badge" title="リピート：同じお客様の前回の案件があります。「🔁 前回も」が付いている人は前回も入りました">🔁 リピート（前回 ${esc(c.repeatPrev)}）</span>`;
+    // 何回目のリピートかも出す（2026-11-25 小沼さん）。回数は月で数える（同じ月の2案件・連日は1回）。
+    const nth = c.repeatCount ? ` ${c.repeatCount}回目` : '';
+    // 前回のD・MC（2026-11-25 小沼さん）。文はサーバーが作る（正本＝RepeatHistory::roleText）。
+    const rr = c.repeatRoles || {};
+    return `<span class="e-badge prev-badge" title="リピート：同じお客様の案件が今回で${escAttr(String(c.repeatCount || ''))}回目です。「🔁」が付いている人は、このお客様の案件に入ったことがあります${rr.all ? '&#10;これまでのD・MC：&#10;' + escAttr(rr.all).replace(/\n/g, '&#10;') : ''}">🔁 リピート${nth}（前回 ${esc(c.repeatPrev)}${rr.prev ? '・' + esc(rr.prev) : ''}）</span>`;
   }
+  // 人ごとの印（2026-11-25 小沼さん）：このお客様の案件に入ったことがある人ぜんぶに出す。
+  // 前回も入った人＝「🔁 前回も」（2回以上なら「・計○回」）／前回は入っていないが前に入った人＝「🔁 過去○回」。
   function prevTag(c, e){
-    if (!e.prev) return '';
-    return ` <span class="e-badge prev-badge" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました">🔁 前回も</span>`;
+    const n = e.prevCount || 0;
+    if (e.prev) {
+      return ` <span class="e-badge prev-badge" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました。これまでに${n || 1}回">🔁 前回も${n > 1 ? '・計' + n + '回' : ''}</span>`;
+    }
+    if (n > 0) {
+      return ` <span class="e-badge prev-badge past" title="前回（${escAttr(c.repeatPrev || '')}）は入っていませんが、このお客様の案件にこれまで${n}回入りました">🔁 過去${n}回</span>`;
+    }
+    return '';
   }
   function seriesTag(c, e){
     if (!c.groupDays) return '';
@@ -1194,7 +1208,7 @@
                    : (e.status === '仮' ? 'tmp'
                    : (e.wish === 'ng' ? 'ng'
                    : ((e.src === 'cal') ? 'cal' : 'ent')));
-          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [], prev: !!e.prev, entryNote: e.entryNote || '' };
+          m[e.name] = { st: st, id: e.id, role: e.roleCode || '', name: e.name, seriesOn: e.seriesOn || [], prev: !!e.prev, prevCount: e.prevCount || 0, entryNote: e.entryNote || '' };
         });
         return m;
       });
@@ -1217,7 +1231,8 @@
               ? `<span class="colseries" title="同じイベントの日：${escAttr(groupDaysText(c))}／全日＝全部の日にエントリーしている人数">🗓 ${esc(groupLabelOf(c))}・全日${all.filter(e => (e.seriesOn || []).length >= groupTotal(c)).length}名</span><br>`
               : '')
           + (c.repeatPrev
-              ? `<span class="colseries" title="リピート：同じお客様の前回の案件（${escAttr(c.repeatPrev)}）。🔁 が付いている人は前回も入りました">🔁 前回 ${esc(c.repeatPrev)}</span><br>`
+              ? `<span class="colseries" title="リピート：同じお客様の前回の案件（${escAttr(c.repeatPrev)}）。濃い🔁＝前回も入った人／うすい🔁＝前に入ったことがある人${(c.repeatRoles || {}).all ? '&#10;これまでのD・MC：&#10;' + escAttr(c.repeatRoles.all).replace(/\n/g, '&#10;') : ''}">🔁 ${c.repeatCount ? c.repeatCount + '回目・' : ''}前回 ${esc(c.repeatPrev)}</span><br>`
+              + ((c.repeatRoles || {}).prev ? `<span class="colseries">${esc(c.repeatRoles.prev)}</span><br>` : '')
               : '')
           + `<span class="colmeta">必${c.need}/応${entCnt}/空${calCnt}</span></th>`;
       });
@@ -1251,7 +1266,9 @@
                 ? `<span class="m-sr all" title="同じイベントの全${srTotal}日（リハ日なども含む）にエントリー">全</span>`
                 : `<span class="m-sr part" title="同じイベント${srTotal}日のうち ${srOn}日だけエントリー（${escAttr(e.seriesOn.join('・'))}）">${srOn}/${srTotal}</span>`);
           // 前回も入った人（リピート・2026-11-16 小沼さん）。
-          const pv = e.prev ? `<span class="m-prev" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました">🔁</span>` : '';
+          // 前回は入っていなくても、前に入ったことがある人にはうすい🔁（2026-11-25 小沼さん）。
+          const pv = e.prev ? `<span class="m-prev" title="前回（${escAttr(c.repeatPrev || '')}）もこのお客様の案件に入りました（これまでに${e.prevCount || 1}回）">🔁</span>`
+                   : (e.prevCount > 0 ? `<span class="m-prev past" title="前回は入っていませんが、このお客様の案件にこれまで${e.prevCount}回入りました">🔁</span>` : '');
           // 本人メモ（エントリーのときに本人が書いたひとこと）があれば 💬 を出す。カーソルを乗せると読める（2026-11-25 FB No.31）。
           const nt = e.entryNote ? `<span class="m-note" title="本人メモ：${escAttr(e.entryNote)}">メモ</span>` : '';
           const rmBtn = (st === 'fix' || st === 'tmp') ? ' <span class="m-x" title="このアサインを外す">×</span>' : '';

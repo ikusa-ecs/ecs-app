@@ -1787,7 +1787,7 @@
         let tags = '';
         // 日付が変わった印（7日間・2026-10-26）。旧→新を出す。全員に見える。
         // リピートの前回（2026-10-26）。前回アサインされた案件だと分かるように出す。
-        if (j.repeatPrev)           tags += '<span class="tag-mini repeat">🔁 前回アサインされた案件（' + j.repeatPrev.date + '）' + (j.repeatPrev.mine ? '・あなたも前回入りました' : '') + '</span>';
+        if (j.repeatPrev)           tags += '<span class="tag-mini repeat">🔁 リピート案件</span>';
         if (j.dateChange)           tags +='<span class="tag-mini dchg">📅 日付が変わりました（' + j.dateChange.from + '→' + j.dateChange.to + '）</span>';
         if (j.extra)                tags += '<span class="tag-mini add">追加</span>';
         // 自分の拠点ではない拠点の案件にだけ、その拠点名を出す（全部に付けるとじゃまなので）。
