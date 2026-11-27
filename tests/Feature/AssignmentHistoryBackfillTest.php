@@ -48,4 +48,34 @@ class AssignmentHistoryBackfillTest extends TestCase
         $this->assertSame('アサイン：変更', $rows[1]->field_label);
         $this->assertSame('今日確定した（MC・確定）', $rows[1]->new_value);
     }
+
+    /**
+     * 取込でまとめて入ったぶん（入れた人が「Claude確認用」）だけを履歴から消す（小沼さん 11/27）。
+     * 対象＝database/migrations/2026_11_27_000001_remove_import_rows_from_assignment_history.php
+     */
+    public function test_cleanup_removes_only_the_import_rows(): void
+    {
+        $project = ProjectFactory::new()->create();
+        $row = fn (string $who, string $source, string $field = 'assignment') => ProjectHistory::create([
+            'project_id' => $project->id, 'project_name' => 'テスト案件', 'action' => 'updated',
+            'field' => $field, 'field_label' => 'アサイン：入れた', 'old_value' => '（なし）',
+            'new_value' => 'だれか（MC・仮）', 'person_name' => $who, 'source' => $source,
+        ]);
+        $backfill = '後から起こした記録（11/25のぶん）';
+        $before = ProjectHistory::count();   // 案件を作ったときの履歴がすでにあることがある
+        $row('Claude確認用', $backfill);                              // 消す
+        $row('Claude確認用', $backfill);                              // 消す
+        $row('社員花子', $backfill);                                  // 同じ日に人が入れた＝残す
+        $row('Claude確認用', '案件別アサイン › アサインの保存');      // あとの本物の履歴＝残す
+        $row('Claude確認用', $backfill, 'project_name');              // アサイン以外＝残す
+
+        $migration = require database_path('migrations/2026_11_27_000001_remove_import_rows_from_assignment_history.php');
+        $migration->up();
+        $migration->up();   // 2回流しても同じ
+
+        $this->assertSame($before + 3, ProjectHistory::count());
+        $this->assertSame(0, ProjectHistory::where('field', 'assignment')->where('source', $backfill)
+            ->where('person_name', 'Claude確認用')->count());
+        $this->assertSame(1, ProjectHistory::where('person_name', '社員花子')->count());
+    }
 }
