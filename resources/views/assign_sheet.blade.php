@@ -962,7 +962,22 @@
     if (!card) return;
     card.classList.toggle('editing');
     btn.textContent = card.classList.contains('editing') ? '完了' : '✎編集';
+    // 「完了」を押したとき、案件の項目（運営人数・時間など）を直していたら画面を読み直す
+    // （2026-11-27 小沼さん「運営人数変えても保存されない」）。
+    // ⚠ 保存はできていたが、ふつうの表示（数字・上の「◯/◯名」・黄色い空き枠）が古いまま残り、
+    //   保存されていないように見えていた。読み直せば全部そろう。
+    // ⚠ 保存の通信が終わる前に読み直すと保存が途中で切れるので、終わるまで待つ。
+    if (!card.classList.contains('editing') && card.getAttribute('data-dirty') === '1') {
+      btn.textContent = '保存中…';
+      var tries = 0;
+      (function wait() {
+        if (ecsSheetPending > 0 && tries++ < 100) { setTimeout(wait, 100); return; }
+        ecsSheetReload();
+      })();
+    }
   }
+  // いま走っている「案件の項目の保存」の数（0になるまで読み直しを待つ）。
+  var ecsSheetPending = 0;
   // 変更したメンバーの役割/担当/巡回を assignments に保存する（送ったキーだけ更新）。
   function ecsSheetSave(inp, field, value) {
     var row = inp.closest('.mrow');
@@ -1144,12 +1159,16 @@
     var card = inp.closest('.acard');
     var pid = card && card.getAttribute('data-project');
     if (!pid) return;
+    card.setAttribute('data-dirty', '1');   // 「完了」で読み直す目印
+    ecsSheetPending++;
+    var done = false;
+    function finish() { if (!done) { done = true; ecsSheetPending = Math.max(0, ecsSheetPending - 1); } }
     fetch('/assign-sheet/project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ECS_CSRF, 'Accept': 'application/json' },
       body: JSON.stringify({ project_id: pid, field: field, value: value })
     })
-      .then(function (r) { return r.json(); })
+      .then(function (r) { finish(); return r.json(); })
       .then(function (res) {
         if (!(res && res.ok)) { alert('保存に失敗しました。' + (res && res.message ? '\n' + res.message : '')); return; }
         // 備考は、ふつうの表示も赤・太字つきで書き直す（開き直さなくても見た目が合うように）。
@@ -1161,7 +1180,7 @@
         // 備考の長さが変わったら「▼開く」を出すかどうかも見直す。
         if (field === 'note' && window.ecsSheetNoteMoreInit) { try { ecsSheetNoteMoreInit(); } catch (e) {} }
       })
-      .catch(function () { alert('通信エラーで保存できませんでした。'); });
+      .catch(function () { finish(); alert('通信エラーで保存できませんでした。'); });
   }
 
   // 移動・音響のチェックを付け外ししたら、選んでいるものを「+」でつないで保存する（2026-11-09）。
