@@ -50,6 +50,15 @@ class WorkSpan
         return $e - $s;
     }
 
+    /**
+     * 並べ替え用：集合の時刻を「0時からの分数」で返す。読めなければ null。
+     * （2026-11-27 小沼さん「同じ日は集合がはやい順に」・アサイン表）
+     */
+    public static function startMinutes(?string $start): ?int
+    {
+        return self::toMinutes($start);
+    }
+
     /** 「9:00」→ 540。読めなければ null。全角の数字・コロンも受ける。 */
     private static function toMinutes(?string $time): ?int
     {

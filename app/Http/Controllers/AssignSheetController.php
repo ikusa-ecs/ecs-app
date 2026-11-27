@@ -113,6 +113,15 @@ class AssignSheetController extends Controller
             ->whereDate('start_date', '<=', $monthFrom->copy()->endOfMonth()->format('Y-m-d'))
             ->orderBy('start_date')
             ->get()
+            // 同じ日は「集合がはやい順」（2026-11-27 小沼さん）。
+            // 集合が空・読めない案件はその日のいちばん後ろ。集合も同じなら登録した順（id）。
+            // ⚠ 時刻は自由記述なので文字のまま比べない（「9:00」が「10:00」より後ろになる）。
+            //   分数への読み替えは App\Support\WorkSpan が正本。
+            ->sortBy(fn ($p) => [
+                Carbon::parse($p->start_date)->format('Y-m-d'),
+                WorkSpan::startMinutes($p->start_time) ?? PHP_INT_MAX,
+                $p->id,
+            ])
             ->values();
 
         // メンバー（assignments・キャンセル除く）をまとめて引く。
