@@ -31,7 +31,7 @@ class AssignSheetHeadTagTest extends TestCase
 
         $this->assertStringContainsString('<span class="htag takeover" title="他拠点との巻き取り">大阪が巻き取り</span>', $html);
         $this->assertStringContainsString('<span class="htag yomi" title="ヨミ（受注の見込み）">Bヨミ</span>', $html);
-        $this->assertStringContainsString('<span class="htag extra">追加</span>', $html);
+        $this->assertStringContainsString('<span class="htag extra">追加案件</span>', $html);
         $this->assertSame(1, substr_count($html, 'class="htag yomi"'), '確定のヨミまで札になっている');
     }
 }

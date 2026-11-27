@@ -76,7 +76,9 @@
   .htag { font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,.22); }
   .htag.fill-ok { background: #2e9e6b; }
   .htag.fill-short { background: #e0692b; }
-  .htag.extra { background: rgba(0,0,0,.32); }
+  /* 追加案件＝白地に濃いピンクの字（小沼さん 11/27「もっとわかりやすい色に」）。頭の色が何色でも浮く。
+     ⚠ 橙＝仮・不足／黄＝ヨミ／緑＝充足／紫＝巻き取り と重ならない色にしてある。 */
+  .htag.extra { background: #fff; color: #be185d; box-shadow: 0 0 0 1.5px #be185d inset; }
   .htag.takeover { background: #6d28d9; color: #fff; }
   .htag.yomi { background: #fde68a; color: #7a4a00; }
   .htag.dtype { background: rgba(0,0,0,.30); }
@@ -222,6 +224,9 @@
   .mrow .m-remark-tag { display: block; font-size: 11px; font-weight: 700; color: var(--ink, #1f2937); line-height: 1.45;
     margin-top: 2px; padding-left: 5px; border-left: 3px solid #9ca3af; overflow-wrap: anywhere; }
   .acard.editing .mrow .m-remark-tag { display: none; }
+  /* 1行に2つの値を並べる行の、値の前の小さな見出し（規模／営業・物品／ケータ）。 */
+  .arow .sub-lbl { display: inline-block; font-size: 9px; font-weight: 700; color: var(--muted, #6b7280);
+    border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; margin-right: 3px; line-height: 1.4; vertical-align: 1px; }
   .mrow .m-remark { width: 100%; margin-top: 3px; font-size: 10px; padding: 1px 4px;
     border: 1px solid var(--line); border-radius: 5px; font-family: inherit; }
   .acard.editing .mrow .m-remark { display: block; }
@@ -241,8 +246,19 @@
   /* 必須が空の行は、ラベルのほうにも色を付ける（列が長いので札だけだと埋もれる）。 */
   .arow.miss-req   .lbl { color: #b91c1c; font-weight: 700; }
   .arow.miss-later .lbl { color: #b45309; font-weight: 700; }
+  /* アサインに要る項目（案件名・時間・会場住所・集合形式・移動・音響）が空＝濃い赤のベタ塗り
+     （小沼さん 11/27「未記入の場合はもっと目立つ色に」）。うすい赤・黄より強い。 */
+  .unfilled.strong { background: #dc2626; color: #fff; }
+  .arow.miss-strong .lbl { color: #dc2626; font-weight: 800; }
   /* 案件の備考は長くなることがあるので、枠の中でスクロールさせる（カードが伸びない）。 */
   .arow.note-row .val.pe-read { max-height: 68px; overflow-y: auto; white-space: pre-wrap; }
+  /* 長い備考は「▼開く」で全部見せる（小沼さん 11/27「備考が長い時開けられるように」）。
+     ボタンは枠におさまらないときだけ出す（JS の ecsSheetNoteMoreInit が .on を付ける）。 */
+  .arow.note-row .val.pe-read.open { max-height: none; overflow-y: visible; }
+  .arow.note-row .note-more { display: none; margin-top: 2px; padding: 0 2px; font-size: 9px; font-weight: 700; line-height: 1.5;
+    color: #2f6fb3; background: transparent; border: 1px solid currentColor; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+  .arow.note-row .note-more.on { display: inline-block; }
+  .acard.editing .arow.note-row .note-more { display: none; }
   /* 編集モードでは進行チェックのチップをクリックで切り替えられる（見た目のヒント）。 */
   .acard.editing .chips .chip-ck { cursor: pointer; }
   .pe-in { font-size: 10.5px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 5px;
@@ -567,9 +583,22 @@
         if ($c['article'] !== '') $jisseki[] = '記事:' . $c['article'];
         if ($c['video'] !== '') $jisseki[] = '動画:' . $c['video'];
 
+        // 2つの値を1行に並べる行は、値の前に小さな見出しを付ける（小沼さん 11/27「規模/営業 だと、
+        // どれが規模でどれが営業か分かりにくい」）。空のほうは「—」。値は必ず e() を通す（{!! !!} で出すため）。
+        // ⚠ 集合/解散・入/開/終 は今のまま（小沼さん指定）。
+        // $must＝空のとき「—」でなく赤い「未入力」を出す見出し（アサインに要る項目だけ）。
+        $pair = fn (array $items, array $must = []) => implode('　', array_map(
+          fn ($label, $value) => '<span class="sub-lbl">' . e($label) . '</span>'
+            . ($value !== '' ? e($value) : (in_array($label, $must, true) ? '<span class="unfilled strong">未入力</span>' : '—')),
+          array_keys($items), $items));
+
+        // 時間が入っていればそのまま、空なら濃い赤の「未入力」（集合/解散・入/開/終で使う）。
+        $timeOrMiss = fn ($v) => (string) $v !== '' ? e($v) : '<span class="unfilled strong">未入力</span>';
+
         $rows = [
           ['edit' => true, 'lbl' => '規模/営業',
             'read' => trim($c['scale'] . '　' . $c['sales']), 'empty' => ($c['scale'] === '' && $c['sales'] === ''),
+            'html' => $pair(['規模' => (string) $c['scale'], '営業' => (string) $c['sales']]),
             'inputs' => [['f' => 'scale', 'v' => $c['scale'], 'ph' => '規模', 'w' => 'wide'],
                          // 営業担当（2026-11-09）。社員の名前が候補に出る・一覧に無い名前もそのまま打てる。2人以上は「・」区切り。
                          ['f' => 'sales_owner', 'v' => $c['sales'], 'ph' => '営業担当', 'w' => 'wide', 'list' => 'ecsSalesList']]],
@@ -583,13 +612,19 @@
             'inputs' => [['f' => 'online_tool', 'v' => $c['onlineTool'], 'ph' => 'ツール'], ['f' => 'broadcast', 'v' => $c['broadcast'], 'ph' => '配信']]],
           // 拘束時間も出す（2026-09-28 baba要望）。計算の正本＝App\Support\WorkSpan。
           // ⚠ 時間の書き方が読めないときは拘束時間を出さない（推測で埋めない）。
-          ['edit' => true, 'lbl' => '集合/解散', 'sep' => '〜',
+          ['edit' => true, 'lbl' => '集合/解散', 'sep' => '〜', 'strong' => true,
             'read' => ($c['meet'] !== '' ? $c['meet'] : '—') . ' 〜 ' . ($c['leave'] !== '' ? $c['leave'] : '—')
                       . ($c['span'] !== '' ? '（拘束 ' . $c['span'] . '）' : ''),
+            // 片方だけ空でも、空のほうを濃い赤の「未入力」にする（小沼さん 11/27「片方だけでも赤くしたい」）。
+            'html' => $timeOrMiss($c['meet']) . ' 〜 ' . $timeOrMiss($c['leave'])
+                      . ($c['span'] !== '' ? '（拘束 ' . e($c['span']) . '）' : ''),
+            'anyEmpty' => ($c['meet'] === '' || $c['leave'] === ''),
             'empty' => ($c['meet'] === '' && $c['leave'] === ''),
             'inputs' => [['f' => 'start_time', 'v' => $c['meet'], 'ph' => '集合'], ['f' => 'end_time', 'v' => $c['leave'], 'ph' => '解散']]],
-          ['edit' => true, 'lbl' => '入/開/終', 'sep' => '/',
+          ['edit' => true, 'lbl' => '入/開/終', 'sep' => '/', 'strong' => true,
             'read' => ($c['enter'] !== '' ? $c['enter'] : '—') . '/' . ($c['evStart'] !== '' ? $c['evStart'] : '—') . '/' . ($c['evEnd'] !== '' ? $c['evEnd'] : '—'),
+            'html' => $timeOrMiss($c['enter']) . '/' . $timeOrMiss($c['evStart']) . '/' . $timeOrMiss($c['evEnd']),
+            'anyEmpty' => ($c['enter'] === '' || $c['evStart'] === '' || $c['evEnd'] === ''),
             'empty' => ($c['enter'] === '' && $c['evStart'] === '' && $c['evEnd'] === ''),
             'inputs' => [['f' => 'event_enter_time', 'v' => $c['enter'], 'ph' => '入'], ['f' => 'event_start_time', 'v' => $c['evStart'], 'ph' => '開'], ['f' => 'event_end_time', 'v' => $c['evEnd'], 'ph' => '終']]],
           // ⚠ 2026-09-28、言い方を案件登録に合わせた（baba要望）＝「客数」→人数／「組数」→チーム数。
@@ -605,25 +640,29 @@
           ['edit' => true, 'lbl' => '運営方式',
             'read' => $c['staffRole'], 'empty' => ($c['staffRole'] === ''),
             'inputs' => [['f' => 'staff_role', 'v' => $c['staffRole'], 'ph' => '運営方式', 'w' => 'wide']]],
-          ['edit' => true, 'lbl' => '音響',
-            'read' => $c['audio'], 'empty' => ($c['audio'] === ''),
-            'inputs' => [['f' => 'audio_equipment', 'v' => $c['audio'], 't' => 'pick', 'ph' => '音響', 'opts' => $pickAtoms('audio_equipment', $c['audio'])]]],
-          ['edit' => true, 'lbl' => '会場住所',
+          ['edit' => true, 'lbl' => '会場住所', 'strong' => true,
             'read' => $c['location'], 'empty' => ($c['location'] === ''),
             'inputs' => [['f' => 'location', 'v' => $c['location'], 'ph' => '会場住所', 'w' => 'wide']]],
-          ['edit' => true, 'lbl' => '集合形式', 'sep' => ' ',
+          ['edit' => true, 'lbl' => '集合形式', 'sep' => ' ', 'strong' => true,
             'read' => $c['assembly'] . ($c['alcohol'] !== '' ? ' 酒:' . $c['alcohol'] : ''), 'empty' => ($c['assembly'] === '' && $c['alcohol'] === ''),
+            // 集合形式が空だと「集合形式　酒:有」と読めてしまう（小沼さん 11/27・12/23 月島JFE）＝見出しを分ける。
+            'html' => $pair(['形式' => (string) $c['assembly'], '酒' => (string) $c['alcohol']], ['形式']),
             'inputs' => [['f' => 'assembly_type', 'v' => $c['assembly'], 'ph' => '集合形式'],
                          ['f' => 'alcohol', 'v' => $c['alcohol'], 't' => 'select', 'opts' => ['' => '酒—', '有' => '酒有', '無' => '酒無']]]],
           ['edit' => true, 'lbl' => '物品/ケータ',
             'read' => $c['goods'] . ($c['catering'] !== '' ? ' ' . $c['catering'] : ''), 'empty' => ($c['goods'] === '' && $c['catering'] === ''),
+            'html' => $pair(['物品' => (string) $c['goods'], 'ケータ' => (string) $c['catering']]),
             // 物品担当（2026-11-09）。社員から選ぶ。今の担当が退職などで名簿に無くても、選び直すまでは残す。
             'inputs' => [['f' => 'goods_owner_id', 'v' => $c['goodsId'], 't' => 'select', 'ph' => '物品担当',
                           'opts' => ['' => '物品担当—'] + ($c['goodsId'] !== '' ? [$c['goodsId'] => $c['goods'] !== '' ? $c['goods'] : $c['goodsId']] : []) + $goodsOpts],
                          ['f' => 'catering', 'v' => $c['catering'], 'ph' => 'ケータリング', 'w' => 'wide']]],
-          ['edit' => true, 'lbl' => '移動',
+          ['edit' => true, 'lbl' => '移動', 'strong' => true,
             'read' => $c['transport'], 'empty' => ($c['transport'] === ''),
             'inputs' => [['f' => 'transport', 'v' => $c['transport'], 't' => 'pick', 'ph' => '移動', 'opts' => $pickAtoms('transport', $c['transport'])]]],
+          // 音響は移動のすぐ下に並べる（小沼さん 11/27「音響は移動の横に」。それまでは運営方式の下）。
+          ['edit' => true, 'lbl' => '音響', 'strong' => true,
+            'read' => $c['audio'], 'empty' => ($c['audio'] === ''),
+            'inputs' => [['f' => 'audio_equipment', 'v' => $c['audio'], 't' => 'pick', 'ph' => '音響', 'opts' => $pickAtoms('audio_equipment', $c['audio'])]]],
           ['edit' => true, 'lbl' => '実績公開', 'sep' => ' ',
             'read' => implode(' ', $jisseki), 'empty' => ($c['logo'] === '' && $c['camera'] === '' && $c['article'] === '' && $c['video'] === ''),
             'inputs' => [['f' => 'pub_logo', 'v' => $c['logo'], 'ph' => 'ロゴ'], ['f' => 'pub_camera', 'v' => $c['camera'], 'ph' => 'カメ'], ['f' => 'pub_article', 'v' => $c['article'], 'ph' => '記事'], ['f' => 'pub_video', 'v' => $c['video'], 'ph' => '動画']]],
@@ -643,6 +682,12 @@
             $rows[$i]['miss'] = ($r['empty'] ?? false)
                 ? \App\Support\ProjectRequiredFields::levelOfRow(array_column($r['inputs'], 'f'))
                 : '';
+            // アサインに要る項目（時間・会場住所・集合形式・移動・音響）が空なら、段階に関係なく
+            // 濃い赤の「未入力」にする（小沼さん 11/27「もっと目立つ色に」）。この画面だけの見せ方＝
+            // 案件登録の赤・黄の段階（ProjectRequiredFields）は変えない。
+            $rows[$i]['strongMiss'] = ! empty($r['strong']) && ($r['empty'] ?? false);
+            // 行の見出し（左の字）は、1つでも空があれば赤くする（時間の「片方だけ空」も拾う）。
+            $rows[$i]['strongLbl'] = ! empty($r['strong']) && (($r['empty'] ?? false) || ! empty($r['anyEmpty']));
         }
         $anyPrep = $c['lineSent'] || $c['handover'] || $c['script'];
       @endphp
@@ -664,7 +709,7 @@
             {{-- 形式は入力したまま（イベント東(リアル)等）をバッジ表示。色は種別で自動（baba 2026-07-16）。 --}}
             @if ($c['format'] !== '')<span class="htag fmt">{{ $c['format'] }}</span>@endif
             @if ($c['dayType'] !== '本番')<span class="htag dtype">{{ $c['dayType'] }}</span>@endif
-            @if ($c['category'] === '追加案件')<span class="htag extra">追加</span>@endif
+            @if ($c['category'] === '追加案件')<span class="htag extra">追加案件</span>@endif
             {{-- 巻き取り・ヨミも実施形態の横に出す（2026-11-12 小沼さん）。ヨミは「確定」以外のときだけ（確定が大半で、全部に出すと目立たなくなる）。 --}}
             @if (($c['takeoverTag'] ?? '') !== '')<span class="htag takeover" title="他拠点との巻き取り">{{ $c['takeoverTag'] }}</span>@endif
             @if (($c['yomi'] ?? '') !== '' && $c['yomi'] !== '確定')<span class="htag yomi" title="ヨミ（受注の見込み）">{{ $c['yomi'] }}</span>@endif
@@ -681,7 +726,7 @@
         <div class="arow hl first">
           <span class="lbl">案件</span>
           {{-- 案件名を押したら案件の詳細（編集画面）へ（2026-08-21 baba） --}}
-          <span class="val pe-read"><a href="/project-form?project={{ urlencode($c['id']) }}" title="案件の詳細・編集を開く" style="color:inherit;">{{ $c['content'] }}</a></span>
+          <span class="val pe-read"><a href="/project-form?project={{ urlencode($c['id']) }}" title="案件の詳細・編集を開く" style="color:inherit;">@if (trim((string) $c['content']) !== ''){{ $c['content'] }}@else<span class="unfilled strong">未入力</span>@endif</a></span>
           <span class="val pe-edit"><input class="pe-in wide" type="text" value="{{ $c['projectName'] }}" placeholder="案件名" title="案件名（入れると保存）" onchange="ecsSheetSaveProject(this,'project_name',this.value)"></span>
         </div>
 
@@ -722,9 +767,9 @@
           @if (isset($r['edit']))
             {{-- ⚠ 空でも隠さない（2026-09-28 baba要望）。埋め忘れに気づけるよう「未入力」を出す。
                  miss-req／miss-later が付いた行はラベルにも色が付く。 --}}
-            <div class="arow pe-row {{ $r['cls'] ?? '' }} {{ $r['miss'] !== '' ? 'miss-' . ($r['miss'] === 'req' ? 'req' : 'later') : '' }}">
-              <span class="lbl">{{ $r['lbl'] }}</span>
-              <span class="val pe-read">@if ($r['read'] !== '')@if (isset($r['html'])){!! $r['html'] !!}@else{{ $r['read'] }}@endif @else<span class="unfilled {{ $r['miss'] === 'req' ? 'req' : ($r['miss'] === 'later' ? 'later' : '') }}">未入力</span>@endif</span>
+            <div class="arow pe-row {{ $r['cls'] ?? '' }} {{ $r['miss'] !== '' ? 'miss-' . ($r['miss'] === 'req' ? 'req' : 'later') : '' }} {{ $r['strongLbl'] ? 'miss-strong' : '' }}">
+              <span class="lbl">{{ $r['lbl'] }}@if (($r['cls'] ?? '') === 'note-row')<button type="button" class="note-more" title="長い備考を全部見る／たたむ" onclick="ecsSheetNoteToggle(this)">▼開く</button>@endif</span>
+              <span class="val pe-read">@if ($r['read'] !== '')@if (isset($r['html'])){!! $r['html'] !!}@else{{ $r['read'] }}@endif @else<span class="unfilled {{ $r['miss'] === 'req' ? 'req' : ($r['miss'] === 'later' ? 'later' : '') }} {{ $r['strongMiss'] ? 'strong' : '' }}">未入力</span>@endif</span>
               <span class="val pe-edit">
                 @foreach ($r['inputs'] as $ii => $in)
                   @if ($ii > 0 && ! empty($r['sep']))<span class="pe-sep">{{ $r['sep'] }}</span>@endif
@@ -1113,6 +1158,8 @@
           var read = row && row.querySelector('.pe-read');
           if (read) read.innerHTML = value.trim() !== '' ? window.ecsRichNote(value.trim()) : '<span class="unfilled">未入力</span>';
         }
+        // 備考の長さが変わったら「▼開く」を出すかどうかも見直す。
+        if (field === 'note' && window.ecsSheetNoteMoreInit) { try { ecsSheetNoteMoreInit(); } catch (e) {} }
       })
       .catch(function () { alert('通信エラーで保存できませんでした。'); });
   }
@@ -1212,6 +1259,27 @@
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
   })();
+  // ===== 長い備考を開く・たたむ（2026-11-27 小沼さん「備考が長い時開けられるようにしてほしい」） =====
+  // 「▼開く」は、備考が枠（68px）におさまらない案件にだけ出す。1件でこけても他の案件は続ける。
+  function ecsSheetNoteMoreInit() {
+    document.querySelectorAll('.arow.note-row').forEach(function (row) {
+      try {
+        var read = row.querySelector('.pe-read');
+        var btn = row.querySelector('.note-more');
+        if (!read || !btn) return;
+        if (read.classList.contains('open')) { btn.classList.add('on'); return; }
+        btn.classList.toggle('on', read.scrollHeight > read.clientHeight + 2);
+      } catch (e) {}
+    });
+  }
+  function ecsSheetNoteToggle(btn) {
+    var row = btn.closest('.pe-row');
+    var read = row && row.querySelector('.pe-read');
+    if (!read) return;
+    var open = read.classList.toggle('open');
+    btn.textContent = open ? '▲閉じる' : '▼開く';
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ecsSheetNoteMoreInit); else ecsSheetNoteMoreInit();
   // ===== スプシのようにダブルクリックで入力（2026-11-11 小沼さん「名前のところダブルクリックしたら入力できるように」） =====
   // メンバー・空き行をダブルクリックすると、そのカードを ✎編集 にして、押したところの入力欄（名前なら社員の選択欄）を開く。
   // D の行も同じ（2026-11-17）。⚠ アサインの行が無く写しだけで補ったDの行は名前の入力欄が無い＝編集の状態になるだけ。
