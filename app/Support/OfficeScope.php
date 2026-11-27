@@ -184,6 +184,34 @@ class OfficeScope
     }
 
     /**
+     * 「その拠点が運営する案件」だけに絞る（2026-11-27 小沼さん・派遣一覧）。
+     *
+     * 運営拠点＝巻き取りがあれば巻き取った拠点、無ければ登録した拠点。
+     *   ・東京の案件を名古屋が巻き取り → 名古屋にだけ出る（東京には出ない）
+     *   ・ヘルプで人を出しているだけの案件 → 運営は変わらないので、登録した拠点にだけ出る
+     *
+     * ⚠ 使うのは**派遣一覧だけ**。applyToProjects（＝共有された案件も見せる）とは別もの。
+     *   ほかの画面に広げるときは、先に小沼さんに確かめる。
+     * ⚠ $office が null（全拠点）のときは何もしない。拠点が空の案件は東京あつかい。
+     */
+    public static function operatedBy($query, ?string $office)
+    {
+        return $query->when($office, fn ($q) => $q->where(function ($qq) use ($office) {
+            // ① 自分の拠点で登録して、どこにも巻き取られていない案件
+            $qq->where(function ($own) use ($office) {
+                $own->where(function ($o) use ($office) {
+                    $o->where('office', $office);
+                    if ($office === self::DEFAULT_OFFICE) {
+                        $o->orWhereNull('office')->orWhere('office', '');
+                    }
+                })->whereDoesntHave('shares', fn ($s) => $s->where('kind', '巻き取り')->where('office', '!=', $office));
+            });
+            // ② 自分の拠点が巻き取った案件
+            $qq->orWhereHas('shares', fn ($s) => $s->where('kind', '巻き取り')->where('office', $office));
+        }));
+    }
+
+    /**
      * 「ほかの拠点に巻き取られた案件」を、登録拠点の画面から外す（2026-09-16 baba要望）。
      *
      * 巻き取り＝その拠点が運営を引き取る、という意味（ヘルプ＝人だけ出す、とは違う）。

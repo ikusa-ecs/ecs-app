@@ -46,8 +46,11 @@ class DispatchController extends Controller
         // 拠点で絞るのは案件（＝派遣は案件にぶら下がるもの）。
         // ⚠ 2026-10-09：派遣を頼んだ案件だけ読む（全部の案件を読むと、過去の取込で何千件にもなるため）。
         //   派遣はECSの日別ボードからしか入らないので件数は少ない＝「過去も」のときも軽いまま。
-        $projects = OfficeScope::applyToProjects(Project::query(), $office)
+        // ⚠ 2026-11-27 小沼さん：出すのは**運営拠点の案件だけ**。東京の案件を名古屋が巻き取ったら
+        //   名古屋の一覧にだけ出す（派遣を手配するのは運営する拠点なので）。全拠点表示のときは全部出る。
+        $projects = OfficeScope::operatedBy(Project::query(), $office)
             ->whereIn('id', ProjectDispatch::query()->select('project_id'))
+            ->with('director:id,name')   // 当日のD（2026-11-27 小沼さん）。案件ごとに引き直さない。
             ->get()
             ->keyBy('id');
 
@@ -87,6 +90,8 @@ class DispatchController extends Controller
                         'place' => $this->cityOf($p->location),
                         'location' => (string) ($p->location ?? ''),
                         'assembly' => (string) ($p->assembly_type ?? ''),
+                        // 当日のD（その案件のディレクター）。決まっていなければ空＝画面で「未定」と出す。
+                        'director' => (string) ($p->director->name ?? ''),
                         'need' => (int) ($p->required_count ?? 0),
                         'filled' => (int) ($filled[$d->project_id] ?? 0),
                         'office' => $p->office ?? '',

@@ -140,6 +140,7 @@
             <th>開催日</th>
             <th>案件</th>
             <th>会場</th>
+            <th>当日のD</th>
             <th>派遣先</th>
             <th>人数</th>
             <th>役割</th>
@@ -163,6 +164,9 @@
               <td>
                 {{ $r['place'] !== '' ? $r['place'] : '—' }}
                 @if ($r['assembly'])<div class="dl-sub">集合：{{ $r['assembly'] }}</div>@endif
+              </td>
+              <td class="nw">
+                @if ($r['director'] !== ''){{ $r['director'] }}@else<span class="dl-sub">未定</span>@endif
               </td>
               <td class="agency">
                 @if ($canEdit)

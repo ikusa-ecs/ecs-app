@@ -104,6 +104,60 @@ class DispatchListTest extends TestCase
             ->assertSee('テスト案件');
     }
 
+    /** 当日のD（その案件のディレクター）が出ること。決まっていなければ「未定」（2026-11-27 小沼さん）。 */
+    public function test_the_director_of_the_day_is_shown(): void
+    {
+        $d = PersonFactory::new()->create(['name' => 'でぃれくた花子', 'role' => 'employee', 'office' => '東京']);
+        $this->project('P-HASD');
+        \App\Models\Project::where('id', 'P-HASD')->update(['director_id' => $d->id]);
+        ProjectDispatch::create(['project_id' => 'P-HASD', 'agency' => 'A社', 'count' => 1, 'status' => DispatchStatus::ASKED]);
+
+        $this->actingAsPerson($this->emp())->get('/dispatch-list')
+            ->assertOk()
+            ->assertSee('当日のD')
+            ->assertSee('でぃれくた花子')
+            ->assertDontSee('<span class="dl-sub">未定</span>', false);
+
+        \App\Models\Project::where('id', 'P-HASD')->update(['director_id' => null]);
+        $this->actingAsPerson($this->emp())->get('/dispatch-list')
+            ->assertOk()
+            ->assertSee('<span class="dl-sub">未定</span>', false);
+    }
+
+    /**
+     * 出すのは運営拠点の案件だけ（2026-11-27 小沼さん）。
+     * 東京の案件を名古屋が巻き取ったら、東京の一覧には出さず、名古屋の一覧に出す。
+     */
+    public function test_only_projects_run_by_the_office_are_listed(): void
+    {
+        $mk = function (string $id, string $office, string $agency, ?array $share = null) {
+            $this->project($id, $office);
+            ProjectDispatch::create(['project_id' => $id, 'agency' => $agency, 'count' => 1, 'status' => DispatchStatus::ASKED]);
+            if ($share) {
+                \App\Models\ProjectShare::create(['project_id' => $id, 'office' => $share[0], 'kind' => $share[1]]);
+            }
+        };
+        $mk('P-OWN', '東京', 'じぶんの派遣');
+        $mk('P-GONE', '東京', 'なごやへ行った派遣', ['名古屋', '巻き取り']);
+        $mk('P-CAME', '大阪', 'とうきょうが引き取った派遣', ['東京', '巻き取り']);
+        $mk('P-HELPOUT', '東京', 'ヘルプをもらう派遣', ['名古屋', 'ヘルプ']);
+        $mk('P-HELPIN', '大阪', 'ヘルプに行くだけの派遣', ['東京', 'ヘルプ']);
+
+        $this->actingAsPerson($this->emp())->get('/dispatch-list')
+            ->assertOk()
+            ->assertSee('じぶんの派遣')
+            ->assertSee('とうきょうが引き取った派遣')
+            ->assertSee('ヘルプをもらう派遣')            // ヘルプは運営が変わらない＝東京のまま
+            ->assertDontSee('なごやへ行った派遣')        // 名古屋が運営
+            ->assertDontSee('ヘルプに行くだけの派遣');   // 大阪が運営
+
+        $this->actingAsPerson($this->emp('manager', '名古屋'))->get('/dispatch-list')
+            ->assertOk()
+            ->assertSee('なごやへ行った派遣')
+            ->assertDontSee('じぶんの派遣')
+            ->assertDontSee('ヘルプをもらう派遣');
+    }
+
     /** 人数・役割・状態・備考をあとから直せること。送っていない欄は触らないこと。 */
     public function test_a_row_can_be_fixed_without_wiping_other_fields(): void
     {
