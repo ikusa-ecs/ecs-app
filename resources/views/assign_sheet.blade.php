@@ -217,8 +217,10 @@
     border-radius: 5px; font-family: inherit; margin-left: 3px; }
   /* メンバーごとの備考（一言・自由記述）。保存先は assignments.remark＝他のアサイン画面の「備考（一言）」と同じもの。
      名前の下に1行使う（役割・担当・巡回の横に入れるとカードからはみ出すため）。 */
-  .mrow .m-remark-tag { display: block; font-size: 9.5px; color: #6b5544; line-height: 1.45;
-    overflow-wrap: anywhere; }
+  /* ⚠ 字は濃く・少し大きく（小沼さん 11/27「備考に書いた『確認中』が色が薄くてわかりづらい」）。
+     色で目立たせない（橙＝仮・黄＝人数不足・赤＝注意 の意味を変えないため）。左の線と太字で区別する。 */
+  .mrow .m-remark-tag { display: block; font-size: 11px; font-weight: 700; color: var(--ink, #1f2937); line-height: 1.45;
+    margin-top: 2px; padding-left: 5px; border-left: 3px solid #9ca3af; overflow-wrap: anywhere; }
   .acard.editing .mrow .m-remark-tag { display: none; }
   .mrow .m-remark { width: 100%; margin-top: 3px; font-size: 10px; padding: 1px 4px;
     border: 1px solid var(--line); border-radius: 5px; font-family: inherit; }
@@ -362,7 +364,7 @@
   html[data-theme="dark"] .mrow .st.kari { background: var(--warn-soft); color: var(--warn-ink); }
   html[data-theme="dark"] .mrow .mempty,
   html[data-theme="dark"] .mrow .m-tag { color: var(--muted); }
-  html[data-theme="dark"] .mrow .m-remark-tag { color: var(--muted); }
+  html[data-theme="dark"] .mrow .m-remark-tag { color: var(--ink); }
 
   /* 編集モードの入力欄 */
   html[data-theme="dark"] .mhead .m-edit-btn { background: var(--info-soft); color: var(--info-ink); }
@@ -414,7 +416,7 @@
   html[data-theme="orange"] .mrow .st.kari { background: #fff3e6; color: #b45309; }
   html[data-theme="orange"] .mrow .mempty,
   html[data-theme="orange"] .mrow .m-tag { color: #6b7280; }
-  html[data-theme="orange"] .mrow .m-remark-tag { color: #4b5563; }
+  html[data-theme="orange"] .mrow .m-remark-tag { color: #1f2937; }
 
   /* 拠点バッジ（この下の style ブロックで作っているもの）。
      ベタ塗りの茶・淡い橙は「仮」ではないのでグレーにする。自拠点・ヘルプの緑は残す。 */
@@ -496,7 +498,11 @@
     @if ($mNext)<a class="month-step" href="/assign-sheet?{{ http_build_query(array_filter(['office' => request('office'), 'month' => $mNext])) }}" title="次の月（案件のある月）">翌月 ▶</a>@else<span class="month-step off">翌月 ▶</span>@endif
   </form>
 
-  <input type="search" id="sheetSearch" placeholder="コンテンツ・種別（リアル／謎解き脱出など）・新人・顧客・人の名前で絞り込み" title="種別＝新人ページの難易度表の「種類」と「分類」。「新人」で、新人が経験したほうがいい（必修・推奨の）コンテンツの案件だけ残ります（「新人必修」「新人推奨」で片方だけ）" oninput="ecsSheetFilter()" style="min-width:190px;">
+  {{-- 欄の中の案内は短く、何で探せるかは欄の下に常に出す（小沼さん 11/27「途中で切れていてわかりづらい」）。 --}}
+  <span style="display:inline-flex; flex-direction:column; gap:2px; min-width:190px;">
+  <input type="search" id="sheetSearch" placeholder="🔍 絞り込み" title="種別＝新人ページの難易度表の「種類」と「分類」。「新人」で、新人が経験したほうがいい（必修・推奨の）コンテンツの案件だけ残ります（「新人必修」「新人推奨」で片方だけ）" oninput="ecsSheetFilter()" style="min-width:190px;">
+  <span style="font-size:10.5px; line-height:1.4; color:var(--muted, #6b7280);">コンテンツ・種別・顧客・人の名前・「新人」で探せます</span>
+  </span>
 
   <label class="chk"><input type="checkbox" id="sheetShort" onchange="ecsSheetFilter()"> 人数が足りない案件だけ（{{ $shortCount }}）</label>
 
